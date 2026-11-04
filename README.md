@@ -10,6 +10,8 @@
 </p>
 
 <p align="center">
+  <a href="https://benkl.github.io/filum/">Website</a> ·
+  <a href="https://github.com/benkl/filum/releases/latest"><b>Download for Windows</b></a> ·
   <a href="docs/wiki/Home.md">Wiki</a> ·
   <a href="docs/wiki/Getting-Started.md">Getting started</a> ·
   <a href="#build-it-yourself">Build it yourself</a> ·

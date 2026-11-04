@@ -4,7 +4,11 @@ This page gets Filum running and walks you through your first design.
 
 ## 1. Run Filum
 
-Filum is the same app everywhere: in a web browser, or as a desktop app for Windows, macOS and Linux. There are no published downloads yet, so for now you build it once from the source code. It takes a few minutes.
+Filum is the same app everywhere: in a web browser, or as a desktop app for Windows, macOS and Linux.
+
+**On Windows**, download the installer from the [latest release](https://github.com/benkl/filum/releases/latest) (or the [website](https://benkl.github.io/filum/)) and run it. The installer isn't code-signed yet, so if Windows shows "Windows protected your PC", choose *More info → Run anyway*.
+
+**On macOS, Linux or in the browser**, build it once from the source code. It takes a few minutes.
 
 ```bash
 npm install && npm --prefix ui install

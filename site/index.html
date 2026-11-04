@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Filum · a friendly machine-embroidery editor</title>
+  <meta name="description" content="Filum is a free, open-source machine-embroidery editor. Draw, auto-digitize pictures, letter with 134 embroidery fonts and watch the stitch-out before you sew. For Windows, macOS, Linux and the browser.">
+  <meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1d1c1f" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="canonical" href="https://benkl.github.io/filum/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Filum: a friendly machine-embroidery editor">
+  <meta property="og:description" content="Draw, digitize, letter and stitch out. Free and open source.">
+  <meta property="og:url" content="https://benkl.github.io/filum/">
+  <meta property="og:image" content="https://benkl.github.io/filum/img/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preload" href="fonts/Nunito-Variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="style.css">
+  <script>document.documentElement.classList.add("js")</script>
+  <script src="main.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="top">
+    <div class="wrap nav-inner">
+      <a class="brand" href="#top" aria-label="Filum home">
+        <img src="favicon.svg" width="32" height="32" alt="">
+        <span>Filum</span>
+      </a>
+      <nav aria-label="Main">
+        <ul class="nav-links">
+          <li><a href="#features">Features</a></li>
+          <li><a href="#formats">Formats</a></li>
+          <li><a href="https://github.com/benkl/filum/blob/main/docs/wiki/Home.md">Guide</a></li>
+          <li><a href="https://github.com/benkl/filum" class="gh" aria-label="Filum on GitHub">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.1c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 0-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.2.5-2.3 1.3-3.1-.2-.4-.6-1.6 0-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.7 1.6.2 2.8.1 3.2.8.8 1.3 1.9 1.3 3.1 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5Z"/></svg>
+            <span>GitHub</span></a></li>
+        </ul>
+      </nav>
+      <a class="btn btn-small" href="#download">Download</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- Hero -->
+    <section class="hero">
+      <div class="wrap hero-inner">
+        <div class="hero-copy">
+          <p class="eyebrow"><span class="dot" aria-hidden="true"></span> Free and open source · <span data-version>v0.1.0</span></p>
+          <h1>From a sketch to a <span class="stitched">stitch-out</span>.</h1>
+          <p class="lede">Filum is a machine-embroidery editor. Draw shapes, turn a picture into stitches, set a name in one of 134 embroidery fonts, and watch the design sew itself out on screen before it goes to your machine.</p>
+          <div class="cta">
+            <a class="btn btn-big" data-dl="exe" href="https://github.com/benkl/filum/releases/download/v0.1.0/Filum_0.1.0_x64-setup.exe">
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M3 5.5 10 4.5v7H3zM11 4.3 21 3v8.5H11zM3 12.5h7v7l-7-1zM11 12.5h10V21l-10-1.4z"/></svg>
+              <span>Download for Windows</span>
+            </a>
+            <a class="btn btn-ghost btn-big" href="https://github.com/benkl/filum">View the source</a>
+          </div>
+          <p class="fine"><span data-version>v0.1.0</span> · 64-bit installer · <a href="https://github.com/benkl/filum/blob/main/docs/wiki/Building-from-Source.md">macOS and Linux: build from source</a></p>
+        </div>
+
+        <figure class="hero-shot">
+          <div class="window">
+            <div class="window-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+            <picture>
+              <source srcset="img/editor-dark.webp" media="(prefers-color-scheme: dark)">
+              <img src="img/editor-light.webp" width="1800" height="1125" alt="The Filum editor: a mountain badge in the realistic view, with layers on the left and the design properties on the right" fetchpriority="high">
+            </picture>
+          </div>
+        </figure>
+      </div>
+    </section>
+
+    <!-- Three views -->
+    <section class="section views" id="features">
+      <div class="wrap">
+        <div class="section-head">
+          <p class="kicker">See it before you sew it</p>
+          <h2>One design, three ways of looking at it</h2>
+          <p>Switch views with <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>. The realistic view shows thread sheen and the weave of the fabric, so you can judge density and direction before the first needle drop.</p>
+        </div>
+        <figure class="views-figure">
+          <img src="img/views.webp" width="2100" height="700" loading="lazy" alt="The same mountain badge as vector shapes, as stitches, and as realistic thread on fabric">
+          <figcaption class="views-labels">
+            <span><kbd>1</kbd> Vector</span>
+            <span><kbd>2</kbd> Stitches</span>
+            <span><kbd>3</kbd> Realistic</span>
+          </figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <div class="seam" aria-hidden="true"></div>
+
+    <!-- Features -->
+    <section class="section">
+      <div class="wrap features">
+
+        <article class="feature">
+          <div class="feature-copy">
+            <p class="kicker">Auto-digitize</p>
+            <h3>Drop in a picture, get stitches back</h3>
+            <p>Pick a preset (Logo, Patch, Line art, Photo, Pixel art and more). Filum reduces the colours and chooses a stitch for every region: fills for areas, satin for strokes, running stitch for fine lines. Or switch the output to cross stitch.</p>
+            <p class="muted">The optional AI helpers run on your own device. Nothing is uploaded.</p>
+            <div class="toggle" role="tablist" aria-label="Digitizer output">
+              <button role="tab" aria-selected="true" aria-controls="dz-shapes" id="tab-shapes">Shapes</button>
+              <button role="tab" aria-selected="false" aria-controls="dz-cross" id="tab-cross">Cross stitch</button>
+            </div>
+          </div>
+          <div class="feature-media hoop">
+            <img id="dz-shapes" role="tabpanel" aria-labelledby="tab-shapes" src="img/digitize-shapes.webp" width="840" height="772" loading="lazy" alt="A cactus illustration digitized into fills and satin outlines, shown as realistic thread">
+            <img id="dz-cross" role="tabpanel" aria-labelledby="tab-cross" src="img/digitize-cross.webp" width="840" height="772" loading="lazy" alt="The same cactus digitized as cross stitch" hidden>
+          </div>
+        </article>
+
+        <article class="feature flip">
+          <div class="feature-copy">
+            <p class="kicker">Stitch types</p>
+            <h3>Every stitch you'd expect, and a few you wouldn't</h3>
+            <p>Satin columns come with underlay and pull compensation, tatami fills with gradient density. Fabric presets set sensible density, underlay and compensation for cotton, fleece, towels and knits.</p>
+            <ul class="chips" aria-label="Stitch types">
+              <li>Running</li><li>Bean</li><li>Motif</li><li>Satin</li><li>Tatami</li><li>Contour</li><li>Spiral</li><li>Sunburst</li><li>Stipple</li><li>Meander</li><li>Hilbert curve</li><li>Gradient</li><li>Appliqué</li><li>Cross stitch</li>
+            </ul>
+          </div>
+          <div class="feature-media">
+            <img src="img/closeup.webp" width="868" height="895" loading="lazy" alt="Close-up of the realistic view: a sunburst fill, satin snow caps and tatami mountains on cotton">
+          </div>
+        </article>
+
+        <article class="feature">
+          <div class="feature-copy">
+            <p class="kicker">Lettering</p>
+            <h3>134 fonts, digitized by hand</h3>
+            <p>The Ink/Stitch community fonts come bundled, with every letter already made of satin columns and underlay. You can also stitch your own TTF and OTF fonts, and set text on an arc or along a path.</p>
+          </div>
+          <div class="feature-media">
+            <img src="img/fonts.webp" width="1072" height="392" loading="lazy" alt="The Fonts dialog with embroidery, outline and system fonts">
+          </div>
+        </article>
+
+        <article class="feature flip">
+          <div class="feature-copy">
+            <p class="kicker">Stitch-out</p>
+            <h3>Watch it sew before your machine does</h3>
+            <p><b>Animate</b> plays the design stitch by stitch, in the order your machine will sew it. Scrub back and forth to check jumps and trims, or save the stitch-out as a video.</p>
+          </div>
+          <div class="feature-media hoop">
+            <img src="img/stitch-out.webp" width="720" height="700" loading="lazy" alt="The stitch-out preview halfway through the lake's fill">
+          </div>
+        </article>
+
+        <article class="feature">
+          <div class="feature-copy">
+            <p class="kicker">Production</p>
+            <h3>A pre-flight check on every export</h3>
+            <p>Before a file is written, Filum checks that the design fits the hoop and lists how each thread colour maps to your machine's colour table. Knockdown, basting, stitch-order optimising, test swatches and printed job sheets are all built in.</p>
+          </div>
+          <div class="feature-media">
+            <img src="img/export.webp" width="655" height="590" loading="lazy" alt="The export check: stitch count, colours, size and time, with each thread matched to the machine's colour table">
+          </div>
+        </article>
+
+      </div>
+    </section>
+
+    <div class="seam" aria-hidden="true"></div>
+
+    <!-- Formats -->
+    <section class="section formats" id="formats">
+      <div class="wrap">
+        <div class="section-head">
+          <p class="kicker">Opens almost anything</p>
+          <h2>Works with the machine you already have</h2>
+        </div>
+        <div class="format-grid">
+          <div>
+            <h3>Reads and writes</h3>
+            <ul class="chips chips-mono">
+              <li>DST</li><li>PES</li><li>JEF</li><li>EXP</li><li>VP3</li><li>XXX</li><li>U01</li><li>SEW</li><li>PEC</li><li>TBF</li><li>SVG</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Also reads</h3>
+            <ul class="chips chips-mono">
+              <li>HUS</li><li>SHV</li><li>PCS</li><li>KSM</li><li class="more">+ 26 more</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Also writes</h3>
+            <ul class="chips">
+              <li>G-code</li><li>PNG</li><li>Video</li><li>Thread lists</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Ink/Stitch -->
+    <section class="section">
+      <div class="wrap">
+        <div class="roots">
+          <div>
+            <p class="kicker">Built on Ink/Stitch</p>
+            <h2>Open source, and at home with Inkscape</h2>
+            <p>Filum's stitch engine is written in Rust and ports the algorithms of <a href="https://inkstitch.org">Ink/Stitch</a>, the open-source embroidery extension for Inkscape. Your Ink/Stitch SVGs open in Filum, and Filum's designs open in Inkscape.</p>
+            <p>Filum is free software under the GPL-3.0-or-later. No account, no subscription, and your designs stay on your computer.</p>
+          </div>
+          <ul class="facts">
+            <li><b>Rust</b><span>stitch engine, also compiled to WebAssembly</span></li>
+            <li><b>134</b><span>embroidery fonts included</span></li>
+            <li><b>40</b><span>machine file formats</span></li>
+            <li><b>GPL-3.0</b><span>free to use, study and change</span></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Download -->
+    <section class="section download" id="download">
+      <div class="wrap">
+        <div class="dl-card">
+          <img class="dl-icon" src="favicon.svg" width="72" height="72" alt="">
+          <h2>Get Filum</h2>
+          <p class="lede">Version <span data-version>0.1.0</span> for Windows 10 and 11 (64-bit).</p>
+          <div class="cta cta-center">
+            <a class="btn btn-big" data-dl="exe" href="https://github.com/benkl/filum/releases/download/v0.1.0/Filum_0.1.0_x64-setup.exe">
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M3 5.5 10 4.5v7H3zM11 4.3 21 3v8.5H11zM3 12.5h7v7l-7-1zM11 12.5h10V21l-10-1.4z"/></svg>
+              <span>Installer (.exe)</span>
+            </a>
+            <a class="btn btn-ghost btn-big" data-dl="msi" href="https://github.com/benkl/filum/releases/download/v0.1.0/Filum_0.1.0_x64_en-US.msi">MSI package</a>
+          </div>
+          <p class="fine">The installer isn't code-signed yet. If Windows shows "Windows protected your PC", choose <b>More info → Run anyway</b>. Checksums and notes are on the <a data-dl="page" href="https://github.com/benkl/filum/releases/tag/v0.1.0">release page</a>.</p>
+
+          <div class="build">
+            <h3>macOS, Linux or the browser</h3>
+            <p>Build it yourself with Rust, <code>wasm-bindgen-cli</code> and Node 20. <a href="https://github.com/benkl/filum/blob/main/docs/wiki/Building-from-Source.md">Full instructions</a></p>
+            <div class="code">
+              <pre><code>git clone https://github.com/benkl/filum && cd filum
+npm install && (cd ui && npm install)
+npm run wasm
+npm run desktop:build   # or: npm run dev</code></pre>
+              <button class="copy" type="button" aria-label="Copy the build commands">Copy</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <div class="brand brand-small">
+        <img src="favicon.svg" width="24" height="24" alt="">
+        <span>Filum</span>
+      </div>
+      <ul>
+        <li><a href="https://github.com/benkl/filum/blob/main/docs/wiki/Home.md">Guide</a></li>
+        <li><a href="https://github.com/benkl/filum/releases">Releases</a></li>
+        <li><a href="https://github.com/benkl/filum/issues">Report a problem</a></li>
+        <li><a href="https://github.com/benkl/filum/blob/main/LICENSE">Licence</a></li>
+      </ul>
+      <p class="muted">Made with thanks to the Ink/Stitch community.</p>
+    </div>
+  </footer>
+</body>
+</html>
