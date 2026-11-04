@@ -1,0 +1,1879 @@
+{
+ "sources": {
+  "inkstitch": {
+   "label": "Ink/Stitch",
+   "url": "https://github.com/inkstitch/inkstitch/tree/d22526223c2296044d9dd6145cc78de3bb0d5c75/palettes",
+   "license": "GPL-3.0-or-later"
+  },
+  "embroiderynerd": {
+   "label": "Embroidery Nerds",
+   "url": "https://github.com/Matthewenderle/Embroidery-Thread-Palette-Converter/tree/c91f86bbf711b90b511f9c9df2c58e677fe3b6be/corel-swatches",
+   "license": "none stated (\"provided for free\") — downloaded on request, not bundled"
+  },
+  "madeira": {
+   "label": "Madeira colour cards",
+   "url": "https://garne.madeira.de/fileadmin/user_upload/home/Farbkarten_2024/Colour_Card_COTONA.pdf",
+   "license": "sampled from Madeira's published colour cards (approximate screen colours)"
+  }
+ },
+ "charts": [
+  {
+   "id": "Admelody-Polyester",
+   "name": "Admelody Polyester",
+   "brand": "Admelody",
+   "source": "inkstitch",
+   "count": 320
+  },
+  {
+   "id": "Admelody-Rayon",
+   "name": "Admelody Rayon",
+   "brand": "Admelody",
+   "source": "inkstitch",
+   "count": 420
+  },
+  {
+   "id": "en/Amann_Saba",
+   "name": "Amann Saba",
+   "brand": "Amann",
+   "source": "embroiderynerd",
+   "count": 500,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Amann_Serafil",
+   "name": "Amann Serafil",
+   "brand": "Amann",
+   "source": "embroiderynerd",
+   "count": 78,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Anchor",
+   "name": "Anchor",
+   "brand": "Anchor",
+   "source": "inkstitch",
+   "count": 423
+  },
+  {
+   "id": "en/Angelking",
+   "name": "Angelking",
+   "brand": "Angelking",
+   "source": "embroiderynerd",
+   "count": 1281,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Angelking_5_Feel_Soft",
+   "name": "Angelking #5 Feel Soft",
+   "brand": "Angelking",
+   "source": "embroiderynerd",
+   "count": 136,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Angelking_6",
+   "name": "Angelking #6",
+   "brand": "Angelking",
+   "source": "embroiderynerd",
+   "count": 90,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Angelking_6_Half",
+   "name": "Angelking #6 Half",
+   "brand": "Angelking",
+   "source": "embroiderynerd",
+   "count": 90,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/ARC_Poly",
+   "name": "ARC Poly",
+   "brand": "ARC",
+   "source": "embroiderynerd",
+   "count": 288,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "ARC-Polyester",
+   "name": "ARC Polyester",
+   "brand": "ARC",
+   "source": "inkstitch",
+   "count": 288
+  },
+  {
+   "id": "en/ARC_Rayon",
+   "name": "ARC Rayon",
+   "brand": "ARC",
+   "source": "embroiderynerd",
+   "count": 288,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "ARC-Rayon",
+   "name": "ARC Rayon",
+   "brand": "ARC",
+   "source": "inkstitch",
+   "count": 288
+  },
+  {
+   "id": "en/AURIfil_Cotton",
+   "name": "AURIfil Cotton",
+   "brand": "Aurifil",
+   "source": "embroiderynerd",
+   "count": 270,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/AURIfil_Filato_Lana_12",
+   "name": "AURIfil Filato Lana 12",
+   "brand": "Aurifil",
+   "source": "embroiderynerd",
+   "count": 97,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Aurifil-Lana",
+   "name": "Aurifil Lana",
+   "brand": "Aurifil",
+   "source": "inkstitch",
+   "count": 106
+  },
+  {
+   "id": "Aurifil-Mako",
+   "name": "Aurifil Mako",
+   "brand": "Aurifil",
+   "source": "inkstitch",
+   "count": 158
+  },
+  {
+   "id": "Aurifil-Polyester",
+   "name": "Aurifil Polyester",
+   "brand": "Aurifil",
+   "source": "inkstitch",
+   "count": 204
+  },
+  {
+   "id": "Aurifil-Rayon",
+   "name": "Aurifil Rayon",
+   "brand": "Aurifil",
+   "source": "inkstitch",
+   "count": 180
+  },
+  {
+   "id": "Aurifil-Royal",
+   "name": "Aurifil Royal",
+   "brand": "Aurifil",
+   "source": "inkstitch",
+   "count": 499
+  },
+  {
+   "id": "en/Aurilux",
+   "name": "Aurilux",
+   "brand": "Aurilux",
+   "source": "embroiderynerd",
+   "count": 204,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/BFC",
+   "name": "BFC",
+   "brand": "BFC",
+   "source": "embroiderynerd",
+   "count": 352,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "BFC-Polyester",
+   "name": "BFC Polyester",
+   "brand": "BFC",
+   "source": "inkstitch",
+   "count": 320
+  },
+  {
+   "id": "en/Brildor",
+   "name": "Brildor",
+   "brand": "Brildor",
+   "source": "embroiderynerd",
+   "count": 175,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Brildor-AC",
+   "name": "Brildor AC",
+   "brand": "Brildor",
+   "source": "inkstitch",
+   "count": 120
+  },
+  {
+   "id": "Brildor-CO",
+   "name": "Brildor CO",
+   "brand": "Brildor",
+   "source": "inkstitch",
+   "count": 70
+  },
+  {
+   "id": "Brildor-MF",
+   "name": "Brildor MF",
+   "brand": "Brildor",
+   "source": "inkstitch",
+   "count": 210
+  },
+  {
+   "id": "Brildor-NY",
+   "name": "Brildor NY",
+   "brand": "Brildor",
+   "source": "inkstitch",
+   "count": 180
+  },
+  {
+   "id": "Brildor-PB",
+   "name": "Brildor PB",
+   "brand": "Brildor",
+   "source": "inkstitch",
+   "count": 260
+  },
+  {
+   "id": "Brother-Country",
+   "name": "Brother Country",
+   "brand": "Brother",
+   "source": "inkstitch",
+   "count": 61
+  },
+  {
+   "id": "Brother-Embroidery",
+   "name": "Brother Embroidery",
+   "brand": "Brother",
+   "source": "inkstitch",
+   "count": 61
+  },
+  {
+   "id": "Brothread-40",
+   "name": "Brothread 40",
+   "brand": "Brother",
+   "source": "inkstitch",
+   "count": 40
+  },
+  {
+   "id": "Brothread-80",
+   "name": "Brothread 80",
+   "brand": "Brother",
+   "source": "inkstitch",
+   "count": 78
+  },
+  {
+   "id": "en/BrothreadBrother_Country",
+   "name": "Brothread/Brother Country",
+   "brand": "Brother",
+   "source": "embroiderynerd",
+   "count": 61,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/BrothreadBrother_Fleshtone",
+   "name": "Brothread/Brother Fleshtone",
+   "brand": "Brother",
+   "source": "embroiderynerd",
+   "count": 10,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/BrothreadBrother_Metallic",
+   "name": "Brothread/Brother Metallic",
+   "brand": "Brother",
+   "source": "embroiderynerd",
+   "count": 15,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/BrothreadBrother_Poly",
+   "name": "Brothread/Brother Poly",
+   "brand": "Brother",
+   "source": "embroiderynerd",
+   "count": 61,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/New_Brothreads_Polyester",
+   "name": "New Brothreads Polyester",
+   "brand": "Brother",
+   "source": "embroiderynerd",
+   "count": 38,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Candle_Polyester",
+   "name": "Candle Polyester",
+   "brand": "Candle",
+   "source": "embroiderynerd",
+   "count": 879,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Candle_Viscose_Rayon",
+   "name": "Candle Viscose Rayon",
+   "brand": "Candle",
+   "source": "embroiderynerd",
+   "count": 719,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Coats-Alcazar",
+   "name": "Coats Alcazar",
+   "brand": "Coats",
+   "source": "inkstitch",
+   "count": 500
+  },
+  {
+   "id": "en/Coats_Alcazar_Global_Rayon",
+   "name": "Coats Alcazar Global Rayon",
+   "brand": "Coats",
+   "source": "embroiderynerd",
+   "count": 500,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Coats-Alcazar-Jazz",
+   "name": "Coats Alcazar Jazz",
+   "brand": "Coats",
+   "source": "inkstitch",
+   "count": 304
+  },
+  {
+   "id": "Coats-Sylko",
+   "name": "Coats Sylko",
+   "brand": "Coats",
+   "source": "inkstitch",
+   "count": 399
+  },
+  {
+   "id": "en/Coats_Sylko_Brazil_Polyester",
+   "name": "Coats Sylko Brazil Polyester",
+   "brand": "Coats",
+   "source": "embroiderynerd",
+   "count": 221,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Coats_Sylko_Global_Polyester",
+   "name": "Coats Sylko Global Polyester",
+   "brand": "Coats",
+   "source": "embroiderynerd",
+   "count": 399,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Coats-Sylko-USA",
+   "name": "Coats Sylko USA",
+   "brand": "Coats",
+   "source": "inkstitch",
+   "count": 303
+  },
+  {
+   "id": "en/Colourful_Thread",
+   "name": "Colourful Thread",
+   "brand": "Colourful Thread",
+   "source": "embroiderynerd",
+   "count": 270,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Cotone_Mako_Contone_Mako",
+   "name": "Cotone Mako Contone Mako",
+   "brand": "Cotone Mako",
+   "source": "embroiderynerd",
+   "count": 144,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/DMC",
+   "name": "DMC",
+   "brand": "DMC",
+   "source": "embroiderynerd",
+   "count": 360,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "DMC",
+   "name": "DMC",
+   "brand": "DMC",
+   "source": "inkstitch",
+   "count": 458
+  },
+  {
+   "id": "en/Durak_Polysoft_40",
+   "name": "Durak Polysoft 40",
+   "brand": "Durak",
+   "source": "embroiderynerd",
+   "count": 420,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Elchel",
+   "name": "Elchel",
+   "brand": "Elchel",
+   "source": "embroiderynerd",
+   "count": 295,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Embellish_Flawless",
+   "name": "Embellish Flawless",
+   "brand": "Embellish",
+   "source": "embroiderynerd",
+   "count": 120,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Embellish_Matte_Thread",
+   "name": "Embellish Matte Thread",
+   "brand": "Embellish",
+   "source": "embroiderynerd",
+   "count": 130,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Embellish_Metallic",
+   "name": "Embellish Metallic",
+   "brand": "Embellish",
+   "source": "embroiderynerd",
+   "count": 10,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Embro_Embroidery",
+   "name": "Embro Embroidery",
+   "brand": "Embro",
+   "source": "embroiderynerd",
+   "count": 61,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Embro_Wire_S-55",
+   "name": "Embro Wire S-55",
+   "brand": "Embro",
+   "source": "embroiderynerd",
+   "count": 468,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Embroidery_Service_Polyfil",
+   "name": "Embroidery Service Polyfil",
+   "brand": "Embroidery Service",
+   "source": "embroiderynerd",
+   "count": 198,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Embroidex",
+   "name": "Embroidex",
+   "brand": "Embroidex",
+   "source": "inkstitch",
+   "count": 258
+  },
+  {
+   "id": "Emmel",
+   "name": "Emmel",
+   "brand": "Emmel",
+   "source": "inkstitch",
+   "count": 521
+  },
+  {
+   "id": "en/Exquisite_Poly_1000M",
+   "name": "Exquisite Poly 1000M",
+   "brand": "Exquisite",
+   "source": "embroiderynerd",
+   "count": 282,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Exquisite_Poly_5000M",
+   "name": "Exquisite Poly 5000M",
+   "brand": "Exquisite",
+   "source": "embroiderynerd",
+   "count": 142,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Fil-Tec_Glide",
+   "name": "Fil-Tec Glide",
+   "brand": "Fil-Tec",
+   "source": "embroiderynerd",
+   "count": 361,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Fil-Tec-Glide",
+   "name": "Fil-Tec Glide",
+   "brand": "Fil-Tec",
+   "source": "inkstitch",
+   "count": 213
+  },
+  {
+   "id": "en/Filato_Lana_-_T_12",
+   "name": "Filato Lana T 12",
+   "brand": "Filato",
+   "source": "embroiderynerd",
+   "count": 133,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Filtex_Card_10195_Rayon",
+   "name": "Filtex Card 10195 Rayon",
+   "brand": "Filtex",
+   "source": "embroiderynerd",
+   "count": 124,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Filtex_Card_Schiffli",
+   "name": "Filtex Card Schiffli",
+   "brand": "Filtex",
+   "source": "embroiderynerd",
+   "count": 84,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Filtex_Schiffli",
+   "name": "Filtex Schiffli",
+   "brand": "Filtex",
+   "source": "embroiderynerd",
+   "count": 75,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Floriani",
+   "name": "Floriani",
+   "brand": "Floriani",
+   "source": "embroiderynerd",
+   "count": 360,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Floriani_Glow_in_the_Dark",
+   "name": "Floriani Glow in the Dark",
+   "brand": "Floriani",
+   "source": "embroiderynerd",
+   "count": 5,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Floriani_Metallic",
+   "name": "Floriani Metallic",
+   "brand": "Floriani",
+   "source": "embroiderynerd",
+   "count": 17,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Floriani-Polyester",
+   "name": "Floriani Polyester",
+   "brand": "Floriani",
+   "source": "inkstitch",
+   "count": 286
+  },
+  {
+   "id": "en/Floriani_Polyester_Embroidery_12wt",
+   "name": "Floriani Polyester Embroidery 12wt",
+   "brand": "Floriani",
+   "source": "embroiderynerd",
+   "count": 30,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Floriani_Variegated_and_Mixed",
+   "name": "Floriani Variegated and Mixed",
+   "brand": "Floriani",
+   "source": "embroiderynerd",
+   "count": 53,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "FuFu-Polyester",
+   "name": "FuFu Polyester",
+   "brand": "FuFu",
+   "source": "inkstitch",
+   "count": 713
+  },
+  {
+   "id": "en/Fufu_Rayon",
+   "name": "Fufu Rayon",
+   "brand": "FuFu",
+   "source": "embroiderynerd",
+   "count": 425,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "FuFu-Rayon",
+   "name": "FuFu Rayon",
+   "brand": "FuFu",
+   "source": "inkstitch",
+   "count": 713
+  },
+  {
+   "id": "en/Gem",
+   "name": "Gem",
+   "brand": "Gem",
+   "source": "embroiderynerd",
+   "count": 423,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Gunold_Cotty_12",
+   "name": "Gunold Cotty 12",
+   "brand": "Gunold",
+   "source": "embroiderynerd",
+   "count": 145,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Gunold_Cotty_30",
+   "name": "Gunold Cotty 30",
+   "brand": "Gunold",
+   "source": "embroiderynerd",
+   "count": 188,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Gunold_Filaine_12",
+   "name": "Gunold Filaine 12",
+   "brand": "Gunold",
+   "source": "embroiderynerd",
+   "count": 129,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Gunold_Glitter_30",
+   "name": "Gunold Glitter 30",
+   "brand": "Gunold",
+   "source": "embroiderynerd",
+   "count": 24,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Gunold_Glowy_40",
+   "name": "Gunold Glowy 40",
+   "brand": "Gunold",
+   "source": "embroiderynerd",
+   "count": 7,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Gunold_Mety_5-2_30",
+   "name": "Gunold Mety 5-2 30",
+   "brand": "Gunold",
+   "source": "embroiderynerd",
+   "count": 38,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Gunold_Mety_7-2_40",
+   "name": "Gunold Mety 7-2 40",
+   "brand": "Gunold",
+   "source": "embroiderynerd",
+   "count": 8,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Gunold_Mono_40",
+   "name": "Gunold Mono 40",
+   "brand": "Gunold",
+   "source": "embroiderynerd",
+   "count": 2,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Gunold_Poly_Fire_40",
+   "name": "Gunold Poly Fire 40",
+   "brand": "Gunold",
+   "source": "embroiderynerd",
+   "count": 27,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Gunold_Poly_Flash_40",
+   "name": "Gunold Poly Flash 40",
+   "brand": "Gunold",
+   "source": "embroiderynerd",
+   "count": 23,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Gunold_Poly_Sparkle_Star_30",
+   "name": "Gunold Poly Sparkle (Star) 30",
+   "brand": "Gunold",
+   "source": "embroiderynerd",
+   "count": 54,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Gunold_Poly40",
+   "name": "Gunold Poly40",
+   "brand": "Gunold",
+   "source": "embroiderynerd",
+   "count": 300,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Gunold_Poly60",
+   "name": "Gunold Poly60",
+   "brand": "Gunold",
+   "source": "embroiderynerd",
+   "count": 54,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Gunold-Polyester",
+   "name": "Gunold Polyester",
+   "brand": "Gunold",
+   "source": "inkstitch",
+   "count": 300
+  },
+  {
+   "id": "en/Gunold_Reflex_Cry_30",
+   "name": "Gunold Reflex Cry 30",
+   "brand": "Gunold",
+   "source": "embroiderynerd",
+   "count": 1,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Gunold_Stickma_Luny_12",
+   "name": "Gunold Stickma Luny 12",
+   "brand": "Gunold",
+   "source": "embroiderynerd",
+   "count": 76,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Gunold_Stickma_Poly",
+   "name": "Gunold Stickma Poly",
+   "brand": "Gunold",
+   "source": "embroiderynerd",
+   "count": 130,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Gunold_Stickma_Sierra",
+   "name": "Gunold Stickma Sierra",
+   "brand": "Gunold",
+   "source": "embroiderynerd",
+   "count": 153,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Gunold_Stickma_Sulky",
+   "name": "Gunold Stickma Sulky",
+   "brand": "Gunold",
+   "source": "embroiderynerd",
+   "count": 198,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Gunold_Sulky_30",
+   "name": "Gunold Sulky 30",
+   "brand": "Gunold",
+   "source": "embroiderynerd",
+   "count": 156,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Gunold_Sulky_40",
+   "name": "Gunold Sulky 40",
+   "brand": "Gunold",
+   "source": "embroiderynerd",
+   "count": 390,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Gutermann-Creativ-Dekor",
+   "name": "Gutermann Creativ Dekor",
+   "brand": "Gütermann",
+   "source": "inkstitch",
+   "count": 200
+  },
+  {
+   "id": "en/Gutermann_Shade_Card_MA_95-1",
+   "name": "Gutermann Shade Card MA 95-1",
+   "brand": "Gütermann",
+   "source": "embroiderynerd",
+   "count": 360,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Gutermann_Shade_Card_TB_95-1",
+   "name": "Gutermann Shade Card TB 95-1",
+   "brand": "Gütermann",
+   "source": "embroiderynerd",
+   "count": 127,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Gutermann_Shade_Card_TB_96-2",
+   "name": "Gutermann Shade Card TB 96-2",
+   "brand": "Gütermann",
+   "source": "embroiderynerd",
+   "count": 46,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Gutermann_Shade_Card_VICI_95-1",
+   "name": "Gutermann Shade Card VICI 95-1",
+   "brand": "Gütermann",
+   "source": "embroiderynerd",
+   "count": 240,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Hemingworth",
+   "name": "Hemingworth",
+   "brand": "Hemingworth",
+   "source": "embroiderynerd",
+   "count": 282,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Hemingworth",
+   "name": "Hemingworth",
+   "brand": "Hemingworth",
+   "source": "inkstitch",
+   "count": 294
+  },
+  {
+   "id": "en/Hilos_Iris_100_Rayon",
+   "name": "Hilos Iris 100% Rayon",
+   "brand": "Hilos Iris",
+   "source": "embroiderynerd",
+   "count": 69,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Hilos_Iris_Polyester",
+   "name": "Hilos Iris Polyester",
+   "brand": "Hilos Iris",
+   "source": "embroiderynerd",
+   "count": 300,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Iris_Smooth_N_Silky_Rayon",
+   "name": "Iris Smooth 'N Silky Rayon",
+   "brand": "Iris",
+   "source": "embroiderynerd",
+   "count": 292,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Iris_UltraBrite_Polyester",
+   "name": "Iris UltraBrite Polyester",
+   "brand": "Iris",
+   "source": "embroiderynerd",
+   "count": 299,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Isacord_30",
+   "name": "Isacord 30",
+   "brand": "Isacord",
+   "source": "embroiderynerd",
+   "count": 28,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Isacord_40",
+   "name": "Isacord 40",
+   "brand": "Isacord",
+   "source": "embroiderynerd",
+   "count": 423,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Isacord-Polyester",
+   "name": "Isacord Polyester",
+   "brand": "Isacord",
+   "source": "inkstitch",
+   "count": 398
+  },
+  {
+   "id": "en/Isafil",
+   "name": "Isafil",
+   "brand": "Isafil",
+   "source": "embroiderynerd",
+   "count": 288,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Isafil-Rayon",
+   "name": "Isafil Rayon",
+   "brand": "Isafil",
+   "source": "inkstitch",
+   "count": 286
+  },
+  {
+   "id": "en/Isalon",
+   "name": "Isalon",
+   "brand": "Isalon",
+   "source": "embroiderynerd",
+   "count": 420,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Isalon-Polyester",
+   "name": "Isalon Polyester",
+   "brand": "Isalon",
+   "source": "inkstitch",
+   "count": 414
+  },
+  {
+   "id": "en/Isamet",
+   "name": "Isamet",
+   "brand": "Isamet",
+   "source": "embroiderynerd",
+   "count": 16,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Janome",
+   "name": "Janome",
+   "brand": "Janome",
+   "source": "inkstitch",
+   "count": 78
+  },
+  {
+   "id": "en/Janome_Acrylic",
+   "name": "Janome Acrylic",
+   "brand": "Janome",
+   "source": "embroiderynerd",
+   "count": 78,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Janome_Polyester",
+   "name": "Janome Polyester",
+   "brand": "Janome",
+   "source": "embroiderynerd",
+   "count": 78,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Jenny_Haskins",
+   "name": "Jenny Haskins",
+   "brand": "Jenny Haskins",
+   "source": "embroiderynerd",
+   "count": 167,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "King-Star",
+   "name": "King Star",
+   "brand": "King Star",
+   "source": "inkstitch",
+   "count": 430
+  },
+  {
+   "id": "en/Kingstar",
+   "name": "Kingstar",
+   "brand": "King Star",
+   "source": "embroiderynerd",
+   "count": 598,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Kingfisher_Card_202",
+   "name": "Kingfisher Card 202",
+   "brand": "Kingfisher",
+   "source": "embroiderynerd",
+   "count": 438,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Macpherson_Vital_Link_Rayon",
+   "name": "Macpherson Vital Link Rayon",
+   "brand": "Macpherson",
+   "source": "embroiderynerd",
+   "count": 146,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Madeira_Burmilana",
+   "name": "Madeira Burmilana",
+   "brand": "Madeira",
+   "source": "embroiderynerd",
+   "count": 219,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Madeira-Burmilana",
+   "name": "Madeira Burmilana",
+   "brand": "Madeira",
+   "source": "inkstitch",
+   "count": 121
+  },
+  {
+   "id": "en/Madeira_Classic_40",
+   "name": "Madeira Classic 40",
+   "brand": "Madeira",
+   "source": "embroiderynerd",
+   "count": 387,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "madeira/Cotona-30",
+   "name": "Madeira Cotona 30",
+   "brand": "Madeira",
+   "source": "madeira",
+   "count": 70
+  },
+  {
+   "id": "madeira/Cotona-50",
+   "name": "Madeira Cotona 50",
+   "brand": "Madeira",
+   "source": "madeira",
+   "count": 120
+  },
+  {
+   "id": "madeira/Cotona-80",
+   "name": "Madeira Cotona 80",
+   "brand": "Madeira",
+   "source": "madeira",
+   "count": 11
+  },
+  {
+   "id": "en/Madeira_Fire_Fighter",
+   "name": "Madeira Fire Fighter",
+   "brand": "Madeira",
+   "source": "embroiderynerd",
+   "count": 24,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Madeira_Frosted_Matt_40",
+   "name": "Madeira Frosted Matt 40",
+   "brand": "Madeira",
+   "source": "embroiderynerd",
+   "count": 189,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Madeira_FS_-_Super_Twist",
+   "name": "Madeira FS Super Twist",
+   "brand": "Madeira",
+   "source": "embroiderynerd",
+   "count": 123,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Madeira-Matt",
+   "name": "Madeira Matt",
+   "brand": "Madeira",
+   "source": "inkstitch",
+   "count": 161
+  },
+  {
+   "id": "en/Madeira_Polyneon",
+   "name": "Madeira Polyneon",
+   "brand": "Madeira",
+   "source": "embroiderynerd",
+   "count": 61,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Madeira-Polyneon",
+   "name": "Madeira Polyneon",
+   "brand": "Madeira",
+   "source": "inkstitch",
+   "count": 349
+  },
+  {
+   "id": "en/Madeira_PolyNeon_40",
+   "name": "Madeira PolyNeon 40",
+   "brand": "Madeira",
+   "source": "embroiderynerd",
+   "count": 413,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Madeira_PolyNeon_Green",
+   "name": "Madeira PolyNeon Green",
+   "brand": "Madeira",
+   "source": "embroiderynerd",
+   "count": 520,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Madeira_PolyStitch",
+   "name": "Madeira PolyStitch",
+   "brand": "Madeira",
+   "source": "embroiderynerd",
+   "count": 128,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Madeira_Rayon",
+   "name": "Madeira Rayon",
+   "brand": "Madeira",
+   "source": "embroiderynerd",
+   "count": 387,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Madeira-Rayon",
+   "name": "Madeira Rayon",
+   "brand": "Madeira",
+   "source": "inkstitch",
+   "count": 357
+  },
+  {
+   "id": "Magnifico",
+   "name": "Magnifico",
+   "brand": "Magnifico",
+   "source": "inkstitch",
+   "count": 200
+  },
+  {
+   "id": "en/Marathon_100_Viscose_Rayon",
+   "name": "Marathon 100% Viscose Rayon",
+   "brand": "Marathon",
+   "source": "embroiderynerd",
+   "count": 317,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Marathon_Poly",
+   "name": "Marathon Poly",
+   "brand": "Marathon",
+   "source": "embroiderynerd",
+   "count": 301,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Marathon-Polyester",
+   "name": "Marathon Polyester",
+   "brand": "Marathon",
+   "source": "inkstitch",
+   "count": 301
+  },
+  {
+   "id": "Marathon-Rayon",
+   "name": "Marathon Rayon",
+   "brand": "Marathon",
+   "source": "inkstitch",
+   "count": 317
+  },
+  {
+   "id": "Marathon-Rayon-V3",
+   "name": "Marathon Rayon V3",
+   "brand": "Marathon",
+   "source": "inkstitch",
+   "count": 384
+  },
+  {
+   "id": "en/Mesa_Endura",
+   "name": "Mesa Endura",
+   "brand": "Mesa",
+   "source": "embroiderynerd",
+   "count": 231,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Metro",
+   "name": "Metro",
+   "brand": "Metro",
+   "source": "inkstitch",
+   "count": 168
+  },
+  {
+   "id": "en/Metro_Polyester",
+   "name": "Metro Polyester",
+   "brand": "Metro",
+   "source": "embroiderynerd",
+   "count": 147,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Mettler_40",
+   "name": "Mettler 40",
+   "brand": "Mettler",
+   "source": "embroiderynerd",
+   "count": 315,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Mettler_Amanda",
+   "name": "Mettler Amanda",
+   "brand": "Mettler",
+   "source": "embroiderynerd",
+   "count": 200,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Mettler_Cotton_Silk_Finish",
+   "name": "Mettler Cotton Silk Finish",
+   "brand": "Mettler",
+   "source": "embroiderynerd",
+   "count": 151,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Mettler-Embroidery",
+   "name": "Mettler Embroidery",
+   "brand": "Mettler",
+   "source": "inkstitch",
+   "count": 152
+  },
+  {
+   "id": "en/Mettler_Fine_Embroidery",
+   "name": "Mettler Fine Embroidery",
+   "brand": "Mettler",
+   "source": "embroiderynerd",
+   "count": 151,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Mettler_Metrosene",
+   "name": "Mettler Metrosene",
+   "brand": "Mettler",
+   "source": "embroiderynerd",
+   "count": 318,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Mettler_Poly_Sheen",
+   "name": "Mettler Poly Sheen",
+   "brand": "Mettler",
+   "source": "embroiderynerd",
+   "count": 435,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Mettler-Poly-Sheen",
+   "name": "Mettler Poly Sheen",
+   "brand": "Mettler",
+   "source": "inkstitch",
+   "count": 351
+  },
+  {
+   "id": "en/Mettler_Silky_Sheen",
+   "name": "Mettler Silky Sheen",
+   "brand": "Mettler",
+   "source": "embroiderynerd",
+   "count": 108,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Misairu_Tsuru",
+   "name": "Misairu Tsuru",
+   "brand": "Misairu Tsuru",
+   "source": "embroiderynerd",
+   "count": 594,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "MTB---Embroidex",
+   "name": "MTB - Embroidex",
+   "brand": "MTB",
+   "source": "inkstitch",
+   "count": 107
+  },
+  {
+   "id": "en/OTTO_Polyester",
+   "name": "OTTO Polyester",
+   "brand": "OTTO",
+   "source": "embroiderynerd",
+   "count": 479,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Outback-Embroidery-Rayon",
+   "name": "Outback Embroidery Rayon",
+   "brand": "Outback",
+   "source": "inkstitch",
+   "count": 100
+  },
+  {
+   "id": "en/Pantone_Pantone",
+   "name": "Pantone® Pantone",
+   "brand": "Pantone",
+   "source": "embroiderynerd",
+   "count": 1341,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Pearl_Yacht_101-3_Rayon",
+   "name": "Pearl Yacht 101-3 Rayon",
+   "brand": "Pearl Yacht",
+   "source": "embroiderynerd",
+   "count": 706,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Pearl_Yacht_40D-2_Poly",
+   "name": "Pearl Yacht 40D-2 Poly",
+   "brand": "Pearl Yacht",
+   "source": "embroiderynerd",
+   "count": 10,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Pearl_Yacht_600E_Poly",
+   "name": "Pearl Yacht 600E Poly",
+   "brand": "Pearl Yacht",
+   "source": "embroiderynerd",
+   "count": 327,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Pearl_Yacht_Rayon",
+   "name": "Pearl Yacht Rayon",
+   "brand": "Pearl Yacht",
+   "source": "embroiderynerd",
+   "count": 706,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Poly-X40",
+   "name": "Poly X40",
+   "brand": "Poly X40",
+   "source": "inkstitch",
+   "count": 286
+  },
+  {
+   "id": "en/Polyseda_Iris_100_Trilobal_Poly",
+   "name": "Polyseda Iris 100% Trilobal Poly",
+   "brand": "Polyseda",
+   "source": "embroiderynerd",
+   "count": 95,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Princess",
+   "name": "Princess",
+   "brand": "Princess",
+   "source": "inkstitch",
+   "count": 120
+  },
+  {
+   "id": "en/Quilters_Select_Para-Cotton_Poly",
+   "name": "Quilters Select Para-Cotton Poly",
+   "brand": "Quilters Select",
+   "source": "embroiderynerd",
+   "count": 40,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Quilters_Select_Pefect_Cotton_Plus",
+   "name": "Quilters Select Pefect Cotton Plus",
+   "brand": "Quilters Select",
+   "source": "embroiderynerd",
+   "count": 60,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Quilters_Select_Perfect_Cotton_Plus_2500yd",
+   "name": "Quilters Select Perfect Cotton Plus 2,500yd",
+   "brand": "Quilters Select",
+   "source": "embroiderynerd",
+   "count": 8,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Radiant-Rayon",
+   "name": "Radiant Rayon",
+   "brand": "Radiant",
+   "source": "inkstitch",
+   "count": 102
+  },
+  {
+   "id": "RAL",
+   "name": "RAL",
+   "brand": "RAL",
+   "source": "inkstitch",
+   "count": 194
+  },
+  {
+   "id": "en/Rapos_Poly",
+   "name": "Rapos Poly",
+   "brand": "Rapos",
+   "source": "embroiderynerd",
+   "count": 381,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/RNK_Micro_Thread",
+   "name": "RNK Micro Thread",
+   "brand": "RNK",
+   "source": "embroiderynerd",
+   "count": 72,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Robison-Anton_Card_304-4_7_Floss",
+   "name": "Robison-Anton Card 304-4 #7 Floss",
+   "brand": "Robison-Anton",
+   "source": "embroiderynerd",
+   "count": 35,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Robison-Anton_Card_40E_600D_Rayon",
+   "name": "Robison-Anton Card 40E 600D Rayon",
+   "brand": "Robison-Anton",
+   "source": "embroiderynerd",
+   "count": 34,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Robison-Anton_Card_70C_Cotton",
+   "name": "Robison-Anton Card 70C Cotton",
+   "brand": "Robison-Anton",
+   "source": "embroiderynerd",
+   "count": 44,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Robison-Anton_Card_SBP-10_Poly",
+   "name": "Robison-Anton Card SBP-10 Poly",
+   "brand": "Robison-Anton",
+   "source": "embroiderynerd",
+   "count": 453,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Robison-Anton_Card_SBP-2_Poly",
+   "name": "Robison-Anton Card SBP-2 Poly",
+   "brand": "Robison-Anton",
+   "source": "embroiderynerd",
+   "count": 79,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Robison-Anton_Card_SBP-4_Poly",
+   "name": "Robison-Anton Card SBP-4 Poly",
+   "brand": "Robison-Anton",
+   "source": "embroiderynerd",
+   "count": 79,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Robison-Anton_Card_SBP-7_Poly",
+   "name": "Robison-Anton Card SBP-7 Poly",
+   "brand": "Robison-Anton",
+   "source": "embroiderynerd",
+   "count": 443,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Robison-Anton_Card_SBP-9_Poly",
+   "name": "Robison-Anton Card SBP-9 Poly",
+   "brand": "Robison-Anton",
+   "source": "embroiderynerd",
+   "count": 454,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Robison-Anton_Card_SSR-6_Rayon",
+   "name": "Robison-Anton Card SSR-6 Rayon",
+   "brand": "Robison-Anton",
+   "source": "embroiderynerd",
+   "count": 369,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Robison-Anton_Card_SSR-7_Rayon",
+   "name": "Robison-Anton Card SSR-7 Rayon",
+   "brand": "Robison-Anton",
+   "source": "embroiderynerd",
+   "count": 408,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Robison-Anton-Polyester",
+   "name": "Robison-Anton Polyester",
+   "brand": "Robison-Anton",
+   "source": "inkstitch",
+   "count": 452
+  },
+  {
+   "id": "Robison-Anton-Rayon",
+   "name": "Robison-Anton Rayon",
+   "brand": "Robison-Anton",
+   "source": "inkstitch",
+   "count": 419
+  },
+  {
+   "id": "en/Royal",
+   "name": "Royal",
+   "brand": "Royal",
+   "source": "embroiderynerd",
+   "count": 499,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Royal-Polyester",
+   "name": "Royal Polyester",
+   "brand": "Royal",
+   "source": "inkstitch",
+   "count": 473
+  },
+  {
+   "id": "Royal-Viscose-Rayon",
+   "name": "Royal Viscose Rayon",
+   "brand": "Royal",
+   "source": "inkstitch",
+   "count": 494
+  },
+  {
+   "id": "en/Sakura",
+   "name": "Sakura",
+   "brand": "Sakura",
+   "source": "embroiderynerd",
+   "count": 1302,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Sakura_Joyce",
+   "name": "Sakura Joyce",
+   "brand": "Sakura",
+   "source": "embroiderynerd",
+   "count": 1680,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/SEMCO_Polyester",
+   "name": "SEMCO Polyester",
+   "brand": "SEMCO",
+   "source": "embroiderynerd",
+   "count": 256,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Setta_Lumina",
+   "name": "Setta Lumina",
+   "brand": "Setta",
+   "source": "embroiderynerd",
+   "count": 373,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Sigma",
+   "name": "Sigma",
+   "brand": "Sigma",
+   "source": "inkstitch",
+   "count": 150
+  },
+  {
+   "id": "en/Sigma_Polyester_40wt",
+   "name": "Sigma Polyester 40wt",
+   "brand": "Sigma",
+   "source": "embroiderynerd",
+   "count": 147,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Silky_Cartella_No._7",
+   "name": "Silky Cartella No. 7",
+   "brand": "Silky",
+   "source": "embroiderynerd",
+   "count": 71,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Simthread-Glow-In-The-Dark-15-Colors",
+   "name": "Simthread Glow In The Dark 15 Colors",
+   "brand": "Simthread",
+   "source": "inkstitch",
+   "count": 15
+  },
+  {
+   "id": "en/Simthread_Polyester",
+   "name": "Simthread Polyester",
+   "brand": "Simthread",
+   "source": "embroiderynerd",
+   "count": 107,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Simthread-Polyester",
+   "name": "Simthread Polyester",
+   "brand": "Simthread",
+   "source": "inkstitch",
+   "count": 107
+  },
+  {
+   "id": "Simthread-Polyester-63-Brother-Colors",
+   "name": "Simthread Polyester 63 Brother Colors",
+   "brand": "Simthread",
+   "source": "inkstitch",
+   "count": 63
+  },
+  {
+   "id": "Simthread-Rayon",
+   "name": "Simthread Rayon",
+   "brand": "Simthread",
+   "source": "inkstitch",
+   "count": 384
+  },
+  {
+   "id": "en/Skylab_Cartella_Colori_No._12",
+   "name": "Skylab Cartella Colori No. 12",
+   "brand": "Skylab",
+   "source": "embroiderynerd",
+   "count": 189,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Sulky_Cotty_12",
+   "name": "Sulky Cotty 12",
+   "brand": "Sulky",
+   "source": "embroiderynerd",
+   "count": 130,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Sulky_Cotty_30",
+   "name": "Sulky Cotty 30",
+   "brand": "Sulky",
+   "source": "embroiderynerd",
+   "count": 130,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Sulky_Cry_30",
+   "name": "Sulky Cry 30",
+   "brand": "Sulky",
+   "source": "embroiderynerd",
+   "count": 1,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Sulky_Filaine_12",
+   "name": "Sulky Filaine 12",
+   "brand": "Sulky",
+   "source": "embroiderynerd",
+   "count": 129,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Sulky_Glowy_40",
+   "name": "Sulky Glowy 40",
+   "brand": "Sulky",
+   "source": "embroiderynerd",
+   "count": 7,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Sulky_Holoshimmmer_30",
+   "name": "Sulky Holoshimmmer 30",
+   "brand": "Sulky",
+   "source": "embroiderynerd",
+   "count": 24,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Sulky_Invisible_40",
+   "name": "Sulky Invisible 40",
+   "brand": "Sulky",
+   "source": "embroiderynerd",
+   "count": 2,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Sulky_Metallic_30",
+   "name": "Sulky Metallic 30",
+   "brand": "Sulky",
+   "source": "embroiderynerd",
+   "count": 36,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Sulky_Poly_Deco_40",
+   "name": "Sulky Poly Deco 40",
+   "brand": "Sulky",
+   "source": "embroiderynerd",
+   "count": 138,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Sulky_Poly_Flash_40",
+   "name": "Sulky Poly Flash 40",
+   "brand": "Sulky",
+   "source": "embroiderynerd",
+   "count": 23,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Sulky_Poly_Lite_60",
+   "name": "Sulky Poly Lite 60",
+   "brand": "Sulky",
+   "source": "embroiderynerd",
+   "count": 36,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Sulky_Poly_Sparkle_Star_30",
+   "name": "Sulky Poly Sparkle (Star) 30",
+   "brand": "Sulky",
+   "source": "embroiderynerd",
+   "count": 54,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Sulky-Polyester",
+   "name": "Sulky Polyester",
+   "brand": "Sulky",
+   "source": "inkstitch",
+   "count": 907
+  },
+  {
+   "id": "Sulky-Rayon",
+   "name": "Sulky Rayon",
+   "brand": "Sulky",
+   "source": "inkstitch",
+   "count": 289
+  },
+  {
+   "id": "en/Sulky_Rayon_40_EU",
+   "name": "Sulky Rayon 40 (EU)",
+   "brand": "Sulky",
+   "source": "embroiderynerd",
+   "count": 289,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Sulky_Rayon_40_US",
+   "name": "Sulky Rayon 40 (US)",
+   "brand": "Sulky",
+   "source": "embroiderynerd",
+   "count": 333,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Sulky_Sliver_40",
+   "name": "Sulky Sliver 40",
+   "brand": "Sulky",
+   "source": "embroiderynerd",
+   "count": 24,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Sulky_Viscose_Rayon",
+   "name": "Sulky Viscose Rayon",
+   "brand": "Sulky",
+   "source": "embroiderynerd",
+   "count": 333,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Swist-Rayon",
+   "name": "Swist Rayon",
+   "brand": "Swist",
+   "source": "inkstitch",
+   "count": 227
+  },
+  {
+   "id": "en/The_Institute_of_Heraldry_TIOH_Fil-tec_Glide",
+   "name": "The Institute of Heraldry (TIOH) Fil-tec Glide",
+   "brand": "The Institute of Heraldry",
+   "source": "embroiderynerd",
+   "count": 50,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Threadart",
+   "name": "Threadart",
+   "brand": "ThreadArt",
+   "source": "inkstitch",
+   "count": 223
+  },
+  {
+   "id": "en/ThreadArt",
+   "name": "ThreadArt",
+   "brand": "ThreadArt",
+   "source": "embroiderynerd",
+   "count": 159,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Timeless",
+   "name": "Timeless",
+   "brand": "Timeless",
+   "source": "embroiderynerd",
+   "count": 213,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Tridalia_100_Trilobal_Poly",
+   "name": "Tridalia 100% Trilobal Poly",
+   "brand": "Tridalia",
+   "source": "embroiderynerd",
+   "count": 131,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Tristar-Polyester",
+   "name": "Tristar Polyester",
+   "brand": "Tristar",
+   "source": "inkstitch",
+   "count": 298
+  },
+  {
+   "id": "Tristar-Rayon",
+   "name": "Tristar Rayon",
+   "brand": "Tristar",
+   "source": "inkstitch",
+   "count": 406
+  },
+  {
+   "id": "Viking-Palette",
+   "name": "Viking Palette",
+   "brand": "Viking",
+   "source": "inkstitch",
+   "count": 29
+  },
+  {
+   "id": "Vyapar-Rayon",
+   "name": "Vyapar Rayon",
+   "brand": "Vyapar",
+   "source": "inkstitch",
+   "count": 288
+  },
+  {
+   "id": "en/Wilcom",
+   "name": "Wilcom",
+   "brand": "Wilcom",
+   "source": "embroiderynerd",
+   "count": 56,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "en/Wonang_100_Viscose_Rayon",
+   "name": "Wonang 100% Viscose Rayon",
+   "brand": "Wonang",
+   "source": "embroiderynerd",
+   "count": 288,
+   "download": "embroiderynerd-charts"
+  },
+  {
+   "id": "Wonderfil-Polyester",
+   "name": "Wonderfil Polyester",
+   "brand": "Wonderfil",
+   "source": "inkstitch",
+   "count": 170
+  },
+  {
+   "id": "Wonderfil-Rayon",
+   "name": "Wonderfil Rayon",
+   "brand": "Wonderfil",
+   "source": "inkstitch",
+   "count": 342
+  },
+  {
+   "id": "en/Yenmet",
+   "name": "Yenmet",
+   "brand": "Yenmet",
+   "source": "embroiderynerd",
+   "count": 56,
+   "download": "embroiderynerd-charts"
+  }
+ ]
+}

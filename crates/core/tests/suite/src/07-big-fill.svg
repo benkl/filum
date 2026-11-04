@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600">
+<rect width="600" height="600" fill="#ffffff"/>
+<path d="M300 40 C450 40 560 150 560 300 C560 450 450 560 300 560 C150 560 40 450 40 300 C40 150 150 40 300 40 Z M300 180 C230 180 180 230 180 300 C180 370 230 420 300 420 C370 420 420 370 420 300 C420 230 370 180 300 180 Z" fill="#2f7fc4" fill-rule="evenodd"/>
+</svg>

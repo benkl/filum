@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600">
+<rect width="600" height="600" fill="#ffffff"/>
+<circle cx="300" cy="300" r="280" fill="#1f2a56"/>
+<circle cx="300" cy="300" r="245" fill="#f4efe1"/>
+<path d="M90 380 L210 210 L270 290 L340 170 L510 380 Z" fill="#2f6b4f"/>
+<path d="M340 170 L370 220 L350 210 L330 230 L315 212 Z" fill="#ffffff"/>
+<circle cx="420" cy="190" r="38" fill="#f2b632"/>
+<rect x="60" y="380" width="480" height="70" fill="#c8102e"/>
+<text x="300" y="430" font-family="DejaVu Sans" font-weight="bold" font-size="46" text-anchor="middle" fill="#ffffff">SUMMIT CLUB</text>
+<text x="300" y="500" font-family="DejaVu Sans" font-size="24" text-anchor="middle" fill="#1f2a56">EST. 1987</text>
+</svg>

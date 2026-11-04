@@ -1,0 +1,204 @@
+{
+ "id": "nc-fonts",
+ "kind": "fonts",
+ "title": "Non-commercial embroidery fonts",
+ "summary": "8 more fonts from the Ink/Stitch community collection (Flowery Crosses, Flowery Crosses Multicolor, Handkerchief, Ladie's present, Magic Crosses, Nautical, Priscilla, Very crossy). Their authors allow only non-commercial use, so Filum doesn't include them.",
+ "license": {
+  "name": "CC BY-NC-SA 4.0",
+  "url": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "terms": "Free for personal and other non-commercial use. Give the font's author credit and share changes to the font under the same licence. Designs stitched with these fonts may not be sold or used commercially."
+ },
+ "source": {
+  "label": "inkstitch/embroidery-fonts",
+  "url": "https://github.com/inkstitch/embroidery-fonts/tree/c7e3a05c3d6f5c77b881c50f257851af9a8e9cb8/src"
+ },
+ "base": "https://raw.githubusercontent.com/inkstitch/embroidery-fonts/c7e3a05c3d6f5c77b881c50f257851af9a8e9cb8/src/",
+ "version": "c7e3a05c3d6f5c77b881c50f257851af9a8e9cb8",
+ "bytes": 14746834,
+ "items": [
+  {
+   "id": "flowery_crosses",
+   "name": "Flowery Crosses",
+   "license": "CC BY-NC-SA 4.0",
+   "files": [
+    [
+     "flowery_crosses/font.json",
+     1398
+    ],
+    [
+     "flowery_crosses/LICENSE",
+     441
+    ],
+    [
+     "flowery_crosses/preview.png",
+     151550
+    ],
+    [
+     "flowery_crosses/ltr.svg",
+     535489
+    ]
+   ]
+  },
+  {
+   "id": "flowery_multicolor",
+   "name": "Flowery Crosses Multicolor",
+   "license": "CC BY-NC-SA 4.0",
+   "files": [
+    [
+     "flowery_multicolor/font.json",
+     1440
+    ],
+    [
+     "flowery_multicolor/LICENSE",
+     440
+    ],
+    [
+     "flowery_multicolor/preview.png",
+     155081
+    ],
+    [
+     "flowery_multicolor/ltr.svg",
+     673551
+    ]
+   ]
+  },
+  {
+   "id": "handkerchief",
+   "name": "Handkerchief",
+   "license": "CC BY-NC-SA 4.0",
+   "files": [
+    [
+     "handkerchief/font.json",
+     1751
+    ],
+    [
+     "handkerchief/LICENSE",
+     412
+    ],
+    [
+     "handkerchief/preview.png",
+     62899
+    ],
+    [
+     "handkerchief/ltr.svg",
+     11495367
+    ]
+   ]
+  },
+  {
+   "id": "ladies_present",
+   "name": "Ladie's present",
+   "license": "CC BY-NC-SA 4.0",
+   "files": [
+    [
+     "ladies_present/font.json",
+     8842
+    ],
+    [
+     "ladies_present/LICENSE",
+     407
+    ],
+    [
+     "ladies_present/preview.png",
+     196116
+    ],
+    [
+     "ladies_present/ltr.svg",
+     64860
+    ]
+   ]
+  },
+  {
+   "id": "magic_crosses",
+   "name": "Magic Crosses",
+   "license": "CC BY-NC-SA 4.0",
+   "files": [
+    [
+     "magic_crosses/font.json",
+     1698
+    ],
+    [
+     "magic_crosses/LICENSE",
+     407
+    ],
+    [
+     "magic_crosses/preview.png",
+     86307
+    ],
+    [
+     "magic_crosses/ltr.svg",
+     232535
+    ]
+   ]
+  },
+  {
+   "id": "nautical",
+   "name": "Nautical",
+   "license": "CC BY-NC-SA 4.0",
+   "files": [
+    [
+     "nautical/font.json",
+     1385
+    ],
+    [
+     "nautical/LICENSE",
+     107
+    ],
+    [
+     "nautical/preview.png",
+     176871
+    ],
+    [
+     "nautical/ltr.svg",
+     309670
+    ]
+   ]
+  },
+  {
+   "id": "priscilla",
+   "name": "Priscilla",
+   "license": "CC BY-NC-SA 4.0",
+   "files": [
+    [
+     "priscilla/font.json",
+     1746
+    ],
+    [
+     "priscilla/LICENSE",
+     419
+    ],
+    [
+     "priscilla/preview.png",
+     91947
+    ],
+    [
+     "priscilla/ltr.svg",
+     332290
+    ]
+   ]
+  },
+  {
+   "id": "very_crossy",
+   "name": "Very crossy",
+   "license": "CC BY-NC-SA 4.0",
+   "files": [
+    [
+     "very_crossy/font.json",
+     2597
+    ],
+    [
+     "very_crossy/LICENSE",
+     377
+    ],
+    [
+     "very_crossy/preview.png",
+     85819
+    ],
+    [
+     "very_crossy/ltr.svg",
+     72615
+    ]
+   ]
+  }
+ ]
+}

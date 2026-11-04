@@ -1,0 +1,314 @@
+/* Output: export extras (ZIP, pictures, repeats), thread lists, element info,
+   rebuild shapes, print sheet. Kept apart from styles.css. */
+
+/* --- export dialog ----------------------------------------------------- */
+.xp-mode {
+  margin-bottom: 2px;
+}
+.xp-formats button.pick {
+  position: relative;
+  padding-right: 22px;
+}
+.xp-formats button.pick::after {
+  content: "";
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 11px;
+  height: 11px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 3px;
+}
+.xp-formats button.pick.on::after {
+  border-color: var(--select);
+  background: var(--select)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2l2.2 2.2 4.8-4.8' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / 10px no-repeat;
+}
+.xp-repeat {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 6px;
+}
+.xp-repeat .ctx-field {
+  min-width: 0;
+}
+.xp-dpi {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.xp-dpi > span {
+  flex: 1;
+  color: var(--muted);
+}
+.xp-dpi .num {
+  width: 92px;
+}
+.xp-pic {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+.xp-pic-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  max-height: 380px;
+  padding: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--canvas);
+}
+.xp-pic-box.checker {
+  background-color: var(--bg-3);
+  background-image: linear-gradient(45deg, var(--bg-2) 25%, transparent 25%), linear-gradient(-45deg, var(--bg-2) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--bg-2) 75%), linear-gradient(-45deg, transparent 75%, var(--bg-2) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+.xp-pic-canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 356px;
+  object-fit: contain;
+}
+.xp-pic .hint svg {
+  vertical-align: -2px;
+}
+.xp-zip {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--bg-3);
+}
+.xp-zip .exp-colours-head b svg {
+  vertical-align: -2px;
+}
+.xp-zip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+  max-height: 240px;
+  overflow: auto;
+}
+.xp-zip-file {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 3px 4px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.xp-zip-file:hover {
+  background: var(--bg-2);
+}
+.xp-zip-file > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+.xp-zip-file .mini {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+/* --- thread list ------------------------------------------------------- */
+.tl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 340px;
+  overflow: auto;
+  margin-top: 8px;
+}
+.tl-row {
+  display: grid;
+  grid-template-columns: 22px 18px minmax(0, 1fr) 16px 18px minmax(0, 1.2fr);
+  gap: 6px;
+  align-items: center;
+  padding: 3px 4px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.tl-row:hover {
+  background: var(--bg-2);
+}
+.tl-row i {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+.tl-row i.none {
+  background: repeating-linear-gradient(45deg, var(--bg-2) 0 3px, var(--bg-3) 3px 6px);
+}
+.tl-row .nm {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tl-row.same {
+  opacity: 0.6;
+}
+.tl-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+/* --- element info ------------------------------------------------------ */
+.ei {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ei-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 10px;
+  font-size: 12px;
+}
+.ei-grid dt {
+  color: var(--muted);
+}
+.ei-grid dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.ei-grid dd.warn {
+  color: #c27c0e;
+}
+.ei-obj {
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+}
+.ei-obj-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+.ei-obj-head i {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.ei-obj-head span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ei-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+/* --- rebuild shapes ---------------------------------------------------- */
+.rb {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 16px;
+}
+.rb-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--canvas);
+  overflow: hidden;
+}
+.rb-preview canvas {
+  display: block;
+  max-width: 100%;
+}
+@media (max-width: 760px) {
+  .rb {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- print sheet ------------------------------------------------------- */
+.pr {
+  display: grid;
+  grid-template-columns: 270px 1fr;
+  gap: 16px;
+  min-height: 520px;
+}
+.pr-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 70vh;
+  overflow: auto;
+  padding-right: 4px;
+}
+.pr-side .check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.pr-side .check small {
+  color: var(--muted);
+}
+.pr-side textarea.input {
+  min-height: 54px;
+  resize: vertical;
+  font: inherit;
+  font-size: 12px;
+}
+.pr-preview {
+  max-height: 70vh;
+  overflow: auto;
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--canvas);
+}
+.pr-preview iframe {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+}
+.pr-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+.pr-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.pr-note i {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+.pr-note .input {
+  flex: 1;
+  min-width: 0;
+}

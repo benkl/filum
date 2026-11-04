@@ -1,0 +1,1988 @@
+{
+ "id": "embroiderynerd-charts",
+ "kind": "charts",
+ "title": "Embroidery Nerds thread charts",
+ "summary": "164 more thread charts from the Embroidery Nerds thread database, by Matthew Enderle — Amann, Angelking, ARC, Aurifil, Coats, Fil-Tec, Floriani, Hemingworth, Kingfisher, Sulky and many more.",
+ "license": {
+  "name": "No licence stated",
+  "url": "https://github.com/Matthewenderle/Embroidery-Thread-Palette-Converter",
+  "terms": "The author offers these charts as a free download for embroiderers but has not published a licence, so Filum can't include them. Filum downloads them from the author's repository to this device, for your own use. Brand and colour names belong to their owners."
+ },
+ "source": {
+  "label": "Matthewenderle/Embroidery-Thread-Palette-Converter (corel-swatches)",
+  "url": "https://github.com/Matthewenderle/Embroidery-Thread-Palette-Converter/tree/c91f86bbf711b90b511f9c9df2c58e677fe3b6be/corel-swatches"
+ },
+ "base": "https://raw.githubusercontent.com/Matthewenderle/Embroidery-Thread-Palette-Converter/c91f86bbf711b90b511f9c9df2c58e677fe3b6be/",
+ "version": "c91f86bbf711b90b511f9c9df2c58e677fe3b6be",
+ "items": [
+  {
+   "id": "en/Amann_Saba",
+   "name": "Amann Saba",
+   "brand": "Amann",
+   "count": 500,
+   "files": [
+    [
+     "corel-swatches/Amann_Saba.xml",
+     54517
+    ]
+   ]
+  },
+  {
+   "id": "en/Amann_Serafil",
+   "name": "Amann Serafil",
+   "brand": "Amann",
+   "count": 78,
+   "files": [
+    [
+     "corel-swatches/Amann_Serafil.xml",
+     8980
+    ]
+   ]
+  },
+  {
+   "id": "en/Angelking",
+   "name": "Angelking",
+   "brand": "Angelking",
+   "count": 1281,
+   "files": [
+    [
+     "corel-swatches/Angelking.xml",
+     157563
+    ]
+   ]
+  },
+  {
+   "id": "en/Angelking_5_Feel_Soft",
+   "name": "Angelking #5 Feel Soft",
+   "brand": "Angelking",
+   "count": 136,
+   "files": [
+    [
+     "corel-swatches/Angelking_5_Feel_Soft.xml",
+     13161
+    ]
+   ]
+  },
+  {
+   "id": "en/Angelking_6",
+   "name": "Angelking #6",
+   "brand": "Angelking",
+   "count": 90,
+   "files": [
+    [
+     "corel-swatches/Angelking_6.xml",
+     10943
+    ]
+   ]
+  },
+  {
+   "id": "en/Angelking_6_Half",
+   "name": "Angelking #6 Half",
+   "brand": "Angelking",
+   "count": 90,
+   "files": [
+    [
+     "corel-swatches/Angelking_6_Half.xml",
+     8912
+    ]
+   ]
+  },
+  {
+   "id": "en/ARC_Poly",
+   "name": "ARC Poly",
+   "brand": "ARC",
+   "count": 288,
+   "files": [
+    [
+     "corel-swatches/ARC_Poly.xml",
+     31062
+    ]
+   ]
+  },
+  {
+   "id": "en/ARC_Rayon",
+   "name": "ARC Rayon",
+   "brand": "ARC",
+   "count": 288,
+   "files": [
+    [
+     "corel-swatches/ARC_Rayon.xml",
+     31175
+    ]
+   ]
+  },
+  {
+   "id": "en/AURIfil_Cotton",
+   "name": "AURIfil Cotton",
+   "brand": "Aurifil",
+   "count": 270,
+   "files": [
+    [
+     "corel-swatches/AURIfil_Cotton.xml",
+     32059
+    ]
+   ]
+  },
+  {
+   "id": "en/AURIfil_Filato_Lana_12",
+   "name": "AURIfil Filato Lana 12",
+   "brand": "Aurifil",
+   "count": 97,
+   "files": [
+    [
+     "corel-swatches/AURIfil_Filato_Lana_12.xml",
+     11805
+    ]
+   ]
+  },
+  {
+   "id": "en/Aurilux",
+   "name": "Aurilux",
+   "brand": "Aurilux",
+   "count": 204,
+   "files": [
+    [
+     "corel-swatches/Aurilux.xml",
+     23131
+    ]
+   ]
+  },
+  {
+   "id": "en/BFC",
+   "name": "BFC",
+   "brand": "BFC",
+   "count": 352,
+   "files": [
+    [
+     "corel-swatches/BFC.xml",
+     42854
+    ]
+   ]
+  },
+  {
+   "id": "en/Brildor",
+   "name": "Brildor",
+   "brand": "Brildor",
+   "count": 175,
+   "files": [
+    [
+     "corel-swatches/Brildor.xml",
+     21453
+    ]
+   ]
+  },
+  {
+   "id": "en/BrothreadBrother_Country",
+   "name": "Brothread/Brother Country",
+   "brand": "Brother",
+   "count": 61,
+   "files": [
+    [
+     "corel-swatches/BrothreadBrother_Country.xml",
+     7612
+    ]
+   ]
+  },
+  {
+   "id": "en/BrothreadBrother_Fleshtone",
+   "name": "Brothread/Brother Fleshtone",
+   "brand": "Brother",
+   "count": 10,
+   "files": [
+    [
+     "corel-swatches/BrothreadBrother_Fleshtone.xml",
+     1899
+    ]
+   ]
+  },
+  {
+   "id": "en/BrothreadBrother_Metallic",
+   "name": "Brothread/Brother Metallic",
+   "brand": "Brother",
+   "count": 15,
+   "files": [
+    [
+     "corel-swatches/BrothreadBrother_Metallic.xml",
+     2456
+    ]
+   ]
+  },
+  {
+   "id": "en/BrothreadBrother_Poly",
+   "name": "Brothread/Brother Poly",
+   "brand": "Brother",
+   "count": 61,
+   "files": [
+    [
+     "corel-swatches/BrothreadBrother_Poly.xml",
+     7593
+    ]
+   ]
+  },
+  {
+   "id": "en/New_Brothreads_Polyester",
+   "name": "New Brothreads Polyester",
+   "brand": "Brother",
+   "count": 38,
+   "files": [
+    [
+     "corel-swatches/New_Brothreads_Polyester.xml",
+     4899
+    ]
+   ]
+  },
+  {
+   "id": "en/Candle_Polyester",
+   "name": "Candle Polyester",
+   "brand": "Candle",
+   "count": 879,
+   "files": [
+    [
+     "corel-swatches/Candle_Polyester.xml",
+     105991
+    ]
+   ]
+  },
+  {
+   "id": "en/Candle_Viscose_Rayon",
+   "name": "Candle Viscose Rayon",
+   "brand": "Candle",
+   "count": 719,
+   "files": [
+    [
+     "corel-swatches/Candle_Viscose_Rayon.xml",
+     77893
+    ]
+   ]
+  },
+  {
+   "id": "en/Coats_Alcazar_Global_Rayon",
+   "name": "Coats Alcazar Global Rayon",
+   "brand": "Coats",
+   "count": 500,
+   "files": [
+    [
+     "corel-swatches/Coats_Alcazar_Global_Rayon.xml",
+     60655
+    ]
+   ]
+  },
+  {
+   "id": "en/Coats_Sylko_Brazil_Polyester",
+   "name": "Coats Sylko Brazil Polyester",
+   "brand": "Coats",
+   "count": 221,
+   "files": [
+    [
+     "corel-swatches/Coats_Sylko_Brazil_Polyester.xml",
+     26429
+    ]
+   ]
+  },
+  {
+   "id": "en/Coats_Sylko_Global_Polyester",
+   "name": "Coats Sylko Global Polyester",
+   "brand": "Coats",
+   "count": 399,
+   "files": [
+    [
+     "corel-swatches/Coats_Sylko_Global_Polyester.xml",
+     48394
+    ]
+   ]
+  },
+  {
+   "id": "en/Colourful_Thread",
+   "name": "Colourful Thread",
+   "brand": "Colourful Thread",
+   "count": 270,
+   "files": [
+    [
+     "corel-swatches/Colourful_Thread.xml",
+     32653
+    ]
+   ]
+  },
+  {
+   "id": "en/Cotone_Mako_Contone_Mako",
+   "name": "Cotone Mako Contone Mako",
+   "brand": "Cotone Mako",
+   "count": 144,
+   "files": [
+    [
+     "corel-swatches/Cotone_Mako_Contone_Mako.xml",
+     16658
+    ]
+   ]
+  },
+  {
+   "id": "en/DMC",
+   "name": "DMC",
+   "brand": "DMC",
+   "count": 360,
+   "files": [
+    [
+     "corel-swatches/DMC.xml",
+     43539
+    ]
+   ]
+  },
+  {
+   "id": "en/Durak_Polysoft_40",
+   "name": "Durak Polysoft 40",
+   "brand": "Durak",
+   "count": 420,
+   "files": [
+    [
+     "corel-swatches/Durak_Polysoft_40.xml",
+     45568
+    ]
+   ]
+  },
+  {
+   "id": "en/Elchel",
+   "name": "Elchel",
+   "brand": "Elchel",
+   "count": 295,
+   "files": [
+    [
+     "corel-swatches/Elchel.xml",
+     35189
+    ]
+   ]
+  },
+  {
+   "id": "en/Embellish_Flawless",
+   "name": "Embellish Flawless",
+   "brand": "Embellish",
+   "count": 120,
+   "files": [
+    [
+     "corel-swatches/Embellish_Flawless.xml",
+     15204
+    ]
+   ]
+  },
+  {
+   "id": "en/Embellish_Matte_Thread",
+   "name": "Embellish Matte Thread",
+   "brand": "Embellish",
+   "count": 130,
+   "files": [
+    [
+     "corel-swatches/Embellish_Matte_Thread.xml",
+     16120
+    ]
+   ]
+  },
+  {
+   "id": "en/Embellish_Metallic",
+   "name": "Embellish Metallic",
+   "brand": "Embellish",
+   "count": 10,
+   "files": [
+    [
+     "corel-swatches/Embellish_Metallic.xml",
+     1796
+    ]
+   ]
+  },
+  {
+   "id": "en/Embro_Embroidery",
+   "name": "Embro Embroidery",
+   "brand": "Embro",
+   "count": 61,
+   "files": [
+    [
+     "corel-swatches/Embro_Embroidery.xml",
+     7603
+    ]
+   ]
+  },
+  {
+   "id": "en/Embro_Wire_S-55",
+   "name": "Embro Wire S-55",
+   "brand": "Embro",
+   "count": 468,
+   "files": [
+    [
+     "corel-swatches/Embro_Wire_S-55.xml",
+     56690
+    ]
+   ]
+  },
+  {
+   "id": "en/Embroidery_Service_Polyfil",
+   "name": "Embroidery Service Polyfil",
+   "brand": "Embroidery Service",
+   "count": 198,
+   "files": [
+    [
+     "corel-swatches/Embroidery_Service_Polyfil.xml",
+     25630
+    ]
+   ]
+  },
+  {
+   "id": "en/Exquisite_Poly_1000M",
+   "name": "Exquisite Poly 1000M",
+   "brand": "Exquisite",
+   "count": 282,
+   "files": [
+    [
+     "corel-swatches/Exquisite_Poly_1000M.xml",
+     33177
+    ]
+   ]
+  },
+  {
+   "id": "en/Exquisite_Poly_5000M",
+   "name": "Exquisite Poly 5000M",
+   "brand": "Exquisite",
+   "count": 142,
+   "files": [
+    [
+     "corel-swatches/Exquisite_Poly_5000M.xml",
+     16831
+    ]
+   ]
+  },
+  {
+   "id": "en/Fil-Tec_Glide",
+   "name": "Fil-Tec Glide",
+   "brand": "Fil-Tec",
+   "count": 361,
+   "files": [
+    [
+     "corel-swatches/Fil-Tec_Glide.xml",
+     42671
+    ]
+   ]
+  },
+  {
+   "id": "en/Filato_Lana_-_T_12",
+   "name": "Filato Lana T 12",
+   "brand": "Filato",
+   "count": 133,
+   "files": [
+    [
+     "corel-swatches/Filato_Lana_-_T_12.xml",
+     16567
+    ]
+   ]
+  },
+  {
+   "id": "en/Filtex_Card_10195_Rayon",
+   "name": "Filtex Card 10195 Rayon",
+   "brand": "Filtex",
+   "count": 124,
+   "files": [
+    [
+     "corel-swatches/Filtex_Card_10195_Rayon.xml",
+     11962
+    ]
+   ]
+  },
+  {
+   "id": "en/Filtex_Card_Schiffli",
+   "name": "Filtex Card Schiffli",
+   "brand": "Filtex",
+   "count": 84,
+   "files": [
+    [
+     "corel-swatches/Filtex_Card_Schiffli.xml",
+     8202
+    ]
+   ]
+  },
+  {
+   "id": "en/Filtex_Schiffli",
+   "name": "Filtex Schiffli",
+   "brand": "Filtex",
+   "count": 75,
+   "files": [
+    [
+     "corel-swatches/Filtex_Schiffli.xml",
+     7435
+    ]
+   ]
+  },
+  {
+   "id": "en/Floriani",
+   "name": "Floriani",
+   "brand": "Floriani",
+   "count": 360,
+   "files": [
+    [
+     "corel-swatches/Floriani.xml",
+     43450
+    ]
+   ]
+  },
+  {
+   "id": "en/Floriani_Glow_in_the_Dark",
+   "name": "Floriani Glow in the Dark",
+   "brand": "Floriani",
+   "count": 5,
+   "files": [
+    [
+     "corel-swatches/Floriani_Glow_in_the_Dark.xml",
+     1158
+    ]
+   ]
+  },
+  {
+   "id": "en/Floriani_Metallic",
+   "name": "Floriani Metallic",
+   "brand": "Floriani",
+   "count": 17,
+   "files": [
+    [
+     "corel-swatches/Floriani_Metallic.xml",
+     2562
+    ]
+   ]
+  },
+  {
+   "id": "en/Floriani_Polyester_Embroidery_12wt",
+   "name": "Floriani Polyester Embroidery 12wt",
+   "brand": "Floriani",
+   "count": 30,
+   "files": [
+    [
+     "corel-swatches/Floriani_Polyester_Embroidery_12wt.xml",
+     4490
+    ]
+   ]
+  },
+  {
+   "id": "en/Floriani_Variegated_and_Mixed",
+   "name": "Floriani Variegated and Mixed",
+   "brand": "Floriani",
+   "count": 53,
+   "files": [
+    [
+     "corel-swatches/Floriani_Variegated_and_Mixed.xml",
+     4317
+    ]
+   ]
+  },
+  {
+   "id": "en/Fufu_Rayon",
+   "name": "Fufu Rayon",
+   "brand": "FuFu",
+   "count": 425,
+   "files": [
+    [
+     "corel-swatches/Fufu_Rayon.xml",
+     51804
+    ]
+   ]
+  },
+  {
+   "id": "en/Gem",
+   "name": "Gem",
+   "brand": "Gem",
+   "count": 423,
+   "files": [
+    [
+     "corel-swatches/Gem.xml",
+     51501
+    ]
+   ]
+  },
+  {
+   "id": "en/Gunold_Cotty_12",
+   "name": "Gunold Cotty 12",
+   "brand": "Gunold",
+   "count": 145,
+   "files": [
+    [
+     "corel-swatches/Gunold_Cotty_12.xml",
+     15897
+    ]
+   ]
+  },
+  {
+   "id": "en/Gunold_Cotty_30",
+   "name": "Gunold Cotty 30",
+   "brand": "Gunold",
+   "count": 188,
+   "files": [
+    [
+     "corel-swatches/Gunold_Cotty_30.xml",
+     20406
+    ]
+   ]
+  },
+  {
+   "id": "en/Gunold_Filaine_12",
+   "name": "Gunold Filaine 12",
+   "brand": "Gunold",
+   "count": 129,
+   "files": [
+    [
+     "corel-swatches/Gunold_Filaine_12.xml",
+     14088
+    ]
+   ]
+  },
+  {
+   "id": "en/Gunold_Glitter_30",
+   "name": "Gunold Glitter 30",
+   "brand": "Gunold",
+   "count": 24,
+   "files": [
+    [
+     "corel-swatches/Gunold_Glitter_30.xml",
+     3011
+    ]
+   ]
+  },
+  {
+   "id": "en/Gunold_Glowy_40",
+   "name": "Gunold Glowy 40",
+   "brand": "Gunold",
+   "count": 7,
+   "files": [
+    [
+     "corel-swatches/Gunold_Glowy_40.xml",
+     1352
+    ]
+   ]
+  },
+  {
+   "id": "en/Gunold_Mety_5-2_30",
+   "name": "Gunold Mety 5-2 30",
+   "brand": "Gunold",
+   "count": 38,
+   "files": [
+    [
+     "corel-swatches/Gunold_Mety_5-2_30.xml",
+     4803
+    ]
+   ]
+  },
+  {
+   "id": "en/Gunold_Mety_7-2_40",
+   "name": "Gunold Mety 7-2 40",
+   "brand": "Gunold",
+   "count": 8,
+   "files": [
+    [
+     "corel-swatches/Gunold_Mety_7-2_40.xml",
+     1470
+    ]
+   ]
+  },
+  {
+   "id": "en/Gunold_Mono_40",
+   "name": "Gunold Mono 40",
+   "brand": "Gunold",
+   "count": 2,
+   "files": [
+    [
+     "corel-swatches/Gunold_Mono_40.xml",
+     823
+    ]
+   ]
+  },
+  {
+   "id": "en/Gunold_Poly_Fire_40",
+   "name": "Gunold Poly Fire 40",
+   "brand": "Gunold",
+   "count": 27,
+   "files": [
+    [
+     "corel-swatches/Gunold_Poly_Fire_40.xml",
+     3691
+    ]
+   ]
+  },
+  {
+   "id": "en/Gunold_Poly_Flash_40",
+   "name": "Gunold Poly Flash 40",
+   "brand": "Gunold",
+   "count": 23,
+   "files": [
+    [
+     "corel-swatches/Gunold_Poly_Flash_40.xml",
+     3085
+    ]
+   ]
+  },
+  {
+   "id": "en/Gunold_Poly_Sparkle_Star_30",
+   "name": "Gunold Poly Sparkle (Star) 30",
+   "brand": "Gunold",
+   "count": 54,
+   "files": [
+    [
+     "corel-swatches/Gunold_Poly_Sparkle_Star_30.xml",
+     6426
+    ]
+   ]
+  },
+  {
+   "id": "en/Gunold_Poly40",
+   "name": "Gunold Poly40",
+   "brand": "Gunold",
+   "count": 300,
+   "files": [
+    [
+     "corel-swatches/Gunold_Poly40.xml",
+     36031
+    ]
+   ]
+  },
+  {
+   "id": "en/Gunold_Poly60",
+   "name": "Gunold Poly60",
+   "brand": "Gunold",
+   "count": 54,
+   "files": [
+    [
+     "corel-swatches/Gunold_Poly60.xml",
+     6875
+    ]
+   ]
+  },
+  {
+   "id": "en/Gunold_Reflex_Cry_30",
+   "name": "Gunold Reflex Cry 30",
+   "brand": "Gunold",
+   "count": 1,
+   "files": [
+    [
+     "corel-swatches/Gunold_Reflex_Cry_30.xml",
+     743
+    ]
+   ]
+  },
+  {
+   "id": "en/Gunold_Stickma_Luny_12",
+   "name": "Gunold Stickma Luny 12",
+   "brand": "Gunold",
+   "count": 76,
+   "files": [
+    [
+     "corel-swatches/Gunold_Stickma_Luny_12.xml",
+     8607
+    ]
+   ]
+  },
+  {
+   "id": "en/Gunold_Stickma_Poly",
+   "name": "Gunold Stickma Poly",
+   "brand": "Gunold",
+   "count": 130,
+   "files": [
+    [
+     "corel-swatches/Gunold_Stickma_Poly.xml",
+     13204
+    ]
+   ]
+  },
+  {
+   "id": "en/Gunold_Stickma_Sierra",
+   "name": "Gunold Stickma Sierra",
+   "brand": "Gunold",
+   "count": 153,
+   "files": [
+    [
+     "corel-swatches/Gunold_Stickma_Sierra.xml",
+     15281
+    ]
+   ]
+  },
+  {
+   "id": "en/Gunold_Stickma_Sulky",
+   "name": "Gunold Stickma Sulky",
+   "brand": "Gunold",
+   "count": 198,
+   "files": [
+    [
+     "corel-swatches/Gunold_Stickma_Sulky.xml",
+     19082
+    ]
+   ]
+  },
+  {
+   "id": "en/Gunold_Sulky_30",
+   "name": "Gunold Sulky 30",
+   "brand": "Gunold",
+   "count": 156,
+   "files": [
+    [
+     "corel-swatches/Gunold_Sulky_30.xml",
+     17678
+    ]
+   ]
+  },
+  {
+   "id": "en/Gunold_Sulky_40",
+   "name": "Gunold Sulky 40",
+   "brand": "Gunold",
+   "count": 390,
+   "files": [
+    [
+     "corel-swatches/Gunold_Sulky_40.xml",
+     42392
+    ]
+   ]
+  },
+  {
+   "id": "en/Gutermann_Shade_Card_MA_95-1",
+   "name": "Gutermann Shade Card MA 95-1",
+   "brand": "Gütermann",
+   "count": 360,
+   "files": [
+    [
+     "corel-swatches/Gutermann_Shade_Card_MA_95-1.xml",
+     42797
+    ]
+   ]
+  },
+  {
+   "id": "en/Gutermann_Shade_Card_TB_95-1",
+   "name": "Gutermann Shade Card TB 95-1",
+   "brand": "Gütermann",
+   "count": 127,
+   "files": [
+    [
+     "corel-swatches/Gutermann_Shade_Card_TB_95-1.xml",
+     15071
+    ]
+   ]
+  },
+  {
+   "id": "en/Gutermann_Shade_Card_TB_96-2",
+   "name": "Gutermann Shade Card TB 96-2",
+   "brand": "Gütermann",
+   "count": 46,
+   "files": [
+    [
+     "corel-swatches/Gutermann_Shade_Card_TB_96-2.xml",
+     5807
+    ]
+   ]
+  },
+  {
+   "id": "en/Gutermann_Shade_Card_VICI_95-1",
+   "name": "Gutermann Shade Card VICI 95-1",
+   "brand": "Gütermann",
+   "count": 240,
+   "files": [
+    [
+     "corel-swatches/Gutermann_Shade_Card_VICI_95-1.xml",
+     28068
+    ]
+   ]
+  },
+  {
+   "id": "en/Hemingworth",
+   "name": "Hemingworth",
+   "brand": "Hemingworth",
+   "count": 282,
+   "files": [
+    [
+     "corel-swatches/Hemingworth.xml",
+     33704
+    ]
+   ]
+  },
+  {
+   "id": "en/Hilos_Iris_100_Rayon",
+   "name": "Hilos Iris 100% Rayon",
+   "brand": "Hilos Iris",
+   "count": 69,
+   "files": [
+    [
+     "corel-swatches/Hilos_Iris_100_Rayon.xml",
+     7013
+    ]
+   ]
+  },
+  {
+   "id": "en/Hilos_Iris_Polyester",
+   "name": "Hilos Iris Polyester",
+   "brand": "Hilos Iris",
+   "count": 300,
+   "files": [
+    [
+     "corel-swatches/Hilos_Iris_Polyester.xml",
+     36602
+    ]
+   ]
+  },
+  {
+   "id": "en/Iris_Smooth_N_Silky_Rayon",
+   "name": "Iris Smooth 'N Silky Rayon",
+   "brand": "Iris",
+   "count": 292,
+   "files": [
+    [
+     "corel-swatches/Iris_Smooth_N_Silky_Rayon.xml",
+     35733
+    ]
+   ]
+  },
+  {
+   "id": "en/Iris_UltraBrite_Polyester",
+   "name": "Iris UltraBrite Polyester",
+   "brand": "Iris",
+   "count": 299,
+   "files": [
+    [
+     "corel-swatches/Iris_UltraBrite_Polyester.xml",
+     35990
+    ]
+   ]
+  },
+  {
+   "id": "en/Isacord_30",
+   "name": "Isacord 30",
+   "brand": "Isacord",
+   "count": 28,
+   "files": [
+    [
+     "corel-swatches/Isacord_30.xml",
+     3290
+    ]
+   ]
+  },
+  {
+   "id": "en/Isacord_40",
+   "name": "Isacord 40",
+   "brand": "Isacord",
+   "count": 423,
+   "files": [
+    [
+     "corel-swatches/Isacord_40.xml",
+     50614
+    ]
+   ]
+  },
+  {
+   "id": "en/Isafil",
+   "name": "Isafil",
+   "brand": "Isafil",
+   "count": 288,
+   "files": [
+    [
+     "corel-swatches/Isafil.xml",
+     34139
+    ]
+   ]
+  },
+  {
+   "id": "en/Isalon",
+   "name": "Isalon",
+   "brand": "Isalon",
+   "count": 420,
+   "files": [
+    [
+     "corel-swatches/Isalon.xml",
+     43706
+    ]
+   ]
+  },
+  {
+   "id": "en/Isamet",
+   "name": "Isamet",
+   "brand": "Isamet",
+   "count": 16,
+   "files": [
+    [
+     "corel-swatches/Isamet.xml",
+     2015
+    ]
+   ]
+  },
+  {
+   "id": "en/Janome_Acrylic",
+   "name": "Janome Acrylic",
+   "brand": "Janome",
+   "count": 78,
+   "files": [
+    [
+     "corel-swatches/Janome_Acrylic.xml",
+     9390
+    ]
+   ]
+  },
+  {
+   "id": "en/Janome_Polyester",
+   "name": "Janome Polyester",
+   "brand": "Janome",
+   "count": 78,
+   "files": [
+    [
+     "corel-swatches/Janome_Polyester.xml",
+     9392
+    ]
+   ]
+  },
+  {
+   "id": "en/Jenny_Haskins",
+   "name": "Jenny Haskins",
+   "brand": "Jenny Haskins",
+   "count": 167,
+   "files": [
+    [
+     "corel-swatches/Jenny_Haskins.xml",
+     20262
+    ]
+   ]
+  },
+  {
+   "id": "en/Kingstar",
+   "name": "Kingstar",
+   "brand": "King Star",
+   "count": 598,
+   "files": [
+    [
+     "corel-swatches/Kingstar.xml",
+     68675
+    ]
+   ]
+  },
+  {
+   "id": "en/Kingfisher_Card_202",
+   "name": "Kingfisher Card 202",
+   "brand": "Kingfisher",
+   "count": 438,
+   "files": [
+    [
+     "corel-swatches/Kingfisher_Card_202.xml",
+     46631
+    ]
+   ]
+  },
+  {
+   "id": "en/Macpherson_Vital_Link_Rayon",
+   "name": "Macpherson Vital Link Rayon",
+   "brand": "Macpherson",
+   "count": 146,
+   "files": [
+    [
+     "corel-swatches/Macpherson_Vital_Link_Rayon.xml",
+     15370
+    ]
+   ]
+  },
+  {
+   "id": "en/Madeira_Burmilana",
+   "name": "Madeira Burmilana",
+   "brand": "Madeira",
+   "count": 219,
+   "files": [
+    [
+     "corel-swatches/Madeira_Burmilana.xml",
+     24312
+    ]
+   ]
+  },
+  {
+   "id": "en/Madeira_Classic_40",
+   "name": "Madeira Classic 40",
+   "brand": "Madeira",
+   "count": 387,
+   "files": [
+    [
+     "corel-swatches/Madeira_Classic_40.xml",
+     46530
+    ]
+   ]
+  },
+  {
+   "id": "en/Madeira_Fire_Fighter",
+   "name": "Madeira Fire Fighter",
+   "brand": "Madeira",
+   "count": 24,
+   "files": [
+    [
+     "corel-swatches/Madeira_Fire_Fighter.xml",
+     3131
+    ]
+   ]
+  },
+  {
+   "id": "en/Madeira_Frosted_Matt_40",
+   "name": "Madeira Frosted Matt 40",
+   "brand": "Madeira",
+   "count": 189,
+   "files": [
+    [
+     "corel-swatches/Madeira_Frosted_Matt_40.xml",
+     20954
+    ]
+   ]
+  },
+  {
+   "id": "en/Madeira_FS_-_Super_Twist",
+   "name": "Madeira FS Super Twist",
+   "brand": "Madeira",
+   "count": 123,
+   "files": [
+    [
+     "corel-swatches/Madeira_FS_-_Super_Twist.xml",
+     13830
+    ]
+   ]
+  },
+  {
+   "id": "en/Madeira_Polyneon",
+   "name": "Madeira Polyneon",
+   "brand": "Madeira",
+   "count": 61,
+   "files": [
+    [
+     "corel-swatches/Madeira_Polyneon.xml",
+     7798
+    ]
+   ]
+  },
+  {
+   "id": "en/Madeira_PolyNeon_40",
+   "name": "Madeira PolyNeon 40",
+   "brand": "Madeira",
+   "count": 413,
+   "files": [
+    [
+     "corel-swatches/Madeira_PolyNeon_40.xml",
+     49402
+    ]
+   ]
+  },
+  {
+   "id": "en/Madeira_PolyNeon_Green",
+   "name": "Madeira PolyNeon Green",
+   "brand": "Madeira",
+   "count": 520,
+   "files": [
+    [
+     "corel-swatches/Madeira_PolyNeon_Green.xml",
+     62598
+    ]
+   ]
+  },
+  {
+   "id": "en/Madeira_PolyStitch",
+   "name": "Madeira PolyStitch",
+   "brand": "Madeira",
+   "count": 128,
+   "files": [
+    [
+     "corel-swatches/Madeira_PolyStitch.xml",
+     15937
+    ]
+   ]
+  },
+  {
+   "id": "en/Madeira_Rayon",
+   "name": "Madeira Rayon",
+   "brand": "Madeira",
+   "count": 387,
+   "files": [
+    [
+     "corel-swatches/Madeira_Rayon.xml",
+     46521
+    ]
+   ]
+  },
+  {
+   "id": "en/Marathon_100_Viscose_Rayon",
+   "name": "Marathon 100% Viscose Rayon",
+   "brand": "Marathon",
+   "count": 317,
+   "files": [
+    [
+     "corel-swatches/Marathon_100_Viscose_Rayon.xml",
+     38386
+    ]
+   ]
+  },
+  {
+   "id": "en/Marathon_Poly",
+   "name": "Marathon Poly",
+   "brand": "Marathon",
+   "count": 301,
+   "files": [
+    [
+     "corel-swatches/Marathon_Poly.xml",
+     35874
+    ]
+   ]
+  },
+  {
+   "id": "en/Mesa_Endura",
+   "name": "Mesa Endura",
+   "brand": "Mesa",
+   "count": 231,
+   "files": [
+    [
+     "corel-swatches/Mesa_Endura.xml",
+     29264
+    ]
+   ]
+  },
+  {
+   "id": "en/Metro_Polyester",
+   "name": "Metro Polyester",
+   "brand": "Metro",
+   "count": 147,
+   "files": [
+    [
+     "corel-swatches/Metro_Polyester.xml",
+     18133
+    ]
+   ]
+  },
+  {
+   "id": "en/Mettler_40",
+   "name": "Mettler 40",
+   "brand": "Mettler",
+   "count": 315,
+   "files": [
+    [
+     "corel-swatches/Mettler_40.xml",
+     35007
+    ]
+   ]
+  },
+  {
+   "id": "en/Mettler_Amanda",
+   "name": "Mettler Amanda",
+   "brand": "Mettler",
+   "count": 200,
+   "files": [
+    [
+     "corel-swatches/Mettler_Amanda.xml",
+     22210
+    ]
+   ]
+  },
+  {
+   "id": "en/Mettler_Cotton_Silk_Finish",
+   "name": "Mettler Cotton Silk Finish",
+   "brand": "Mettler",
+   "count": 151,
+   "files": [
+    [
+     "corel-swatches/Mettler_Cotton_Silk_Finish.xml",
+     14892
+    ]
+   ]
+  },
+  {
+   "id": "en/Mettler_Fine_Embroidery",
+   "name": "Mettler Fine Embroidery",
+   "brand": "Mettler",
+   "count": 151,
+   "files": [
+    [
+     "corel-swatches/Mettler_Fine_Embroidery.xml",
+     16878
+    ]
+   ]
+  },
+  {
+   "id": "en/Mettler_Metrosene",
+   "name": "Mettler Metrosene",
+   "brand": "Mettler",
+   "count": 318,
+   "files": [
+    [
+     "corel-swatches/Mettler_Metrosene.xml",
+     38857
+    ]
+   ]
+  },
+  {
+   "id": "en/Mettler_Poly_Sheen",
+   "name": "Mettler Poly Sheen",
+   "brand": "Mettler",
+   "count": 435,
+   "files": [
+    [
+     "corel-swatches/Mettler_Poly_Sheen.xml",
+     52024
+    ]
+   ]
+  },
+  {
+   "id": "en/Mettler_Silky_Sheen",
+   "name": "Mettler Silky Sheen",
+   "brand": "Mettler",
+   "count": 108,
+   "files": [
+    [
+     "corel-swatches/Mettler_Silky_Sheen.xml",
+     13173
+    ]
+   ]
+  },
+  {
+   "id": "en/Misairu_Tsuru",
+   "name": "Misairu Tsuru",
+   "brand": "Misairu Tsuru",
+   "count": 594,
+   "files": [
+    [
+     "corel-swatches/Misairu_Tsuru.xml",
+     70452
+    ]
+   ]
+  },
+  {
+   "id": "en/OTTO_Polyester",
+   "name": "OTTO Polyester",
+   "brand": "OTTO",
+   "count": 479,
+   "files": [
+    [
+     "corel-swatches/OTTO_Polyester.xml",
+     48698
+    ]
+   ]
+  },
+  {
+   "id": "en/Pantone_Pantone",
+   "name": "Pantone® Pantone",
+   "brand": "Pantone",
+   "count": 1341,
+   "files": [
+    [
+     "corel-swatches/Pantone_Pantone.xml",
+     156694
+    ]
+   ]
+  },
+  {
+   "id": "en/Pearl_Yacht_101-3_Rayon",
+   "name": "Pearl Yacht 101-3 Rayon",
+   "brand": "Pearl Yacht",
+   "count": 706,
+   "files": [
+    [
+     "corel-swatches/Pearl_Yacht_101-3_Rayon.xml",
+     84250
+    ]
+   ]
+  },
+  {
+   "id": "en/Pearl_Yacht_40D-2_Poly",
+   "name": "Pearl Yacht 40D-2 Poly",
+   "brand": "Pearl Yacht",
+   "count": 10,
+   "files": [
+    [
+     "corel-swatches/Pearl_Yacht_40D-2_Poly.xml",
+     1635
+    ]
+   ]
+  },
+  {
+   "id": "en/Pearl_Yacht_600E_Poly",
+   "name": "Pearl Yacht 600E Poly",
+   "brand": "Pearl Yacht",
+   "count": 327,
+   "files": [
+    [
+     "corel-swatches/Pearl_Yacht_600E_Poly.xml",
+     31305
+    ]
+   ]
+  },
+  {
+   "id": "en/Pearl_Yacht_Rayon",
+   "name": "Pearl Yacht Rayon",
+   "brand": "Pearl Yacht",
+   "count": 706,
+   "files": [
+    [
+     "corel-swatches/Pearl_Yacht_Rayon.xml",
+     84244
+    ]
+   ]
+  },
+  {
+   "id": "en/Polyseda_Iris_100_Trilobal_Poly",
+   "name": "Polyseda Iris 100% Trilobal Poly",
+   "brand": "Polyseda",
+   "count": 95,
+   "files": [
+    [
+     "corel-swatches/Polyseda_Iris_100_Trilobal_Poly.xml",
+     9332
+    ]
+   ]
+  },
+  {
+   "id": "en/Quilters_Select_Para-Cotton_Poly",
+   "name": "Quilters Select Para-Cotton Poly",
+   "brand": "Quilters Select",
+   "count": 40,
+   "files": [
+    [
+     "corel-swatches/Quilters_Select_Para-Cotton_Poly.xml",
+     5290
+    ]
+   ]
+  },
+  {
+   "id": "en/Quilters_Select_Pefect_Cotton_Plus",
+   "name": "Quilters Select Pefect Cotton Plus",
+   "brand": "Quilters Select",
+   "count": 60,
+   "files": [
+    [
+     "corel-swatches/Quilters_Select_Pefect_Cotton_Plus.xml",
+     7655
+    ]
+   ]
+  },
+  {
+   "id": "en/Quilters_Select_Perfect_Cotton_Plus_2500yd",
+   "name": "Quilters Select Perfect Cotton Plus 2,500yd",
+   "brand": "Quilters Select",
+   "count": 8,
+   "files": [
+    [
+     "corel-swatches/Quilters_Select_Perfect_Cotton_Plus_2500yd.xml",
+     1671
+    ]
+   ]
+  },
+  {
+   "id": "en/Rapos_Poly",
+   "name": "Rapos Poly",
+   "brand": "Rapos",
+   "count": 381,
+   "files": [
+    [
+     "corel-swatches/Rapos_Poly.xml",
+     38168
+    ]
+   ]
+  },
+  {
+   "id": "en/RNK_Micro_Thread",
+   "name": "RNK Micro Thread",
+   "brand": "RNK",
+   "count": 72,
+   "files": [
+    [
+     "corel-swatches/RNK_Micro_Thread.xml",
+     8913
+    ]
+   ]
+  },
+  {
+   "id": "en/Robison-Anton_Card_304-4_7_Floss",
+   "name": "Robison-Anton Card 304-4 #7 Floss",
+   "brand": "Robison-Anton",
+   "count": 35,
+   "files": [
+    [
+     "corel-swatches/Robison-Anton_Card_304-4_7_Floss.xml",
+     3727
+    ]
+   ]
+  },
+  {
+   "id": "en/Robison-Anton_Card_40E_600D_Rayon",
+   "name": "Robison-Anton Card 40E 600D Rayon",
+   "brand": "Robison-Anton",
+   "count": 34,
+   "files": [
+    [
+     "corel-swatches/Robison-Anton_Card_40E_600D_Rayon.xml",
+     3709
+    ]
+   ]
+  },
+  {
+   "id": "en/Robison-Anton_Card_70C_Cotton",
+   "name": "Robison-Anton Card 70C Cotton",
+   "brand": "Robison-Anton",
+   "count": 44,
+   "files": [
+    [
+     "corel-swatches/Robison-Anton_Card_70C_Cotton.xml",
+     4610
+    ]
+   ]
+  },
+  {
+   "id": "en/Robison-Anton_Card_SBP-10_Poly",
+   "name": "Robison-Anton Card SBP-10 Poly",
+   "brand": "Robison-Anton",
+   "count": 453,
+   "files": [
+    [
+     "corel-swatches/Robison-Anton_Card_SBP-10_Poly.xml",
+     54773
+    ]
+   ]
+  },
+  {
+   "id": "en/Robison-Anton_Card_SBP-2_Poly",
+   "name": "Robison-Anton Card SBP-2 Poly",
+   "brand": "Robison-Anton",
+   "count": 79,
+   "files": [
+    [
+     "corel-swatches/Robison-Anton_Card_SBP-2_Poly.xml",
+     7881
+    ]
+   ]
+  },
+  {
+   "id": "en/Robison-Anton_Card_SBP-4_Poly",
+   "name": "Robison-Anton Card SBP-4 Poly",
+   "brand": "Robison-Anton",
+   "count": 79,
+   "files": [
+    [
+     "corel-swatches/Robison-Anton_Card_SBP-4_Poly.xml",
+     7832
+    ]
+   ]
+  },
+  {
+   "id": "en/Robison-Anton_Card_SBP-7_Poly",
+   "name": "Robison-Anton Card SBP-7 Poly",
+   "brand": "Robison-Anton",
+   "count": 443,
+   "files": [
+    [
+     "corel-swatches/Robison-Anton_Card_SBP-7_Poly.xml",
+     52521
+    ]
+   ]
+  },
+  {
+   "id": "en/Robison-Anton_Card_SBP-9_Poly",
+   "name": "Robison-Anton Card SBP-9 Poly",
+   "brand": "Robison-Anton",
+   "count": 454,
+   "files": [
+    [
+     "corel-swatches/Robison-Anton_Card_SBP-9_Poly.xml",
+     54937
+    ]
+   ]
+  },
+  {
+   "id": "en/Robison-Anton_Card_SSR-6_Rayon",
+   "name": "Robison-Anton Card SSR-6 Rayon",
+   "brand": "Robison-Anton",
+   "count": 369,
+   "files": [
+    [
+     "corel-swatches/Robison-Anton_Card_SSR-6_Rayon.xml",
+     38350
+    ]
+   ]
+  },
+  {
+   "id": "en/Robison-Anton_Card_SSR-7_Rayon",
+   "name": "Robison-Anton Card SSR-7 Rayon",
+   "brand": "Robison-Anton",
+   "count": 408,
+   "files": [
+    [
+     "corel-swatches/Robison-Anton_Card_SSR-7_Rayon.xml",
+     48272
+    ]
+   ]
+  },
+  {
+   "id": "en/Royal",
+   "name": "Royal",
+   "brand": "Royal",
+   "count": 499,
+   "files": [
+    [
+     "corel-swatches/Royal.xml",
+     50479
+    ]
+   ]
+  },
+  {
+   "id": "en/Sakura",
+   "name": "Sakura",
+   "brand": "Sakura",
+   "count": 1302,
+   "files": [
+    [
+     "corel-swatches/Sakura.xml",
+     160141
+    ]
+   ]
+  },
+  {
+   "id": "en/Sakura_Joyce",
+   "name": "Sakura Joyce",
+   "brand": "Sakura",
+   "count": 1680,
+   "files": [
+    [
+     "corel-swatches/Sakura_Joyce.xml",
+     206591
+    ]
+   ]
+  },
+  {
+   "id": "en/SEMCO_Polyester",
+   "name": "SEMCO Polyester",
+   "brand": "SEMCO",
+   "count": 256,
+   "files": [
+    [
+     "corel-swatches/SEMCO_Polyester.xml",
+     31188
+    ]
+   ]
+  },
+  {
+   "id": "en/Setta_Lumina",
+   "name": "Setta Lumina",
+   "brand": "Setta",
+   "count": 373,
+   "files": [
+    [
+     "corel-swatches/Setta_Lumina.xml",
+     40682
+    ]
+   ]
+  },
+  {
+   "id": "en/Sigma_Polyester_40wt",
+   "name": "Sigma Polyester 40wt",
+   "brand": "Sigma",
+   "count": 147,
+   "files": [
+    [
+     "corel-swatches/Sigma_Polyester_40wt.xml",
+     18152
+    ]
+   ]
+  },
+  {
+   "id": "en/Silky_Cartella_No._7",
+   "name": "Silky Cartella No. 7",
+   "brand": "Silky",
+   "count": 71,
+   "files": [
+    [
+     "corel-swatches/Silky_Cartella_No._7.xml",
+     8472
+    ]
+   ]
+  },
+  {
+   "id": "en/Simthread_Polyester",
+   "name": "Simthread Polyester",
+   "brand": "Simthread",
+   "count": 107,
+   "files": [
+    [
+     "corel-swatches/Simthread_Polyester.xml",
+     13388
+    ]
+   ]
+  },
+  {
+   "id": "en/Skylab_Cartella_Colori_No._12",
+   "name": "Skylab Cartella Colori No. 12",
+   "brand": "Skylab",
+   "count": 189,
+   "files": [
+    [
+     "corel-swatches/Skylab_Cartella_Colori_No._12.xml",
+     22631
+    ]
+   ]
+  },
+  {
+   "id": "en/Sulky_Cotty_12",
+   "name": "Sulky Cotty 12",
+   "brand": "Sulky",
+   "count": 130,
+   "files": [
+    [
+     "corel-swatches/Sulky_Cotty_12.xml",
+     14413
+    ]
+   ]
+  },
+  {
+   "id": "en/Sulky_Cotty_30",
+   "name": "Sulky Cotty 30",
+   "brand": "Sulky",
+   "count": 130,
+   "files": [
+    [
+     "corel-swatches/Sulky_Cotty_30.xml",
+     14409
+    ]
+   ]
+  },
+  {
+   "id": "en/Sulky_Cry_30",
+   "name": "Sulky Cry 30",
+   "brand": "Sulky",
+   "count": 1,
+   "files": [
+    [
+     "corel-swatches/Sulky_Cry_30.xml",
+     735
+    ]
+   ]
+  },
+  {
+   "id": "en/Sulky_Filaine_12",
+   "name": "Sulky Filaine 12",
+   "brand": "Sulky",
+   "count": 129,
+   "files": [
+    [
+     "corel-swatches/Sulky_Filaine_12.xml",
+     14090
+    ]
+   ]
+  },
+  {
+   "id": "en/Sulky_Glowy_40",
+   "name": "Sulky Glowy 40",
+   "brand": "Sulky",
+   "count": 7,
+   "files": [
+    [
+     "corel-swatches/Sulky_Glowy_40.xml",
+     1365
+    ]
+   ]
+  },
+  {
+   "id": "en/Sulky_Holoshimmmer_30",
+   "name": "Sulky Holoshimmmer 30",
+   "brand": "Sulky",
+   "count": 24,
+   "files": [
+    [
+     "corel-swatches/Sulky_Holoshimmmer_30.xml",
+     3015
+    ]
+   ]
+  },
+  {
+   "id": "en/Sulky_Invisible_40",
+   "name": "Sulky Invisible 40",
+   "brand": "Sulky",
+   "count": 2,
+   "files": [
+    [
+     "corel-swatches/Sulky_Invisible_40.xml",
+     829
+    ]
+   ]
+  },
+  {
+   "id": "en/Sulky_Metallic_30",
+   "name": "Sulky Metallic 30",
+   "brand": "Sulky",
+   "count": 36,
+   "files": [
+    [
+     "corel-swatches/Sulky_Metallic_30.xml",
+     4600
+    ]
+   ]
+  },
+  {
+   "id": "en/Sulky_Poly_Deco_40",
+   "name": "Sulky Poly Deco 40",
+   "brand": "Sulky",
+   "count": 138,
+   "files": [
+    [
+     "corel-swatches/Sulky_Poly_Deco_40.xml",
+     14896
+    ]
+   ]
+  },
+  {
+   "id": "en/Sulky_Poly_Flash_40",
+   "name": "Sulky Poly Flash 40",
+   "brand": "Sulky",
+   "count": 23,
+   "files": [
+    [
+     "corel-swatches/Sulky_Poly_Flash_40.xml",
+     3064
+    ]
+   ]
+  },
+  {
+   "id": "en/Sulky_Poly_Lite_60",
+   "name": "Sulky Poly Lite 60",
+   "brand": "Sulky",
+   "count": 36,
+   "files": [
+    [
+     "corel-swatches/Sulky_Poly_Lite_60.xml",
+     4300
+    ]
+   ]
+  },
+  {
+   "id": "en/Sulky_Poly_Sparkle_Star_30",
+   "name": "Sulky Poly Sparkle (Star) 30",
+   "brand": "Sulky",
+   "count": 54,
+   "files": [
+    [
+     "corel-swatches/Sulky_Poly_Sparkle_Star_30.xml",
+     6371
+    ]
+   ]
+  },
+  {
+   "id": "en/Sulky_Rayon_40_EU",
+   "name": "Sulky Rayon 40 (EU)",
+   "brand": "Sulky",
+   "count": 289,
+   "files": [
+    [
+     "corel-swatches/Sulky_Rayon_40_EU.xml",
+     34761
+    ]
+   ]
+  },
+  {
+   "id": "en/Sulky_Rayon_40_US",
+   "name": "Sulky Rayon 40 (US)",
+   "brand": "Sulky",
+   "count": 333,
+   "files": [
+    [
+     "corel-swatches/Sulky_Rayon_40_US.xml",
+     40079
+    ]
+   ]
+  },
+  {
+   "id": "en/Sulky_Sliver_40",
+   "name": "Sulky Sliver 40",
+   "brand": "Sulky",
+   "count": 24,
+   "files": [
+    [
+     "corel-swatches/Sulky_Sliver_40.xml",
+     3176
+    ]
+   ]
+  },
+  {
+   "id": "en/Sulky_Viscose_Rayon",
+   "name": "Sulky Viscose Rayon",
+   "brand": "Sulky",
+   "count": 333,
+   "files": [
+    [
+     "corel-swatches/Sulky_Viscose_Rayon.xml",
+     40077
+    ]
+   ]
+  },
+  {
+   "id": "en/The_Institute_of_Heraldry_TIOH_Fil-tec_Glide",
+   "name": "The Institute of Heraldry (TIOH) Fil-tec Glide",
+   "brand": "The Institute of Heraldry",
+   "count": 50,
+   "files": [
+    [
+     "corel-swatches/The_Institute_of_Heraldry_TIOH_Fil-tec_Glide.xml",
+     7575
+    ]
+   ]
+  },
+  {
+   "id": "en/ThreadArt",
+   "name": "ThreadArt",
+   "brand": "ThreadArt",
+   "count": 159,
+   "files": [
+    [
+     "corel-swatches/ThreadArt.xml",
+     19308
+    ]
+   ]
+  },
+  {
+   "id": "en/Timeless",
+   "name": "Timeless",
+   "brand": "Timeless",
+   "count": 213,
+   "files": [
+    [
+     "corel-swatches/Timeless.xml",
+     26121
+    ]
+   ]
+  },
+  {
+   "id": "en/Tridalia_100_Trilobal_Poly",
+   "name": "Tridalia 100% Trilobal Poly",
+   "brand": "Tridalia",
+   "count": 131,
+   "files": [
+    [
+     "corel-swatches/Tridalia_100_Trilobal_Poly.xml",
+     13293
+    ]
+   ]
+  },
+  {
+   "id": "en/Wilcom",
+   "name": "Wilcom",
+   "brand": "Wilcom",
+   "count": 56,
+   "files": [
+    [
+     "corel-swatches/Wilcom.xml",
+     6966
+    ]
+   ]
+  },
+  {
+   "id": "en/Wonang_100_Viscose_Rayon",
+   "name": "Wonang 100% Viscose Rayon",
+   "brand": "Wonang",
+   "count": 288,
+   "files": [
+    [
+     "corel-swatches/Wonang_100_Viscose_Rayon.xml",
+     34889
+    ]
+   ]
+  },
+  {
+   "id": "en/Yenmet",
+   "name": "Yenmet",
+   "brand": "Yenmet",
+   "count": 56,
+   "files": [
+    [
+     "corel-swatches/Yenmet.xml",
+     8210
+    ]
+   ]
+  }
+ ],
+ "bytes": 4462323
+}

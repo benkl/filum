@@ -1,0 +1,21 @@
+/target
+node_modules/
+/ui/dist
+/ui/src/wasm/pkg
+*.log
+.DS_Store
+/src-tauri/gen/schemas
+/src-tauri/gen
+/src-tauri/target
+/ui/tsconfig.tsbuildinfo
+/node_modules
+
+# AI models and runtimes are downloaded at build time (npm run models)
+/ui/public/models
+/ui/public/ort
+/ui/public/ocr
+/ui/.model-cache
+__pycache__/
+
+# hand-digitized references for the digitizer suite (third-party files, fetched locally)
+/crates/core/tests/suite/reference/

@@ -1,0 +1,20 @@
+[package]
+name = "filum-core"
+description = "Filum embroidery engine: geometry, stitch generators (ported from Ink/Stitch), stitch plans and machine file formats."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = ["digitize"]
+digitize = ["dep:image"]
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+kurbo.workspace = true
+roxmltree.workspace = true
+svgtypes.workspace = true
+filum-formats.workspace = true
+image = { workspace = true, optional = true }
+clipper2-rust = "1.2.0"

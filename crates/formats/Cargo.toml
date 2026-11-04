@@ -1,0 +1,8 @@
+[package]
+name = "filum-formats"
+description = "Machine embroidery file readers/writers (DST, PES, JEF, EXP, VP3, ...) for Filum. Encoders ported from Ink/Stitch's pystitch (MIT)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
