@@ -7,7 +7,7 @@ default-members = ["crates/core", "crates/cli"]
 version = "0.1.0"
 edition = "2021"
 license = "GPL-3.0-or-later"
-repository = "https://github.com/kislovskij/filum"
+repository = "https://github.com/benkl/filum"
 authors = ["Benjamin Kleinert"]
 
 [workspace.dependencies]
