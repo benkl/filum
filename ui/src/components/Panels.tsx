@@ -451,8 +451,12 @@ function useSections(bodyRef: React.RefObject<HTMLDivElement | null>, query: str
       spy();
     };
     scan();
-    const mo = new MutationObserver(() => {
-      if (!raf) raf = requestAnimationFrame(scan);
+    // only a change of the sections themselves moves the list (values changing
+    // inside them do not); while searching every text change can, so then all
+    const sections = (n: Node) => n instanceof Element && (n.matches(".section") || !!n.querySelector(".section"));
+    const mo = new MutationObserver((recs) => {
+      if (raf) return;
+      if (q || recs.some((r) => [...r.addedNodes, ...r.removedNodes].some(sections))) raf = requestAnimationFrame(scan);
     });
     mo.observe(body, { childList: true, subtree: true, characterData: true });
     body.addEventListener("scroll", spy, { passive: true });

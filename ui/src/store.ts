@@ -468,8 +468,11 @@ export const useStore = create<State>((set, get) => ({
 /** The plan of each document the editor planned (side views reuse it instead of planning again). */
 export const planOf = new WeakMap<StitchDocument, PlanData>();
 
-// Re-plan whenever the document changes (latest wins inside the client).
-let planTimer: ReturnType<typeof setTimeout> | null = null;
+// Re-plan whenever the document changes (latest wins inside the client): on
+// the next frame, so a burst of changes in one frame plans once, without a
+// fixed delay on every edit.
+let planFrame: unknown = 0;
+const nextFrame = (f: () => void): unknown => (typeof requestAnimationFrame === "function" ? requestAnimationFrame(f) : setTimeout(f, 0));
 let lastPlanned: StitchDocument | null = null;
 /** Same document for the engine (reference pictures are not stitched). */
 const sameForEngine = (a: StitchDocument | null, b: StitchDocument) =>
@@ -481,8 +484,9 @@ useStore.subscribe((s) => {
   const skip = sameForEngine(lastPlanned, s.doc);
   lastPlanned = s.doc;
   if (skip) return;
-  if (planTimer) clearTimeout(planTimer);
-  planTimer = setTimeout(() => {
+  if (planFrame) return;
+  planFrame = nextFrame(() => {
+    planFrame = 0;
     const doc = useStore.getState().doc;
     useStore.setState({ planning: true });
     engine
@@ -494,7 +498,7 @@ useStore.subscribe((s) => {
       .catch((e: Error) => {
         if (e.message !== "superseded") useStore.setState({ planning: false, planError: e.message });
       });
-  }, 40);
+  });
 });
 
 // The density model follows the plan while the map is on (one request at a

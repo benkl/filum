@@ -120,7 +120,28 @@ Ordered by impact over effort. Each step names how we'll know it worked.
 2. **Flow and curved fills.** Streamline tracing uses flat arrays instead of hash maps, and each shape's direction field is cached.
 3. **Run cache.** Evict least recently used entries instead of emptying the whole cache at 4,000 entries, which regenerates everything at once on large designs.
 4. **Clipped outlines.** Hidden-stitch removal returns outlines with many round-join points, which makes their fills slower. A coarser arc tolerance would help, but it changes stitches, so it needs a decision and a suite run.
-5. **Measure in the browser.** Time the same benchmark in wasm. If the gap is large, generate objects in parallel (a worker pool, or wasm threads where the platform allows them) and show the visible objects first.
+5. ~~Measure in the browser.~~ Done, see 4.1.
+6. **Flow, curved and gradient fills on first load** are now the slowest thing in the browser: 0.5 s for 16 curved fills and 0.9 s for six 3-colour gradients, cold. Items 1 and 2 address them. If that isn't enough, generate objects in parallel (a worker pool, or wasm threads where the platform allows them) and show the visible objects first.
+7. **The digitize dialog** costs about 0.4 s for the stitches plus 0.2 s for the colour preview per change of a setting. A third of that is the denoise filter's 7×7 window. Run the preview and the stitches in parallel, or skip the stitches until the user looks at that tab.
+8. **Very large designs on the canvas.** With 140,000 stitches, panning the stitch and realistic views drops to 15–30 frames per second in a software-rendered browser. Draw the cached layer scaled while the view moves, and repaint sharply only once it stops, as zooming already does.
+
+### 4.1 Browser profile (November 2026)
+The editor was profiled as a production build in a headless browser on eight designs, from a 14-object badge to 300 overlapping fills with 142,000 stitches. Two scripts measure it:
+- `ui/scripts/wasm-bench.mjs` times the engine's wasm module directly.
+- A browser script times startup, the cold plan, an edit until its plan and its repaint, panning and zooming in the three views, and the density map, and records a CPU profile of the main thread.
+
+Findings and what was done:
+- **Wasm ran 4–9× slower than native.** Normally the gap is under 2×. 58 % of the engine's time in wasm went into two software math routines, `hypot` (used for every distance) and the fused multiply-add it calls. With `sqrt(x² + y²)`, plus a multiply hash for grid cells instead of the default SipHash, cold plans got 4–42× faster in the browser (a 70-object logo 396 → 44 ms, 300 fills 1,499 → 36 ms, gradients 6,009 → 894 ms), and wasm now runs at about native speed. Natively, curved fills got 32 % faster and gradients 23 %. Every stitch is identical.
+- **Digitizing** in wasm went from 536 to 382 ms, and its colour preview from 296 to 187 ms:
+  - The denoise filter's exponential comes from a table.
+  - Lab-to-RGB finds each byte in a table of 255 band edges instead of calling `pow`; a test checks 400,000 values byte for byte.
+  - The ink detection's grey closing uses a sliding max and min that takes the same time whatever the radius.
+  - Line stamping skips cells already marked.
+
+  The suite's quality numbers are identical, and natively the digitizer is 10–47 % faster.
+- **An edit's plan** used to wait a fixed 40 ms before planning. It now plans on the next frame, and the client's latest-wins queue still merges bursts. Edit to new plan went from 48–129 ms to 25–60 ms, and edit to repaint from 65–144 ms to 48–91 ms.
+- **The Properties panel's section tracker** rescanned all sections and forced a layout on every value change inside them. It now rescans only when sections are added or removed, or while searching.
+- **What's left on the main thread** is mostly canvas compositing (`drawImage`, 14 %), garbage collection (7 %) and building the stitch geometry for the canvas (11 %). None of these is wasteful, and all three scale with the stitch count.
 
 ### Phase D: later
 - Tell a face from a frame's inside by learned segmentation (the on-device model the AI tab already uses), not by geometry alone.

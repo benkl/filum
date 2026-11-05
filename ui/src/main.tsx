@@ -27,4 +27,5 @@ createRoot(document.getElementById("root")!).render(
 // Desktop: a file Filum was opened with replaces the restored design.
 void openLaunchFiles();
 
-if (import.meta.env.DEV) Object.assign(window, { __store: useStore, __engine: engine });
+// dev builds, and production builds made with VITE_PERF=1 for profiling
+if (import.meta.env.DEV || import.meta.env.VITE_PERF) Object.assign(window, { __store: useStore, __engine: engine });
