@@ -38,6 +38,17 @@ Press <kbd>?</kbd> in Filum to see this list in the app, with a filter box. On a
 | Space + drag · middle mouse | Pan |
 | Shift+D | Density map |
 
+## Stitch-out player
+
+| Keys | What it does |
+|---|---|
+| Animate (bottom bar) | Open the player and play the stitch-out |
+| ← / → | One stitch back / forward |
+| Shift+← / Shift+→ | Previous / next colour block |
+| Home / End | To the start / the end |
+| Click or drag the timeline | Go to that stitch |
+| Esc | Close the player |
+
 ## Selection & objects
 
 | Keys | What it does |

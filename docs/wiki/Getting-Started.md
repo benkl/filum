@@ -31,7 +31,7 @@ Try this:
 1. Press <kbd>1</kbd>, <kbd>2</kbd> and <kbd>3</kbd> to switch between the **Vector**, **Stitch** and **Realistic** views.
 2. Click the **Mountains** in the *Layers* list (or on the canvas). The right-hand panel switches to **Selection** and shows the stitch settings for that shape.
 3. Pick a different fill, like **Contour** or **Stipple**, and watch the stitches update.
-4. Click **Animate** in the bottom bar to watch the design sew itself out.
+4. Click **Animate** in the bottom bar to watch the design sew itself out. The timeline under the canvas shows each colour block; drag along it to go back and forth.
 
 ![The Selection panel with the stitch types of a fill](images/stitch-settings.webp)
 

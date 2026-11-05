@@ -56,4 +56,4 @@ Add the job details, operator notes, the estimated time and your own branding. T
 ## Pictures and video
 
 - **Pictures**: the Export dialog can add a **Realistic picture** or a **Simple picture (lines)** as PNG, with a transparent, white or fabric-coloured background.
-- **Stitch-out video**: **Video** in the bottom bar records the stitch-out animation as a `.webm` file. That's great for showing a client or posting online. In the browser, this needs a browser that supports recording (MediaRecorder).
+- **Stitch-out video**: **Video** in the bottom bar (or the camera in the stitch-out player) records the stitch-out animation at the player's speed as a `.webm` file. That's great for showing a client or posting online. In the browser, this needs a browser that supports recording (MediaRecorder).

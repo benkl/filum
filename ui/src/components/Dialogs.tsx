@@ -64,6 +64,17 @@ const SHORTCUTS: { group: string; rows: [string, string][] }[] = [
     ],
   },
   {
+    group: "Stitch-out player",
+    rows: [
+      ["Animate (bottom bar)", "Open the player and play the stitch-out"],
+      ["← / →", "One stitch back / forward"],
+      ["Shift+← / Shift+→", "Previous / next colour block"],
+      ["Home / End", "To the start / the end"],
+      ["Click or drag the timeline", "Go to that stitch"],
+      ["Esc", "Close the player"],
+    ],
+  },
+  {
     group: "Selection & objects",
     rows: [
       ["Ctrl+A", "Select all (node tool: every point)"],

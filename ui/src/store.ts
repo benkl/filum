@@ -121,7 +121,8 @@ export interface State {
   /** Grid spacing (mm; 0 = automatic). */
   gridStep: number;
   showUnderlay: boolean;
-  anim: { playing: boolean; index: number | null; speed: number };
+  /** The stitch-out player: position (null = closed), speed (stitches/s, 0 = auto), whether the view follows the needle. */
+  anim: { playing: boolean; index: number | null; speed: number; follow: boolean };
   dialog: DialogName;
   toasts: Toast[];
   activeThread: string | null;
@@ -217,6 +218,16 @@ const savedView: Partial<Pick<State, (typeof VIEW_FIELDS)[number]>> = (() => {
   }
 })();
 const DOC_KEY = "filum.autosave";
+/** The stitch-out player's speed and follow setting, remembered between sessions. */
+const PLAYER_KEY = "filum.player";
+function playerPrefs(): { speed: number; follow: boolean } {
+  try {
+    const p = JSON.parse(localStorage.getItem(PLAYER_KEY) ?? "{}");
+    return { speed: typeof p.speed === "number" && p.speed >= 0 ? p.speed : 0, follow: p.follow === true };
+  } catch {
+    return { speed: 0, follow: false };
+  }
+}
 
 export const emptyDoc = (): StitchDocument => ({
   version: 1,
@@ -254,7 +265,7 @@ export const useStore = create<State>((set, get) => ({
   showGrid: true,
   gridStep: 0,
   showUnderlay: true,
-  anim: { playing: false, index: null, speed: 1 },
+  anim: { playing: false, index: null, ...playerPrefs() },
   dialog: null,
   toasts: [],
   activeThread: null,
@@ -495,6 +506,7 @@ useStore.subscribe((s, p) => {
 // Autosave to local storage (desktop users also get real files via Save).
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 useStore.subscribe((s, prev) => {
+  if (s.anim.speed !== prev.anim.speed || s.anim.follow !== prev.anim.follow) localStorage.setItem(PLAYER_KEY, JSON.stringify({ speed: s.anim.speed, follow: s.anim.follow }));
   if (VIEW_FIELDS.some((k) => s[k] !== prev[k])) localStorage.setItem(VIEW_KEY, JSON.stringify(Object.fromEntries(VIEW_FIELDS.map((k) => [k, s[k]]))));
   if (s.doc === prev.doc || !s.prefs.autosave) return;
   if (saveTimer) clearTimeout(saveTimer);

@@ -58,6 +58,18 @@ For machines with cutwork needles, **Path → Cutwork segmentation** splits runn
 
 - **Issues** (left panel, or **Stitch → Troubleshoot…**) lists anything that could go wrong on the machine.
 - The **Density map** (<kbd>Shift</kbd>+<kbd>D</kbd>) shows where stitches pile up.
-- **Animate** in the bottom bar plays the stitch-out, so you can check the sew order and the jumps.
+- **Animate** in the bottom bar opens the stitch-out player and plays the design stitch by stitch, so you can check the sew order and the jumps.
+
+### The stitch-out player
+
+The player sits between the canvas and the bottom bar while it's open.
+
+- **Timeline**: one lane per colour block, in sew order. Each bar shows where its block falls in the stitch-out: faded where it is still to sew, in the thread colour where it is sewn. Thin ticks mark trims inside a block, and the round marker at the end of a bar is the thread change (or a stop). Click or drag anywhere on the timeline to go to that stitch, or click a thread's name to go to the start of its block.
+- **Counters**: the stitches sewn so far, and the machine time at that point out of the total (at the machine's stitches per minute, with its trim and thread-change times from *Design → Machine*).
+- **Speed**: *Auto* sews any design in about twelve seconds, or pick a fixed number of stitches per second.
+- **Follow the needle** keeps the needle in view while you're zoomed in.
+- The camera button records the same stitch-out as a video. The player remembers its speed, the follow setting and its height (drag its top edge).
+
+Keys: <kbd>←</kbd> <kbd>→</kbd> one stitch, <kbd>Shift</kbd>+<kbd>←</kbd> <kbd>→</kbd> one colour block, <kbd>Home</kbd> <kbd>End</kbd> the start and the end, <kbd>Esc</kbd> closes the player.
 
 ![The stitch-out animation](images/stitch-out.webp)

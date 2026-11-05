@@ -9,6 +9,7 @@ import { Digitize, StitchRunning } from "./icons/stitch";
 import { useEffect } from "react";
 import { Canvas } from "./canvas/Canvas";
 import { BottomBar } from "./components/BottomBar";
+import { StitchOutPanel, seek, stepBlock, stepStitch } from "./components/StitchOut";
 import { ContextBar, TitleBar, ToolRail } from "./components/Bars";
 import { Dialogs } from "./components/Dialogs";
 import { Workspace } from "./components/Panels";
@@ -110,6 +111,13 @@ function useShortcuts() {
         else if (s.tool !== "select") s.setTool("select");
         else s.select([]);
         return;
+      }
+      // the stitch-out player takes the arrows while it is open
+      if (s.anim.index != null && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const dir = k === "arrowleft" ? -1 : k === "arrowright" ? 1 : 0;
+        if (dir) return (e.preventDefault(), e.shiftKey ? stepBlock(dir) : stepStitch(dir));
+        if (k === "home") return (e.preventDefault(), seek(0));
+        if (k === "end") return (e.preventDefault(), seek(Infinity));
       }
       const step = e.shiftKey ? s.prefs.nudgeBig : s.prefs.nudge;
       if (k === "arrowleft") return (e.preventDefault(), nudge(-step, 0));
@@ -233,6 +241,7 @@ export default function App() {
               <PlanningIndicator />
               <EmptyHint />
             </div>
+            <StitchOutPanel />
             <BottomBar />
           </div>
         }

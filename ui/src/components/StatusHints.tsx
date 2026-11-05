@@ -23,7 +23,15 @@ function hintsFor(s: ReturnType<typeof useStore.getState>): Hint[] {
       [["Enter"], "Done"],
       [["Del"], "Remove picture"],
     ];
-  if (s.anim.index != null) return [[["Drag", "slider"], "Scrub the stitch-out"], [["Esc"], "Stop"], [["LMB"], "Back to editing"]];
+  if (s.anim.index != null)
+    return [
+      [["Drag", "timeline"], "Scrub"],
+      [["←", "→"], "One stitch"],
+      [["Shift", "←", "→"], "Colour block"],
+      [["Home", "End"], "Start · end"],
+      [["Esc"], "Close"],
+      [["LMB"], "Back to editing"],
+    ];
   if (s.editingText) return [[["Type"], "Edit the text"], [["Enter"], "New line"], [["Esc"], "Finish"], [["Drag", "handles"], "Arch · spacing"]];
   const sel = s.selection.length;
   switch (s.tool) {

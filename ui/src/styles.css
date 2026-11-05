@@ -575,7 +575,7 @@ a:focus-visible,
 }
 .center {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) 36px;
+  grid-template-rows: minmax(0, 1fr) auto 36px;
   min-width: 0;
   min-height: 0;
 }
@@ -794,6 +794,300 @@ a:focus-visible,
   flex: 1;
   min-width: 60px;
   accent-color: var(--accent);
+}
+
+/* ---------------- stitch-out player ---------------- */
+/* a timeline of the colour blocks between the canvas and the bottom bar:
+   one lane per block, bars laid out by sew order, the needle as a line */
+.stitchout {
+  position: relative;
+  display: grid;
+  grid-template-rows: 30px minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+  --so-label: 168px;
+  --so-row: 22px;
+}
+.so-grip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -3px;
+  height: 6px;
+  cursor: ns-resize;
+  z-index: 3;
+}
+.so-grip:hover {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.so-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  min-width: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  overflow: hidden;
+  container-type: inline-size;
+}
+.so-head > * {
+  flex: none;
+}
+.so-play {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 22px;
+  margin: 0 2px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: var(--accent);
+  color: var(--accent-fg);
+  transition: background 0.12s var(--ease);
+}
+.so-play:hover {
+  background: var(--accent-hover);
+}
+.so-count,
+.so-clock {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.so-count b {
+  color: var(--text);
+  font-weight: 600;
+}
+.so-clock {
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.so-now {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 auto !important;
+  min-width: 0;
+  margin-left: 8px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.so-now i,
+.so-label i {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--r-xs);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 22%, transparent);
+}
+.so-speed {
+  height: 22px;
+  margin-right: 2px;
+  font-size: 12px;
+}
+@container (max-width: 640px) {
+  .so-now,
+  .so-clock {
+    display: none;
+  }
+}
+.so-body {
+  display: grid;
+  grid-template-columns: var(--so-label) minmax(0, 1fr);
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.so-labels {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  border-right: 1px solid var(--border);
+  background: var(--panel);
+}
+.so-corner {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--faint);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+.so-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: var(--so-row);
+  padding: 0 10px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: 11.5px;
+  text-align: left;
+}
+.so-label:hover {
+  background: var(--bg-2);
+}
+.so-label.on {
+  background: var(--accent-soft);
+}
+.so-n {
+  min-width: 14px;
+  color: var(--faint);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.so-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* the bars sit between 12 px and 18 px margins so the first and last end markers show */
+.so-track {
+  position: relative;
+  min-width: 0;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+  --so-l: 12px;
+  --so-r: 18px;
+}
+.so-ruler {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  height: 22px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.so-scale {
+  position: absolute;
+  inset: 0 var(--so-r) 0 var(--so-l);
+}
+.so-scale span {
+  position: absolute;
+  top: 0;
+  height: 21px;
+  padding: 3px 0 0 4px;
+  border-left: 1px solid var(--ruler-line);
+  color: var(--ruler-text);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.so-rows {
+  position: relative;
+  height: calc(var(--rows) * var(--so-row));
+  margin: 0 var(--so-r) 0 var(--so-l);
+}
+.so-lane,
+.so-row {
+  position: absolute;
+  left: calc(-1 * var(--so-l));
+  right: calc(-1 * var(--so-r));
+  height: var(--so-row);
+}
+.so-lane.on {
+  background: var(--accent-soft);
+}
+.so-row {
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+/* still to sew: the thread colour faded; sewn: the colour itself */
+/* (the fill's top is set inline: its lane's top + 7 px) */
+.so-bar,
+.so-fill {
+  position: absolute;
+  top: 7px;
+  height: 8px;
+  min-width: 2px;
+  border-radius: 4px;
+}
+.so-bar {
+  background: color-mix(in srgb, var(--c) 32%, var(--panel));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 55%, transparent);
+  pointer-events: auto;
+}
+.so-fill {
+  background: var(--c);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 18%, transparent);
+  pointer-events: none;
+}
+.so-trim {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 1px;
+  background: color-mix(in srgb, var(--text) 45%, transparent);
+  z-index: 1;
+}
+.so-stop {
+  position: absolute;
+  top: -1px;
+  width: 6px;
+  height: 10px;
+  margin-left: -3px;
+  border-radius: 2px;
+  background: var(--text);
+  z-index: 1;
+}
+.so-end {
+  position: absolute;
+  top: 3px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-left: -8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--bg-3);
+  color: var(--muted);
+  z-index: 2;
+  pointer-events: auto;
+}
+.so-needle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--so-l) + (100% - var(--so-l) - var(--so-r)) * var(--at));
+  width: 2px;
+  margin-left: -1px;
+  background: var(--select);
+  z-index: 5;
+  pointer-events: none;
+}
+.so-needle::before {
+  content: "";
+  position: sticky;
+  top: 0;
+  display: block;
+  width: 10px;
+  height: 10px;
+  margin-left: -4px;
+  border-radius: 0 0 50% 50%;
+  background: var(--select);
 }
 
 /* ---------------- side panels ---------------- */

@@ -27,7 +27,7 @@ Under the hood is a fast stitch engine written in Rust. It's a port of the algor
 
 ## Highlights
 
-**See it before you sew it.** Switch between the vector, stitch and realistic views with <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>. The realistic view shows thread sheen and fabric texture, and **Animate** plays the stitch-out stitch by stitch.
+**See it before you sew it.** Switch between the vector, stitch and realistic views with <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>. The realistic view shows thread sheen and fabric texture, and **Animate** plays the stitch-out stitch by stitch, with a timeline of the colour blocks, their trims and thread changes, and the machine time.
 
 ![The same badge in the vector, stitch and realistic views](docs/wiki/images/views.webp)
 
