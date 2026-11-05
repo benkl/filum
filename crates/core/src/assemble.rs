@@ -95,7 +95,11 @@ impl Engine {
     /// (the thread's own, else the design's).
     fn runs_for(&mut self, obj: &Object, doc: &Document) -> Vec<Run> {
         let (fabric, weight) = (doc.fabric, doc.thread(&obj.thread).and_then(|t| t.weight).unwrap_or(doc.options.thread_weight));
-        let json = serde_json::to_string(&(&obj.paths, &obj.stitch, &obj.start, &obj.end)).unwrap_or_default();
+        crate::prof!("runs_for (incl. generate)");
+        let json = {
+            crate::prof!("runs_for: json key");
+            serde_json::to_string(&(&obj.paths, &obj.stitch, &obj.start, &obj.end)).unwrap_or_default()
+        };
         let knockdown = doc.options.knockdown;
         let k = key(&json, fabric, weight) ^ (knockdown as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
         if let Some(r) = self.cache.get(&k) {
@@ -117,12 +121,16 @@ impl Engine {
         if width <= 0.0 {
             return true;
         }
+        crate::prof!("hidden: is_wide (incl. key)");
         let json = serde_json::to_string(&(&o.paths, &o.stitch, width)).unwrap_or_default();
         let k = key(&json, Fabric::Cotton, 0);
         if let Some(&w) = self.wide.get(&k) {
             return w;
         }
-        let w = crate::region::has_width(&object_cover(o), width);
+        let w = {
+            crate::prof!("hidden: has_width (miss)");
+            crate::region::has_width(&object_cover(o), width)
+        };
         if self.wide.len() > 4000 {
             self.wide.clear();
         }
@@ -138,42 +146,52 @@ impl Engine {
     /// The object as it is stitched: with "remove overlaps" a fill loses the
     /// parts hidden under objects stacked on top of it. `None` = fully hidden.
     pub fn stitched_object<'a>(&mut self, doc: &'a Document, i: usize) -> Option<Cow<'a, Object>> {
+        self.stitched_in(doc, i, &mut Scan::new(doc))
+    }
+
+    /// Every object as it is stitched (see `stitched_object`), in one pass
+    /// over the document.
+    pub fn stitched_objects<'a>(&mut self, doc: &'a Document) -> Vec<Option<Cow<'a, Object>>> {
+        let mut scan = Scan::new(doc);
+        (0..doc.objects.len()).map(|i| self.stitched_in(doc, i, &mut scan)).collect()
+    }
+
+    /// `stitched_object` with what is known of the objects on top (their
+    /// bounds, width test and key, worked out once per document).
+    fn stitched_in<'a>(&mut self, doc: &'a Document, i: usize, scan: &mut Scan) -> Option<Cow<'a, Object>> {
         let obj = &doc.objects[i];
         let opts = &doc.options;
         let lines = matches!(obj.stitch, StitchParams::Running(_)) && opts.trim_running;
         if !opts.remove_overlaps || !(matches!(obj.stitch, StitchParams::Fill(_)) || lines) || obj.hidden.is_some_and(|h| h.keep) {
             return Some(Cow::Borrowed(obj));
         }
-        let b = obj.bounds();
+        crate::prof!("hidden: stitched_object");
+        let b = scan.bounds(doc, i);
         // a colour layer isn't hidden by its own group, and a group covers once (by its first layer)
         let own = layer_group(obj);
         let mut groups: Vec<&str> = Vec::new();
-        let above: Vec<&Object> = doc.objects[i + 1..]
-            .iter()
-            .filter(|o| may_cover(o, opts) && o.bounds().intersects(&b))
-            .filter(|o| match layer_group(o) {
-                Some(g) if Some(g) == own || groups.contains(&g) => false,
-                Some(g) => {
-                    groups.push(g);
-                    true
-                }
-                None => true,
-            })
-            .collect();
+        let mut above: Vec<usize> = Vec::new();
+        for j in i + 1..doc.objects.len() {
+            if !(scan.may_cover(doc, j) && scan.bounds(doc, j).intersects(&b)) {
+                continue;
+            }
+            match layer_group(&doc.objects[j]) {
+                Some(g) if Some(g) == own || groups.contains(&g) => continue,
+                Some(g) => groups.push(g),
+                None => {}
+            }
+            above.push(j);
+        }
         // thin objects (outlines, borders, narrow satins) don't hide what lies under them
         let min_w = opts.cover_min_width;
-        let above: Vec<&Object> = above.into_iter().filter(|o| cover_mode(o) == CoverMode::Always || self.is_wide(o, min_w)).collect();
+        above.retain(|&j| cover_mode(&doc.objects[j]) == CoverMode::Always || *scan.wide[j].get_or_insert_with(|| self.is_wide(&doc.objects[j], min_w)));
         if above.is_empty() {
             return Some(Cow::Borrowed(obj));
         }
-        let json = serde_json::to_string(&(
-            &obj.paths,
-            lines,
-            above.iter().map(|o| (&o.paths, &o.stitch)).collect::<Vec<_>>(),
-            opts.overlap_margin,
-            opts.min_fragment,
-        ))
-        .unwrap_or_default();
+        crate::prof!("hidden: key + clip");
+        let above_keys: Vec<u64> = above.iter().map(|&j| scan.key(doc, j)).collect();
+        let above: Vec<&Object> = above.iter().map(|&j| &doc.objects[j]).collect();
+        let json = serde_json::to_string(&(&obj.paths, lines, above_keys, opts.overlap_margin, opts.min_fragment)).unwrap_or_default();
         let k = key(&json, doc.fabric, 0);
         if lines {
             if !self.lines.contains_key(&k) {
@@ -189,6 +207,7 @@ impl Engine {
                     })
                     .collect();
                 let covers: Vec<Cover> = above.iter().flat_map(|o| object_cover(o)).collect();
+                crate::prof!("hidden: clip_lines (miss)");
                 let cut = crate::region::clip_lines(&polys, &covers, opts.overlap_margin, 0.8);
                 if self.lines.len() > 2000 {
                     self.lines.clear();
@@ -202,6 +221,7 @@ impl Engine {
             };
         }
         if !self.clips.contains_key(&k) {
+            crate::prof!("hidden: subtract_min (miss)");
             let area = fill_rings(&obj.paths);
             let covers: Vec<Cover> = above.iter().flat_map(|o| object_cover(o)).collect();
             let clipped = subtract_min(&area, &covers, opts.overlap_margin.max(0.0), opts.min_fragment.max(0.0));
@@ -218,17 +238,19 @@ impl Engine {
     }
 
     pub fn plan(&mut self, doc: &Document) -> StitchPlan {
+        crate::prof!("plan");
         let mut items: Vec<(usize, Vec<Run>)> = Vec::new();
         // where the previous object ended: an object without a start point
         // begins as near to it as it can (Ink/Stitch passes every element the
         // previous stitch) — shorter jumps, fewer trims. Snapped to half a
         // millimetre, so small edits upstream keep the cached stitches.
         let mut prev: Option<Point> = None;
+        let mut scan = Scan::new(doc);
         for i in 0..doc.objects.len() {
             if !doc.objects[i].visible {
                 continue;
             }
-            let Some(obj) = self.stitched_object(doc, i) else { continue };
+            let Some(obj) = self.stitched_in(doc, i, &mut scan) else { continue };
             // cut by what lies on top: with "keep underlay" the full underlay stays under it
             let keep_under = doc.options.keep_underlay && matches!(obj, Cow::Owned(_)) && matches!(obj.stitch, StitchParams::Fill(_));
             let obj = match (obj.start, prev) {
@@ -256,11 +278,42 @@ impl Engine {
         // first the basting (holding fabric and stabiliser), then the
         // knockdown (flattening the nap) — both in the knockdown's colour
         // when there is one
+        crate::prof!("plan: basting/knockdown/assemble");
         let mut prefix = basting_runs(doc, &items);
         let knock = knockdown_runs(doc, &items);
         let thread = (!knock.is_empty()).then(|| knockdown_thread(doc));
         prefix.extend(knock);
         assemble_prefixed(doc, &items, &prefix, thread)
+    }
+}
+
+/// What hidden-stitch removal asks of every object on top of a fill, worked
+/// out once per document instead of once per fill under it: its bounds,
+/// whether it may hide what's under it, its width test and a key of its
+/// shape and stitching.
+struct Scan {
+    bounds: Vec<Option<Rect>>,
+    covers: Vec<Option<bool>>,
+    wide: Vec<Option<bool>>,
+    keys: Vec<Option<u64>>,
+}
+
+impl Scan {
+    fn new(doc: &Document) -> Scan {
+        let n = doc.objects.len();
+        Scan { bounds: vec![None; n], covers: vec![None; n], wide: vec![None; n], keys: vec![None; n] }
+    }
+    fn bounds(&mut self, doc: &Document, j: usize) -> Rect {
+        *self.bounds[j].get_or_insert_with(|| doc.objects[j].bounds())
+    }
+    fn may_cover(&mut self, doc: &Document, j: usize) -> bool {
+        *self.covers[j].get_or_insert_with(|| may_cover(&doc.objects[j], &doc.options))
+    }
+    fn key(&mut self, doc: &Document, j: usize) -> u64 {
+        *self.keys[j].get_or_insert_with(|| {
+            let o = &doc.objects[j];
+            key(&serde_json::to_string(&(&o.paths, &o.stitch)).unwrap_or_default(), Fabric::Cotton, 0)
+        })
     }
 }
 

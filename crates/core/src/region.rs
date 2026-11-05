@@ -147,6 +147,7 @@ pub fn subtract(area: &[Ring], covers: &[Cover], margin: f64, _res: f64) -> Opti
 /// `min_fragment` mm²: a piece that small isn't worth a jump, and a hole that
 /// small isn't worth cutting (the stitches under it stay).
 pub fn subtract_min(area: &[Ring], covers: &[Cover], margin: f64, min_fragment: f64) -> Option<Vec<Ring>> {
+    crate::prof!("region: subtract_min");
     let a = clip::region(area);
     let total = clip::area(&a);
     if total <= 1e-9 {

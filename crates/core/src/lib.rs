@@ -7,6 +7,8 @@
 //!
 //! Licensed GPL-3.0-or-later (it contains ports of Ink/Stitch algorithms).
 
+#[macro_use]
+pub mod prof;
 pub mod assemble;
 pub mod locks;
 pub mod clip;

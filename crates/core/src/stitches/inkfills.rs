@@ -818,6 +818,11 @@ pub struct FlowOpts<'a> {
     pub hide_later: bool,
     /// Where lines may run at all (inside the shape).
     pub zone: Option<&'a dyn Fn(Point) -> bool>,
+    /// With `pick`: a key of everything the lines are traced from (the
+    /// shape, the field, the row distance). Every colour of a gradient
+    /// traces the same lines: the first traces them, the others take them
+    /// from a small cache.
+    pub lines_key: Option<u64>,
     /// Where a travel stitch between two lines may run (it lies on top of
     /// what is sewn there): elsewhere the lines are joined by a jump.
     pub travel: Option<&'a dyn Fn(Point) -> bool>,
@@ -989,11 +994,20 @@ pub fn flow_ex(rings: &[Ring], field: &crate::model::FlowField, spacing: f64, st
     let centre = pt((b.min_x + b.max_x) / 2.0, (b.min_y + b.max_y) / 2.0);
     // shared lines: the same streamlines for every layer, whatever the start
     let first_seed = if ranked { None } else { start.filter(|p| inside(*p)) };
-    if let Some(s) = first_seed.or(Some(centre).filter(|p| inside(*p))) {
-        queue.push_back(s);
+    // traced already for another colour of the same lines
+    let traced = o.lines_key.filter(|_| ranked).and_then(shared_lines);
+    if traced.is_none() {
+        if let Some(s) = first_seed.or(Some(centre).filter(|p| inside(*p))) {
+            queue.push_back(s);
+        }
     }
     let mut scan_y = b.min_y + dsep * 0.5;
-    loop {
+    #[cfg(feature = "prof")]
+    let prof_trace = crate::prof::Guard::new("flow: trace streamlines");
+    if let Some(t) = &traced {
+        (lines, ranks) = (t.0.clone(), t.1.clone());
+    }
+    while traced.is_none() {
         while let Some(c) = queue.pop_front() {
             if budget == 0 {
                 break;
@@ -1024,6 +1038,12 @@ pub fn flow_ex(rings: &[Ring], field: &crate::model::FlowField, spacing: f64, st
             break;
         }
     }
+    if let (None, Some(k)) = (&traced, o.lines_key.filter(|_| ranked)) {
+        keep_shared_lines(k, &lines, &ranks);
+    }
+    #[cfg(feature = "prof")]
+    drop(prof_trace);
+    crate::prof!("flow: pick/order/join");
     // a gradient layer sews only its parts of every line; across the parts a
     // later layer sews it travels along the line, hidden (true = travel)
     // every point: (point, this layer sews it, a later layer covers it)
@@ -1037,6 +1057,7 @@ pub fn flow_ex(rings: &[Ring], field: &crate::model::FlowField, spacing: f64, st
                 .map(|(l, &rank)| {
                     let tau = dither_threshold(rank);
                     let mut lab: Vec<usize> = l.iter().map(|p| pick(*p, tau)).collect();
+                    crate::prof!("flow: merge_short_pieces");
                     merge_short_pieces(&mut lab, (min_piece / h).ceil() as usize);
                     l.into_iter().zip(lab).map(|(p, c)| (p, c == o.layer, o.hide_later && c > o.layer)).collect()
                 })
@@ -1087,6 +1108,34 @@ pub fn flow_ex(rings: &[Ring], field: &crate::model::FlowField, spacing: f64, st
     };
     let order = order_lines(rings, lines, start.unwrap_or(pt(b.min_x, b.min_y)), dsep, o.travel, o.open, o.angle, &stitched);
     join_ordered(order, stitch_len, travel_len, o.sew, f)
+}
+
+type TracedLines = std::rc::Rc<(Vec<Vec<Point>>, Vec<i64>)>;
+
+thread_local! {
+    /// The last shared lines traced (see `FlowOpts::lines_key`), newest last.
+    static SHARED_LINES: std::cell::RefCell<Vec<(u64, TracedLines)>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+fn shared_lines(key: u64) -> Option<TracedLines> {
+    SHARED_LINES.with(|c| c.borrow().iter().find(|e| e.0 == key).map(|e| e.1.clone()))
+}
+
+/// Forget the shared lines traced so far (tests: trace from scratch).
+#[cfg(test)]
+pub(crate) fn forget_shared_lines() {
+    SHARED_LINES.with(|c| c.borrow_mut().clear());
+}
+
+fn keep_shared_lines(key: u64, lines: &[Vec<Point>], ranks: &[i64]) {
+    SHARED_LINES.with(|c| {
+        let mut c = c.borrow_mut();
+        c.retain(|e| e.0 != key);
+        if c.len() >= 4 {
+            c.remove(0);
+        }
+        c.push((key, std::rc::Rc::new((lines.to_vec(), ranks.to_vec()))));
+    })
 }
 
 /// Points of the ranked lines by grid cell: (point, line, the side its rank grows to).
@@ -1146,12 +1195,16 @@ fn merge_short_pieces(lab: &mut [usize], min: usize) {
 /// or the first line).
 #[allow(clippy::too_many_arguments)]
 fn order_lines(rings: &[Ring], lines: Vec<Vec<(Point, bool)>>, start: Point, dsep: f64, travel_ok: Option<&dyn Fn(Point) -> bool>, open: Option<&dyn Fn(Point) -> f64>, angle: f64, stitched: &dyn Fn(&[Point]) -> Vec<Point>) -> Vec<(Vec<(Point, bool)>, Option<Vec<Point>>)> {
+    crate::prof!("flow: order_lines");
     let mut graph = super::travel::TravelGraph::new(rings, angle);
-    if let Some(ok) = travel_ok {
-        graph.forbid(ok);
-    }
-    if let Some(f) = open {
-        graph.open(f);
+    {
+        crate::prof!("flow: graph forbid/open");
+        if let Some(ok) = travel_ok {
+            graph.forbid(ok);
+        }
+        if let Some(f) = open {
+            graph.open(f);
+        }
     }
     // the outline is open to every colour (travel at the very edge)
     let edge = (dsep * 0.75).max(0.3);
@@ -1188,6 +1241,7 @@ fn order_lines(rings: &[Ring], lines: Vec<Vec<(Point, bool)>>, start: Point, dse
         };
         let mut pick: Option<(usize, Vec<Point>)> = None;
         if !out.is_empty() {
+            crate::prof!("flow: order hop/routes/allowed");
             // a straight hop to the nearest end that crosses nothing sewn
             pick = ends.iter().enumerate().take_while(|(_, c)| c.0 <= hop).find_map(|(ci, c)| {
                 let e = end_of(c);
@@ -1220,7 +1274,10 @@ fn order_lines(rings: &[Ring], lines: Vec<Vec<(Point, bool)>>, start: Point, dse
             l.reverse();
         }
         let pts: Vec<Point> = l.iter().map(|x| x.0).collect();
-        graph.sewn(&stitched(&pts), true);
+        {
+            crate::prof!("flow: stitched + graph.sewn");
+            graph.sewn(&stitched(&pts), true);
+        }
         pos = pts[pts.len() - 1];
         out.push((l, travel));
     }

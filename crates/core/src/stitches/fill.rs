@@ -373,6 +373,7 @@ pub fn tatami_ramp(
     ramp: Option<(&crate::model::DensityRamp, f64)>,
     f: u8,
 ) -> Vec<Run> {
+    crate::prof!("tatami (rows + travel)");
     if rings.is_empty() {
         return vec![];
     }
@@ -419,18 +420,31 @@ pub fn tatami_ramp(
     let mut run: Run = Vec::new();
     let mut pos = middle.or(start.map(|p| p.rotate(a)));
     // travel between sections: Ink/Stitch's travel graph (rows horizontal
-    // in this frame); sewn rows close the edges across them
-    let mut graph = super::travel::TravelGraph::new(&rr, 0.0);
-    // alternate rows: every colour travels along the outline only (Ink/Stitch's
-    // linear gradient fill sews its colours with underpath off); so does a
-    // fill with underpath switched off
-    if rows_mix.is_some() || NO_UNDERPATH.with(|c| c.get()) {
-        graph.forbid(&|_| false);
-    }
-    // a density ramp's open end: travel keeps to the edge there
-    if let Some(rf) = frame {
-        graph.open(&|q: Point| rf.spacing(q.y) / spacing.max(0.05));
-    }
+    // in this frame); sewn rows close the edges across them. Built when a
+    // travel first needs it (a fill of one section never does), with the
+    // rows sewn until then
+    let no_underpath = rows_mix.is_some() || NO_UNDERPATH.with(|c| c.get());
+    let mut graph: Option<super::travel::TravelGraph> = None;
+    let mut sewn_before: Vec<(Point, Point)> = Vec::new();
+    let travel_graph = |graph: &mut Option<super::travel::TravelGraph>, sewn_before: &mut Vec<(Point, Point)>| {
+        if graph.is_none() {
+            let mut g = super::travel::TravelGraph::new(&rr, 0.0);
+            // alternate rows: every colour travels along the outline only (Ink/Stitch's
+            // linear gradient fill sews its colours with underpath off); so does a
+            // fill with underpath switched off
+            if no_underpath {
+                g.forbid(&|_| false);
+            }
+            // a density ramp's open end: travel keeps to the edge there
+            if let Some(rf) = frame {
+                g.open(&|q: Point| rf.spacing(q.y) / spacing.max(0.05));
+            }
+            for (a, b) in sewn_before.drain(..) {
+                g.sewn(&[a, b], false);
+            }
+            *graph = Some(g);
+        }
+    };
     // with an end point, the section that can finish closest to it is sewn last
     let end_r = end.map(|p| p.rotate(a));
     let last_section = end_r.and_then(|e| {
@@ -473,8 +487,10 @@ pub fn tatami_ramp(
         let si = remaining.remove(best.0);
         let sec = &grating.sections[si];
         let (entry, top, ltr0) = section_entries(sec)[best.1];
-        // connect
-        if let Some(p) = pos {
+        // connect (into the first run there is nothing to travel from)
+        if let Some(p) = pos.filter(|_| !run.is_empty()) {
+            travel_graph(&mut graph, &mut sewn_before);
+            let graph = graph.as_ref().unwrap();
             match graph.route(p, entry).or_else(|| travel_path(&rr, p, entry).filter(|path| path.windows(2).all(|w| !graph.crosses_sewn(w[0], w[1])))) {
                 // every corner of the route kept (it goes round sewn rows)
                 Some(path) if !run.is_empty() => {
@@ -540,7 +556,8 @@ pub fn tatami_ramp(
                     }
                     // alternate rows: never straight across the other colours' rows
                     if !followed && rows_mix.is_some() {
-                        match graph.route(prev, start) {
+                        travel_graph(&mut graph, &mut sewn_before);
+                        match graph.as_ref().unwrap().route(prev, start) {
                             Some(path) => {
                                 for q in resample_max(&path, travel_len.max(0.5)).into_iter().skip(1) {
                                     push(&mut run, q, f | flags::TRAVEL);
@@ -608,7 +625,10 @@ pub fn tatami_ramp(
                 None => vec![(*x0, *x1)],
             };
             for (p0, p1) in pieces {
-                graph.sewn(&[pt(p0, *y), pt(p1, *y)], false);
+                match graph.as_mut() {
+                    Some(g) => g.sewn(&[pt(p0, *y), pt(p1, *y)], false),
+                    None => sewn_before.push((pt(p0, *y), pt(p1, *y))),
+                }
             }
         }
         pos = run.last().map(|x| x.0);
@@ -1199,7 +1219,26 @@ fn streamlines_sewn(rings: &[Ring], field: &crate::model::FlowField, p: &FillPar
     let travel = |q: Point| share.as_ref().is_none_or(|s| 1.0 - s.at(q) - s.later_at(q) <= 0.4);
     // open rows (this colour's row distance over the normal one): travel keeps to the edge there
     let open = |q: Point| row(q) / mine(q).max(MIN_SHARE) / spacing.max(0.05);
+    // the shared lines depend on the shape, the field and the full row
+    // distance only (a blend's two ramps add up the same either way round)
+    let lines_key = shared.then(|| {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        for ring in rings {
+            ring.len().hash(&mut h);
+            for q in ring {
+                (q.x.to_bits(), q.y.to_bits()).hash(&mut h);
+            }
+        }
+        (field.origin[0].to_bits(), field.origin[1].to_bits(), field.cell.to_bits(), field.cols, field.rows).hash(&mut h);
+        field.angles.iter().for_each(|x| x.to_bits().hash(&mut h));
+        (spacing.to_bits(), density.to_bits(), a.to_bits(), share.is_some(), other_frame.is_some()).hash(&mut h);
+        let ramp = p.ramp.as_ref().map(|r| crate::model::DensityRamp { reverse: r.reverse && other_frame.is_none(), ..r.clone() });
+        serde_json::to_string(&ramp).unwrap_or_default().hash(&mut h);
+        h.finish()
+    });
     let o = super::inkfills::FlowOpts {
+        lines_key,
         sep: (frame.is_some() || shared).then_some(&row as &dyn Fn(Point) -> f64),
         pick: shared.then_some(&pick as &dyn Fn(Point, f64) -> usize),
         layer: p.gradient.as_ref().map_or(blend_layer, |g| g.layer as usize),
@@ -1771,6 +1810,36 @@ mod tests {
             }
         }
         (holes as f64 / inside.max(1) as f64, crowded as f64 / sewn.max(1) as f64)
+    }
+
+    #[test]
+    fn colours_take_the_shared_lines_as_traced() {
+        // a colour whose lines come from the cache sews what it sews traced from scratch
+        let oval: Ring = (0..72).map(|k| { let a = k as f64 / 72.0 * TAU; pt(20.0 + 18.0 * a.cos(), 15.0 + 12.0 * a.sin()) }).collect();
+        let paths = vec![SubPath::polyline(&oval, true)];
+        let run = |p: &FillParams, start: Option<Point>| fill(&paths, p, 0.0, 1.0, false, 1.0, start, None);
+        let grad = |l: u32| GradientParams { from: [2.0, 15.0], to: [38.0, 15.0], layer: l, group: "g".into(), stops: (0..3).map(|k| crate::model::GradientStop { pos: k as f64 / 2.0, mid: 0.5 }).collect(), ..Default::default() };
+        let ramp = |reverse: bool| crate::model::DensityRamp { from: [2.0, 15.0], to: [38.0, 15.0], dense: 0.4, sparse: 4.0, additive: true, reverse, group: Some("b".into()), ..Default::default() };
+        for method in [FillMethod::Curved, FillMethod::Tatami] {
+            let base = FillParams { method, row_spacing: 0.4, underlay: false, angle: 70.0, ..Default::default() };
+            let layers: Vec<Vec<FillParams>> = vec![
+                (0..3).map(|l| FillParams { gradient: Some(grad(l)), ..base.clone() }).collect(),
+                [false, true].iter().map(|&r| FillParams { ramp: Some(ramp(r)), ..base.clone() }).collect(),
+            ];
+            for group in layers {
+                for (k, p) in group.iter().enumerate() {
+                    let start = Some(pt(3.0 + k as f64, 15.0));
+                    super::super::inkfills::forget_shared_lines();
+                    let fresh = run(p, start);
+                    // every other colour first: this one finds the lines traced
+                    super::super::inkfills::forget_shared_lines();
+                    for q in group.iter().filter(|q| *q != p) {
+                        run(q, None);
+                    }
+                    assert_eq!(run(p, start), fresh, "{method:?} colour {k}");
+                }
+            }
+        }
     }
 
     #[test]

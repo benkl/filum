@@ -63,17 +63,20 @@ pub struct TravelGraph {
     on_line: Vec<bool>,
     /// outline segments by grid cell (quick inside tests for short joins)
     rgrid: HashMap<(i64, i64), Vec<(Point, Point)>>,
+    /// distance to the outline (interior weights)
+    bdist: BoundaryDist,
 }
 
 /// Cost of an interior stretch (Ink/Stitch: length / (distance to outline + 0.1 px)).
-fn interior_weight(rings: &[Ring], a: Point, b: Point) -> f64 {
-    a.dist(b) / (dist_to_boundary(rings, a.lerp(b, 0.5)) + 0.1 / PX)
+fn interior_weight(outline: &BoundaryDist, a: Point, b: Point) -> f64 {
+    a.dist(b) / (outline.dist(a.lerp(b, 0.5)) + 0.1 / PX)
 }
 
 impl TravelGraph {
     /// The travel graph of a shape whose rows run at `angle` (radians, the
     /// rotation that lays the rows horizontal: frame = p.rotate(angle)).
     pub fn new(rings: &[Ring], angle: f64) -> TravelGraph {
+        crate::prof!("travel: TravelGraph::new");
         let rr = rotate_rings(rings, angle);
         let b = rings_bounds(&rr);
         // Ink/Stitch: denser grid in small shapes (area < 10000 px²)
@@ -93,6 +96,7 @@ impl TravelGraph {
             open: None,
             on_line: Vec::new(),
             rgrid: HashMap::new(),
+            bdist: BoundaryDist::new(rings),
         };
         for ring in rings {
             let n = ring.len();
@@ -138,7 +142,7 @@ impl TravelGraph {
                     // both inside: once per pair
                     Some(&bn) if (ni, nj) > (i, j) => {
                         if segment_inside(&rr, qa, qb) {
-                            let w = interior_weight(rings, g.pts[a as usize], g.pts[bn as usize]);
+                            let w = interior_weight(&g.bdist, g.pts[a as usize], g.pts[bn as usize]);
                             g.add_edge(a, bn, w);
                         }
                     }
@@ -164,7 +168,7 @@ impl TravelGraph {
                         if let Some((t, ri, k, u)) = hit {
                             let q = qa + (qb - qa) * t;
                             let bn = g.add_node(back(q));
-                            let w = interior_weight(rings, g.pts[a as usize], g.pts[bn as usize]);
+                            let w = interior_weight(&g.bdist, g.pts[a as usize], g.pts[bn as usize]);
                             g.add_edge(a, bn, w);
                             on_ring[ri].push((k, u, bn));
                         }
@@ -377,7 +381,7 @@ impl TravelGraph {
                 }
                 if self.join_inside(p, q, true) && !self.crosses_sewn(p, q) {
                     joined += 1;
-                    let w = self.opened(interior_weight(&self.rings, p, q).max(d), p, q);
+                    let w = self.opened(interior_weight(&self.bdist, p, q).max(d), p, q);
                     self.add_edge(id, o, w);
                 }
             }
@@ -415,7 +419,7 @@ impl TravelGraph {
                             continue;
                         }
                         if d < 1e-9 || (self.join_inside(p, q, false) && !self.crosses_sewn(p, q)) {
-                            out.push((id, self.opened(interior_weight(&self.rings, p, q).max(d), p, q)));
+                            out.push((id, self.opened(interior_weight(&self.bdist, p, q).max(d), p, q)));
                         }
                     }
                 }
@@ -427,6 +431,7 @@ impl TravelGraph {
     /// Routes from `from` to the `targets` (cheapest by the travel weights);
     /// for every target its route, or None where none is left.
     pub fn routes(&self, from: Point, targets: &[Point]) -> Vec<Option<Vec<Point>>> {
+        crate::prof!("travel: routes (dijkstra)");
         let n = self.pts.len();
         let mut out = vec![None; targets.len()];
         if n == 0 || targets.is_empty() {

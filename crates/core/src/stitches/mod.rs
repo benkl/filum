@@ -57,11 +57,41 @@ fn orient_polyline(mut pts: Vec<Point>, closed: bool, start: Option<Point>, end:
 
 /// Generate the runs for one object.
 pub fn generate(obj: &Object, fabric: &FabricProfile) -> Vec<Run> {
+    #[cfg(feature = "prof")]
+    let _prof_guard = crate::prof::Guard::new(prof_kind(obj));
     let runs = generate_plain(obj, fabric);
     if obj.patterns.is_empty() {
         runs
     } else {
         apply_patterns(runs, &obj.patterns)
+    }
+}
+
+/// The generator an object goes to, for the profiler.
+#[cfg(feature = "prof")]
+fn prof_kind(obj: &Object) -> &'static str {
+    use crate::model::FillMethod as M;
+    match &obj.stitch {
+        StitchParams::Fill(f) if f.gradient.is_some() => match f.method {
+            M::Tatami => "gen fill gradient tatami",
+            M::Curved => "gen fill gradient curved",
+            M::Flow => "gen fill gradient flow",
+            _ => "gen fill gradient other",
+        },
+        StitchParams::Fill(f) if f.ramp.is_some() => "gen fill ramp/blend",
+        StitchParams::Fill(f) => match f.method {
+            M::Tatami => "gen fill tatami",
+            M::Contour | M::Spiral => "gen fill contour/spiral",
+            M::Curved => "gen fill curved",
+            M::Flow => "gen fill flow",
+            M::Guided => "gen fill guided",
+            M::Stipple | M::Meander | M::Hilbert => "gen fill texture",
+            _ => "gen fill other",
+        },
+        StitchParams::Satin(_) => "gen satin",
+        StitchParams::Running(_) => "gen running",
+        StitchParams::Applique(_) => "gen applique",
+        _ => "gen other",
     }
 }
 
