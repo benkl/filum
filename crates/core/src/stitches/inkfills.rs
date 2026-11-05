@@ -993,6 +993,8 @@ pub fn flow_ex(rings: &[Ring], field: &crate::model::FlowField, spacing: f64, st
         queue.push_back(s);
     }
     let mut scan_y = b.min_y + dsep * 0.5;
+    #[cfg(feature = "prof")]
+    let prof_trace = crate::prof::Guard::new("flow: trace streamlines");
     loop {
         while let Some(c) = queue.pop_front() {
             if budget == 0 {
@@ -1024,6 +1026,9 @@ pub fn flow_ex(rings: &[Ring], field: &crate::model::FlowField, spacing: f64, st
             break;
         }
     }
+    #[cfg(feature = "prof")]
+    drop(prof_trace);
+    crate::prof!("flow: pick/order/join");
     // a gradient layer sews only its parts of every line; across the parts a
     // later layer sews it travels along the line, hidden (true = travel)
     // every point: (point, this layer sews it, a later layer covers it)
@@ -1037,6 +1042,7 @@ pub fn flow_ex(rings: &[Ring], field: &crate::model::FlowField, spacing: f64, st
                 .map(|(l, &rank)| {
                     let tau = dither_threshold(rank);
                     let mut lab: Vec<usize> = l.iter().map(|p| pick(*p, tau)).collect();
+                    crate::prof!("flow: merge_short_pieces");
                     merge_short_pieces(&mut lab, (min_piece / h).ceil() as usize);
                     l.into_iter().zip(lab).map(|(p, c)| (p, c == o.layer, o.hide_later && c > o.layer)).collect()
                 })
@@ -1146,12 +1152,16 @@ fn merge_short_pieces(lab: &mut [usize], min: usize) {
 /// or the first line).
 #[allow(clippy::too_many_arguments)]
 fn order_lines(rings: &[Ring], lines: Vec<Vec<(Point, bool)>>, start: Point, dsep: f64, travel_ok: Option<&dyn Fn(Point) -> bool>, open: Option<&dyn Fn(Point) -> f64>, angle: f64, stitched: &dyn Fn(&[Point]) -> Vec<Point>) -> Vec<(Vec<(Point, bool)>, Option<Vec<Point>>)> {
+    crate::prof!("flow: order_lines");
     let mut graph = super::travel::TravelGraph::new(rings, angle);
-    if let Some(ok) = travel_ok {
-        graph.forbid(ok);
-    }
-    if let Some(f) = open {
-        graph.open(f);
+    {
+        crate::prof!("flow: graph forbid/open");
+        if let Some(ok) = travel_ok {
+            graph.forbid(ok);
+        }
+        if let Some(f) = open {
+            graph.open(f);
+        }
     }
     // the outline is open to every colour (travel at the very edge)
     let edge = (dsep * 0.75).max(0.3);
@@ -1188,6 +1198,7 @@ fn order_lines(rings: &[Ring], lines: Vec<Vec<(Point, bool)>>, start: Point, dse
         };
         let mut pick: Option<(usize, Vec<Point>)> = None;
         if !out.is_empty() {
+            crate::prof!("flow: order hop/routes/allowed");
             // a straight hop to the nearest end that crosses nothing sewn
             pick = ends.iter().enumerate().take_while(|(_, c)| c.0 <= hop).find_map(|(ci, c)| {
                 let e = end_of(c);
@@ -1220,7 +1231,10 @@ fn order_lines(rings: &[Ring], lines: Vec<Vec<(Point, bool)>>, start: Point, dse
             l.reverse();
         }
         let pts: Vec<Point> = l.iter().map(|x| x.0).collect();
-        graph.sewn(&stitched(&pts), true);
+        {
+            crate::prof!("flow: stitched + graph.sewn");
+            graph.sewn(&stitched(&pts), true);
+        }
         pos = pts[pts.len() - 1];
         out.push((l, travel));
     }

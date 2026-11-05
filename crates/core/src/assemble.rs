@@ -95,7 +95,11 @@ impl Engine {
     /// (the thread's own, else the design's).
     fn runs_for(&mut self, obj: &Object, doc: &Document) -> Vec<Run> {
         let (fabric, weight) = (doc.fabric, doc.thread(&obj.thread).and_then(|t| t.weight).unwrap_or(doc.options.thread_weight));
-        let json = serde_json::to_string(&(&obj.paths, &obj.stitch, &obj.start, &obj.end)).unwrap_or_default();
+        crate::prof!("runs_for (incl. generate)");
+        let json = {
+            crate::prof!("runs_for: json key");
+            serde_json::to_string(&(&obj.paths, &obj.stitch, &obj.start, &obj.end)).unwrap_or_default()
+        };
         let knockdown = doc.options.knockdown;
         let k = key(&json, fabric, weight) ^ (knockdown as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
         if let Some(r) = self.cache.get(&k) {
@@ -117,12 +121,16 @@ impl Engine {
         if width <= 0.0 {
             return true;
         }
+        crate::prof!("hidden: is_wide (incl. key)");
         let json = serde_json::to_string(&(&o.paths, &o.stitch, width)).unwrap_or_default();
         let k = key(&json, Fabric::Cotton, 0);
         if let Some(&w) = self.wide.get(&k) {
             return w;
         }
-        let w = crate::region::has_width(&object_cover(o), width);
+        let w = {
+            crate::prof!("hidden: has_width (miss)");
+            crate::region::has_width(&object_cover(o), width)
+        };
         if self.wide.len() > 4000 {
             self.wide.clear();
         }
@@ -144,6 +152,7 @@ impl Engine {
         if !opts.remove_overlaps || !(matches!(obj.stitch, StitchParams::Fill(_)) || lines) || obj.hidden.is_some_and(|h| h.keep) {
             return Some(Cow::Borrowed(obj));
         }
+        crate::prof!("hidden: stitched_object");
         let b = obj.bounds();
         // a colour layer isn't hidden by its own group, and a group covers once (by its first layer)
         let own = layer_group(obj);
@@ -166,6 +175,7 @@ impl Engine {
         if above.is_empty() {
             return Some(Cow::Borrowed(obj));
         }
+        crate::prof!("hidden: key + clip");
         let json = serde_json::to_string(&(
             &obj.paths,
             lines,
@@ -189,6 +199,7 @@ impl Engine {
                     })
                     .collect();
                 let covers: Vec<Cover> = above.iter().flat_map(|o| object_cover(o)).collect();
+                crate::prof!("hidden: clip_lines (miss)");
                 let cut = crate::region::clip_lines(&polys, &covers, opts.overlap_margin, 0.8);
                 if self.lines.len() > 2000 {
                     self.lines.clear();
@@ -202,6 +213,7 @@ impl Engine {
             };
         }
         if !self.clips.contains_key(&k) {
+            crate::prof!("hidden: subtract_min (miss)");
             let area = fill_rings(&obj.paths);
             let covers: Vec<Cover> = above.iter().flat_map(|o| object_cover(o)).collect();
             let clipped = subtract_min(&area, &covers, opts.overlap_margin.max(0.0), opts.min_fragment.max(0.0));
@@ -218,6 +230,7 @@ impl Engine {
     }
 
     pub fn plan(&mut self, doc: &Document) -> StitchPlan {
+        crate::prof!("plan");
         let mut items: Vec<(usize, Vec<Run>)> = Vec::new();
         // where the previous object ended: an object without a start point
         // begins as near to it as it can (Ink/Stitch passes every element the
@@ -256,6 +269,7 @@ impl Engine {
         // first the basting (holding fabric and stabiliser), then the
         // knockdown (flattening the nap) — both in the knockdown's colour
         // when there is one
+        crate::prof!("plan: basting/knockdown/assemble");
         let mut prefix = basting_runs(doc, &items);
         let knock = knockdown_runs(doc, &items);
         let thread = (!knock.is_empty()).then(|| knockdown_thread(doc));

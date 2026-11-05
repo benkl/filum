@@ -334,6 +334,7 @@ pub struct ShareGrid {
 
 impl ShareGrid {
     pub fn new(g: &GradientParams, rings: &[Ring], spacing: f64) -> ShareGrid {
+        crate::prof!("gradient: ShareGrid::new");
         let b = rings_bounds(rings);
         let cell = (b.width().max(b.height()) / 160.0).max(spacing.max(0.1));
         let (w, h) = ((b.width() / cell).ceil() as usize + 2, (b.height() / cell).ceil() as usize + 2);

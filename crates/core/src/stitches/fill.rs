@@ -373,6 +373,7 @@ pub fn tatami_ramp(
     ramp: Option<(&crate::model::DensityRamp, f64)>,
     f: u8,
 ) -> Vec<Run> {
+    crate::prof!("tatami (rows + travel)");
     if rings.is_empty() {
         return vec![];
     }

@@ -8,6 +8,8 @@ license.workspace = true
 [features]
 default = ["digitize"]
 digitize = ["dep:image"]
+# scope timers (see src/prof.rs), for examples/plan_bench
+prof = []
 
 [dependencies]
 serde.workspace = true

@@ -74,6 +74,7 @@ impl TravelGraph {
     /// The travel graph of a shape whose rows run at `angle` (radians, the
     /// rotation that lays the rows horizontal: frame = p.rotate(angle)).
     pub fn new(rings: &[Ring], angle: f64) -> TravelGraph {
+        crate::prof!("travel: TravelGraph::new");
         let rr = rotate_rings(rings, angle);
         let b = rings_bounds(&rr);
         // Ink/Stitch: denser grid in small shapes (area < 10000 px²)
@@ -427,6 +428,7 @@ impl TravelGraph {
     /// Routes from `from` to the `targets` (cheapest by the travel weights);
     /// for every target its route, or None where none is left.
     pub fn routes(&self, from: Point, targets: &[Point]) -> Vec<Option<Vec<Point>>> {
+        crate::prof!("travel: routes (dijkstra)");
         let n = self.pts.len();
         let mut out = vec![None; targets.len()];
         if n == 0 || targets.is_empty() {
