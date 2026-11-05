@@ -24,7 +24,7 @@ const AVOID = new Set([
   "b3313910ae69074759c9ae7d", "4ac931dbb3199380913dfe56",
 ]);
 // a name allowed where it is a tool the project uses, not a model it follows
-const ALLOWED_IN = { "4ac931dbb3199380913dfe56": ["assets/logo/", "docs/wiki/Building-from-Source.md", "site/README.md", "site/blender/", "site/scripts/"] };
+const ALLOWED_IN = { "4ac931dbb3199380913dfe56": ["assets/logo/", "docs/wiki/Building-from-Source.md"] };
 
 // upstream data (font and chart metadata, licence texts) is checked by its own tests
 const SKIP = [/^ui\/public\/(embroidery-fonts|palettes|downloads|licenses)\//, /(^|\/)(Cargo|package-lock)\.(lock|json)$/, /\.(png|webp|jpe?g|gif|ico|icns|gz|blend|wasm|ttf|otf|onnx|pdf)$/i];

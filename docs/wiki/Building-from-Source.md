@@ -64,7 +64,6 @@ Pull requests are welcome. A few house rules:
 | `ui` | The React + TypeScript editor |
 | `ui/public` | Bundled embroidery fonts, thread charts, licences and AI models |
 | `assets` | The app icon, and `assets/logo` with the logo's source |
-| `site` | The website, published to GitHub Pages by `.github/workflows/pages.yml` |
 | `docs` | The [implementation plan](../IMPLEMENTATION_PLAN.md), [algorithm research](../ALGORITHMS_RESEARCH.md), the [density model](../density-model.md) and this wiki |
 
 ## Refreshing bundled data
@@ -110,10 +109,6 @@ NODE_PATH=/tmp/shots/node_modules node docs/tools/screenshots.mjs export     # j
 ```
 
 It needs ImageMagick (`magick`) and `rsvg-convert`. The digitizer shots use the test picture `docs/tools/cactus.svg`.
-
-## The website
-
-`site/` holds the website at [benkl.github.io/filum](https://benkl.github.io/filum/): a static page built with Vite and TypeScript, with interactive mock-ups of the editor's features and a guided tour. `cd site && npm install && npm run dev` serves it on port 5180; `npm run build` writes the static files to `site/dist`. Every push to `main` that touches `site/` builds and publishes it. `site/README.md` explains how its renders, demo data and social card are made.
 
 ## Mobile
 
