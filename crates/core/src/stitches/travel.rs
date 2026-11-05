@@ -26,6 +26,8 @@
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap};
 
+use crate::geom::CellMap;
+
 use crate::geom::*;
 
 /// Ink/Stitch works in pixels (96 dpi).
@@ -48,13 +50,13 @@ pub struct TravelGraph {
     edges: Vec<Edge>,
     cell: f64,
     /// edges by grid cell (for removing those a sewn segment crosses)
-    egrid: HashMap<(i64, i64), Vec<u32>>,
+    egrid: CellMap<Vec<u32>>,
     /// lattice and outline nodes by grid cell (for joining a point to the lattice)
-    ngrid: HashMap<(i64, i64), Vec<u32>>,
+    ngrid: CellMap<Vec<u32>>,
     /// nodes on sewn lines by grid cell
-    lgrid: HashMap<(i64, i64), Vec<u32>>,
+    lgrid: CellMap<Vec<u32>>,
     /// sewn segments by grid cell (joins to the lattice must not cross them)
-    sewn: HashMap<(i64, i64), Vec<(Point, Point)>>,
+    sewn: CellMap<Vec<(Point, Point)>>,
     /// lattice step (mm)
     step: f64,
     /// open rows: interior cost factor sampled on the node grid (see `open`)
@@ -62,7 +64,7 @@ pub struct TravelGraph {
     /// nodes on sewn lines (see `sewn`), as opposed to lattice and outline nodes
     on_line: Vec<bool>,
     /// outline segments by grid cell (quick inside tests for short joins)
-    rgrid: HashMap<(i64, i64), Vec<(Point, Point)>>,
+    rgrid: CellMap<Vec<(Point, Point)>>,
     /// distance to the outline (interior weights)
     bdist: BoundaryDist,
 }
@@ -88,14 +90,14 @@ impl TravelGraph {
             adj: Vec::new(),
             edges: Vec::new(),
             cell: step * 2.0,
-            egrid: HashMap::new(),
-            ngrid: HashMap::new(),
-            lgrid: HashMap::new(),
-            sewn: HashMap::new(),
+            egrid: CellMap::default(),
+            ngrid: CellMap::default(),
+            lgrid: CellMap::default(),
+            sewn: CellMap::default(),
             step,
             open: None,
             on_line: Vec::new(),
-            rgrid: HashMap::new(),
+            rgrid: CellMap::default(),
             bdist: BoundaryDist::new(rings),
         };
         for ring in rings {
@@ -115,7 +117,7 @@ impl TravelGraph {
         // vertical (90°) lines all pass through them
         let (i0, i1) = ((b.min_x / step).floor() as i64 - 1, (b.max_x / step).ceil() as i64 + 1);
         let (j0, j1) = ((b.min_y / step).floor() as i64 - 1, (b.max_y / step).ceil() as i64 + 1);
-        let mut node_at: HashMap<(i64, i64), u32> = HashMap::new();
+        let mut node_at: CellMap<u32> = CellMap::default();
         for j in j0..=j1 {
             for i in i0..=i1 {
                 if (i + j).rem_euclid(2) != 0 {

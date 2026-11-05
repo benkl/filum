@@ -53,30 +53,51 @@ pub fn bilateral(lab: &Img, r: usize, sigma_s: f32, sigma_r: f32, alpha: &[bool]
         }
     }
     let inv_r = 1.0 / (2.0 * sigma_r * sigma_r);
+    // the range weight exp(-d²/2σ²) from a table over d² (linear between
+    // entries, zero past e^-12): exp is a software routine in WebAssembly and
+    // took over a third of the digitizer's time there
+    const STEP: f32 = 0.25;
+    let reach = 12.0 / inv_r;
+    let table: Vec<f32> = (0..=(reach / STEP).ceil() as usize + 1).map(|k| (-(k as f32 * STEP) * inv_r).exp()).collect();
+    let range_w = |d2: f32| -> f32 {
+        let t = d2 / STEP;
+        let k = t as usize;
+        if k + 1 >= table.len() {
+            return 0.0;
+        }
+        let f = t - k as f32;
+        table[k] + (table[k + 1] - table[k]) * f
+    };
+    let side = 2 * r + 1;
+    let opaque = alpha.iter().all(|a| *a);
     for y in 0..h {
+        // the window is clipped to the picture once per pixel, not tested per
+        // neighbour (the same neighbours in the same order: the same sums)
+        let (y0, y1) = (y.saturating_sub(r), (y + r).min(h - 1));
         for x in 0..w {
             let i = y * w + x;
             if !alpha[i] {
                 continue;
             }
+            let (x0, x1) = (x.saturating_sub(r), (x + r).min(w - 1));
             let c0 = [lab.data[i * 3], lab.data[i * 3 + 1], lab.data[i * 3 + 2]];
             let (mut acc, mut wsum) = ([0f32; 3], 0f32);
-            for &(dx, dy, ws) in &spatial {
-                let (nx, ny) = (x as i64 + dx, y as i64 + dy);
-                if nx < 0 || ny < 0 || nx >= w as i64 || ny >= h as i64 {
-                    continue;
+            for ny in y0..=y1 {
+                let row = (ny + r - y) * side;
+                for nx in x0..=x1 {
+                    let j = ny * w + nx;
+                    if !opaque && !alpha[j] {
+                        continue;
+                    }
+                    let ws = spatial[row + nx + r - x].2;
+                    let c = [lab.data[j * 3], lab.data[j * 3 + 1], lab.data[j * 3 + 2]];
+                    let d2 = (c[0] - c0[0]).powi(2) + (c[1] - c0[1]).powi(2) + (c[2] - c0[2]).powi(2);
+                    let wgt = ws * range_w(d2);
+                    for k in 0..3 {
+                        acc[k] += c[k] * wgt;
+                    }
+                    wsum += wgt;
                 }
-                let j = ny as usize * w + nx as usize;
-                if !alpha[j] {
-                    continue;
-                }
-                let c = [lab.data[j * 3], lab.data[j * 3 + 1], lab.data[j * 3 + 2]];
-                let d2 = (c[0] - c0[0]).powi(2) + (c[1] - c0[1]).powi(2) + (c[2] - c0[2]).powi(2);
-                let wgt = ws * (-d2 * inv_r).exp();
-                for k in 0..3 {
-                    acc[k] += c[k] * wgt;
-                }
-                wsum += wgt;
             }
             if wsum > 0.0 {
                 for k in 0..3 {

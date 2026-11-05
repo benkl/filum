@@ -2410,24 +2410,42 @@ fn grey_close(v: &[f32], w: usize, h: usize, r: usize) -> Vec<f32> {
     let pass = |src: &[f32], horizontal: bool, take_max: bool| -> Vec<f32> {
         let mut out = vec![0f32; src.len()];
         let (outer, inner) = if horizontal { (h, w) } else { (w, h) };
+        let mut line = vec![0f32; inner];
         for o in 0..outer {
-            for i in 0..inner {
-                let lo = i.saturating_sub(r);
-                let hi = (i + r).min(inner - 1);
-                let mut acc = if take_max { f32::MIN } else { f32::MAX };
-                for k in lo..=hi {
-                    let idx = if horizontal { o * w + k } else { k * w + o };
-                    let x = src[idx];
-                    acc = if take_max { acc.max(x) } else { acc.min(x) };
-                }
-                let idx = if horizontal { o * w + i } else { i * w + o };
-                out[idx] = acc;
+            for (i, x) in line.iter_mut().enumerate() {
+                *x = src[if horizontal { o * w + i } else { i * w + o }];
+            }
+            for (i, x) in sliding_extreme(&line, r, take_max).into_iter().enumerate() {
+                out[if horizontal { o * w + i } else { i * w + o }] = x;
             }
         }
         out
     };
     let d = pass(&pass(v, true, true), false, true);
     pass(&pass(&d, true, false), false, false)
+}
+
+/// The max (or min) of every window `i - r ..= i + r` of `x` (clipped at the
+/// ends), in constant time per element (van Herk / Gil-Werman): block-wise
+/// running extremes from the left and from the right, one of each per window.
+fn sliding_extreme(x: &[f32], r: usize, take_max: bool) -> Vec<f32> {
+    let n = x.len();
+    let k = 2 * r + 1;
+    let neutral = if take_max { f32::MIN } else { f32::MAX };
+    let op = |a: f32, b: f32| if take_max { a.max(b) } else { a.min(b) };
+    // padded by r neutral values on both sides, rounded up to whole blocks
+    let len = (n + 2 * r).div_ceil(k) * k;
+    let at = |j: usize| if j >= r && j - r < n { x[j - r] } else { neutral };
+    let mut left = vec![neutral; len];
+    let mut right = vec![neutral; len];
+    for j in 0..len {
+        left[j] = if j % k == 0 { at(j) } else { op(left[j - 1], at(j)) };
+    }
+    for j in (0..len).rev() {
+        right[j] = if j % k == k - 1 || j + 1 == len { at(j) } else { op(right[j + 1], at(j)) };
+    }
+    // the window of element i is padded j = i .. i + 2r
+    (0..n).map(|i| op(right[i], left[i + k - 1])).collect()
 }
 
 /// Line pixels take the colour of the nearest other pixel: the fills on both
@@ -2617,6 +2635,7 @@ impl LineCover {
     /// Mark everything within `r` of the polyline.
     fn stamp(&mut self, pts: &[Point], r: f64) {
         let k = (r / self.g).ceil() as isize;
+        let reach = r + self.g * 0.5;
         let mut mark = |p: Point| {
             let (cx, cy) = ((p.x / self.g) as isize, (p.y / self.g) as isize);
             for dy in -k..=k {
@@ -2625,9 +2644,14 @@ impl LineCover {
                     if x < 0 || y < 0 || x as usize >= self.w || y as usize >= self.h {
                         continue;
                     }
+                    // the samples are half a cell apart: most of a disc is marked already
+                    let i = y as usize * self.w + x as usize;
+                    if self.cells[i] {
+                        continue;
+                    }
                     let c = pt((x as f64 + 0.5) * self.g, (y as f64 + 0.5) * self.g);
-                    if c.dist(p) <= r + self.g * 0.5 {
-                        self.cells[y as usize * self.w + x as usize] = true;
+                    if c.dist(p) <= reach {
+                        self.cells[i] = true;
                     }
                 }
             }
@@ -4007,4 +4031,35 @@ fn skeleton_paths(skel: &[bool], w: usize, min_cells: usize, max_paths: usize) -
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sliding_extremes_match_a_direct_scan() {
+        let mut v = 0x9e37_79b9u32;
+        for n in [1usize, 2, 5, 17, 64, 101] {
+            let x: Vec<f32> = (0..n)
+                .map(|_| {
+                    v ^= v << 13;
+                    v ^= v >> 17;
+                    v ^= v << 5;
+                    (v % 1000) as f32 / 10.0
+                })
+                .collect();
+            for r in [0usize, 1, 3, 8, 40] {
+                for take_max in [true, false] {
+                    let direct: Vec<f32> = (0..n)
+                        .map(|i| {
+                            let w = &x[i.saturating_sub(r)..=(i + r).min(n - 1)];
+                            w.iter().copied().fold(if take_max { f32::MIN } else { f32::MAX }, |a, b| if take_max { a.max(b) } else { a.min(b) })
+                        })
+                        .collect();
+                    assert_eq!(sliding_extreme(&x, r, take_max), direct, "n {n} r {r} max {take_max}");
+                }
+            }
+        }
+    }
 }

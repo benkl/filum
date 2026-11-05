@@ -14,14 +14,15 @@ pub fn delta_e(a: [f64; 3], b: [f64; 3]) -> f64 {
     let (l1, a1, b1) = (a[0], a[1], a[2]);
     let (l2, a2, b2) = (b[0], b[1], b[2]);
     let rad = std::f64::consts::PI / 180.0;
-    let c1 = a1.hypot(b1);
-    let c2 = a2.hypot(b2);
+    // sqrt, not hypot: a software routine in WebAssembly (see Point::length)
+    let c1 = (a1 * a1 + b1 * b1).sqrt();
+    let c2 = (a2 * a2 + b2 * b2).sqrt();
     let cm = (c1 + c2) / 2.0;
     let g = 0.5 * (1.0 - (cm.powi(7) / (cm.powi(7) + 25f64.powi(7))).sqrt());
     let a1p = a1 * (1.0 + g);
     let a2p = a2 * (1.0 + g);
-    let c1p = a1p.hypot(b1);
-    let c2p = a2p.hypot(b2);
+    let c1p = (a1p * a1p + b1 * b1).sqrt();
+    let c2p = (a2p * a2p + b2 * b2).sqrt();
     let hue = |x: f64, y: f64| {
         if x == 0.0 && y == 0.0 {
             0.0

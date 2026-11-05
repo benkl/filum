@@ -74,11 +74,36 @@ pub fn lab_to_rgb(lab: [f64; 3]) -> [u8; 3] {
     let r = 3.2406 * x - 1.5372 * y - 0.4986 * z;
     let g = -0.9689 * x + 1.8758 * y + 0.0415 * z;
     let b = 0.0557 * x - 0.2040 * y + 1.0570 * z;
-    let enc = |c: f64| {
-        let c = if c <= 0.0031308 { 12.92 * c } else { 1.055 * c.powf(1.0 / 2.4) - 0.055 };
-        (c.clamp(0.0, 1.0) * 255.0).round() as u8
-    };
-    [enc(r), enc(g), enc(b)]
+    [srgb_encode(r), srgb_encode(g), srgb_encode(b)]
+}
+
+/// Linear light (0..1) to an sRGB byte: the byte whose band holds `c`. The
+/// 255 band edges (where the rounded encoding steps up) are worked out once,
+/// so a pixel costs a binary search, not three `powf` calls (a software
+/// routine in WebAssembly: most of the digitizer's colour conversion time).
+fn srgb_encode(c: f64) -> u8 {
+    static EDGES: std::sync::OnceLock<Vec<f64>> = std::sync::OnceLock::new();
+    let edges = EDGES.get_or_init(|| {
+        let enc = |c: f64| if c <= 0.0031308 { 12.92 * c } else { 1.055 * c.powf(1.0 / 2.4) - 0.055 };
+        // the edge below byte k+1: the smallest c that rounds up to it (bisection on
+        // the exact encoding, so the bytes match the direct formula)
+        (0..255)
+            .map(|k| {
+                let target = k as f64 + 0.5;
+                let (mut lo, mut hi) = (0.0f64, 1.0f64);
+                for _ in 0..80 {
+                    let mid = 0.5 * (lo + hi);
+                    if (enc(mid).clamp(0.0, 1.0) * 255.0) >= target {
+                        hi = mid;
+                    } else {
+                        lo = mid;
+                    }
+                }
+                hi
+            })
+            .collect()
+    });
+    edges.partition_point(|&e| e <= c) as u8
 }
 
 /// Perceptual colour distance (CIE76 ΔE; cheap and good enough for thread matching).
@@ -152,6 +177,26 @@ pub fn nearest_name(c: [u8; 3]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn srgb_bytes_match_the_formula() {
+        let direct = |c: f64| {
+            let c = if c <= 0.0031308 { 12.92 * c } else { 1.055 * c.powf(1.0 / 2.4) - 0.055 };
+            (c.clamp(0.0, 1.0) * 255.0).round() as u8
+        };
+        let mut rng = 0x2545_f491_4f6c_dd1du64;
+        for i in 0..400_000u32 {
+            let c = if i < 200_000 {
+                i as f64 / 200_000.0 * 1.2 - 0.1
+            } else {
+                rng ^= rng << 13;
+                rng ^= rng >> 7;
+                rng ^= rng << 17;
+                (rng >> 11) as f64 / (1u64 << 53) as f64
+            };
+            assert_eq!(srgb_encode(c), direct(c), "{c}");
+        }
+    }
 
     #[test]
     fn gpl() {

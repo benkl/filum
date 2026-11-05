@@ -2,7 +2,7 @@
 //!
 //! ```text
 //! cargo run --release -p filum-core --features prof --example plan_bench -- \
-//!     [crates/core/tests/suite] [--only NAME] [--no-suite] [--no-synth] [--phases]
+//!     [crates/core/tests/suite] [--only NAME] [--no-suite] [--no-synth] [--phases] [--dump DIR]
 //! ```
 //!
 //! Every picture of the digitizer suite (with its sidecar json, as
@@ -49,6 +49,15 @@ fn main() -> Result<(), String> {
         cases.extend(synthetic().into_iter().filter(|c| only.as_deref().is_none_or(|o| c.name.contains(o))));
     }
 
+    // --dump DIR: every design as a .filum file (to load in the editor and time it there)
+    if let Some(dir) = args.iter().position(|a| a == "--dump").and_then(|i| args.get(i + 1)) {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        for c in &cases {
+            let json = serde_json::to_string(&c.doc).map_err(|e| e.to_string())?;
+            std::fs::write(PathBuf::from(dir).join(format!("{}.filum", c.name)), json).map_err(|e| e.to_string())?;
+        }
+        println!("{} designs written to {dir}", cases.len());
+    }
     println!(
         "{:<22} {:>4} {:>7} | {:>8} {:>8} | {:>8} {:>8} | {:>8} {:>8} {:>5} | {:>9} | {:>7} {:>16}",
         "design", "objs", "digit s", "cold off", "cold on", "warm off", "warm on", "edit off", "edit on", "regen", "UI/edit", "stitches", "plan hash (off^on)"

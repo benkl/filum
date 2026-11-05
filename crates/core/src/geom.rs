@@ -20,9 +20,13 @@ pub const fn pt(x: f64, y: f64) -> Point {
 impl Point {
     pub const ZERO: Point = pt(0.0, 0.0);
 
+    /// `sqrt(x² + y²)`, not `hypot`: in WebAssembly `hypot` is a software
+    /// routine (with a software fused multiply-add) that made up more than half
+    /// of the engine's time there; `sqrt` is one instruction. Design
+    /// coordinates (mm) never come near the overflow `hypot` guards against.
     #[inline]
     pub fn length(self) -> f64 {
-        self.x.hypot(self.y)
+        (self.x * self.x + self.y * self.y).sqrt()
     }
     #[inline]
     pub fn length_sq(self) -> f64 {
@@ -1082,5 +1086,36 @@ mod tests {
     fn simplify_line() {
         let pts = vec![pt(0.0, 0.0), pt(1.0, 0.001), pt(2.0, 0.0)];
         assert_eq!(simplify(&pts, 0.01).len(), 2);
+    }
+}
+
+/// A hash map keyed by grid cells. Rust's default hasher (SipHash, keyed at
+/// random) is built to resist attacks on untrusted keys; for grid cells it
+/// cost several percent of the engine's time, most of all in WebAssembly.
+/// This one mixes the two coordinates with a multiply (as FxHash does).
+pub type CellMap<V> = std::collections::HashMap<(i64, i64), V, std::hash::BuildHasherDefault<CellHasher>>;
+
+#[derive(Default, Clone, Copy)]
+pub struct CellHasher(u64);
+
+impl std::hash::Hasher for CellHasher {
+    #[inline]
+    fn finish(&self) -> u64 {
+        // spread the high bits down: the table uses the low ones
+        self.0 ^ (self.0 >> 29)
+    }
+    #[inline]
+    fn write(&mut self, bytes: &[u8]) {
+        for &b in bytes {
+            self.write_u64(b as u64);
+        }
+    }
+    #[inline]
+    fn write_i64(&mut self, v: i64) {
+        self.write_u64(v as u64);
+    }
+    #[inline]
+    fn write_u64(&mut self, v: u64) {
+        self.0 = (self.0.rotate_left(5) ^ v).wrapping_mul(0x51_7c_c1_b7_27_22_0a_95);
     }
 }

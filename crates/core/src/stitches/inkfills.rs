@@ -10,7 +10,7 @@
 //! * **Circular** (`circular_fill.py`) — an Archimedean spiral around a centre
 //!   point, clipped to the shape; pieces are joined by travel inside it.
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
 use std::f64::consts::TAU;
 
 use crate::geom::*;
@@ -157,7 +157,7 @@ fn tile_lattice(tile: &Tile, b: Rect, k: f64, ky: f64) -> (Vec<Point>, Vec<(usiz
     let n = ((w.hypot(h) / min_shift).ceil() as i64 + 1).min(4000);
     let diag = (s0 + s1).length().max((s0 - s1).length());
     let (xcut, ycut) = (w / 2.0 + diag, h / 2.0 + diag);
-    let mut ids: HashMap<(i64, i64), usize> = HashMap::new();
+    let mut ids: crate::geom::CellMap<usize> = Default::default();
     let mut nodes = Vec::new();
     let mut edges = HashSet::new();
     let mut node = |p: Point, nodes: &mut Vec<Point>| -> usize {
@@ -769,7 +769,7 @@ impl InsideGrid {
 
 struct SpatialHash {
     cell: f64,
-    map: std::collections::HashMap<(i64, i64), Vec<Point>>,
+    map: crate::geom::CellMap<Vec<Point>>,
 }
 
 impl SpatialHash {
@@ -875,9 +875,9 @@ pub fn flow_ex(rings: &[Ring], field: &crate::model::FlowField, spacing: f64, st
         // the line's own points with their arc position (+ forwards, − backwards):
         // a line that comes back to itself (a closed loop, a spiral) stops there
         // instead of sewing over itself
-        let mut own: std::collections::HashMap<(i64, i64), Vec<(Point, f64)>> = Default::default();
+        let mut own: crate::geom::CellMap<Vec<(Point, f64)>> = Default::default();
         let key = |p: Point| ((p.x / dsep).floor() as i64, (p.y / dsep).floor() as i64);
-        let meets_itself = |own: &std::collections::HashMap<(i64, i64), Vec<(Point, f64)>>, q: Point, at: f64, r: f64| {
+        let meets_itself = |own: &crate::geom::CellMap<Vec<(Point, f64)>>, q: Point, at: f64, r: f64| {
             let (kx, ky) = key(q);
             (kx - 1..=kx + 1).any(|x| (ky - 1..=ky + 1).any(|y| own.get(&(x, y)).is_some_and(|v| v.iter().any(|(p, s)| (s - at).abs() > r * 4.5 && p.dist(q) < r))))
         };
@@ -1139,7 +1139,7 @@ fn keep_shared_lines(key: u64, lines: &[Vec<Point>], ranks: &[i64]) {
 }
 
 /// Points of the ranked lines by grid cell: (point, line, the side its rank grows to).
-type Owners = std::collections::HashMap<(i64, i64), Vec<(Point, usize, Point)>>;
+type Owners = crate::geom::CellMap<Vec<(Point, usize, Point)>>;
 
 /// The dither threshold of the line of rank `r` (0..1): the van der Corput
 /// sequence, so neighbouring ranks are half the range apart, every second
