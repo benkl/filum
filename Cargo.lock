@@ -998,7 +998,7 @@ dependencies = [
 
 [[package]]
 name = "filum-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "filum-core",
  "serde_json",
@@ -1006,7 +1006,7 @@ dependencies = [
 
 [[package]]
 name = "filum-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clipper2-rust",
  "filum-formats",
@@ -1020,7 +1020,7 @@ dependencies = [
 
 [[package]]
 name = "filum-desktop"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "filum-core",
  "serde_json",
@@ -1033,11 +1033,11 @@ dependencies = [
 
 [[package]]
 name = "filum-formats"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "filum-wasm"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "filum-core",
  "js-sys",

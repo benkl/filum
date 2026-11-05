@@ -4,7 +4,7 @@ members = ["crates/core", "crates/formats", "crates/wasm", "crates/cli", "src-ta
 default-members = ["crates/core", "crates/cli"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/benkl/filum"
