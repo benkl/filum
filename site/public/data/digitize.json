@@ -1,0 +1,56 @@
+{
+ "logo": {
+  "objects": 12,
+  "fills": 4,
+  "satins": 8,
+  "running": 0,
+  "threads": 6,
+  "stitches": 11146,
+  "time": "15:50"
+ },
+ "illustration": {
+  "objects": 11,
+  "fills": 4,
+  "satins": 7,
+  "running": 0,
+  "threads": 6,
+  "stitches": 10784,
+  "time": "15:35"
+ },
+ "lineart": {
+  "objects": 13,
+  "fills": 2,
+  "satins": 9,
+  "running": 2,
+  "threads": 4,
+  "stitches": 13643,
+  "time": "19:22"
+ },
+ "patch": {
+  "objects": 11,
+  "fills": 4,
+  "satins": 7,
+  "running": 0,
+  "threads": 7,
+  "stitches": 11310,
+  "time": "16:33"
+ },
+ "cartoon": {
+  "objects": 14,
+  "fills": 4,
+  "satins": 7,
+  "running": 3,
+  "threads": 7,
+  "stitches": 10511,
+  "time": "15:39"
+ },
+ "pixel": {
+  "objects": 11,
+  "fills": 10,
+  "satins": 1,
+  "running": 0,
+  "threads": 6,
+  "stitches": 10174,
+  "time": "15:26"
+ }
+}

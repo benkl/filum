@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="800" height="800">
+  <rect width="400" height="400" fill="#ffffff"/>
+  <circle cx="200" cy="185" r="150" fill="#ffe3a3"/>
+  <!-- cactus -->
+  <g fill="#3f9b5a" stroke="#1f5e36" stroke-width="8" stroke-linejoin="round">
+    <path d="M170 300 V120 a30 30 0 0 1 60 0 V300 Z"/>
+    <path d="M170 220 H130 a22 22 0 0 1 -22 -22 V160 a16 16 0 0 1 32 0 V190 H170"/>
+    <path d="M230 200 H268 a20 20 0 0 0 20 -20 V140 a16 16 0 0 0 -32 0 V170 H230"/>
+  </g>
+  <!-- the flower, in front of the cactus -->
+  <circle cx="200" cy="98" r="15" fill="#d83a3f"/>
+  <!-- pot -->
+  <path d="M120 290 H280 L262 372 H138 Z" fill="#ec8045" stroke="#6b3f24" stroke-width="8" stroke-linejoin="round"/>
+  <rect x="110" y="278" width="180" height="30" rx="8" fill="#ec8045" stroke="#6b3f24" stroke-width="8"/>
+</svg>

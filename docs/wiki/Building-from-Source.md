@@ -113,7 +113,7 @@ It needs ImageMagick (`magick`) and `rsvg-convert`. The digitizer shots use the 
 
 ## The website
 
-`site/` holds the website at [benkl.github.io/filum](https://benkl.github.io/filum/): plain HTML, CSS and a little JavaScript, with no build step. Preview it with any static server, for example `python -m http.server -d site`. Every push to `main` that touches `site/` publishes it. The pictures in `site/img` are crops of the wiki screenshots. The download buttons link the current release and switch to the newest one from the GitHub API when the page loads.
+`site/` holds the website at [benkl.github.io/filum](https://benkl.github.io/filum/): a static page built with Vite and TypeScript, with interactive mock-ups of the editor's features and a guided tour. `cd site && npm install && npm run dev` serves it on port 5180; `npm run build` writes the static files to `site/dist`. Every push to `main` that touches `site/` builds and publishes it. `site/README.md` explains how its renders, demo data and social card are made.
 
 ## Mobile
 
