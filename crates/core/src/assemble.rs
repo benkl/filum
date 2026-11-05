@@ -146,6 +146,19 @@ impl Engine {
     /// The object as it is stitched: with "remove overlaps" a fill loses the
     /// parts hidden under objects stacked on top of it. `None` = fully hidden.
     pub fn stitched_object<'a>(&mut self, doc: &'a Document, i: usize) -> Option<Cow<'a, Object>> {
+        self.stitched_in(doc, i, &mut Scan::new(doc))
+    }
+
+    /// Every object as it is stitched (see `stitched_object`), in one pass
+    /// over the document.
+    pub fn stitched_objects<'a>(&mut self, doc: &'a Document) -> Vec<Option<Cow<'a, Object>>> {
+        let mut scan = Scan::new(doc);
+        (0..doc.objects.len()).map(|i| self.stitched_in(doc, i, &mut scan)).collect()
+    }
+
+    /// `stitched_object` with what is known of the objects on top (their
+    /// bounds, width test and key, worked out once per document).
+    fn stitched_in<'a>(&mut self, doc: &'a Document, i: usize, scan: &mut Scan) -> Option<Cow<'a, Object>> {
         let obj = &doc.objects[i];
         let opts = &doc.options;
         let lines = matches!(obj.stitch, StitchParams::Running(_)) && opts.trim_running;
@@ -153,37 +166,32 @@ impl Engine {
             return Some(Cow::Borrowed(obj));
         }
         crate::prof!("hidden: stitched_object");
-        let b = obj.bounds();
+        let b = scan.bounds(doc, i);
         // a colour layer isn't hidden by its own group, and a group covers once (by its first layer)
         let own = layer_group(obj);
         let mut groups: Vec<&str> = Vec::new();
-        let above: Vec<&Object> = doc.objects[i + 1..]
-            .iter()
-            .filter(|o| may_cover(o, opts) && o.bounds().intersects(&b))
-            .filter(|o| match layer_group(o) {
-                Some(g) if Some(g) == own || groups.contains(&g) => false,
-                Some(g) => {
-                    groups.push(g);
-                    true
-                }
-                None => true,
-            })
-            .collect();
+        let mut above: Vec<usize> = Vec::new();
+        for j in i + 1..doc.objects.len() {
+            if !(scan.may_cover(doc, j) && scan.bounds(doc, j).intersects(&b)) {
+                continue;
+            }
+            match layer_group(&doc.objects[j]) {
+                Some(g) if Some(g) == own || groups.contains(&g) => continue,
+                Some(g) => groups.push(g),
+                None => {}
+            }
+            above.push(j);
+        }
         // thin objects (outlines, borders, narrow satins) don't hide what lies under them
         let min_w = opts.cover_min_width;
-        let above: Vec<&Object> = above.into_iter().filter(|o| cover_mode(o) == CoverMode::Always || self.is_wide(o, min_w)).collect();
+        above.retain(|&j| cover_mode(&doc.objects[j]) == CoverMode::Always || *scan.wide[j].get_or_insert_with(|| self.is_wide(&doc.objects[j], min_w)));
         if above.is_empty() {
             return Some(Cow::Borrowed(obj));
         }
         crate::prof!("hidden: key + clip");
-        let json = serde_json::to_string(&(
-            &obj.paths,
-            lines,
-            above.iter().map(|o| (&o.paths, &o.stitch)).collect::<Vec<_>>(),
-            opts.overlap_margin,
-            opts.min_fragment,
-        ))
-        .unwrap_or_default();
+        let above_keys: Vec<u64> = above.iter().map(|&j| scan.key(doc, j)).collect();
+        let above: Vec<&Object> = above.iter().map(|&j| &doc.objects[j]).collect();
+        let json = serde_json::to_string(&(&obj.paths, lines, above_keys, opts.overlap_margin, opts.min_fragment)).unwrap_or_default();
         let k = key(&json, doc.fabric, 0);
         if lines {
             if !self.lines.contains_key(&k) {
@@ -237,11 +245,12 @@ impl Engine {
         // previous stitch) — shorter jumps, fewer trims. Snapped to half a
         // millimetre, so small edits upstream keep the cached stitches.
         let mut prev: Option<Point> = None;
+        let mut scan = Scan::new(doc);
         for i in 0..doc.objects.len() {
             if !doc.objects[i].visible {
                 continue;
             }
-            let Some(obj) = self.stitched_object(doc, i) else { continue };
+            let Some(obj) = self.stitched_in(doc, i, &mut scan) else { continue };
             // cut by what lies on top: with "keep underlay" the full underlay stays under it
             let keep_under = doc.options.keep_underlay && matches!(obj, Cow::Owned(_)) && matches!(obj.stitch, StitchParams::Fill(_));
             let obj = match (obj.start, prev) {
@@ -275,6 +284,36 @@ impl Engine {
         let thread = (!knock.is_empty()).then(|| knockdown_thread(doc));
         prefix.extend(knock);
         assemble_prefixed(doc, &items, &prefix, thread)
+    }
+}
+
+/// What hidden-stitch removal asks of every object on top of a fill, worked
+/// out once per document instead of once per fill under it: its bounds,
+/// whether it may hide what's under it, its width test and a key of its
+/// shape and stitching.
+struct Scan {
+    bounds: Vec<Option<Rect>>,
+    covers: Vec<Option<bool>>,
+    wide: Vec<Option<bool>>,
+    keys: Vec<Option<u64>>,
+}
+
+impl Scan {
+    fn new(doc: &Document) -> Scan {
+        let n = doc.objects.len();
+        Scan { bounds: vec![None; n], covers: vec![None; n], wide: vec![None; n], keys: vec![None; n] }
+    }
+    fn bounds(&mut self, doc: &Document, j: usize) -> Rect {
+        *self.bounds[j].get_or_insert_with(|| doc.objects[j].bounds())
+    }
+    fn may_cover(&mut self, doc: &Document, j: usize) -> bool {
+        *self.covers[j].get_or_insert_with(|| may_cover(&doc.objects[j], &doc.options))
+    }
+    fn key(&mut self, doc: &Document, j: usize) -> u64 {
+        *self.keys[j].get_or_insert_with(|| {
+            let o = &doc.objects[j];
+            key(&serde_json::to_string(&(&o.paths, &o.stitch)).unwrap_or_default(), Fabric::Cotton, 0)
+        })
     }
 }
 

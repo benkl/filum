@@ -74,11 +74,11 @@ impl StitchEngine {
     pub fn stitched_shapes(&mut self, doc_json: &str) -> Result<String, JsValue> {
         let doc = parse_doc(doc_json)?;
         let mut out = Vec::new();
-        for i in 0..doc.objects.len() {
+        for (i, shape) in self.engine.stitched_objects(&doc).into_iter().enumerate() {
             if !doc.objects[i].visible {
                 continue;
             }
-            match self.engine.stitched_object(&doc, i) {
+            match shape {
                 None => out.push(serde_json::json!({ "index": i, "paths": [] })),
                 Some(std::borrow::Cow::Owned(o)) => out.push(serde_json::json!({ "index": i, "paths": o.paths })),
                 Some(_) => {}

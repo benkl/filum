@@ -84,19 +84,14 @@ fn main() -> Result<(), String> {
         let mut ui = Engine::new();
         ui.plan(&on);
         ui.plan(&off);
-        for i in 0..on.objects.len() {
-            let _ = ui.stitched_object(&on, i);
-        }
+        let _ = ui.stitched_objects(&on);
         let (on3, off3) = (nudge(&nudge(&on)), nudge(&nudge(&off)));
         let (ui_edit, _) = time(|| {
             ui.plan(&on3);
             ui.plan(&off3);
             ui.plan(&on3);
-            for i in 0..on3.objects.len() {
-                if on3.objects[i].visible {
-                    let _ = ui.stitched_object(&on3, i);
-                }
-            }
+            // the stitched shapes (crates/wasm stitchedShapes)
+            let _ = ui.stitched_objects(&on3);
         });
         let _ = prof::take();
 
