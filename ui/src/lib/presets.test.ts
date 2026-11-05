@@ -49,6 +49,12 @@ check(
 const stats = { stitches: 1000, width: 220, height: 150, colorChanges: 0 } as PlanStats;
 const jef = exportChecks({ machine: machineById("doc"), frame: null, format: "jef", stats, hoop: { name: "x", width: 300, height: 300 }, outsideHoop: false, machineFormat: true, distinctColours: 1 });
 check(jef.some((c) => c.id === "jef" && c.level === "warn"), "JEF over 200 × 200 mm warns about the 110 × 110 code");
+// trims on short jumps: Brother machines cut only from their trimming length (5 mm)
+const shortTrims = { ...stats, width: 90, height: 90, shortTrims: 3 } as PlanStats;
+const pes = exportChecks({ machine: machineById("doc"), frame: null, format: "pes", stats: shortTrims, hoop: { name: "x", width: 100, height: 100 }, outsideHoop: false, machineFormat: true, distinctColours: 1 });
+check(pes.some((c) => c.id === "short-trims" && c.level === "warn"), "PES with trims on jumps under 5 mm: warns that Brother machines may not cut them");
+const dst = exportChecks({ machine: machineById("doc"), frame: null, format: "dst", stats: shortTrims, hoop: { name: "x", width: 100, height: 100 }, outsideHoop: false, machineFormat: true, distinctColours: 1 });
+check(!dst.some((c) => c.id === "short-trims"), "DST for another machine: no Brother warning");
 
 // materials
 check(FABRICS.every((f) => f.backing && f.topping && f.needle), "every fabric has backing, topping and needle");

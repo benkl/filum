@@ -811,6 +811,16 @@ export function exportChecks(opts: {
       title: `Special frame: ${frame.note}`,
       detail: `${frame.name} — hoop the item as the manual shows`,
     });
+  // Brother machines cut a jump only from their "jump stitch trimming" length
+  // (5 mm by default): shorter trimmed jumps stay as a loose thread
+  const short = stats.shortTrims ?? 0;
+  if (short > 0 && (format === "pes" || format === "pec" || machine.brand === "Brother" || machine.brand === "Baby Lock"))
+    out.push({
+      id: "short-trims",
+      level: "warn",
+      title: `${short} trim${short === 1 ? "" : "s"} on a jump under 5 mm`,
+      detail: "Brother machines leave jumps shorter than their trimming length (5 mm by default) uncut: lower it on the machine, or snip these by hand",
+    });
   if (format === "jef") {
     const j = jefHoop(w, h);
     if (j.fallback)

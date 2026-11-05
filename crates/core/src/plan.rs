@@ -75,6 +75,9 @@ pub struct PlanStats {
     pub stitches: usize,
     pub jumps: usize,
     pub trims: usize,
+    /// Trims before a jump shorter than 5 mm: Brother machines leave jumps
+    /// under their cutting length (5 mm by default) uncut.
+    pub short_trims: usize,
     pub color_changes: usize,
     pub stops: usize,
     pub width: f64,
@@ -219,7 +222,14 @@ impl StitchPlan {
         let mut block_len = 0.0;
         let mut block_count = 0usize;
         let mut total_len = 0.0;
-        for s in &self.stitches {
+        for (i, s) in self.stitches.iter().enumerate() {
+            if s.is(flags::TRIM) {
+                // the jump that follows: to the next stitch, unless a colour change, stop or end comes first
+                let next = self.stitches[i + 1..].iter().find(|x| x.is_stitch() || x.is(flags::COLOR_CHANGE | flags::STOP | flags::END));
+                if next.is_some_and(|x| x.is_stitch() && x.pos().dist(s.pos()) < 5.0) {
+                    st.short_trims += 1;
+                }
+            }
             if s.is(flags::COLOR_CHANGE) {
                 st.color_changes += 1;
                 st.thread_per_color_m.push(block_len / 1000.0);

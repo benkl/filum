@@ -12,10 +12,20 @@ Pick the **thread** weight too (No. 75 down to No. 12). Filum then recommends a 
 
 The **Design** tab's *Machine* section has presets for Baby Lock, Bernina, Brother, Janome, Pfaff / Viking, Singer and commercial machines. **Stitch-out** sets:
 - tie-in / tie-off and the start and end locks
-- *Trim jumps over* (the length at which jumps are trimmed)
+- *Trim jumps over* (the length at which jumps are trimmed, see [Where Filum trims](#where-filum-trims))
 - the minimum and maximum stitch length
 
 **Time estimates** work out the sewing time from your machine's speed.
+
+### Where Filum trims
+
+Filum follows the usual machine-embroidery conventions:
+- **Gaps longer than *Trim jumps over*** (3 mm to start) are tied off, trimmed, jumped and tied in again, in that order. You can change the length for the whole design, or for a single object under its stitch options.
+- **A shorter gap to the next object** is sewn straight across, as Ink/Stitch does, because a cut that short isn't worth a trim. The exception is a connecting stitch longer than 2 mm that nothing sewn later covers: that one would lie across the fabric, so it's trimmed as well (commercial digitizing software trims from 2 mm).
+- **A colour change** is tied off but not trimmed first: the machine cuts the thread itself when it changes colour.
+- **Stops** (appliqué steps) and the end of the design are tied off and trimmed.
+
+Brother and Baby Lock machines only cut jumps longer than their own *jump stitch trimming* length, 5 mm by default. When a PES file has trims on shorter jumps, the export dialog warns you, so you can lower that length on the machine or snip those threads by hand.
 
 ## Stitch processing
 

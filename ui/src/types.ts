@@ -559,6 +559,8 @@ export interface PlanStats {
   stitches: number;
   jumps: number;
   trims: number;
+  /** Trims before a jump shorter than 5 mm (Brother machines may leave them uncut). */
+  shortTrims?: number;
   colorChanges: number;
   stops: number;
   width: number;

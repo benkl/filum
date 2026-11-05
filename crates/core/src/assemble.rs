@@ -8,7 +8,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
-use crate::geom::{point_in_ring, Point, Rect, Ring};
+use crate::geom::{point_in_ring, pt, Point, Rect, Ring};
 use crate::model::{thread_density_scale, Basting, CoverMode, DesignOptions, Document, Fabric, FillMethod, MachineSettings, Object, StitchParams, SubPath, Thread, Ties};
 use crate::plan::{flags, Stitch, StitchPlan};
 use crate::region::{object_cover, outline, subtract_min, Cover};
@@ -437,6 +437,81 @@ fn basting_runs(doc: &Document, items: &[(usize, Vec<Run>)]) -> Vec<Run> {
 }
 
 
+/// A connecting stitch between two objects (a gap up to the trim distance,
+/// sewn through) is trimmed instead when it stays visible over this length:
+/// commercial auto-trim cuts from 2 mm (Ink/Stitch sews up to 3 mm).
+const VISIBLE_CONNECTION: f64 = 2.0;
+/// Visible: a stretch longer than this that nothing sewn later lies within
+/// `COVERED_WITHIN` of.
+const VISIBLE_STRETCH: f64 = 1.0;
+const COVERED_WITHIN: f64 = 0.45;
+
+/// The stitches still to be sewn (every run of the design, in sewing
+/// order), indexed by grid cell on first use: does a connecting stitch end
+/// up under them?
+struct Ahead<'a> {
+    runs: Vec<&'a Run>,
+    grid: Option<crate::geom::CellMap<Vec<(u32, Point, Point)>>>,
+}
+
+impl Ahead<'_> {
+    const CELL: f64 = 1.0;
+
+    fn grid(&mut self) -> &crate::geom::CellMap<Vec<(u32, Point, Point)>> {
+        let runs = &self.runs;
+        self.grid.get_or_insert_with(|| {
+            let mut g: crate::geom::CellMap<Vec<(u32, Point, Point)>> = Default::default();
+            for (k, run) in runs.iter().enumerate() {
+                for w in run.windows(2) {
+                    let (a, b) = (w[0].0, w[1].0);
+                    let (lo, hi) = (pt(a.x.min(b.x), a.y.min(b.y)), pt(a.x.max(b.x), a.y.max(b.y)));
+                    for y in (lo.y / Self::CELL).floor() as i64..=(hi.y / Self::CELL).floor() as i64 {
+                        for x in (lo.x / Self::CELL).floor() as i64..=(hi.x / Self::CELL).floor() as i64 {
+                            g.entry((x, y)).or_default().push((k as u32, a, b));
+                        }
+                    }
+                }
+            }
+            g
+        })
+    }
+
+    /// Does the stitch `a → b`, sewn before run `next`, stay visible: a
+    /// stretch of it longer than `VISIBLE_STRETCH` that no stitch of run
+    /// `next` or later lies on?
+    fn visible(&mut self, a: Point, b: Point, next: usize) -> bool {
+        let grid = self.grid();
+        let near = |p: Point| {
+            let (kx, ky) = ((p.x / Self::CELL).floor() as i64, (p.y / Self::CELL).floor() as i64);
+            (ky - 1..=ky + 1).any(|y| {
+                (kx - 1..=kx + 1).any(|x| grid.get(&(x, y)).is_some_and(|v| v.iter().any(|&(k, s0, s1)| k as usize >= next && seg_dist(p, s0, s1) < COVERED_WITHIN)))
+            })
+        };
+        let len = a.dist(b);
+        let n = (len / 0.2).ceil().max(1.0) as usize;
+        let step = len / n as f64;
+        let mut open = 0.0;
+        for k in 0..=n {
+            if near(a + (b - a) * (k as f64 / n as f64)) {
+                open = 0.0;
+            } else {
+                open += step;
+                if open > VISIBLE_STRETCH {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+}
+
+fn seg_dist(p: Point, a: Point, b: Point) -> f64 {
+    let d = b - a;
+    let l2 = d.length_sq();
+    let t = if l2 < 1e-12 { 0.0 } else { ((p - a).dot(d) / l2).clamp(0.0, 1.0) };
+    (a + d * t).dist(p)
+}
+
 fn fallback_thread(i: usize) -> Thread {
     Thread { id: format!("auto{i}"), name: "Black".into(), color: "#1c1c1c".into(), brand: String::new(), code: String::new(), weight: None }
 }
@@ -457,6 +532,13 @@ struct Builder<'a> {
     min_stitch: f64,
     min_jump: f64,
     last_min_jump: f64,
+    /// The current object's and the last object's jump limit were set on the
+    /// object (they win over the visible-connection trim).
+    min_jump_set: bool,
+    last_min_jump_set: bool,
+    /// The runs still to come, and the index among them of the run being sewn.
+    ahead: Ahead<'a>,
+    at: usize,
 }
 
 impl Builder<'_> {
@@ -504,7 +586,11 @@ impl Builder<'_> {
                 let owner = self.last_obj;
                 self.tie_off(p, owner);
             }
-            self.out.push(Stitch::new(p, flags::TRIM, o));
+            // a colour change cuts the thread itself (the machine trims there;
+            // Ink/Stitch writes no trim before it): no trim of our own
+            if !color_change {
+                self.out.push(Stitch::new(p, flags::TRIM, o));
+            }
             if stop {
                 self.out.push(Stitch::new(p, flags::STOP, o));
             }
@@ -521,7 +607,10 @@ impl Builder<'_> {
         match self.pos {
             Some(p) => {
                 let gap = p.dist(start);
-                if gap > self.last_min_jump && !self.needs_tie_in {
+                // a short connection to the next object is sewn through, unless
+                // it would show: nothing sewn later covers it
+                let shows = || gap > VISIBLE_CONNECTION && o != self.last_obj && o != u32::MAX && !self.last_min_jump_set;
+                if !self.needs_tie_in && (gap > self.last_min_jump || (shows() && self.ahead.visible(p, start, self.at))) {
                     self.cut(o, false, false);
                 }
                 if self.needs_tie_in && gap > 1e-6 {
@@ -553,6 +642,7 @@ impl Builder<'_> {
         self.pos = Some(last);
         self.last_obj = o;
         self.last_min_jump = self.min_jump;
+        self.last_min_jump_set = self.min_jump_set;
         self.prev_ties = self.ties;
     }
 }
@@ -569,7 +659,24 @@ pub fn assemble_with(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[Run]
 /// Assemble with stitches sewn before the design (basting, knockdown): in
 /// `prefix_thread`, or in the first object's thread.
 pub fn assemble_prefixed(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[Run], prefix_thread: Option<Thread>) -> StitchPlan {
-    let mut b = Builder { m: &doc.machine, out: Vec::new(), pos: None, needs_tie_in: true, ties: Ties::Both, prev_ties: Ties::Both, last_obj: u32::MAX, min_stitch: doc.machine.min_stitch, min_jump: doc.machine.trim_distance, last_min_jump: doc.machine.trim_distance };
+    let ahead = Ahead { runs: items.iter().flat_map(|(_, runs)| runs.iter()).collect(), grid: None };
+    let mut b = Builder {
+        m: &doc.machine,
+        out: Vec::new(),
+        pos: None,
+        needs_tie_in: true,
+        ties: Ties::Both,
+        prev_ties: Ties::Both,
+        last_obj: u32::MAX,
+        min_stitch: doc.machine.min_stitch,
+        min_jump: doc.machine.trim_distance,
+        last_min_jump: doc.machine.trim_distance,
+        min_jump_set: false,
+        last_min_jump_set: false,
+        ahead,
+        at: 0,
+    };
+    let mut at = 0usize;
     let mut threads: Vec<Thread> = Vec::new();
     let mut cur_thread: Option<&str> = None;
 
@@ -611,7 +718,10 @@ pub fn assemble_prefixed(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[
         b.ties = obj.ties;
         b.min_stitch = obj.min_stitch.unwrap_or(doc.machine.min_stitch).max(0.0);
         b.min_jump = obj.min_jump.unwrap_or(doc.machine.trim_distance).max(0.0);
+        b.min_jump_set = obj.min_jump.is_some();
         for run in runs {
+            b.at = at;
+            at += 1;
             if is_stop(run) {
                 // stop inside the object (appliqué steps)
                 if b.pos.is_some() {
@@ -986,5 +1096,77 @@ mod tests {
         let all = n(&d);
         d.objects[0].min_stitch = Some(1.5);
         assert!(n(&d) < all * 2 / 3, "1 mm stitches dropped below a 1.5 mm minimum: {} of {all}", n(&d));
+    }
+}
+
+#[cfg(test)]
+mod trim_tests {
+    use super::*;
+    use crate::model::*;
+
+    fn line(id: &str, thread: &str, pts: &[(f64, f64)]) -> Object {
+        let p: Vec<Point> = pts.iter().map(|&(x, y)| pt(x, y)).collect();
+        Object {
+            id: id.into(),
+            name: id.into(),
+            thread: thread.into(),
+            visible: true,
+            locked: false,
+            paths: vec![SubPath::polyline(&p, false)],
+            stitch: StitchParams::Running(RunningParams::default()),
+            trim_after: false,
+            stop_after: false,
+            ties: Default::default(),
+            force_lock: false,
+            min_stitch: None,
+            min_jump: None,
+            clone: None,
+            hidden: None,
+            patterns: vec![],
+            start: None,
+            end: None,
+        }
+    }
+    fn thread(id: &str, color: &str) -> Thread {
+        Thread { id: id.into(), name: id.into(), color: color.into(), brand: "".into(), code: "".into(), weight: None }
+    }
+    fn plan(objects: Vec<Object>) -> StitchPlan {
+        let d = Document { threads: vec![thread("a", "#000000"), thread("b", "#ff0000")], objects, ..Default::default() };
+        crate::Engine::new().plan(&d)
+    }
+    fn trims(p: &StitchPlan) -> usize {
+        p.stitches.iter().filter(|s| s.is(flags::TRIM)).count()
+    }
+
+    #[test]
+    fn a_colour_change_cuts_without_a_trim_of_its_own() {
+        // the machine trims at a colour change (Ink/Stitch writes no trim there)
+        let p = plan(vec![line("1", "a", &[(0.0, 0.0), (20.0, 0.0)]), line("2", "b", &[(0.0, 10.0), (20.0, 10.0)])]);
+        let cc = p.stitches.iter().position(|s| s.is(flags::COLOR_CHANGE)).unwrap();
+        assert!(!p.stitches[cc - 1].is(flags::TRIM), "no trim right before the colour change");
+        // tied off before it, tied in after it
+        assert!(p.stitches[cc - 1].is(flags::TIE) && p.stitches[cc - 2].is(flags::TIE));
+        let next = cc + p.stitches[cc..].iter().position(|s| s.is_stitch()).unwrap();
+        assert!(p.stitches[next + 1].is(flags::TIE), "tie-in after the colour change");
+        // only the end trims
+        assert_eq!(trims(&p), 1);
+    }
+
+    #[test]
+    fn a_visible_connection_over_2_mm_is_trimmed() {
+        // 2.5 mm across bare fabric to the next object: cut
+        let open = plan(vec![line("1", "a", &[(0.0, 0.0), (20.0, 0.0)]), line("2", "a", &[(22.5, 0.0), (40.0, 0.0)])]);
+        assert_eq!(trims(&open), 2, "a trim between the lines, and the end");
+        // 1.5 mm: sewn through
+        let short = plan(vec![line("1", "a", &[(0.0, 0.0), (20.0, 0.0)]), line("2", "a", &[(21.5, 0.0), (40.0, 0.0)])]);
+        assert_eq!(trims(&short), 1);
+        // 2.5 mm, but the next line runs back over it: hidden, sewn through
+        let covered = plan(vec![line("1", "a", &[(0.0, 0.0), (20.0, 0.0)]), line("2", "a", &[(22.5, 0.0), (15.0, 0.0), (15.0, 10.0)])]);
+        assert_eq!(trims(&covered), 1);
+        // an object's own minimum jump wins
+        let mut first = line("1", "a", &[(0.0, 0.0), (20.0, 0.0)]);
+        first.min_jump = Some(3.0);
+        let set = plan(vec![first, line("2", "a", &[(22.5, 0.0), (40.0, 0.0)])]);
+        assert_eq!(trims(&set), 1);
     }
 }

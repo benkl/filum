@@ -143,6 +143,23 @@ Findings and what was done:
 - **The Properties panel's section tracker** rescanned all sections and forced a layout on every value change inside them. It now rescans only when sections are added or removed, or while searching.
 - **What's left on the main thread** is mostly canvas compositing (`drawImage`, 14 %), garbage collection (7 %) and building the stitch geometry for the canvas (11 %). None of these is wasteful, and all three scale with the stitch count.
 
+### 4.2 Machine conventions check (November 2026)
+`cargo run --release -p filum-core --example plan_audit -- <dir of .filum designs>` checks plans and the machine files written from them. It found the trim logic sound:
+- a tie-off before and a tie-in after every trim
+- the order tie-off → trim → jump → tie-in
+- no untrimmed jumps
+- DST, PES, EXP, JEF and VP3 within their per-axis limits, with their trims read back
+
+Three things were changed:
+- **No trim before a colour change.** The machine cuts there itself, Ink/Stitch writes none, and the trim count and time estimate counted it twice.
+- **A connecting stitch over 2 mm between objects that nothing sewn later covers is trimmed**, the threshold of commercial auto-trim. Before, every gap up to 3 mm was sewn through, leaving threads of up to 2.9 mm across the fabric between letters and lines.
+- **The PES export warns about trims on jumps under 5 mm**, which Brother machines don't cut by default.
+
+Still open:
+- **Gradient colours trim inside their shape.** A colour may not travel over the colours sewn before it, so its pieces are joined by trims: 98 in six 3-colour flow gradients, 96 of which a travel inside the shape could replace. Travelling under the colours sewn later, along the shared rows, would remove most of them.
+- **Travel crossing the rows on top.** In curved and flow fills a little travel runs across rows already sewn: about 13 mm per fill. Travel along the rows lies in their groove and is accepted practice.
+- **A trim with no jump after it** (a trim set on an object whose next one starts at exactly the same point) is lost in PES, which carries trims on jumps.
+
 ### Phase D: later
 - Tell a face from a frame's inside by learned segmentation (the on-device model the AI tab already uses), not by geometry alone.
 - Let the user pick a region's role (fill, line, leave out) right in the stitch preview, not only by colour.
