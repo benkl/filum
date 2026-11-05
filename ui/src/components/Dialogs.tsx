@@ -2,6 +2,7 @@ import { FontPickerDialog } from "./Lettering";
 import { RouteDialog } from "./RouteDialog";
 import { KnockdownDialog } from "./KnockdownDialog";
 import { CrossStitchDialog } from "./CrossStitchAssistant";
+import { CalibrateDialog } from "./CalibrateDialog";
 import { TestSwatchesDialog } from "./TestSwatches";
 import { LicensesDialog } from "./Licenses";
 import { OutlineDialog, RepeatDialog } from "./ArrangeTools";
@@ -228,6 +229,8 @@ export function Dialogs() {
       return <ShapeEffectsDialog onClose={close} />;
     case "swatches":
       return <TestSwatchesDialog onClose={close} />;
+    case "calibrate":
+      return <CalibrateDialog onClose={close} />;
     case "crossstitch":
       return <CrossStitchDialog onClose={close} />;
     default:

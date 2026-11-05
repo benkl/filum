@@ -46,6 +46,7 @@ PES v1 describes colours as entries of Brother's thread table, so the machine sh
 - Choose the right **Fabric** preset in the title bar. It sets density, underlay and pull compensation for that fabric.
 - Check the **Density map** (<kbd>Shift</kbd>+<kbd>D</kbd>) for areas that are too dense.
 - Use the recommended **backing** and **topping** (**Design → Fabric & thread**).
+- **Calibrate the fabric** (the ruler button next to the fabric): sew one swatch, measure it, and new objects start from the pull compensation your setup needs (see [Production tools](Production-Tools.md#calibrate-a-fabric)).
 - Sew **Test swatches** with a few densities or pull compensations and keep the best (see [Production tools](Production-Tools.md)).
 - On towels and fleece, add **Knockdown** stitches.
 

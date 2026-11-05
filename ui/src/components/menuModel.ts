@@ -12,7 +12,7 @@
 //   Tools    the drawing and editing tools
 //   Help
 
-import { AlignCenterHorizontal, ArrowDownUp, Clipboard, SquareSplitHorizontal, ArrowRightLeft, Blend, ClipboardPaste, Combine, Copy, CopyPlus, Eye, EyeOff, FileCode, FileDown, FilePlus, FlipHorizontal2, FlipVertical2, Flower2, FolderOpen, Grid2x2Check, Group, ImagePlus, Import, Link2, Lock, LockOpen, Mountain, Printer, Redo2, RotateCw, Route, Scissors, Settings, Spline, Trash2, Undo2, Ungroup, Unlink, Wand2, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react";
+import { AlignCenterHorizontal, ArrowDownUp, Clipboard, SquareSplitHorizontal, ArrowRightLeft, Blend, ClipboardPaste, Combine, Copy, CopyPlus, Eye, EyeOff, FileCode, FileDown, FilePlus, FlipHorizontal2, FlipVertical2, Flower2, FolderOpen, Grid2x2Check, Group, ImagePlus, Import, Link2, Lock, LockOpen, Mountain, Printer, Redo2, RotateCw, Route, Ruler, Scissors, Settings, Spline, Trash2, Undo2, Ungroup, Unlink, Wand2, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react";
 import { Applique, Basting, Rebuild, StitchAngle, Cutwork, DensityMap, Digitize, GradientTool, Hoop, Jump, Knockdown, PatchBorder, SewOrder, Spool, StitchCross, StitchRunning, StitchSatin } from "../icons/stitch";
 import { TOOL_ICONS } from "../icons/toolIcons";
 import { unlinkClone } from "../lib/clones";
@@ -297,6 +297,7 @@ export function buildMenus(): Record<string, MenuItem[]> {
       },
       tool("guides", "Stitch direction", "D", "Draw guide lines the rows follow"),
       { label: "Test swatches…", icon: Grid2x2Check, run: () => s.setDialog("swatches"), disabled: !hasSel },
+      { label: "Calibrate fabric…", icon: Ruler, run: () => s.setDialog("calibrate"), hint: "Sew a swatch, measure it: new objects on the fabric start from your pull compensation" },
       "-",
       {
         label: "Basting",

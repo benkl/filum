@@ -44,6 +44,18 @@ Related commands:
 - **Path → Route** auto-routes running stitches and satin columns into continuous paths, and can turn jumps into running stitch.
 - **Object → Stitch order** moves the selection earlier or later (<kbd>Ctrl</kbd>+<kbd>[</kbd> / <kbd>Ctrl</kbd>+<kbd>]</kbd>).
 
+### Calibrate a fabric
+
+The presets are starting points. How much the thread pulls also depends on your backing, how tightly you hoop and your machine. To match your own setup, click the ruler button next to the fabric (or choose **Stitch → Calibrate fabric…**):
+
+1. **Sew the swatch.** Download a 100 × 100 mm file in your machine's format and sew it the way you always do. It has two fill discs (rows across, rows up and down) and two satin bars (lying, standing), each labelled A to D in running stitch, and no pull compensation of its own. The panel shows the backing, topping and needle the fabric preset suggests.
+2. **Measure it.** Measure each piece along its stitches and across them, to a tenth of a millimetre. The diagram points at the size you're typing, and each field shows how far it is from the drawn size. One disc and one bar are enough; all four make the numbers more reliable.
+3. **Save.** Filum works out the satin pull compensation and how far the column ends are pulled in, and for fills the pull compensation and how much smaller (or larger) the shape is stitched. It explains each number and notes anything odd, like a fabric that gives more in one direction or a measurement far from the drawing.
+
+![Measuring the calibration swatch](images/calibrate.webp)
+
+The calibration is saved for that fabric on this device. New satins and fills on it start from your numbers, and you can still change them per object. Objects already in a design keep theirs, unless you tick **Also update the objects in this design** (one undo step). A calibrated fabric shows a filled ruler button; **Standard numbers** in the dialog forgets the calibration.
+
 ## Test swatches
 
 Not sure which density or pull compensation suits your fabric? Select an object and choose **Stitch → Test swatches…**. Pick a setting, such as row spacing (density), stitch length, pull compensation or angle. Then set a start value, a step and a grid. Filum makes copies of the object in a grid, one value per copy, each named after its value. Sew it once and keep the best.

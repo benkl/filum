@@ -16,7 +16,14 @@ export const uid = (p = "o") => `${p}${Date.now().toString(36)}${Math.random().t
 
 export const defaultRunning = (): RunningParams => ({ length: 2.5, tolerance: 0.2, repeats: 1, beanRepeats: 0 });
 
-export const defaultSatin = (): SatinParams => ({
+/** Per-fabric starting numbers for new objects (fabric calibration); set once by the app. */
+let fabricDefaults: () => { satin?: Partial<SatinParams>; fill?: Partial<FillParams> } = () => ({});
+export const setFabricDefaults = (f: typeof fabricDefaults) => {
+  fabricDefaults = f;
+};
+
+export const defaultSatin = (): SatinParams => ({ ...baseSatin(), ...fabricDefaults().satin });
+const baseSatin = (): SatinParams => ({
   method: "satin",
   spacing: 0.4,
   width: 3,
@@ -35,7 +42,8 @@ export const defaultSatin = (): SatinParams => ({
   reverse: false,
 });
 
-export const defaultFill = (): FillParams => ({
+export const defaultFill = (): FillParams => ({ ...baseFill(), ...fabricDefaults().fill });
+const baseFill = (): FillParams => ({
   method: "tatami",
   angle: 0,
   rowSpacing: 0.25,

@@ -1,7 +1,8 @@
 // Fabric and thread of the design: the fabric preset with what its makers
 // recommend underneath and on top, the thread weight, and the hoop's shape.
 
-import { Circle, Square, TriangleAlert } from "lucide-react";
+import { Circle, Ruler, Square, TriangleAlert } from "lucide-react";
+import { calibrationFor } from "../lib/calibration";
 import { Fabric, Knockdown } from "../icons/stitch";
 import { defaultDesignOptions } from "../lib/geometry";
 import { FABRICS, fabricInfo, THREAD_WEIGHTS, threadWeightInfo } from "../lib/materials";
@@ -35,18 +36,30 @@ export function MaterialSection() {
   const doc = useStore((s) => s.doc);
   const commit = useStore((s) => s.commit);
   const fabric = fabricInfo(doc.fabric);
+  // re-read when the dialog closes (the calibration lives on the device, not in the design)
+  useStore((s) => s.dialog);
+  const calibrated = calibrationFor(doc.fabric);
   const weight = threadWeightInfo(doc.options?.threadWeight);
   const setWeight = (w: ThreadWeight) => commit((d) => ({ ...d, options: { ...(d.options ?? defaultDesignOptions()), threadWeight: w } }));
   return (
     <>
       <Row label="Fabric" title="Adjusts pull compensation, density and underlay for every object">
-        <select className="select" style={{ width: "100%" }} value={doc.fabric} onChange={(e) => useStore.getState().setFabric(e.target.value as never)}>
-          {FABRICS.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.label}
-            </option>
-          ))}
-        </select>
+        <div className="mt-fabric">
+          <select className="select" value={doc.fabric} onChange={(e) => useStore.getState().setFabric(e.target.value as never)}>
+            {FABRICS.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+          <button
+            className={`icon-btn ${calibrated ? "on" : ""}`}
+            title={calibrated ? `Calibrated on this device (${calibrated.date}): new objects start from your numbers. Click to measure again.` : "Calibrate this fabric: sew a swatch, measure it, and new objects start from your pull compensation"}
+            onClick={() => useStore.getState().setDialog("calibrate")}
+          >
+            <Ruler size={13} />
+          </button>
+        </div>
       </Row>
       <Row label="Thread" title="Top thread weight — finer thread stitches denser, heavier thread wider (Madeira's density guide)">
         <div className="seg mt-weights">
@@ -60,6 +73,7 @@ export function MaterialSection() {
       <div className="mt-card">
         <p className="mt-effect">
           <Fabric size={12} /> {fabric.effect}
+          {calibrated && " · calibrated pull compensation for new objects"}
           {weight.weight !== 40 && ` · spacing ×${(weight.spacing / 0.4).toFixed(2)} for No. ${weight.weight}`}
         </p>
         <dl className="mt-advice">

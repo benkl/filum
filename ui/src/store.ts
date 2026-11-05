@@ -29,6 +29,7 @@ export interface View {
 }
 
 export type DialogName =
+  | "calibrate"
   | "swatches"
   | "crossstitch"
   | "palette"

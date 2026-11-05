@@ -6,6 +6,11 @@ import { loadAutosave, useStore } from "./store";
 import { sampleDocument } from "./sample";
 import { engine } from "./engine/client";
 import { openLaunchFiles } from "./lib/actions";
+import { setFabricDefaults } from "./lib/geometry";
+import { calibratedDefaults } from "./lib/calibration";
+
+// New objects start from the design fabric's calibrated numbers (Calibrate fabric…).
+setFabricDefaults(() => calibratedDefaults(useStore.getState().doc.fabric));
 
 // Restore the last session, or open the sample design on first launch.
 const saved = loadAutosave();

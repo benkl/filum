@@ -37,7 +37,7 @@ Under the hood is a fast stitch engine written in Rust. It's a port of the algor
 
 **Every stitch type you'd expect, and a few you wouldn't.** You get running, bean and motif lines, and satin columns with underlay and pull compensation. Tatami fills come with gradient density. There are also contour, spiral, sunburst, stipple, meander, Hilbert curve and gradient fills, plus appliqué and cross stitch.
 
-**Production tools.** These include knockdown stitches for towels and fleece, basting, and removing stitching hidden under other objects. You can also optimise the stitch order for fewer jumps and colour changes, run test swatches and print job sheets. Fabric presets set sensible density, underlay and pull compensation for you.
+**Production tools.** These include knockdown stitches for towels and fleece, basting, and removing stitching hidden under other objects. You can also optimise the stitch order for fewer jumps and colour changes, run test swatches and print job sheets. Fabric presets set sensible density, underlay and pull compensation for you, and you can calibrate a fabric for your own setup by sewing and measuring one swatch.
 
 **Opens almost anything.** Filum reads and writes DST, PES, JEF, EXP, VP3, XXX, U01, SEW and more, and reads 30 further formats (HUS, SHV, PCS, KSM, …). It also writes thread lists, PNG pictures, G-code and stitch-out videos.
 

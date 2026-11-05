@@ -6277,3 +6277,478 @@ kbd {
   white-space: nowrap;
   padding-right: 16px;
 }
+
+/* ---------------- fabric calibration ---------------- */
+/* three steps over one swatch: a live preview, a diagram that points at the
+   measurement being typed, and the result as before / after cards */
+.mt-fabric {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+}
+.mt-fabric .select {
+  flex: 1;
+  min-width: 0;
+}
+.mt-fabric .icon-btn {
+  flex: none;
+  width: 24px;
+  border: 1px solid var(--border);
+}
+.mt-fabric .icon-btn.on {
+  border-color: var(--accent);
+}
+.cal-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.cal-intro {
+  flex: 1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.cal-fabric {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 260px;
+  color: var(--muted);
+}
+.cal-fabric .select {
+  min-width: 130px;
+}
+.cal-state {
+  width: 100%;
+  font-size: 11px;
+  text-align: right;
+}
+.cal-state.on {
+  color: var(--hoop);
+}
+.cal-steps {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 14px;
+  padding: 3px;
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  list-style: none;
+}
+.cal-steps li {
+  flex: 1;
+}
+.cal-steps button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 550;
+}
+.cal-steps button:hover {
+  color: var(--text);
+}
+.cal-steps button.on {
+  background: var(--bg-3);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.cal-dot {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--border);
+  color: var(--text);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+.cal-steps .on .cal-dot {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.cal-steps .done .cal-dot {
+  background: var(--hoop);
+  color: #fff;
+}
+.cal-grid {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.cal-preview,
+.cal-diagram {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--canvas);
+  overflow: hidden;
+}
+.cal-preview {
+  aspect-ratio: 1;
+}
+.cal-preview > div {
+  position: absolute;
+  inset: 0;
+}
+.cal-size {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-3) 85%, transparent);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+.cal-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.cal-lead {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.cal-lead svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--accent);
+}
+.cal-check {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  list-style: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+.cal-check b {
+  display: inline-block;
+  min-width: 64px;
+  color: var(--text);
+  font-weight: 600;
+}
+.cal-download {
+  display: flex;
+  gap: 6px;
+}
+.cal-download .select {
+  height: 26px;
+}
+.cal-side .hint {
+  padding: 0;
+}
+/* the diagram */
+.cal-diagram {
+  padding: 0 0 26px;
+}
+.cal-diagram svg {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+}
+.cal-hoop {
+  fill: var(--bg-3);
+  stroke: var(--hoop);
+  stroke-width: 0.5;
+  stroke-dasharray: 2 1.4;
+}
+.cal-diagram pattern path {
+  stroke: var(--muted);
+  stroke-width: 0.35;
+}
+.cal-piece > ellipse,
+.cal-piece > rect {
+  stroke: var(--muted);
+  stroke-width: 0.4;
+  transition: stroke 0.12s var(--ease);
+}
+.cal-piece text {
+  fill: var(--muted);
+  font-size: 5px;
+  font-weight: 700;
+}
+.cal-piece.done > ellipse,
+.cal-piece.done > rect {
+  stroke: var(--hoop);
+}
+.cal-piece.on > ellipse,
+.cal-piece.on > rect {
+  stroke: var(--accent);
+  stroke-width: 0.7;
+}
+.cal-piece.on text {
+  fill: var(--accent);
+}
+.cal-dim line {
+  stroke: var(--accent);
+  stroke-width: 0.5;
+}
+.cal-dim text {
+  font-size: 3.6px;
+  font-weight: 650;
+}
+.cal-legend {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 6px;
+  margin: 0;
+  color: var(--faint);
+  font-size: 11px;
+  text-align: center;
+}
+/* the measurements */
+.cal-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 4px;
+  font-size: 12px;
+}
+.cal-table thead th {
+  padding: 0 4px 2px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+}
+.cal-table tbody th {
+  padding: 0 8px 0 0;
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+  vertical-align: top;
+  line-height: 28px;
+}
+.cal-table td {
+  padding: 0 4px;
+  vertical-align: top;
+}
+.cal-table tr.on th {
+  color: var(--accent);
+}
+.cal-letter {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+  font-weight: 700;
+  line-height: 1;
+}
+tr.on .cal-letter {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.cal-pname {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.cal-pname svg {
+  color: var(--muted);
+}
+.cal-field {
+  position: relative;
+  display: block;
+}
+.cal-field .input {
+  width: 100%;
+  height: 28px;
+  padding-right: 30px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  text-align: right;
+}
+.cal-field .input::placeholder {
+  color: var(--faint);
+}
+.cal-field.odd .input {
+  border-color: #d08a1f;
+}
+.cal-unit {
+  position: absolute;
+  right: 8px;
+  top: 7px;
+  color: var(--faint);
+  font-size: 11px;
+  pointer-events: none;
+}
+.cal-diff {
+  display: block;
+  padding: 2px 2px 0;
+  color: var(--faint);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+.cal-diff.in {
+  color: #c2410c;
+}
+.cal-diff.out {
+  color: #2563eb;
+}
+[data-theme="dark"] .cal-diff.in {
+  color: #fb923c;
+}
+[data-theme="dark"] .cal-diff.out {
+  color: #60a5fa;
+}
+.cal-diff.same {
+  color: var(--hoop);
+}
+/* the result */
+.cal-result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cal-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.cal-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.cal-card {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--bg-3);
+}
+.cal-card.empty {
+  background: var(--bg-2);
+}
+.cal-card h4 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+.cal-card h4 svg {
+  color: var(--accent);
+}
+.cal-card .hint {
+  padding: 0;
+}
+.cal-card dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+.cal-card dt {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.cal-card dd {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 2px 0 0;
+}
+.cal-card dd b {
+  font-size: 17px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.cal-was {
+  color: var(--faint);
+  font-size: 11px;
+}
+.cal-why {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+.cal-note {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, #d08a1f 12%, var(--bg-3));
+  font-size: 12px;
+  line-height: 1.45;
+}
+.cal-note svg {
+  flex: none;
+  margin-top: 2px;
+  color: #d08a1f;
+}
+.cal-apply {
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.cal-apply p {
+  margin: 0;
+}
+.cal-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-weight: 550;
+}
+.cal-toggle input {
+  accent-color: var(--accent);
+}
+@media (max-width: 760px) {
+  .cal-top,
+  .cal-grid,
+  .cal-cards {
+    display: flex;
+    flex-direction: column;
+  }
+  .cal-fabric {
+    max-width: none;
+    justify-content: flex-start;
+  }
+  .cal-state {
+    text-align: left;
+  }
+  .cal-preview,
+  .cal-diagram {
+    width: 100%;
+  }
+}

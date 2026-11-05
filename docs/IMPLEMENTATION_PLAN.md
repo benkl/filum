@@ -145,6 +145,7 @@ The window, top to bottom: a menu bar with quick icons (save, undo, redo), a tit
 - [x] Layers: drag to reorder, rename, show/hide, up/down, per-object thumbnails. Scene tab with hoop, fabric and design statistics.
 - [x] Properties panel: transform, thread picker, every stitch parameter, trim/stop commands.
 - [x] Stitch-out animation with a scrubber; WebM video export of the stitch-out.
+- [x] Fabric calibration: a measured swatch (two fill discs, two satin bars) sets the pull compensation, column-end pull-in and fill expand new objects start from, per fabric on the device.
 - [x] Stitch-out player: a timeline of the colour blocks (trims, stops, thread changes), machine-time clock, playback speeds, follow the needle, block-by-block stepping.
 - [x] Dialogs:
   - Export: format grid, statistics, hoop overflow warning
