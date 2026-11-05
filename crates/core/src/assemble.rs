@@ -38,6 +38,23 @@ fn covers_others(o: &Object) -> bool {
     o.visible && matches!(o.stitch, StitchParams::Fill(_) | StitchParams::Satin(_) | StitchParams::Applique(_))
 }
 
+/// The colour layers an object is one of: the layers of a multi-colour
+/// gradient or a tartan share one shape and interleave their rows, so none of
+/// them hides another. Together they cover the shape like any fill.
+fn layer_group(o: &Object) -> Option<&str> {
+    match &o.stitch {
+        StitchParams::Fill(f) => f.gradient.as_ref().map(|g| g.group.as_str()).or(f.tartan.as_ref().map(|t| t.group.as_str())),
+        _ => None,
+    }
+}
+
+/// Fills that leave gaps for what's under them: a density ramp (colour
+/// blending puts two of them over each other) or rows that open up towards
+/// the end (end row spacing).
+fn see_through(o: &Object) -> bool {
+    matches!(&o.stitch, StitchParams::Fill(f) if f.ramp.is_some() || f.end_row_spacing > 0.0)
+}
+
 impl Engine {
     pub fn new() -> Engine {
         Engine::default()
@@ -78,7 +95,21 @@ impl Engine {
             return Some(Cow::Borrowed(obj));
         }
         let b = obj.bounds();
-        let above: Vec<&Object> = doc.objects[i + 1..].iter().filter(|o| covers_others(o) && o.bounds().intersects(&b)).collect();
+        // a colour layer isn't hidden by its own group, and a group covers once (by its first layer)
+        let own = layer_group(obj);
+        let mut groups: Vec<&str> = Vec::new();
+        let above: Vec<&Object> = doc.objects[i + 1..]
+            .iter()
+            .filter(|o| covers_others(o) && !see_through(o) && o.bounds().intersects(&b))
+            .filter(|o| match layer_group(o) {
+                Some(g) if Some(g) == own || groups.contains(&g) => false,
+                Some(g) => {
+                    groups.push(g);
+                    true
+                }
+                None => true,
+            })
+            .collect();
         if above.is_empty() {
             return Some(Cow::Borrowed(obj));
         }
@@ -529,6 +560,34 @@ mod tests {
         let shape = eng.stitched_object(&d, 0).unwrap();
         let area = crate::geom::rings_area(&fill_rings(&shape.paths));
         assert!((area - (900.0 - 18.8 * 18.8)).abs() < 12.0, "area {area}");
+    }
+
+    #[test]
+    fn colour_layers_do_not_hide_each_other() {
+        use crate::model::GradientParams;
+        let layer = |n: u32, group: &str| StitchParams::Fill(FillParams { underlay: false, gradient: Some(GradientParams { layer: n, group: group.into(), ..Default::default() }), ..Default::default() });
+        // a two-colour gradient over a plain fill, then a second gradient over the first
+        let base = StitchParams::Fill(FillParams { underlay: false, ..Default::default() });
+        let mut d = doc(vec![
+            obj("under", square(5.0, 5.0, 10.0), base),
+            obj("g1", square(0.0, 0.0, 30.0), layer(0, "g")),
+            obj("g2", square(0.0, 0.0, 30.0), layer(1, "g")),
+        ]);
+        d.options.remove_overlaps = true;
+        d.options.overlap_margin = 0.0;
+        let mut eng = Engine::new();
+        // every layer of the gradient is stitched in full
+        for i in 1..3 {
+            let shape = eng.stitched_object(&d, i).unwrap();
+            assert!(matches!(shape, Cow::Borrowed(_)), "layer {i} is not clipped");
+        }
+        // what lies under the whole gradient is still hidden
+        assert!(eng.stitched_object(&d, 0).is_none(), "the fill under the gradient is hidden");
+
+        // colour blending: two fills with opposite ramps over each other
+        let ramp = |a: f64| StitchParams::Fill(FillParams { underlay: false, ramp: Some(crate::model::DensityRamp { from: [0.0, 0.0], to: [a, 0.0], ..Default::default() }), ..Default::default() });
+        let d2 = Document { options: d.options.clone(), ..doc(vec![obj("a", square(0.0, 0.0, 30.0), ramp(30.0)), obj("b", square(0.0, 0.0, 30.0), ramp(-30.0))]) };
+        assert!(matches!(Engine::new().stitched_object(&d2, 0), Some(Cow::Borrowed(_))), "a blend layer keeps its stitches");
     }
 
     #[test]

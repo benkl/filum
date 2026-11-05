@@ -47,6 +47,7 @@ Press <kbd>?</kbd> in Filum to see this list in the app, with a filter box. On a
 | Shift+← / Shift+→ | Previous / next colour block |
 | Home / End | To the start / the end |
 | Click or drag the timeline | Go to that stitch |
+| Ctrl + wheel on the timeline | Zoom the timeline |
 | Esc | Close the player |
 
 ## Selection & objects

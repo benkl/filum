@@ -72,6 +72,7 @@ const SHORTCUTS: { group: string; rows: [string, string][] }[] = [
       ["Shift+← / Shift+→", "Previous / next colour block"],
       ["Home / End", "To the start / the end"],
       ["Click or drag the timeline", "Go to that stitch"],
+      ["Ctrl + wheel on the timeline", "Zoom the timeline"],
       ["Esc", "Close the player"],
     ],
   },

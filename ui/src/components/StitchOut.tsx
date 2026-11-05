@@ -1,9 +1,9 @@
 // The stitch-out player: a timeline of the colour blocks under the canvas,
 // the playback loop, following the needle and the stitch-out video.
 
-import { ArrowLeftToLine, ArrowRightToLine, Camera, LocateFixed, OctagonPause, Pause, Play, SkipBack, SkipForward, X } from "lucide-react";
+import { ArrowLeftToLine, ArrowRightToLine, Gauge, Pause, Play, Video, X, ZoomIn, ZoomOut } from "lucide-react";
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
-import { ColorChange, Trim } from "../icons/stitch";
+import { BlockNext, BlockPrevious, ColorChange, FollowNeedle, GradientTool, MachineStop, Trim } from "../icons/stitch";
 import { saveFile } from "../lib/platform";
 import { startCapture, stopCapture } from "../canvas/Canvas";
 import { SPEEDS, blockAt, buildTimeline, playRate, speedLabel, tickStep, type Timeline, type TimelineBlock } from "../lib/stitchout";
@@ -190,11 +190,18 @@ export async function recordVideo() {
 // The panel
 
 const HEIGHT_KEY = "filum.playerHeight";
-const ROW = 22;
-const MIN_H = 28 + 22 + ROW;
+const ROW = 26;
+const RULER = 30;
+const HEAD = 40;
+const LABEL_W = 208;
+/** Margins inside the track, so the first and last end markers show. */
+const PAD_L = 12;
+const PAD_R = 20;
+const MIN_H = HEAD + RULER + ROW;
+const MAX_ZOOM = 64;
 const loadHeight = () => {
   const v = Number(localStorage.getItem(HEIGHT_KEY));
-  return v >= MIN_H ? v : 168;
+  return v >= MIN_H ? v : 220;
 };
 
 /** Merges markers closer than `gap` records (thousands of trims would only draw a solid line). */
@@ -211,6 +218,9 @@ interface RowInfo {
   color: string;
   title: string;
   name: string;
+  seconds: number;
+  /** The gradient this block is a colour of: its group, the layer's place and how many colours it has. */
+  gradient?: { group: string; layer: number; of: number; first: boolean; last: boolean };
 }
 
 /** The parts of the rows that don't move while playing. */
@@ -223,13 +233,15 @@ const Tracks = memo(function Tracks({ rows, total, gap }: { rows: RowInfo[]; tot
             {thin(b.trims, gap).map((t) => (
               <i key={`t${t}`} className="so-trim" style={{ left: pct(t - b.start, b.end - b.start) }} />
             ))}
-            {b.stops.map((t) => (
-              <i key={`s${t}`} className="so-stop" style={{ left: pct(t - b.start, b.end - b.start) }} title="The machine stops here" />
-            ))}
           </div>
+          {b.stops.map((t) => (
+            <span key={`s${t}`} className="so-mark stop" style={{ left: pct(t, total) }} title="The machine stops here">
+              <MachineStop size={11} />
+            </span>
+          ))}
           {b.ending !== "end" && (
-            <span className="so-end" style={{ left: pct(b.end, total) }} title={b.ending === "color" ? "Trim and change the thread" : "The machine stops"}>
-              {b.ending === "color" ? <ColorChange size={11} /> : <OctagonPause size={11} />}
+            <span className={`so-mark ${b.ending === "color" ? "change" : "stop"}`} style={{ left: pct(b.end, total) }} title={b.ending === "color" ? "Trim and change the thread" : "The machine stops"}>
+              {b.ending === "color" ? <ColorChange size={11} /> : <MachineStop size={11} />}
             </span>
           )}
         </div>
@@ -247,75 +259,134 @@ export function StitchOutPanel() {
   const doc = useStore((s) => s.doc);
   const set = useStore((s) => s.set);
   const [height, setHeight] = useState(loadHeight);
-  const [width, setWidth] = useState(600);
-  const trackRef = useRef<HTMLDivElement>(null);
+  const [view, setView] = useState(600);
+  const [zoom, setZoom] = useState(1);
+  const [hover, setHover] = useState<number | null>(null);
+  const rowsRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  /** Scroll position to apply after a zoom renders (keeps the record under the pointer in place). */
+  const pending = useRef<number | null>(null);
   const tl = useMemo(() => (plan ? timelineOf(plan, doc.machine) : null), [plan, doc.machine]);
   const seq = useMemo(() => colorSequence(doc, plan), [doc, plan]);
+  const open = index != null;
+
+  // the track fills the body's width at zoom 1
+  useLayoutEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setView(Math.max(120, el.clientWidth - LABEL_W)));
+    ro.observe(el);
+    setView(Math.max(120, el.clientWidth - LABEL_W));
+    return () => ro.disconnect();
+  }, [open]);
+  const trackW = view * zoom;
+  const inner = Math.max(1, trackW - PAD_L - PAD_R);
 
   useLayoutEffect(() => {
-    const el = trackRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setWidth(el.clientWidth));
-    ro.observe(el);
-    setWidth(el.clientWidth);
-    return () => ro.disconnect();
-  }, [index == null]);
+    if (pending.current != null && bodyRef.current) bodyRef.current.scrollLeft = pending.current;
+    pending.current = null;
+  }, [zoom]);
 
   const total = tl?.total ?? 0;
   const at = Math.max(0, Math.min(total, index ?? total));
   const cur = tl ? blockAt(tl, Math.min(at, Math.max(0, total - 1))) : 0;
 
-  // keep the block being sewn in view
+  /** Zoom around a point of the body (px from its left edge). */
+  const zoomTo = (z: number, px?: number) => {
+    const body = bodyRef.current;
+    const next = Math.max(1, Math.min(MAX_ZOOM, z));
+    if (!body || next === zoom) return;
+    const x = px ?? LABEL_W + (body.clientWidth - LABEL_W) / 2;
+    const frac = (body.scrollLeft + x - LABEL_W - PAD_L) / inner;
+    const nextInner = view * next - PAD_L - PAD_R;
+    pending.current = Math.max(0, frac * nextInner + PAD_L + LABEL_W - x);
+    setZoom(next);
+  };
+  // Ctrl / ⌘ + wheel zooms the timeline (React's wheel listeners can't prevent the page zoom)
   useEffect(() => {
     const body = bodyRef.current;
-    if (!body || index == null) return;
-    const top = 22 + ROW * cur;
-    if (top < body.scrollTop + 22 || top + ROW > body.scrollTop + body.clientHeight) body.scrollTo({ top: Math.max(0, top - 22 - ROW), behavior: playing ? "smooth" : "auto" });
-  }, [cur, index == null]);
+    if (!body) return;
+    const wheel = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      const r = body.getBoundingClientRect();
+      zoomTo(zoom * Math.exp(-e.deltaY * 0.004), e.clientX - r.left);
+    };
+    body.addEventListener("wheel", wheel, { passive: false });
+    return () => body.removeEventListener("wheel", wheel);
+  });
 
-  const rows: RowInfo[] = useMemo(
-    () =>
-      (tl?.blocks ?? []).map((b) => {
-        const t = seq[b.index]?.thread ?? plan?.threads[b.index];
-        const name = t ? t.name || [t.brand, t.code].filter(Boolean).join(" ") || t.color.toUpperCase() : `Colour ${b.index + 1}`;
-        const secs = tl ? tl.secondsAt[b.end] - tl.secondsAt[b.start] : 0;
-        const title = [
-          `${b.index + 1}. ${t ? threadTitle(t) : name}`,
-          `${b.stitches.toLocaleString()} stitches · ${fmtTime(secs)} on the machine`,
-          b.trims.length ? `${b.trims.length} trim${b.trims.length === 1 ? "" : "s"}` : "",
-          b.stops.length ? `${b.stops.length} stop${b.stops.length === 1 ? "" : "s"}` : "",
-        ]
-          .filter(Boolean)
-          .join("\n");
-        return { block: b, color: t?.color ?? "#888", title, name };
-      }),
-    [tl, seq, plan],
-  );
+  // keep the block being sewn in view, and the needle when zoomed in
+  useEffect(() => {
+    const body = bodyRef.current;
+    if (!body || !open) return;
+    const top = RULER + ROW * cur;
+    if (top < body.scrollTop + RULER || top + ROW > body.scrollTop + body.clientHeight) body.scrollTo({ top: Math.max(0, top - RULER - ROW), behavior: playing ? "smooth" : "auto" });
+  }, [cur, open]);
+  useEffect(() => {
+    const body = bodyRef.current;
+    if (!body || !open || zoom === 1 || !total) return;
+    const x = LABEL_W + PAD_L + (at / total) * inner;
+    const left = body.scrollLeft + LABEL_W + 24;
+    const right = body.scrollLeft + body.clientWidth - 24;
+    if (x < left || x > right) body.scrollLeft = Math.max(0, x - LABEL_W - (body.clientWidth - LABEL_W) * (playing ? 0.15 : 0.5));
+  }, [at, zoom, open]);
 
-  if (index == null || !tl || !total) return null;
+  const rows: RowInfo[] = useMemo(() => {
+    if (!tl || !plan) return [];
+    const out = tl.blocks.map((b) => {
+      const t = seq[b.index]?.thread ?? plan.threads[b.index];
+      const name = t ? t.name || [t.brand, t.code].filter(Boolean).join(" ") || t.color.toUpperCase() : `Colour ${b.index + 1}`;
+      const seconds = tl.secondsAt[b.end] - tl.secondsAt[b.start];
+      // the object of the block's first stitch: is it a colour of a gradient?
+      let obj: (typeof doc.objects)[number] | undefined;
+      for (let i = b.start; i < b.end && !obj; i++) if (plan.objects[i] < doc.objects.length) obj = doc.objects[plan.objects[i]];
+      const g = obj?.stitch.type === "fill" ? obj.stitch.gradient : undefined;
+      const title = [
+        `${b.index + 1}. ${t ? threadTitle(t) : name}`,
+        g ? `Colour ${g.layer + 1} of ${g.stops.length} of a gradient (${obj!.name.replace(/ · colour \d+$/, "")})` : obj ? obj.name : "",
+        `${b.stitches.toLocaleString()} stitches · ${fmtTime(seconds)} on the machine`,
+        b.trims.length ? `${b.trims.length} trim${b.trims.length === 1 ? "" : "s"}` : "",
+        b.stops.length ? `${b.stops.length} stop${b.stops.length === 1 ? "" : "s"}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+      return { block: b, color: t?.color ?? "#888", title, name, seconds, gradient: g ? { group: g.group, layer: g.layer, of: g.stops.length, first: false, last: false } : undefined };
+    });
+    // a bracket joins the neighbouring rows of one gradient
+    out.forEach((r, i) => {
+      if (!r.gradient) return;
+      r.gradient.first = out[i - 1]?.gradient?.group !== r.gradient.group;
+      r.gradient.last = out[i + 1]?.gradient?.group !== r.gradient.group;
+    });
+    return out;
+  }, [tl, seq, plan, doc.objects]);
 
-  const gap = Math.max(1, Math.ceil((total * 3) / Math.max(1, width)));
-  const step = tickStep(tl.stitchAt[total], width);
+  if (!open || !tl || !total) return null;
+
+  const stitches = tl.stitchAt[total];
+  const gap = Math.max(1, Math.ceil((total * 3) / inner));
+  const step = tickStep(stitches, inner, 80);
   const ticks: { at: number; label: number }[] = [];
   // the ruler counts stitches; the bars are laid out by records
-  for (let v = 0, r = 0; v <= tl.stitchAt[total]; v += step) {
+  for (let v = 0, r = 0; v <= stitches; v += step) {
     while (r < total && tl.stitchAt[r] < v) r++;
     ticks.push({ at: r, label: v });
   }
 
+  const recordAt = (clientX: number) => {
+    const el = rowsRef.current;
+    if (!el) return 0;
+    const r = el.getBoundingClientRect();
+    return Math.max(0, Math.min(total, Math.round(((clientX - r.left) / Math.max(1, r.width)) * total)));
+  };
   const scrubFrom = (e: RPointerEvent<HTMLDivElement>) => {
-    const rowsEl = trackRef.current;
     const el = e.currentTarget;
-    if (!rowsEl || e.button !== 0) return;
+    if (e.button !== 0) return;
     e.preventDefault();
     el.setPointerCapture(e.pointerId);
-    const to = (x: number) => {
-      const r = rowsEl.getBoundingClientRect();
-      seek(((x - r.left) / Math.max(1, r.width)) * total);
-    };
-    to(e.clientX);
-    const move = (ev: PointerEvent) => to(ev.clientX);
+    seek(recordAt(e.clientX));
+    const move = (ev: PointerEvent) => seek(recordAt(ev.clientX));
     const up = () => {
       el.removeEventListener("pointermove", move);
       el.removeEventListener("pointerup", up);
@@ -329,8 +400,8 @@ export function StitchOutPanel() {
   const resizeFrom = (e: RPointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     const y0 = e.clientY;
-    const h0 = height;
-    const max = Math.max(MIN_H, window.innerHeight * 0.6);
+    const h0 = Math.min(height, fit);
+    const max = Math.max(MIN_H, Math.min(fit, window.innerHeight * 0.6));
     let h = h0;
     const move = (ev: PointerEvent) => {
       h = Math.round(Math.max(MIN_H, Math.min(max, h0 + y0 - ev.clientY)));
@@ -345,72 +416,108 @@ export function StitchOutPanel() {
     window.addEventListener("pointerup", up);
   };
 
+  // a few blocks: the panel is only as tall as they need
+  const fit = HEAD + RULER + rows.length * ROW + 10;
   const sewn = tl.stitchAt[at];
   const block = rows[cur];
+  const left = tl.secondsAt[total] - tl.secondsAt[at];
+  const hoverRow = hover != null ? rows[blockAt(tl, Math.min(hover, total - 1))] : null;
+  const cuts = tl.blocks.reduce((n, b) => n + b.trims.length, 0) + tl.blocks.filter((b) => b.ending === "color").length;
   return (
-    <section className="stitchout" style={{ height }} aria-label="Stitch-out">
+    <section className={`stitchout ${playing ? "playing" : ""}`} style={{ height: Math.min(height, fit), ["--so-label" as string]: `${LABEL_W}px`, ["--so-row" as string]: `${ROW}px` }} aria-label="Stitch-out">
       <div className="so-grip" onPointerDown={resizeFrom} title="Drag to resize" />
       <div className="so-head">
-        <button className="icon-btn" title="To the start (Home)" onClick={() => seek(0)}>
-          <ArrowLeftToLine size={14} />
-        </button>
-        <button className="icon-btn" title="Previous colour block (Shift+←)" onClick={() => stepBlock(-1)}>
-          <SkipBack size={14} />
-        </button>
-        <button className={`so-play ${playing ? "on" : ""}`} title={playing ? "Pause" : "Play"} onClick={togglePlay}>
-          {playing ? <Pause size={13} /> : <Play size={13} />}
-        </button>
-        <button className="icon-btn" title="Next colour block (Shift+→)" onClick={() => stepBlock(1)}>
-          <SkipForward size={14} />
-        </button>
-        <button className="icon-btn" title="To the end (End)" onClick={() => seek(total)}>
-          <ArrowRightToLine size={14} />
-        </button>
-        <div className="vsep" />
-        <span className="so-count" title="Stitches sewn so far">
-          <b>{sewn.toLocaleString()}</b> / {tl.stitchAt[total].toLocaleString()}
-        </span>
-        <span className="so-clock" title={`Machine time at ${doc.machine.spm} spm, with trims and thread changes`}>
-          {fmtTime(tl.secondsAt[at])} / {fmtTime(tl.secondsAt[total])}
-        </span>
+        <div className="so-transport" role="group" aria-label="Transport">
+          <button title="To the start (Home)" onClick={() => seek(0)}>
+            <ArrowLeftToLine size={14} />
+          </button>
+          <button title="Previous colour block (Shift+←)" onClick={() => stepBlock(-1)}>
+            <BlockPrevious size={15} />
+          </button>
+          <button className="so-play" title={playing ? "Pause" : "Play"} aria-pressed={playing} onClick={togglePlay}>
+            {playing ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
+          </button>
+          <button title="Next colour block (Shift+→)" onClick={() => stepBlock(1)}>
+            <BlockNext size={15} />
+          </button>
+          <button title="To the end (End)" onClick={() => seek(total)}>
+            <ArrowRightToLine size={14} />
+          </button>
+        </div>
+        <div className="so-readout">
+          <span className="so-count" title="Stitches sewn so far">
+            <b>{sewn.toLocaleString()}</b>
+            <span> / {stitches.toLocaleString()}</span>
+          </span>
+          <span className="so-pct">{Math.round((100 * at) / total)}%</span>
+          <span className="so-clock" title={`Machine time at ${doc.machine.spm} spm, with trims and thread changes`}>
+            {fmtTime(tl.secondsAt[at])}
+            <span> / {fmtTime(tl.secondsAt[total])}</span>
+          </span>
+          {left > 0 && <span className="so-left">{fmtTime(left)} left</span>}
+        </div>
         {block && (
           <span className="so-now" title={block.title}>
             <i style={{ background: block.color }} />
-            {cur + 1}/{rows.length} · {block.name}
+            <span className="so-now-n">{cur + 1}</span>
+            <span className="so-now-name">{block.name}</span>
+            {block.gradient && <GradientTool size={12} className="so-grad" />}
           </span>
         )}
         <div className="spacer" />
-        <select className="select so-speed" value={speed} title="Playback speed (stitches per second)" onChange={(e) => set({ anim: { ...useStore.getState().anim, speed: +e.target.value } })}>
-          {SPEEDS.map((v) => (
-            <option key={v} value={v}>
-              {speedLabel(v)}
-            </option>
-          ))}
-        </select>
-        <button className={`icon-btn ${following ? "on" : ""}`} title="Follow the needle (keep it in view)" onClick={() => set({ anim: { ...useStore.getState().anim, follow: !following } })}>
-          <LocateFixed size={14} />
+        <div className="so-zoom" role="group" aria-label="Timeline zoom">
+          <button title="Zoom out (Ctrl+wheel)" disabled={zoom <= 1} onClick={() => zoomTo(zoom / 2)}>
+            <ZoomOut size={13} />
+          </button>
+          <button className="so-zoom-v" title="Fit the whole stitch-out" onClick={() => zoomTo(1)}>
+            {zoom === 1 ? "Fit" : `${zoom >= 10 ? Math.round(zoom) : zoom.toFixed(1).replace(/\.0$/, "")}×`}
+          </button>
+          <button title="Zoom in (Ctrl+wheel)" disabled={zoom >= MAX_ZOOM} onClick={() => zoomTo(zoom * 2)}>
+            <ZoomIn size={13} />
+          </button>
+        </div>
+        <label className="so-speed" title="Playback speed (stitches per second)">
+          <Gauge size={13} />
+          <select value={speed} onChange={(e) => set({ anim: { ...useStore.getState().anim, speed: +e.target.value } })}>
+            {SPEEDS.map((v) => (
+              <option key={v} value={v}>
+                {speedLabel(v)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button className={`icon-btn so-tog ${following ? "on" : ""}`} title="Follow the needle: keep it in view on the canvas" aria-pressed={following} onClick={() => set({ anim: { ...useStore.getState().anim, follow: !following } })}>
+          <FollowNeedle size={15} />
         </button>
         <button className="icon-btn" title="Record a stitch-out video" onClick={recordVideo}>
-          <Camera size={14} />
+          <Video size={15} />
         </button>
         <button className="icon-btn" title="Close (Esc)" onClick={closePlayer}>
-          <X size={14} />
+          <X size={15} />
         </button>
       </div>
-      <div className="so-body" ref={bodyRef} style={{ ["--rows" as string]: rows.length }}>
+      <div className="so-body" ref={bodyRef} style={{ ["--rows" as string]: rows.length, gridTemplateColumns: `${LABEL_W}px ${trackW}px` }}>
         <div className="so-labels">
-          <div className="so-corner" title="Thread cuts: trims and thread changes">
-            <Trim size={11} /> {tl.blocks.reduce((n, b) => n + b.trims.length, 0) + tl.blocks.filter((b) => b.ending === "color").length}
+          <div className="so-corner">
+            <span title="Colour blocks">{rows.length} blocks</span>
+            <span title="Thread cuts: trims and thread changes">
+              <Trim size={11} /> {cuts}
+            </span>
           </div>
-          {rows.map(({ block: b, color, name, title }) => (
-            <button key={b.index} className={`so-label ${b.index === cur ? "on" : ""}`} title={`${title}\nClick: go to this block`} onClick={() => seek(b.start)}>
-              <i style={{ background: color }} />
+          {rows.map(({ block: b, color, name, title, seconds, gradient }) => (
+            <button key={b.index} className={`so-label ${b.index === cur ? "on" : ""} ${b.index < cur ? "done" : ""}`} title={`${title}\nClick: go to this block`} onClick={() => seek(b.start)}>
+              {gradient && <span className={`so-bracket ${gradient.first ? "first" : ""} ${gradient.last ? "last" : ""}`} aria-hidden />}
+              <i className="so-sw" style={{ background: color }} />
               <span className="so-n">{b.index + 1}</span>
               <span className="so-name">{name}</span>
+              {gradient && <GradientTool size={11} className="so-grad" />}
+              <span className="so-meta">
+                {b.stitches.toLocaleString()} · {fmtTime(seconds)}
+              </span>
             </button>
           ))}
         </div>
-        <div className="so-track" onPointerDown={scrubFrom}>
+        <div className="so-track" onPointerDown={scrubFrom} onPointerMove={(e) => setHover(recordAt(e.clientX))} onPointerLeave={() => setHover(null)}>
           <div className="so-ruler">
             <div className="so-scale">
               {ticks.map((t) => (
@@ -418,18 +525,39 @@ export function StitchOutPanel() {
                   {t.label.toLocaleString()}
                 </span>
               ))}
+              {/* the colour sequence, sewn part in full colour */}
+              <div className="so-ribbon">
+                {rows.map(({ block: b, color }) => (
+                  <i key={b.index} style={{ left: pct(b.start, total), width: pct(b.end - b.start, total), ["--c" as string]: color, ["--sewn" as string]: `${Math.max(0, Math.min(1, (at - b.start) / Math.max(1, b.end - b.start))) * 100}%` }} />
+                ))}
+              </div>
+              {hover != null && hoverRow && (
+                <span className={`so-hover-tip ${hover / total > 0.75 ? "flip" : ""}`} style={{ left: pct(hover, total) }}>
+                  <i style={{ background: hoverRow.color }} />
+                  {tl.stitchAt[hover].toLocaleString()} · {fmtTime(tl.secondsAt[hover])}
+                </span>
+              )}
             </div>
           </div>
-          <div className="so-rows" ref={trackRef}>
+          <div className="so-rows" ref={rowsRef}>
             {rows.map(({ block: b }) => (
               <div key={b.index} className={`so-lane ${b.index === cur ? "on" : ""}`} style={{ top: ROW * b.index }} />
             ))}
             <Tracks rows={rows} total={total} gap={gap} />
             {rows.map(({ block: b, color }) =>
-              at > b.start ? <div key={b.index} className="so-fill" style={{ top: ROW * b.index + 7, left: pct(b.start, total), width: pct(Math.min(at, b.end) - b.start, total), ["--c" as string]: color }} /> : null,
+              at > b.start ? (
+                <div
+                  key={b.index}
+                  className={`so-fill ${b.index === cur && at < b.end ? "live" : ""}`}
+                  style={{ top: ROW * b.index + (ROW - 10) / 2, left: pct(b.start, total), width: pct(Math.min(at, b.end) - b.start, total), ["--c" as string]: color }}
+                />
+              ) : null,
             )}
+            {hover != null && <div className="so-hover" style={{ left: pct(hover, total) }} />}
           </div>
-          <div className="so-needle" style={{ ["--at" as string]: at / total }} />
+          <div className="so-needle" style={{ left: PAD_L + (at / total) * inner }}>
+            <span />
+          </div>
         </div>
       </div>
     </section>

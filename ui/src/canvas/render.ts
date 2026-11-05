@@ -5,6 +5,7 @@ import { FLAG } from "../types";
 import type { View } from "../store";
 import { threadWidth } from "../lib/materials";
 import { paintInteractive, paintUnderlays, type InteractiveOverlay } from "./interactive";
+import { colourGroup, groupPicture } from "./vectorGradient";
 import type { DensityMode } from "../lib/density";
 
 // Rendering model
@@ -529,11 +530,33 @@ function paintBackground(ctx: CanvasRenderingContext2D, r: RenderInput, area: Mm
   if (opts.hoop !== false) paintHoop(ctx, r);
   if (r.mode === "vector" || !r.plan) {
     const colors = new Map(doc.threads.map((t) => [t.id, t.color]));
+    const color = (o: DesignObject) => colors.get(o.thread) ?? "#222";
+    // gradients and colour blends: the whole group once, as its colour mix
+    const painted = new Set<string>();
     for (const o of doc.objects) {
       if (!o.visible) continue;
       const b = objectBoundsCached(o);
       if (b && !hits(area, b.x, b.y, b.x + b.w, b.y + b.h)) continue;
-      drawVectorObject(ctx, o, colors.get(o.thread) ?? "#222", scale);
+      const group = colourGroup(o);
+      if (group) {
+        if (painted.has(group)) continue;
+        painted.add(group);
+        const layers = doc.objects.filter((x) => x.visible && colourGroup(x) === group);
+        const pic = groupPicture(layers, color);
+        if (pic) {
+          const p = objectPath(o);
+          ctx.save();
+          ctx.clip(p, "evenodd");
+          ctx.imageSmoothingEnabled = true;
+          ctx.drawImage(pic.image, pic.box.x, pic.box.y, pic.box.w, pic.box.h);
+          ctx.restore();
+          ctx.strokeStyle = shade(color(o), -0.35);
+          ctx.lineWidth = 1 / scale;
+          ctx.stroke(p);
+          continue;
+        }
+      }
+      drawVectorObject(ctx, o, color(o), scale);
     }
   }
 }

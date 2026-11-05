@@ -798,17 +798,17 @@ a:focus-visible,
 
 /* ---------------- stitch-out player ---------------- */
 /* a timeline of the colour blocks between the canvas and the bottom bar:
-   one lane per block, bars laid out by sew order, the needle as a line */
+   one lane per block in sew order, a colour-sequence ribbon on the ruler,
+   the needle as a line; it zooms (Ctrl+wheel) and scrolls both ways */
 .stitchout {
   position: relative;
   display: grid;
-  grid-template-rows: 30px minmax(0, 1fr);
+  grid-template-rows: 40px minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   border-top: 1px solid var(--border);
   background: var(--panel);
-  --so-label: 168px;
-  --so-row: 22px;
+  transition: height 0.18s var(--ease);
 }
 .so-grip {
   position: absolute;
@@ -817,16 +817,30 @@ a:focus-visible,
   top: -3px;
   height: 6px;
   cursor: ns-resize;
-  z-index: 3;
+  z-index: 8;
 }
-.so-grip:hover {
-  background: color-mix(in srgb, var(--accent) 35%, transparent);
+.so-grip::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 1px;
+  width: 36px;
+  height: 4px;
+  margin-left: -18px;
+  border-radius: 2px;
+  background: var(--border-strong);
+  opacity: 0;
+  transition: opacity 0.12s var(--ease);
 }
+.so-grip:hover::after {
+  opacity: 1;
+}
+/* the head */
 .so-head {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 0 8px;
+  gap: 10px;
+  padding: 0 8px 0 10px;
   min-width: 0;
   border-bottom: 1px solid var(--border);
   background: var(--bg);
@@ -836,35 +850,92 @@ a:focus-visible,
 .so-head > * {
   flex: none;
 }
-.so-play {
+.so-transport,
+.so-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-3);
+}
+.so-transport button,
+.so-zoom button {
   display: inline-grid;
   place-items: center;
-  width: 28px;
-  height: 22px;
-  margin: 0 2px;
+  width: 26px;
+  height: 24px;
   border: 0;
-  border-radius: var(--r-sm);
+  border-radius: 999px;
+  background: none;
+  color: var(--text);
+  transition:
+    background 0.12s var(--ease),
+    color 0.12s var(--ease),
+    transform 0.12s var(--ease);
+}
+.so-transport button:hover,
+.so-zoom button:hover:not(:disabled) {
+  background: var(--bg-2);
+}
+.so-zoom button:disabled {
+  opacity: 0.35;
+}
+.so-transport .so-play {
+  width: 32px;
+  height: 28px;
+  margin: -2px 2px;
   background: var(--accent);
   color: var(--accent-fg);
-  transition: background 0.12s var(--ease);
+  box-shadow: 0 2px 8px -2px color-mix(in srgb, var(--accent) 70%, transparent);
 }
-.so-play:hover {
+.so-transport .so-play:hover {
   background: var(--accent-hover);
+  transform: scale(1.04);
 }
-.so-count,
-.so-clock {
-  margin-left: 6px;
-  color: var(--muted);
-  font-size: 12px;
+.so-transport .so-play:active {
+  transform: scale(0.96);
+}
+.so-zoom .so-zoom-v {
+  width: auto;
+  min-width: 34px;
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+.so-readout {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .so-count b {
-  color: var(--text);
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.so-count span,
+.so-clock span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.so-pct {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 10.5px;
+  font-weight: 650;
 }
 .so-clock {
   font-family: var(--mono);
+  font-size: 12px;
+}
+.so-left {
+  color: var(--faint);
   font-size: 11px;
 }
 .so-now {
@@ -873,44 +944,90 @@ a:focus-visible,
   gap: 6px;
   flex: 0 1 auto !important;
   min-width: 0;
-  margin-left: 8px;
-  overflow: hidden;
-  color: var(--muted);
+  height: 24px;
+  padding: 0 9px 0 6px;
+  border-radius: 999px;
+  background: var(--bg-2);
   font-size: 12px;
   white-space: nowrap;
-  text-overflow: ellipsis;
 }
-.so-now i,
-.so-label i {
+.so-now i {
   flex: none;
-  width: 10px;
-  height: 10px;
-  border-radius: var(--r-xs);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 22%, transparent);
 }
-.so-speed {
-  height: 22px;
-  margin-right: 2px;
-  font-size: 12px;
+.so-now-n {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
-@container (max-width: 640px) {
+.so-now-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.so-grad {
+  flex: none;
+  color: var(--accent);
+}
+.so-speed {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 4px 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-3);
+  color: var(--muted);
+}
+.so-speed select {
+  height: 22px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+.so-head .icon-btn {
+  border-radius: 999px;
+}
+@container (max-width: 980px) {
+  .so-left,
+  .so-pct {
+    display: none;
+  }
+}
+@container (max-width: 820px) {
+  .so-now-name,
+  .so-speed svg {
+    display: none;
+  }
+}
+@container (max-width: 700px) {
   .so-now,
   .so-clock {
     display: none;
   }
 }
+@container (max-width: 560px) {
+  .so-zoom {
+    display: none;
+  }
+}
+/* the body: labels stay left, the ruler stays on top */
 .so-body {
   display: grid;
-  grid-template-columns: var(--so-label) minmax(0, 1fr);
   min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: auto;
   scrollbar-width: thin;
+  overscroll-behavior: contain;
 }
 .so-labels {
   position: sticky;
   left: 0;
-  z-index: 2;
+  z-index: 6;
   border-right: 1px solid var(--border);
   background: var(--panel);
 }
@@ -920,26 +1037,32 @@ a:focus-visible,
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 4px;
-  height: 22px;
-  padding: 0 10px;
+  justify-content: space-between;
+  height: 30px;
+  padding: 0 10px 0 14px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
   color: var(--faint);
   font-size: 10.5px;
   font-variant-numeric: tabular-nums;
 }
+.so-corner span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 .so-label {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   width: 100%;
   height: var(--so-row);
-  padding: 0 10px;
+  padding: 0 10px 0 14px;
   border: 0;
   background: none;
   color: var(--text);
-  font-size: 11.5px;
+  font-size: 12px;
   text-align: left;
 }
 .so-label:hover {
@@ -947,6 +1070,32 @@ a:focus-visible,
 }
 .so-label.on {
   background: var(--accent-soft);
+}
+.so-label.on::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
+}
+.so-sw {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 22%, transparent);
+}
+.so-label.done .so-sw {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--text) 22%, transparent),
+    0 0 0 1.5px var(--panel),
+    0 0 0 2.5px color-mix(in srgb, var(--hoop) 75%, transparent);
+}
+.so-label.done .so-name {
+  color: var(--muted);
 }
 .so-n {
   min-width: 14px;
@@ -956,11 +1105,38 @@ a:focus-visible,
   text-align: right;
 }
 .so-name {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-/* the bars sit between 12 px and 18 px margins so the first and last end markers show */
+.so-meta {
+  flex: none;
+  color: var(--faint);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+/* the colours of one gradient: a bracket down the left edge */
+.so-bracket {
+  position: absolute;
+  left: 5px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-left: 1.5px solid var(--accent);
+}
+.so-bracket.first {
+  top: 8px;
+  border-top: 1.5px solid var(--accent);
+  border-top-left-radius: 4px;
+}
+.so-bracket.last {
+  bottom: 8px;
+  border-bottom: 1.5px solid var(--accent);
+  border-bottom-left-radius: 4px;
+}
+/* the track: bars sit between margins so the first and last end markers show */
 .so-track {
   position: relative;
   min-width: 0;
@@ -968,13 +1144,13 @@ a:focus-visible,
   touch-action: none;
   user-select: none;
   --so-l: 12px;
-  --so-r: 18px;
+  --so-r: 20px;
 }
 .so-ruler {
   position: sticky;
   top: 0;
   z-index: 4;
-  height: 22px;
+  height: 30px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
 }
@@ -982,17 +1158,65 @@ a:focus-visible,
   position: absolute;
   inset: 0 var(--so-r) 0 var(--so-l);
 }
-.so-scale span {
+.so-scale > span {
   position: absolute;
   top: 0;
-  height: 21px;
-  padding: 3px 0 0 4px;
+  height: 22px;
+  padding: 4px 0 0 4px;
   border-left: 1px solid var(--ruler-line);
   color: var(--ruler-text);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   pointer-events: none;
+}
+.so-ribbon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 4px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-2);
+}
+.so-ribbon i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, var(--c) var(--sewn), color-mix(in srgb, var(--c) 35%, var(--panel)) var(--sewn));
+}
+.so-ribbon i:first-child {
+  border-radius: 2px 0 0 2px;
+}
+.so-ribbon i:last-child {
+  border-radius: 0 2px 2px 0;
+}
+.so-hover-tip {
+  position: absolute;
+  top: 3px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 7px 0 5px;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--bg-3);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.so-hover-tip.flip {
+  transform: translateX(calc(-100% - 12px));
+}
+.so-hover-tip i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--bg-3) 40%, transparent);
 }
 .so-rows {
   position: relative;
@@ -1006,6 +1230,9 @@ a:focus-visible,
   right: calc(-1 * var(--so-r));
   height: var(--so-row);
 }
+.so-lane:nth-child(even) {
+  background: color-mix(in srgb, var(--text) 2.5%, transparent);
+}
 .so-lane.on {
   background: var(--accent-soft);
 }
@@ -1015,79 +1242,104 @@ a:focus-visible,
   pointer-events: none;
 }
 /* still to sew: the thread colour faded; sewn: the colour itself */
-/* (the fill's top is set inline: its lane's top + 7 px) */
 .so-bar,
 .so-fill {
   position: absolute;
-  top: 7px;
-  height: 8px;
-  min-width: 2px;
-  border-radius: 4px;
+  height: 10px;
+  min-width: 3px;
+  border-radius: 5px;
 }
 .so-bar {
-  background: color-mix(in srgb, var(--c) 32%, var(--panel));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 55%, transparent);
+  top: calc(50% - 5px);
+  background: color-mix(in srgb, var(--c) 26%, var(--panel));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 50%, transparent);
   pointer-events: auto;
 }
 .so-fill {
   background: var(--c);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 18%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--text) 16%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
   pointer-events: none;
+}
+.so-fill.live {
+  border-top-right-radius: 2px;
+  border-bottom-right-radius: 2px;
 }
 .so-trim {
   position: absolute;
-  top: -2px;
-  bottom: -2px;
-  width: 1px;
-  background: color-mix(in srgb, var(--text) 45%, transparent);
+  top: -3px;
+  bottom: -3px;
+  width: 1.5px;
+  margin-left: -0.75px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--text) 50%, transparent);
   z-index: 1;
 }
-.so-stop {
+.so-mark {
   position: absolute;
-  top: -1px;
-  width: 6px;
-  height: 10px;
-  margin-left: -3px;
-  border-radius: 2px;
-  background: var(--text);
-  z-index: 1;
-}
-.so-end {
-  position: absolute;
-  top: 3px;
+  top: calc(50% - 9px);
   display: grid;
   place-items: center;
-  width: 16px;
-  height: 16px;
-  margin-left: -8px;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
   border: 1px solid var(--border-strong);
   border-radius: 50%;
   background: var(--bg-3);
   color: var(--muted);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   z-index: 2;
   pointer-events: auto;
+}
+.so-mark.stop {
+  border-color: #d08a1f;
+  color: #b4690e;
+}
+.so-hover {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: color-mix(in srgb, var(--text) 35%, transparent);
+  pointer-events: none;
+  z-index: 3;
 }
 .so-needle {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: calc(var(--so-l) + (100% - var(--so-l) - var(--so-r)) * var(--at));
   width: 2px;
   margin-left: -1px;
   background: var(--select);
   z-index: 5;
   pointer-events: none;
 }
-.so-needle::before {
-  content: "";
+.so-needle span {
   position: sticky;
   top: 0;
   display: block;
-  width: 10px;
-  height: 10px;
-  margin-left: -4px;
-  border-radius: 0 0 50% 50%;
+  width: 12px;
+  height: 14px;
+  margin-left: -5px;
+  border-radius: 3px 3px 6px 6px;
   background: var(--select);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--select) 50%, transparent);
+}
+.stitchout.playing .so-needle span {
+  animation: so-pulse 1.2s var(--ease) infinite;
+}
+@keyframes so-pulse {
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--select) 25%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stitchout,
+  .stitchout.playing .so-needle span {
+    transition: none;
+    animation: none;
+  }
 }
 
 /* ---------------- side panels ---------------- */

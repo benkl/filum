@@ -1,5 +1,5 @@
-import { Camera, Focus, Play } from "lucide-react";
-import { Hoop, Spool } from "../icons/stitch";
+import { Focus, Video } from "lucide-react";
+import { Hoop, Spool, StitchOut } from "../icons/stitch";
 import { fit } from "../lib/actions";
 import { closePlayer, play, recordVideo, usePlayback } from "./StitchOut";
 import { useStore } from "../store";
@@ -109,10 +109,10 @@ export function BottomBar() {
         onClick={() => (playerOpen ? closePlayer() : play())}
         title={playerOpen ? "Close the stitch-out player (Esc)" : "Animate the stitch-out, with a timeline of the colour blocks"}
       >
-        <Play size={13} /> <span className="bb-label">Animate</span>
+        <StitchOut size={14} /> <span className="bb-label">Animate</span>
       </button>
       <button className="btn sm" onClick={recordVideo} disabled={!total} title="Record a stitch-out video">
-        <Camera size={13} /> <span className="bb-label">Video</span>
+        <Video size={14} /> <span className="bb-label">Video</span>
       </button>
     </div>
   );

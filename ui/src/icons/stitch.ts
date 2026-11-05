@@ -78,3 +78,20 @@ export const EmbroideryMachine = icon("embroidery-machine", [["rect",{"x":"2","y
 export const BatchLettering = icon("batch-lettering", [["rect",{"x":"2","y":"8","width":"14","height":"14","rx":"2"}],["path",{"d":"M8 4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2"}],["path",{"d":"m6 18 3-6 3 6"}],["path",{"d":"M7 16h4"}]]);
 /** design-wide stitch processing: stitches hidden under others left out */
 export const StitchProcessing = icon("stitch-processing", [["rect",{"x":"9","y":"9","width":"12","height":"12","rx":"2"}],["path",{"d":"M3 5a2 2 0 0 1 2-2"}],["path",{"d":"M8 3h2"}],["path",{"d":"M13 3a2 2 0 0 1 2 2"}],["path",{"d":"M3 8v2"}],["path",{"d":"M3 13a2 2 0 0 0 2 2"}],["path",{"d":"m12 15 3-3"}],["path",{"d":"m15 18 3-3"}]]);
+
+// The stitch-out player's icons (drawn by assets/icons/stitchout_icons.py, which also writes ./svg)
+
+/** the stitch-out player: play over a running stitch */
+export const StitchOut = icon("stitch-out", [["path",{"d":"M9 12.35L9 5.65A1.5 1.5 0 0 1 11.27 4.36L16.86 7.71A1.5 1.5 0 0 1 16.86 10.29L11.27 13.64A1.5 1.5 0 0 1 9 12.35Z"}],["path",{"d":"M3 20L6 20"}],["path",{"d":"M10.5 20L13.5 20"}],["path",{"d":"M18 20L21 20"}]]);
+
+/** follow the needle: running stitch up to the needle point, in a viewfinder */
+export const FollowNeedle = icon("follow-needle", [["path",{"d":"M3 7L3 5A2 2 0 0 1 5 3L7 3"}],["path",{"d":"M17 3L19 3A2 2 0 0 1 21 5L21 7"}],["path",{"d":"M21 17L21 19A2 2 0 0 1 19 21L17 21"}],["path",{"d":"M7 21L5 21A2 2 0 0 1 3 19L3 17"}],["path",{"d":"M7 17L8.5 15.5"}],["path",{"d":"M11.5 12.5L13 11"}],["path",{"d":"M16 8L16.01 8"}]]);
+
+/** previous colour block: skip back to a satin column */
+export const BlockPrevious = icon("block-previous", [["path",{"d":"M20 15.69L20 8.31A1.5 1.5 0 0 0 17.51 7.18L13.29 10.87A1.5 1.5 0 0 0 13.29 13.13L17.51 16.82A1.5 1.5 0 0 0 20 15.69Z"}],["path",{"d":"M8 4L4 6.67L8 9.33L4 12L8 14.67L4 17.33L8 20"}]]);
+
+/** next colour block: skip to a satin column */
+export const BlockNext = icon("block-next", [["path",{"d":"M4 15.69L4 8.31A1.5 1.5 0 0 1 6.49 7.18L10.71 10.87A1.5 1.5 0 0 1 10.71 13.13L6.49 16.82A1.5 1.5 0 0 1 4 15.69Z"}],["path",{"d":"M16 4L20 6.67L16 9.33L20 12L16 14.67L20 17.33L16 20"}]]);
+
+/** the machine stops: stitched pause bars on a stop sign */
+export const MachineStop = icon("machine-stop", [["path",{"d":"M2.59 7.27L7.27 2.59A2 2 0 0 1 8.69 2L15.31 2A2 2 0 0 1 16.73 2.59L21.41 7.27A2 2 0 0 1 22 8.69L22 15.31A2 2 0 0 1 21.41 16.73L16.73 21.41A2 2 0 0 1 15.31 22L8.69 22A2 2 0 0 1 7.27 21.41L2.59 16.73A2 2 0 0 1 2 15.31L2 8.69A2 2 0 0 1 2.59 7.27Z"}],["path",{"d":"M9.5 7L9.5 10"}],["path",{"d":"M9.5 14L9.5 17"}],["path",{"d":"M14.5 7L14.5 10"}],["path",{"d":"M14.5 14L14.5 17"}]]);

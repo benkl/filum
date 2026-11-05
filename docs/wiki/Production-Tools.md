@@ -76,8 +76,11 @@ For machines with cutwork needles, **Path → Cutwork segmentation** splits runn
 
 The player sits between the canvas and the bottom bar while it's open.
 
-- **Timeline**: one lane per colour block, in sew order. Each bar shows where its block falls in the stitch-out: faded where it is still to sew, in the thread colour where it is sewn. Thin ticks mark trims inside a block, and the round marker at the end of a bar is the thread change (or a stop). Click or drag anywhere on the timeline to go to that stitch, or click a thread's name to go to the start of its block.
-- **Counters**: the stitches sewn so far, and the machine time at that point out of the total (at the machine's stitches per minute, with its trim and thread-change times from *Design → Machine*).
+- **Timeline**: one lane per colour block, in sew order, with each block's stitches and machine time next to its thread. Each bar shows where its block falls in the stitch-out: faded where it is still to sew, in the thread colour where it is sewn. Thin ticks mark trims inside a block, and the round marker at the end of a bar is the thread change (or a stop). Click or drag anywhere on the timeline to go to that stitch, or click a thread's name to go to the start of its block. Point at the timeline to see the stitch, the time and the colour there.
+- **Colour sequence**: the strip under the ruler shows every block in order, sewn part in full colour.
+- **Gradients**: the colours of one gradient are joined by a bracket and marked with the gradient icon.
+- **Zoom**: <kbd>Ctrl</kbd>+wheel (or the zoom buttons) zooms the timeline around the pointer, up to 64×; **Fit** shows the whole stitch-out again. While zoomed in, the timeline keeps the needle in view.
+- **Counters**: the stitches sewn so far and how far along that is, and the machine time at that point out of the total, with the time left (at the machine's stitches per minute, with its trim and thread-change times from *Design → Machine*).
 - **Speed**: *Auto* sews any design in about twelve seconds, or pick a fixed number of stitches per second.
 - **Follow the needle** keeps the needle in view while you're zoomed in.
 - The camera button records the same stitch-out as a video. The player remembers its speed, the follow setting and its height (drag its top edge).

@@ -26,6 +26,7 @@ function hintsFor(s: ReturnType<typeof useStore.getState>): Hint[] {
   if (s.anim.index != null)
     return [
       [["Drag", "timeline"], "Scrub"],
+      [["Ctrl", "Wheel"], "Zoom"],
       [["←", "→"], "One stitch"],
       [["Shift", "←", "→"], "Colour block"],
       [["Home", "End"], "Start · end"],
