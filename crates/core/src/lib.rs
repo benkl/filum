@@ -18,6 +18,7 @@ pub mod info;
 pub mod io;
 pub mod model;
 pub mod optimize;
+pub mod outline_route;
 pub mod plan;
 pub mod prng;
 pub mod region;

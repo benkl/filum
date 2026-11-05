@@ -521,8 +521,9 @@ fn underlay(geo: &SatinGeometry, p: &SatinParams, which: super::underlay::SatinU
         let center: Vec<Point> = pairs.iter().map(|(a, b)| a.lerp(*b, pos)).collect();
         let fwd = running_stitch(&center, len, 0.1);
         // there and back, as often as asked: an even count ends at the start,
-        // where the cover begins
-        let n = (p.center_walk_repeats.max(1) + 1) / 2 * 2;
+        // where the cover begins; an odd one at the end, and the cover comes
+        // back (Ink/Stitch: the column begins and ends at its start)
+        let n = p.center_walk_repeats.max(1);
         for k in 0..n {
             let pass: Box<dyn Iterator<Item = &Point>> = if k % 2 == 0 { Box::new(fwd.iter()) } else { Box::new(fwd.iter().rev()) };
             for q in pass {
@@ -583,7 +584,20 @@ pub fn satin_on(paths: &[SubPath], p: &SatinParams, fabric: &crate::model::Fabri
     } else {
         super::underlay::satin_underlay(0.0, p, fabric)
     };
-    underlay(&geo, p, which, &mut run, density);
+    // an odd centre walk ends at the far end: the cover runs back from there
+    let back = which.center && p.center_walk_repeats.max(1) % 2 == 1;
+    if back {
+        // the other underlays first (they return to the start), the walk last
+        underlay(&geo, p, super::underlay::SatinUnderlay { center: false, ..which }, &mut run, density);
+        underlay(&geo, p, super::underlay::SatinUnderlay { center: true, contour: false, zigzag: false }, &mut run, density);
+    } else {
+        underlay(&geo, p, which, &mut run, density);
+    }
+    let geo = if back {
+        SatinGeometry { sections: geo.sections.into_iter().rev().map(|(mut a, mut b)| { a.reverse(); b.reverse(); (a, b) }).collect() }
+    } else {
+        geo
+    };
 
     let pc = (p.pull_comp + extra_pull) * 0.5;
     let pct = p.pull_comp_pct / 100.0 * 0.5;

@@ -812,6 +812,10 @@ export interface DigitizeOptions {
   thinTriple?: boolean;
   /** Line centres follow the drawn line, not the pixel grid. */
   lineSubpixel?: boolean;
+  /** Outline width (mm): dark lines become satin of exactly this width (0 = as drawn). */
+  outlineLineMm?: number;
+  /** Lines that meet are routed as one network (no trims between them). */
+  routeLines?: boolean;
   /** Zig-zag photo: rows of zigzags in one colour, wider where darker. */
   photoZigzag?: boolean;
   photoSpacing?: number;
@@ -830,8 +834,9 @@ export interface DigitizeOptions {
   gradients?: boolean;
   masks?: SegMask[];
   edgeMap?: { width: number; height: number; data: string } | null;
-  /** Remove the background colour only outside (connected to the border) or everywhere. */
-  backgroundScope?: "outside" | "everywhere";
+  /** Where the background colour is left out: outside and in plain holes, everywhere,
+   *  or only where it touches the picture's border (every enclosed area is stitched). */
+  backgroundScope?: "outside" | "everywhere" | "border";
   regionEdits?: RegionEdit[];
 }
 

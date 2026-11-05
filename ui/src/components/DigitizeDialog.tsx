@@ -1,5 +1,5 @@
-import { Ban, Brush, Clipboard, Contrast, Eye, EyeOff, Grid3x3, Image as ImageIcon, ImageUp, Lock, Maximize2, MousePointerClick, Palette, PenLine, Pencil, Pipette, RotateCcw, ScanEye, ScanLine, ScanText, Shapes, Smile, Sparkle, Sparkles, Trash2, Unlock, Waves, Rainbow, Disc3, Grid2x2, type LucideIcon } from "lucide-react";
-import { PatchBorder, StitchContour, StitchCross, StitchFill, StitchMeander, StitchRadial, StitchSatin, StitchSpiral } from "../icons/stitch";
+import { Ban, Brush, Clipboard, Contrast, Eye, EyeOff, Grid3x3, Image as ImageIcon, ImageUp, Lock, Maximize2, MousePointerClick, Palette, PenLine, Pipette, RotateCcw, ScanEye, ScanLine, ScanText, Shapes, Sparkle, Sparkles, Trash2, Unlock, Waves, Rainbow, Disc3, Grid2x2, type LucideIcon } from "lucide-react";
+import { StitchContour, StitchCross, StitchFill, StitchMeander, StitchRadial, StitchSatin, StitchSpiral } from "../icons/stitch";
 import { edgeMapImage, toBase64, type EdgeMapData, type SamPoint, type TextLine } from "../lib/mlUtil";
 import type { SamImage } from "../lib/ml";
 
@@ -12,6 +12,25 @@ import { pending } from "../lib/actions";
 import { fillMethodDefaults, objectBounds, transformObject, translateMat, uid, unionBoxes } from "../lib/geometry";
 import { openFile } from "../lib/platform";
 import { DesignView } from "../canvas/DesignView";
+import {
+  backdropOf,
+  backdropPatch,
+  DETAIL,
+  detailOf,
+  DIGITIZE_DEFAULTS,
+  DIGITIZE_PRESETS,
+  migrateSettings,
+  OUTLINE_DEFAULT_MM,
+  outlinesOf,
+  outlinesPatch,
+  presetOf,
+  presetSettings,
+  type Backdrop,
+  type Detail,
+  type DigitizeSettings,
+  type Outlines,
+  type PresetId,
+} from "../lib/digitizePresets";
 import { CROSS_DEFAULTS, crossStitchDesign, type CrossSettings } from "../lib/crossStitch";
 import { CROSS_KINDS } from "./CrossStitchAssistant";
 import { emptyDoc, useStore } from "../store";
@@ -23,8 +42,8 @@ import { Dialog, fmtTime, Num, Row, Slider, Toggle } from "./ui";
 
 type Rgb = [number, number, number];
 
-/** Options remembered between sessions (image-specific colour edits are not). */
-type Settings = Required<Omit<DigitizeOptions, "palette" | "paletteBrand" | "fixedColors" | "skipColors" | "lineColors" | "fillColors" | "edgeColors" | "colorOrder" | "widthMm" | "masks" | "edgeMap" | "regionEdits">>;
+type Settings = DigitizeSettings;
+const DEFAULTS = DIGITIZE_DEFAULTS;
 
 /** What a colour becomes: decided from the picture, or chosen. */
 type Role = "auto" | "fill" | "line" | "omit";
@@ -35,69 +54,13 @@ const ROLES: { id: Role; icon: ReactNode; label: string; hint: string }[] = [
   { id: "omit", icon: <EyeOff size={12} />, label: "Omit", hint: "Leave this colour out" },
 ];
 
-const DEFAULTS: Settings = {
-  colors: 6,
-  removeBackground: true,
-  backgroundScope: "outside",
-  minRegionMm2: 1.5,
-  smoothing: 2,
-  simplifyMm: 0.12,
-  overlapMm: 0.2,
-  satinMaxWidthMm: 6,
-  runningMaxWidthMm: 0.9,
-  maxPixels: 640,
-  allowSatin: true,
-  allowRunning: true,
-  fillMethod: "tatami",
-  fillAngle: null,
-  rowSpacing: 0.25,
-  underlay: true,
-  outline: "none",
-  outlineWidthMm: 1.5,
-  outlineColor: [28, 28, 28],
-  denoise: 1,
-  mergeDeltaE: 3,
-  seamless: true,
-  cornerAngle: 50,
-  fillDirection: "axis",
-  flowDetail: 40,
-  flowSmoothing: 2,
-  flowStrength: 1,
-  gradientFlow: false,
-  edgeOutlines: "none",
-  edgeContrast: 30,
-  lineArt: "none",
-  lineStrength: 0.5,
-  lineNetworks: true,
-  lineMaxWidthMm: 3,
-  inkSensitivity: 50,
-  lineGapMm: 1,
-  lineMinMm: 2,
-  lineContinuity: 35,
-  lineTaper: true,
-  thinTriple: false,
-  lineSubpixel: true,
-  photoZigzag: false,
-  photoSpacing: 1,
-  photoAngle: 45,
-  photoContrast: 1.2,
-  photoMin: 0.12,
-  pixelArt: "auto",
-  gradients: false,
+const PRESET_ICONS: Record<PresetId, ReactNode> = {
+  logo: <Shapes size={16} />,
+  illustration: <Brush size={16} />,
+  drawing: <PenLine size={16} />,
+  photo: <ImageIcon size={16} />,
+  pixel: <Grid3x3 size={16} />,
 };
-
-const PRESETS: { id: string; label: string; hint: string; icon: ReactNode; opts: Partial<Settings> }[] = [
-  { id: "logo", icon: <Shapes size={16} />, label: "Logo", hint: "Crisp shapes, satin for strokes", opts: { photoZigzag: false, colors: 6, smoothing: 2, minRegionMm2: 1.5, simplifyMm: 0.12, allowSatin: true, satinMaxWidthMm: 6, allowRunning: true, fillMethod: "tatami", fillAngle: null, rowSpacing: 0.25, underlay: true, outline: "none" } },
-  { id: "illustration", icon: <Brush size={16} />, label: "Illustration", hint: "More colours, finer detail", opts: { photoZigzag: false, colors: 10, smoothing: 1, minRegionMm2: 0.8, simplifyMm: 0.1, maxPixels: 900, allowSatin: true, satinMaxWidthMm: 5, fillMethod: "tatami", rowSpacing: 0.25, underlay: true, outline: "none" } },
-  { id: "lineart", icon: <PenLine size={16} />, label: "Line art", hint: "Few colours, satin & running lines", opts: { photoZigzag: false, colors: 3, smoothing: 1, minRegionMm2: 0.5, simplifyMm: 0.08, maxPixels: 1000, allowSatin: true, satinMaxWidthMm: 8, allowRunning: true, runningMaxWidthMm: 1.2, outline: "none" } },
-  { id: "patch", icon: <PatchBorder size={16} />, label: "Patch", hint: "Bold fills with a satin border", opts: { photoZigzag: false, colors: 6, smoothing: 3, minRegionMm2: 2, simplifyMm: 0.15, fillMethod: "tatami", rowSpacing: 0.25, underlay: true, outline: "satin", outlineWidthMm: 3, outlineColor: [31, 42, 86] } },
-  { id: "stipple", icon: <Sparkle size={16} />, label: "Stipple art", hint: "Light, sketchy texture", opts: { photoZigzag: false, colors: 5, smoothing: 2, allowSatin: false, allowRunning: true, fillMethod: "stipple", rowSpacing: 1.1, underlay: false, outline: "running", outlineWidthMm: 1, outlineColor: [40, 40, 40] } },
-  { id: "photo", icon: <ImageIcon size={16} />, label: "Photo", hint: "Smoothed colours, gradient fills, rows that follow the picture", opts: { photoZigzag: false, colors: 10, smoothing: 1, denoise: 2, mergeDeltaE: 4, minRegionMm2: 2, gradients: true, fillDirection: "axis", fillMethod: "flow", flowStrength: 1, lineNetworks: false, gradientFlow: true, rowSpacing: 0.3, edgeOutlines: "none", lineArt: "none", pixelArt: "off", allowSatin: false, allowRunning: false } },
-  { id: "sketch", icon: <Pencil size={16} />, label: "Sketch", hint: "Line drawing from the picture (coherent lines)", opts: { photoZigzag: false, colors: 4, denoise: 2, lineArt: "coherent", lineStrength: 0.5, fillMethod: "meander", rowSpacing: 1.2, underlay: false, pixelArt: "off" } },
-  { id: "pixel", icon: <Grid3x3 size={16} />, label: "Pixel art", hint: "Sprites and icons: smooth, depixelized shapes", opts: { photoZigzag: false, colors: 16, smoothing: 0, denoise: 0, mergeDeltaE: 0, minRegionMm2: 0, pixelArt: "on", allowSatin: false, allowRunning: false, fillMethod: "tatami" } },
-  { id: "zigzagphoto", icon: <ScanLine size={16} />, label: "Zig-zag photo", hint: "One colour: the picture as rows of zigzags, wider and denser where darker", opts: { photoZigzag: true, colors: 4, denoise: 1, removeBackground: true } },
-  { id: "cartoon", icon: <Smile size={16} />, label: "Cartoon", hint: "Flat colours with dark outlines on every edge", opts: { photoZigzag: false, colors: 8, smoothing: 2, denoise: 1, edgeOutlines: "running", edgeContrast: 25, outlineColor: [28, 28, 28], pixelArt: "off" } },
-];
 
 const FILL_METHODS: { id: FillMethod; icon: LucideIcon; label: string; hint: string }[] = [
   { id: "tatami", icon: StitchFill, label: "Tatami", hint: "Parallel staggered rows — the classic, even fill" },
@@ -141,7 +104,7 @@ const MASK_MODES: [SegMask["mode"], string, string][] = [
 
 type Pane = "style" | "colours" | "shapes" | "lines" | "stitches" | "cross" | "ai";
 const PANES: { id: Pane; label: string; hint: string; icon: ReactNode }[] = [
-  { id: "style", label: "Style", hint: "Preset, size and the source picture", icon: <Sparkles size={15} /> },
+  { id: "style", label: "Style", hint: "Output, preset, the look and the size", icon: <Sparkles size={15} /> },
   { id: "colours", label: "Colours", hint: "Palette, thread chart and background", icon: <Palette size={15} /> },
   { id: "shapes", label: "Shapes", hint: "Tracing and cleanup", icon: <Shapes size={15} /> },
   { id: "lines", label: "Lines", hint: "Satin strokes, line art and outlines", icon: <StitchSatin size={15} /> },
@@ -152,9 +115,9 @@ const PANES: { id: Pane; label: string; hint: string; icon: ReactNode }[] = [
 
 /** The tab of every remembered option (the compiler checks that none is missing). */
 const PANE_OF: Record<keyof Settings, Pane> = {
-  maxPixels: "style",
-  denoise: "style",
-  pixelArt: "style",
+  maxPixels: "shapes",
+  denoise: "shapes",
+  pixelArt: "shapes",
   colors: "colours",
   mergeDeltaE: "colours",
   removeBackground: "colours",
@@ -181,6 +144,8 @@ const PANE_OF: Record<keyof Settings, Pane> = {
   lineTaper: "lines",
   thinTriple: "lines",
   lineSubpixel: "lines",
+  outlineLineMm: "lines",
+  routeLines: "lines",
   photoZigzag: "style",
   photoSpacing: "style",
   photoAngle: "style",
@@ -188,8 +153,8 @@ const PANE_OF: Record<keyof Settings, Pane> = {
   photoMin: "style",
   edgeOutlines: "lines",
   edgeContrast: "lines",
-  outline: "lines",
-  outlineWidthMm: "lines",
+  outline: "style",
+  outlineWidthMm: "style",
   outlineColor: "lines",
   fillMethod: "stitches",
   fillAngle: "stitches",
@@ -281,9 +246,7 @@ function drawSam(ctx: CanvasRenderingContext2D, dpr: number, bmp: ImageBitmap, s
 const SETTINGS_KEY = "filum.digitize.v2";
 const loadSettings = (): Settings => {
   try {
-    const s: Settings = { ...DEFAULTS, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}") };
-    // direction "flow" used to switch every fill to a flow fill
-    return s.fillDirection === "flow" ? { ...s, fillMethod: "flow", fillDirection: "axis" } : s;
+    return migrateSettings(JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}"));
   } catch {
     return DEFAULTS;
   }
@@ -372,7 +335,8 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
   const [pickRole, setPickRole] = useState<Exclude<Role, "auto"> | null>(null);
   const eyedropper = pickRole !== null;
   const [placement, setPlacement] = useState<"add" | "replace">("add");
-  const [preset, setPreset] = useState<string | null>(null);
+  // the preset the settings still match (any change makes them custom)
+  const preset = presetOf(settings);
   // recognition (on-device AI): object masks, edges, text
   const [bmp, setBmp] = useState<ImageBitmap | null>(null);
   const [sam, setSam] = useState<SamImage | null>(null);
@@ -391,7 +355,6 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
   const runId = useRef(0);
 
   const set = (p: Partial<Settings>) => {
-    setPreset(null);
     setSettings((s) => ({ ...s, ...p }));
   };
   const [paneState, setPaneState] = useState<Pane>(() => {
@@ -941,53 +904,108 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
                   hint={
                     output === "cross"
                       ? "The picture's colours on a grid of crosses — every colour setting (palette, thread chart, background, left-out areas, AI masks) applies."
-                      : "Traced shapes: fills, satin columns and lines."
+                      : settings.photoZigzag
+                        ? "One colour, rows of zigzags: wider and denser where the picture is darker, nothing where it is light."
+                        : "Traced shapes: fills, satin columns and lines."
                   }
                 >
                   <Seg
                     full
-                    value={output}
+                    value={output === "cross" ? "cross" : settings.photoZigzag ? "zigzag" : "shapes"}
                     onChange={(v) => {
-                      setOutput(v);
                       if (v === "cross") {
+                        setOutput("cross");
                         setSettings((s) => ({ ...s, ...CROSS_PRESET }));
-                        setPreset(null);
+                      } else {
+                        setOutput("shapes");
+                        set({ photoZigzag: v === "zigzag" });
                       }
                     }}
                     options={[
                       ["shapes", "Shapes"],
+                      ["zigzag", "Zig-zag photo"],
                       ["cross", "Cross stitch"],
                     ]}
                   />
                 </Group>
-                {output === "shapes" && (
-                  <Group title="Preset" hint={PRESETS.find((p) => p.id === preset)?.hint ?? "Custom settings — pick a preset to start from"}>
+                {output === "shapes" && !settings.photoZigzag && (
+                  <Group title="Preset" hint={DIGITIZE_PRESETS.find((p) => p.id === preset)?.hint ?? "Custom settings — pick a preset to start from"}>
                     <div className="dz-presets">
-                      {PRESETS.map((p) => (
+                      {DIGITIZE_PRESETS.map((p) => (
                         <button
                           key={p.id}
                           className={preset === p.id ? "on" : ""}
                           title={p.hint}
-                          onClick={() => {
-                            // a preset starts from the defaults (so one preset's border or
-                            // outlines don't leak into the next); only the background choice stays
-                            setSettings((s) => ({ ...DEFAULTS, removeBackground: s.removeBackground, backgroundScope: s.backgroundScope, ...p.opts }));
-                            setPreset(p.id);
-                          }}
+                          aria-pressed={preset === p.id}
+                          // a preset starts from the defaults: nothing leaks from the last one
+                          onClick={() => setSettings((s) => presetSettings(p.id, { outlineColor: s.outlineColor }))}
                         >
-                          {p.icon}
+                          {PRESET_ICONS[p.id]}
                           <span>{p.label}</span>
                         </button>
                       ))}
                     </div>
                   </Group>
                 )}
+                {output === "shapes" && !settings.photoZigzag && (
+                  <Group title="Look" hint="Each control moves several settings of the tabs together; it shows Custom once those are changed by hand.">
+                    <Row label="Outlines" title="Lines of the picture: none, as wide as drawn, or one even satin width (clean logo outlines, sewn as one network)">
+                      <span className="dz-inline">
+                        <Seg<Outlines>
+                          value={outlinesOf(settings)}
+                          onChange={(v) => set(outlinesPatch(v, settings.outlineLineMm || OUTLINE_DEFAULT_MM))}
+                          options={[
+                            ["off", "None"],
+                            ["drawn", "As drawn"],
+                            ["even", "Even"],
+                          ]}
+                        />
+                        {outlinesOf(settings) === "even" && (
+                          <Num value={settings.outlineLineMm} unit="mm" step={0.1} min={0.8} max={4} digits={1} onChange={(v) => set({ outlineLineMm: v })} />
+                        )}
+                      </span>
+                    </Row>
+                    <Row label="Detail" title="Bold: fewer, simpler shapes. Fine: small shapes and close tracing (more stitches, more trims)">
+                      <Seg<Detail | "custom">
+                        value={detailOf(settings) ?? "custom"}
+                        onChange={(v) => v !== "custom" && set(DETAIL[v])}
+                        options={[
+                          ["bold", "Bold"],
+                          ["normal", "Normal"],
+                          ["fine", "Fine"],
+                          ...(detailOf(settings) ? [] : [["custom", "Custom"] as ["custom", string]]),
+                        ]}
+                      />
+                    </Row>
+                    <Row label="Background" title="The colour around the design: left out (the fabric shows, also in plain holes), left out only outside the design (every enclosed area stitched), or stitched">
+                      <Seg<Backdrop>
+                        value={backdropOf(settings)}
+                        onChange={(v) => set(backdropPatch(v))}
+                        options={[
+                          ["fabric", "Fabric shows"],
+                          ["enclosed", "Fill enclosed"],
+                          ["all", "Stitch all"],
+                        ]}
+                      />
+                    </Row>
+                    <Row label="Border" title="An outline around the whole design (patches, stickers)">
+                      <span className="dz-inline">
+                        <Seg
+                          value={settings.outline}
+                          onChange={(v) => set({ outline: v })}
+                          options={[
+                            ["none", "None"],
+                            ["running", "Running"],
+                            ["satin", "Satin"],
+                          ]}
+                        />
+                        {settings.outline === "satin" && <Num value={settings.outlineWidthMm} unit="mm" step={0.1} min={0.8} max={6} digits={1} onChange={(v) => set({ outlineWidthMm: v })} />}
+                      </span>
+                    </Row>
+                  </Group>
+                )}
                 {output === "shapes" && settings.photoZigzag && (
-                  <Group
-                    title="Zig-zag photo"
-                    hint="One colour, rows of zigzags: wider and denser where the picture is darker, nothing where it is light. Colour, shape and line settings do not apply."
-                    extra={<Toggle on={settings.photoZigzag} onChange={(v) => set({ photoZigzag: v })} />}
-                  >
+                  <Group title="Zig-zag photo">
                     <Row label="Row spacing" title="Distance between the rows — wider: lighter, more graphic">
                       <Slider min={0.5} max={3} step={0.1} unit="mm" value={settings.photoSpacing} onChange={(v) => set({ photoSpacing: v })} />
                     </Row>
@@ -1025,19 +1043,6 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
                       <Maximize2 size={12} /> Fit hoop
                     </button>
                   </div>
-                  <Row label="Detail" title="Working resolution — more is slower but keeps finer shapes">
-                    <Slider min={200} max={1600} step={20} digits={0} unit="px" value={settings.maxPixels} onChange={(v) => set({ maxPixels: v })} />
-                  </Row>
-                </Group>
-                <Group title="Source picture">
-                  <Row label="Denoise" title="Edge-preserving smoothing before colours are reduced (photos, JPEG noise)">
-                    <Slider min={0} max={4} step={1} digits={0} value={settings.denoise} onChange={(v) => set({ denoise: v })} />
-                  </Row>
-                  {output === "shapes" && (
-                    <Row label="Pixel art" title="Depixelize sprites and icons into smooth shapes (Kopf & Lischinski)">
-                      <Seg value={settings.pixelArt} onChange={(v) => set({ pixelArt: v })} options={[["auto", "Auto"], ["on", "On"], ["off", "Off"]]} />
-                    </Row>
-                  )}
                 </Group>
               </>
             )}
@@ -1066,7 +1071,9 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
                   hint={
                     settings.backgroundScope === "outside"
                       ? "The border colour is left out where it reaches the edge of the picture, and in plain holes (letter counters, the inside of rings and outlines). Small enclosed areas (highlights) and ones with shapes on them (a badge face) are stitched."
-                      : "The border colour is left out everywhere, also inside shapes (letter counters, holes)."
+                      : settings.backgroundScope === "border"
+                        ? "The border colour is left out only where it reaches the edge of the picture: every area enclosed by the design is stitched (a logo's white faces inside its outlines)."
+                        : "The border colour is left out everywhere, also inside shapes (letter counters, holes)."
                   }
                 >
                   <Row label="Background" title="Leave out the colour that dominates the image border">
@@ -1077,7 +1084,8 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
                         value={settings.backgroundScope}
                         onChange={(v) => set({ backgroundScope: v })}
                         options={[
-                          ["outside", "Outside only"],
+                          ["border", "At the edge"],
+                          ["outside", "Outside & holes"],
                           ["everywhere", "Everywhere"],
                         ]}
                       />
@@ -1220,6 +1228,17 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
 
             {pane === "shapes" && (
               <>
+                <Group title="Picture">
+                  <Row label="Resolution" title="Working resolution — more is slower but keeps finer shapes">
+                    <Slider min={200} max={1600} step={20} digits={0} unit="px" value={settings.maxPixels} onChange={(v) => set({ maxPixels: v })} />
+                  </Row>
+                  <Row label="Denoise" title="Edge-preserving smoothing before colours are reduced (photos, JPEG noise)">
+                    <Slider min={0} max={4} step={1} digits={0} value={settings.denoise} onChange={(v) => set({ denoise: v })} />
+                  </Row>
+                  <Row label="Pixel art" title="Depixelize sprites and icons into smooth shapes (Kopf & Lischinski)">
+                    <Seg value={settings.pixelArt} onChange={(v) => set({ pixelArt: v })} options={[["auto", "Auto"], ["on", "On"], ["off", "Off"]]} />
+                  </Row>
+                </Group>
                 <Group title="Tracing">
                   <Row label="Seamless" title="Neighbouring shapes share one traced boundary (no gaps, no overlaps); corners stay sharp, pixel steps become smooth curves">
                     <Toggle on={settings.seamless} onChange={(v) => set({ seamless: v })} />
@@ -1286,8 +1305,19 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
                       <Row label="Through junctions" title="A line continues through a junction when it bends less than this — fewer, longer lines (0: every junction ends the lines)">
                         <Slider min={0} max={60} step={5} digits={0} unit="°" value={settings.lineContinuity} onChange={(v) => set({ lineContinuity: v })} />
                       </Row>
-                      <Row label="Follow width" title="Satin lines get wider and narrower like the drawn line">
-                        <Toggle on={settings.lineTaper} onChange={(v) => set({ lineTaper: v })} />
+                      <Row label="Outline width" title="Dark lines (outlines, ink) as satin of one even width — 0: as wide as drawn">
+                        <span className="dz-inline">
+                          <Toggle on={settings.outlineLineMm > 0} onChange={(v) => set({ outlineLineMm: v ? OUTLINE_DEFAULT_MM : 0 })} />
+                          {settings.outlineLineMm > 0 && <Num value={settings.outlineLineMm} unit="mm" step={0.1} min={0.8} max={4} digits={1} onChange={(v) => set({ outlineLineMm: v })} />}
+                        </span>
+                      </Row>
+                      {settings.outlineLineMm <= 0 && (
+                        <Row label="Follow width" title="Satin lines get wider and narrower like the drawn line">
+                          <Toggle on={settings.lineTaper} onChange={(v) => set({ lineTaper: v })} />
+                        </Row>
+                      )}
+                      <Row label="One network" title="Lines that meet are sewn in one go: each walks out under a running path its column covers on the way back — no trims between them">
+                        <Toggle on={settings.routeLines} onChange={(v) => set({ routeLines: v })} />
                       </Row>
                       <Row label="Sub-pixel" title="Line centres follow the drawn line (its darkness profile), not the pixel grid — thin, smoothed lines stay straight and smooth">
                         <Toggle on={settings.lineSubpixel} onChange={(v) => set({ lineSubpixel: v })} />
@@ -1368,24 +1398,6 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
                     </Row>
                   )}
                   {extra !== "none" && <p className="dz-hint">One line per place: the lines in the picture come first, then the border, then these.</p>}
-                </Group>
-                <Group title="Border" hint={settings.outline === "none" ? "An outline around the whole design (patches, stickers)." : undefined}>
-                  <Seg
-                    full
-                    value={settings.outline}
-                    onChange={(v) => set({ outline: v })}
-                    options={[
-                      ["none", "None"],
-                      ["running", "Running"],
-                      ["satin", "Satin"],
-                    ]}
-                  />
-                  {settings.outline === "satin" && (
-                    <Row label="Width">
-                      <Slider min={0.8} max={6} step={0.1} unit="mm" value={settings.outlineWidthMm} onChange={(v) => set({ outlineWidthMm: v })} />
-                    </Row>
-                  )}
-                  {settings.outline !== "none" && outlineColourRow}
                 </Group>
               </>
             )}
@@ -1547,7 +1559,7 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
               <RotateCcw size={12} /> Reset {PANES.find((p) => p.id === pane)?.label.toLowerCase()}
             </button>
             <div className="spacer" />
-            <button className="btn sm ghost" onClick={() => (setSettings(DEFAULTS), setPreset("logo"))} title="All settings back to the defaults">
+            <button className="btn sm ghost" onClick={() => setSettings(presetSettings("logo"))} title="All settings back to the defaults">
               Reset all
             </button>
           </div>

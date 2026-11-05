@@ -863,7 +863,8 @@ fn cartoon() -> Img {
 #[test]
 fn line_networks_become_strokes_with_fills_under_them() {
     let img = cartoon();
-    let opts = DigitizeOptions { width_mm: 100.0, colors: 3, ..Default::default() };
+    // the strokes as found (routing cuts them where they meet: see below)
+    let opts = DigitizeOptions { width_mm: 100.0, colors: 3, route_lines: false, ..Default::default() };
     let r = img.run(&opts);
     let dark = |o: &Object| rgb(o, &r).iter().all(|c| *c < 70);
     // the black line drawing is strokes, not a narrow fill
@@ -910,7 +911,7 @@ fn ink_lines_are_found_even_when_the_colours_merge_them() {
 #[test]
 fn line_options_change_the_strokes() {
     let img = cartoon();
-    let base = DigitizeOptions { width_mm: 100.0, colors: 3, ..Default::default() };
+    let base = DigitizeOptions { width_mm: 100.0, colors: 3, route_lines: false, ..Default::default() };
     let dark_count = |o: &DigitizeOptions| {
         let r = img.run(o);
         r.objects.iter().filter(|x| rgb(x, &r).iter().all(|c| *c < 70)).count()
@@ -1114,4 +1115,41 @@ fn satin_edge_in_the_colours_own_thread() {
     // the same thread as the disc's fill
     let disc = r.objects.iter().find(|o| matches!(o.stitch, StitchParams::Fill(_)) && rgb(o, &r)[1] > 150).unwrap();
     assert_eq!(disc.thread, edges[0].thread);
+}
+
+#[test]
+fn outlines_at_a_set_width_sew_as_one_network() {
+    // a grid drawing at a fixed outline width: every dark line a satin of
+    // that width, the whole network sewn with fewer trims than line by line
+    // a frame with three bars down and one across (T and X junctions)
+    let mut img = Img::new(400, 300, [255, 255, 255]);
+    let ink = [15u8, 15, 15];
+    let bars: Vec<((f64, f64), (f64, f64))> = vec![
+        ((50.0, 50.0), (350.0, 50.0)),
+        ((350.0, 50.0), (350.0, 250.0)),
+        ((350.0, 250.0), (50.0, 250.0)),
+        ((50.0, 250.0), (50.0, 50.0)),
+        ((125.0, 50.0), (125.0, 250.0)),
+        ((200.0, 50.0), (200.0, 250.0)),
+        ((275.0, 50.0), (275.0, 250.0)),
+        ((50.0, 150.0), (350.0, 150.0)),
+    ];
+    for (a, b) in bars {
+        img.paint(ink, |x, y| seg_dist(x, y, a, b) <= 3.0);
+    }
+    let opts = DigitizeOptions { width_mm: 100.0, colors: 2, outline_line_mm: 1.4, ..Default::default() };
+    let r = img.run(&opts);
+    let dark = |o: &Object| rgb(o, &r).iter().all(|c| *c < 70);
+    let satins: Vec<&Object> = r.objects.iter().filter(|o| dark(o) && matches!(o.stitch, StitchParams::Satin(_))).collect();
+    assert!(!satins.is_empty());
+    for o in &satins {
+        let StitchParams::Satin(p) = &o.stitch else { unreachable!() };
+        assert!((p.width - 1.4).abs() < 1e-9, "{} is {} mm", o.name, p.width);
+    }
+    let doc = filum_core::Document { objects: r.objects.clone(), threads: r.threads.clone(), ..Default::default() };
+    let plan = filum_core::Engine::new().plan(&doc);
+    let trims = plan.stitches.iter().filter(|s| s.flags & filum_core::plan::flags::TRIM != 0).count();
+    let routed = filum_core::Engine::new().plan(&filum_core::Document { objects: img.run(&DigitizeOptions { route_lines: false, ..opts.clone() }).objects, threads: r.threads.clone(), ..Default::default() });
+    let unrouted = routed.stitches.iter().filter(|s| s.flags & filum_core::plan::flags::TRIM != 0).count();
+    assert!(trims < unrouted && trims <= 1, "routed {trims} trims, unrouted {unrouted}");
 }
