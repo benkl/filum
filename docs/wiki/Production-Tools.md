@@ -21,7 +21,27 @@ The **Design** tab's *Machine* section has presets for Baby Lock, Bernina, Broth
 
 Under **Design → Stitch processing**:
 
-- **Remove hidden** leaves out stitching that's covered by objects sewn on top. It's non-destructive, so your shapes don't change, and you set an **overlap** margin. A readout shows how many stitches it saves. You'll also find it at **Stitch → Remove hidden stitching**.
+- **Basting**, **Knockdown**: see below.
+
+## Hidden stitching
+
+Where an object is sewn on top of another, the stitching underneath is never seen, but it still adds bulk, needle holes and sewing time. **Design → Hidden stitching** (the switch in its title, or **Stitch → Remove hidden stitching**) leaves it out. Nothing is destructive: your shapes stay as drawn, and the stitches come back as soon as you change your mind.
+
+- **The readout** shows how many stitches it saves and how many objects it cuts. **Show on canvas** hatches what is left out, right on the design.
+- **Overlap → Under the top**: how far a cut fill still reaches under the object on top, so no gap opens when the fabric pulls. Digitizers use about 0.3–0.5 mm on stable fabrics and 0.8–1.0 mm on knits; Filum suggests a value for the design's fabric.
+- **What hides stitching**:
+  - **Narrowest**: an object only hides what's under it where it is at least this wide. Outlines, thin borders and narrow satins leave the fill under them whole (1.5 mm by default).
+  - **Rows up to**: fills and satins with rows further apart than this are open and show what's under them (1 mm by default).
+  - **Textures**: stipple, meander, Hilbert and cross-stitch fills leave fabric showing, so by default they don't hide anything.
+  - **Appliqué fabric**: the fabric of an appliqué hides what's under it. Its placement, tack-down and cover stitches are never cut.
+  - The colours of one gradient or tartan never hide each other, and a colour blend (or any fill whose rows open up towards one end) never hides what's under it.
+- **What is removed**: fills, always. **Running stitch** cuts lines under a cover too, reaching the overlap under it. **Underlay → Kept** sews the cut fill's whole underlay, so the fabric under the object on top stays steady. **Smallest piece** leaves out leftover pieces too small to be worth a jump and a trim, and doesn't cut holes that small.
+- **Objects** lists every object that loses stitches, most first. Click one to select it, or the tick to let it keep its stitches. Objects set by hand are listed under it.
+
+![Hidden stitching, with what is left out hatched on the canvas](images/hidden-stitching.webp)
+
+Each object has its own **Selection → Hidden stitching** section: **Hides** (Auto, Always or Never) decides whether stitching under it is left out, with a line explaining what Auto does for this object, and **Keep its stitches** sews it whole even where something hides it. The section also says how many of its stitches are left out. These settings are kept in Filum files and in SVG.
+
 - **Basting** sews a temporary tacking line that holds the fabric to the backing: **Box around the design** or **Following the design**, with its own distance and stitch length.
 - **Knockdown** puts a light layer of stitches under the design, so it doesn't sink into towels, fleece or velvet. Click **Edit…** (or **Stitch → Knockdown…**) to set it up for the whole design or just the selection.
 

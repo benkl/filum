@@ -797,6 +797,7 @@ impl<'a> Ctx<'a> {
             min_stitch: ink.get("min_stitch_length_mm").and_then(|v| v.trim().parse().ok()),
             min_jump: ink.get("min_jump_stitch_length_mm").and_then(|v| v.trim().parse().ok()),
             clone: None,
+            hidden: None,
             patterns: vec![],
             start: None,
             end: None,
@@ -1163,7 +1164,14 @@ impl<'a> Ctx<'a> {
             if let Ok(stitch) = serde_json::from_str::<StitchParams>(json) {
                 let color = st.fill.flatten().or(st.stroke.flatten()).unwrap_or([0x1c, 0x1c, 0x1c]);
                 let paths = if let StitchParams::Satin(_) = stitch { paths } else { paths };
+                let first = self.doc.objects.len();
                 self.add(label, color, paths, stitch, &ink);
+                // its part in hidden-stitch removal
+                if let Some(h) = node.attributes().find(|a| a.namespace() == Some(FILUM_NS) && a.name() == "hidden").and_then(|a| serde_json::from_str(a.value()).ok()) {
+                    for o in &mut self.doc.objects[first..] {
+                        o.hidden = Some(h);
+                    }
+                }
                 return;
             }
         }
@@ -1778,6 +1786,7 @@ xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"{}mm\" height=\"{}mm\" view
         attrs.retain(|(k, _)| seen.insert(k.clone()));
         let ink: String = attrs.iter().map(|(k, v)| format!(" inkstitch:{k}=\"{}\"", esc(v))).collect();
         let hidden = if o.visible { "" } else { " display=\"none\"" };
+        let rule = o.hidden.map(|h| format!(" filum:hidden=\"{}\"", esc(&serde_json::to_string(&h).unwrap_or_default()))).unwrap_or_default();
         // guided fills: the guide line, grouped with the fill (Ink/Stitch guide-line marker)
         // ripples: their guide line or satin guide, and the anchor line
         let (guide, guide_satin, anchor): (Option<Vec<SubPath>>, bool, Option<[[f64; 2]; 2]>) = match &o.stitch {
@@ -1791,7 +1800,7 @@ xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"{}mm\" height=\"{}mm\" view
             body.push_str(&format!("    <g id=\"{}-group\" inkscape:label=\"{}\">\n", esc(&o.id), esc(&o.name)));
         }
         body.push_str(&format!(
-            "    {indent}<path id=\"{}\" inkscape:label=\"{}\" style=\"{}\"{hidden} d=\"{}\"{ink} filum:params=\"{params}\" />\n",
+            "    {indent}<path id=\"{}\" inkscape:label=\"{}\" style=\"{}\"{hidden} d=\"{}\"{ink} filum:params=\"{params}\"{rule} />\n",
             esc(&o.id),
             esc(&o.name),
             style,
@@ -2143,6 +2152,16 @@ mod tests {
             let (pa, pb) = (a.paths[0].nodes[0].p, b.paths[0].nodes[0].p);
             assert!((pa[0] - pb[0]).abs() < 1e-3 && (pa[1] - pb[1]).abs() < 1e-3);
         }
+    }
+
+    #[test]
+    fn keeps_an_objects_hidden_stitching_rule() {
+        let mut doc = import_svg(INK).unwrap().document;
+        let rule = crate::model::HiddenRule { covers: crate::model::CoverMode::Never, keep: true };
+        doc.objects[0].hidden = Some(rule);
+        let back = import_svg(&export_svg(&doc)).unwrap().document;
+        assert_eq!(back.objects[0].hidden, Some(rule));
+        assert_eq!(back.objects[1].hidden, None);
     }
 
     #[test]

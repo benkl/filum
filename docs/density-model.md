@@ -115,6 +115,6 @@ These are judgement calls anchored to the sources above, not measurements. Test 
 - The share of the stitched area in each class.
 - A readout under the pointer: layers, holes/mm², +g/m² and the class.
 - **Show / Next**, which zooms to each too-dense place and selects what stitches there.
-- When fills stack on fills, a one-click **Remove hidden** (Stitch ▸ Remove hidden stitching).
+- When fills stack on fills, **Hidden stitching** (Design ▸ Hidden stitching) leaves out what's under them, with rules for what hides (width, row spacing, textures, appliqué) and per-object overrides.
 
 Changing the fabric or a thread's weight (Threads ▸ manager, "wt") re-judges the same stitches.

@@ -437,6 +437,7 @@ export function Canvas() {
         gridStep: s.gridStep,
         showJumps: s.showJumps,
         showUnderlay: s.showUnderlay,
+        hiddenShapes: s.showHidden ? s.hiddenShapes : null,
         animIndex: s.anim.index,
         fabricColor: s.fabricColor,
         fabricAll: s.fabricAll,

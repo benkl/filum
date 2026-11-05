@@ -14,7 +14,8 @@ fn circle(cx: f64, cy: f64, r: f64) -> SubPath {
 }
 
 fn obj(id: &str, thread: &str, paths: Vec<SubPath>, stitch: StitchParams) -> Object {
-    Object { id: id.into(), name: id.into(), thread: thread.into(), visible: true, locked: false, paths, stitch, trim_after: false, stop_after: false, ties: Default::default(), force_lock: false, min_stitch: None, min_jump: None, clone: None, patterns: vec![], start: None, end: None }
+    Object { id: id.into(), name: id.into(), thread: thread.into(), visible: true, locked: false, paths, stitch, trim_after: false, stop_after: false, ties: Default::default(), force_lock: false, min_stitch: None, min_jump: None, clone: None,
+            hidden: None, patterns: vec![], start: None, end: None }
 }
 
 fn sample() -> Document {

@@ -27,6 +27,7 @@ import {
   Waves,
   X,
   type LucideIcon,
+  Layers2,
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Applique, BatchLettering, EmbroideryMachine, Fabric as FabricIcon, Hoop, LockStitch, Spool, StitchFill, StitchProcessing, StitchRunning, StitchSatin, TextArc } from "../icons/stitch";
@@ -283,6 +284,7 @@ const SECTION_ICONS: Record<string, LucideIcon> = {
   Hoop: Hoop,
   "Fabric & thread": FabricIcon,
   "Stitch processing": StitchProcessing,
+  "Hidden stitching": Layers2,
   Machine: EmbroideryMachine,
   "Stitch-out": LockStitch,
   "Time estimates": Timer,

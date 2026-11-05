@@ -81,6 +81,13 @@ export const defaultApplique = (): AppliqueParams => ({
 export const defaultDesignOptions = (): DesignOptions => ({
   removeOverlaps: false,
   overlapMargin: 0.6,
+  coverMinWidth: 1.5,
+  coverMaxSpacing: 1.0,
+  texturedCovers: false,
+  appliqueCovers: true,
+  minFragment: 2.0,
+  keepUnderlay: false,
+  trimRunning: false,
   basting: "none",
   bastingMargin: 6,
   bastingLength: 5,

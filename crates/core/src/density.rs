@@ -513,6 +513,7 @@ mod tests {
             min_jump: None,
             patterns: vec![],
             clone: None,
+            hidden: None,
             start: None,
             end: None,
         }

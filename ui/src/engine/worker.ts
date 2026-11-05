@@ -52,6 +52,9 @@ self.onmessage = async (e: MessageEvent<Req>) => {
         transfer.push(r.layers.buffer, r.holes.buffer, r.added.buffer, r.class.buffer);
         break;
       }
+      case "stitchedShapes":
+        result = JSON.parse(eng.stitchedShapes(args[0] as string));
+        break;
       case "elementInfo":
         result = JSON.parse(eng.elementInfo(args[0] as string, args[1] as string));
         break;

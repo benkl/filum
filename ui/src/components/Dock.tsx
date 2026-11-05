@@ -1,4 +1,5 @@
 import { ChevronDown, Info, OctagonAlert, Shapes, TriangleAlert, type LucideIcon, ChevronUp, Eye, EyeOff, GripVertical, ImagePlus, Lock, Move, Sparkles, Trash2, Type, Unlock } from "lucide-react";
+import { HiddenStitchingSection, ObjectHiddenSection } from "./HiddenStitching";
 import { DensityMap, Hoop, StitchFill, StitchRunning, StitchSatin } from "../icons/stitch";
 import { CommandsSection } from "./CommandsSection";
 import { MachineSettings } from "./MachineSettings";
@@ -29,7 +30,6 @@ import {
   satinOutline,
 } from "../lib/geometry";
 import { useStore, type StitchPatch } from "../store";
-import { engine } from "../engine/client";
 import type { DesignObject, DesignOptions } from "../types";
 import { HoopOptions } from "./Bars";
 import { HoopShapeRow, MaterialSection } from "./MaterialPanel";
@@ -350,6 +350,7 @@ export function ScenePanel() {
       <Section title="Fabric & thread">
         <MaterialSection />
       </Section>
+      <HiddenStitchingSection />
       <DesignOptionsSection />
       <MachineSettings />
       <Section title="Fabric look" defaultOpen={false}>
@@ -362,46 +363,10 @@ export function ScenePanel() {
 /** Design-wide stitch processing (applied when the plan is built, objects stay as drawn). */
 function DesignOptionsSection() {
   const doc = useStore((s) => s.doc);
-  const stitches = useStore((s) => s.plan?.stats.stitches);
   const o = doc.options ?? defaultDesignOptions();
   const set = (p: Partial<DesignOptions>) => useStore.getState().commit((d) => ({ ...d, options: { ...(d.options ?? defaultDesignOptions()), ...p } }));
-  const [before, setBefore] = useState<number | null>(null);
-  // stitch count without hidden-stitch removal, for the savings readout
-  useEffect(() => {
-    if (!o.removeOverlaps) return setBefore(null);
-    let live = true;
-    const t = setTimeout(() => {
-      engine
-        .planDetached({ ...doc, options: { ...o, removeOverlaps: false } })
-        .then((p) => live && setBefore(p.stats.stitches))
-        .catch(() => {});
-    }, 500);
-    return () => {
-      live = false;
-      clearTimeout(t);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc, o.removeOverlaps]);
-  const saved = before != null && stitches != null ? before - stitches : null;
   return (
     <Section title="Stitch processing">
-      <Row label="Remove hidden" title="Leave out fill stitching hidden under objects stacked on top. The shapes stay unchanged.">
-        <Toggle on={o.removeOverlaps} onChange={(v) => set({ removeOverlaps: v })} />
-      </Row>
-      {o.removeOverlaps && (
-        <>
-          <Row label="Overlap" title="How far a lower fill still reaches under the object above, so no gaps open up">
-            <Num value={o.overlapMargin} unit="mm" step={0.1} min={0} max={3} onChange={(v) => set({ overlapMargin: v })} />
-          </Row>
-          {saved != null && (
-            <p className="hint" style={{ margin: "0 0 6px" }}>
-              {saved > 0
-                ? `Saves ${saved.toLocaleString()} stitches (${Math.round((saved / before!) * 100)} %) — less bulk, faster sewing.`
-                : "Nothing is hidden under other objects."}
-            </p>
-          )}
-        </>
-      )}
       <Row label="Basting" title="Long stitches sewn first to hold fabric and stabiliser together (floating, hard-to-hoop items)">
         <select className="select" style={{ width: "100%" }} value={o.basting} onChange={(e) => set({ basting: e.target.value as DesignOptions["basting"] })}>
           <option value="none">None</option>
@@ -1331,6 +1296,7 @@ export function PropertiesPanel() {
           <StitchOptions o={o} />
         </Section>
       )}
+      {!o.clone && <ObjectHiddenSection o={o} />}
       <CommandsSection objects={oneGradient ? sel : [o]} />
       <ElementInfoSection ids={oneGradient ? sel.map((x) => x.id) : [o.id]} />
     </div>

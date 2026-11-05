@@ -15,6 +15,7 @@ import type {
   PlanData,
   StitchDocument,
   StitchParams,
+  SubPath,
   Thread,
   Tool,
   ViewMode,
@@ -122,6 +123,10 @@ export interface State {
   /** Grid spacing (mm; 0 = automatic). */
   gridStep: number;
   showUnderlay: boolean;
+  /** Show on the canvas what hidden-stitch removal takes out. */
+  showHidden: boolean;
+  /** The objects cut by it, as they are stitched (for that view; see lib/hiddenStitching). */
+  hiddenShapes: { index: number; paths: SubPath[] }[] | null;
   /** The stitch-out player: position (null = closed), speed (stitches/s, 0 = auto), whether the view follows the needle. */
   anim: { playing: boolean; index: number | null; speed: number; follow: boolean };
   dialog: DialogName;
@@ -210,7 +215,7 @@ export interface State {
 const THEME_KEY = "filum.theme";
 /** View toggles remembered between sessions. */
 const VIEW_KEY = "filum.view";
-const VIEW_FIELDS = ["showGrid", "showJumps", "showUnderlay", "smartGuides", "stitchColors", "fabricColor", "fabricTexture", "fabricAll", "fabricWeave", "densityMode"] as const;
+const VIEW_FIELDS = ["showGrid", "showJumps", "showUnderlay", "showHidden", "smartGuides", "stitchColors", "fabricColor", "fabricTexture", "fabricAll", "fabricWeave", "densityMode"] as const;
 const savedView: Partial<Pick<State, (typeof VIEW_FIELDS)[number]>> = (() => {
   try {
     return JSON.parse(localStorage.getItem(VIEW_KEY) ?? "{}");
@@ -266,6 +271,8 @@ export const useStore = create<State>((set, get) => ({
   showGrid: true,
   gridStep: 0,
   showUnderlay: true,
+  showHidden: false,
+  hiddenShapes: null,
   anim: { playing: false, index: null, ...playerPrefs() },
   dialog: null,
   toasts: [],

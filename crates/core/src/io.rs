@@ -129,6 +129,7 @@ pub fn plan_to_document(plan: &StitchPlan, name: &str) -> Document {
             min_stitch: None,
             min_jump: None,
             clone: None,
+            hidden: None,
             patterns: vec![],
             start: None,
             end: None,
@@ -342,6 +343,7 @@ mod origin_tests {
             min_jump: None,
             patterns: vec![],
             clone: None,
+            hidden: None,
             start: None,
             end: None,
         }];

@@ -154,6 +154,7 @@ mod tests {
             min_stitch: None,
             min_jump: None,
             clone: None,
+            hidden: None,
             patterns: vec![],
             start: None,
             end: None,

@@ -97,6 +97,8 @@ export interface RenderInput {
   gridStep?: number;
   showJumps: boolean;
   showUnderlay: boolean;
+  /** What hidden-stitch removal takes out: the cut objects as they are stitched. */
+  hiddenShapes?: { index: number; paths: SubPath[] }[] | null;
   animIndex: number | null;
   fabricColor: string;
   width: number;
@@ -357,6 +359,58 @@ function anchoredFabric(ctx: CanvasRenderingContext2D, color: string, ox: number
   if (!pat) return color;
   pat.setTransform(new DOMMatrix([1, 0, 0, 1, ox, oy]));
   return pat;
+}
+
+let hatch: { dark: boolean; p: CanvasPattern } | null = null;
+
+/** The removed part of each cut object (its shape minus what is stitched), hatched; lines dashed. */
+function paintHidden(ctx: CanvasRenderingContext2D, doc: StitchDocument, shapes: { index: number; paths: SubPath[] }[], scale: number, dark: boolean) {
+  if (!hatch || hatch.dark !== dark) {
+    const c = document.createElement("canvas");
+    c.width = c.height = 8;
+    const g = c.getContext("2d")!;
+    g.strokeStyle = dark ? "rgba(255, 120, 90, 0.75)" : "rgba(214, 64, 32, 0.7)";
+    g.lineWidth = 1.5;
+    g.beginPath();
+    g.moveTo(-2, 10);
+    g.lineTo(10, -2);
+    g.moveTo(-2, 2);
+    g.lineTo(2, -2);
+    g.moveTo(6, 10);
+    g.lineTo(10, 6);
+    g.stroke();
+    hatch = { dark, p: ctx.createPattern(c, "repeat")! };
+  }
+  const edge = dark ? "rgba(255, 120, 90, 0.9)" : "rgba(214, 64, 32, 0.85)";
+  ctx.save();
+  for (const h of shapes) {
+    const o = doc.objects[h.index];
+    if (!o) continue;
+    const full = objectPath(o);
+    if (o.stitch.type === "running") {
+      // the whole line dashed, what's left of it solid on top
+      ctx.strokeStyle = edge;
+      ctx.lineWidth = 2 / scale;
+      ctx.setLineDash([4 / scale, 3 / scale]);
+      ctx.stroke(full);
+      ctx.setLineDash([]);
+      continue;
+    }
+    const removed = new Path2D();
+    removed.addPath(full);
+    if (h.paths.length) removed.addPath(pathsToPath2D(h.paths));
+    // the pattern in screen pixels, however far zoomed in
+    hatch.p.setTransform(new DOMMatrix().scaleSelf(1 / scale, 1 / scale));
+    ctx.fillStyle = hatch.p;
+    ctx.fill(removed, "evenodd");
+    ctx.strokeStyle = edge;
+    ctx.lineWidth = 1 / scale;
+    ctx.setLineDash([3 / scale, 2 / scale]);
+    if (h.paths.length) ctx.stroke(pathsToPath2D(h.paths));
+    else ctx.stroke(full);
+    ctx.setLineDash([]);
+  }
+  ctx.restore();
 }
 
 function drawVectorObject(ctx: CanvasRenderingContext2D, o: DesignObject, color: string, scale: number) {
@@ -879,6 +933,9 @@ export class Renderer {
     mmTransform(ctx, r);
     paintReferences(ctx, r, "over");
     mmTransform(ctx, r);
+
+    // what hidden-stitch removal takes out: the part of each cut object that isn't stitched, hatched
+    if (r.hiddenShapes?.length) paintHidden(ctx, doc, r.hiddenShapes, scale, theme.dark);
 
     // needle marker while animating
     if (plan && mode !== "vector" && r.animIndex != null && limit > 0) {

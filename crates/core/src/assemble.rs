@@ -9,9 +9,9 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
 use crate::geom::{point_in_ring, Point, Rect, Ring};
-use crate::model::{thread_density_scale, Basting, Document, Fabric, MachineSettings, Object, StitchParams, SubPath, Thread, Ties};
+use crate::model::{thread_density_scale, Basting, CoverMode, DesignOptions, Document, Fabric, FillMethod, MachineSettings, Object, StitchParams, SubPath, Thread, Ties};
 use crate::plan::{flags, Stitch, StitchPlan};
-use crate::region::{object_cover, outline, subtract, Cover};
+use crate::region::{object_cover, outline, subtract_min, Cover};
 use crate::stitches::applique::is_stop;
 use crate::stitches::fill::fill_rings;
 use crate::stitches::running::running_stitch;
@@ -23,6 +23,9 @@ use crate::stitches::{self, Run};
 pub struct Engine {
     cache: HashMap<u64, Vec<Run>>,
     clips: HashMap<u64, Option<Vec<Ring>>>,
+    lines: HashMap<u64, Option<Vec<Vec<Point>>>>,
+    /// Whether an object's shape has a part at least so wide (cover width test).
+    wide: HashMap<u64, bool>,
 }
 
 fn key(json: &str, fabric: Fabric, weight: u32) -> u64 {
@@ -36,6 +39,34 @@ fn key(json: &str, fabric: Fabric, weight: u32) -> u64 {
 /// Objects whose stitching hides what lies underneath.
 fn covers_others(o: &Object) -> bool {
     o.visible && matches!(o.stitch, StitchParams::Fill(_) | StitchParams::Satin(_) | StitchParams::Applique(_))
+}
+
+fn cover_mode(o: &Object) -> CoverMode {
+    o.hidden.map(|h| h.covers).unwrap_or_default()
+}
+
+/// Textured fills: open by nature, whatever their spacing.
+fn textured(o: &Object) -> bool {
+    matches!(&o.stitch, StitchParams::Fill(f) if matches!(f.method, FillMethod::Stipple | FillMethod::Meander | FillMethod::Hilbert | FillMethod::Cross))
+}
+
+/// Whether an object may hide what lies under it, by its kind and settings
+/// (the width test needs its shape and comes after).
+fn may_cover(o: &Object, opts: &DesignOptions) -> bool {
+    if !covers_others(o) {
+        return false;
+    }
+    let open = |spacing: f64| opts.cover_max_spacing > 0.0 && spacing > opts.cover_max_spacing + 1e-9;
+    match cover_mode(o) {
+        CoverMode::Never => false,
+        CoverMode::Always => true,
+        CoverMode::Auto => match &o.stitch {
+            StitchParams::Fill(f) => !see_through(o) && (opts.textured_covers || !textured(o)) && !open(f.row_spacing),
+            StitchParams::Satin(p) => !open(p.spacing),
+            StitchParams::Applique(_) => opts.applique_covers,
+            _ => false,
+        },
+    }
 }
 
 /// The colour layers an object is one of: the layers of a multi-colour
@@ -81,6 +112,24 @@ impl Engine {
         r
     }
 
+    /// Whether an object has a part at least `width` mm wide (cached).
+    fn is_wide(&mut self, o: &Object, width: f64) -> bool {
+        if width <= 0.0 {
+            return true;
+        }
+        let json = serde_json::to_string(&(&o.paths, &o.stitch, width)).unwrap_or_default();
+        let k = key(&json, Fabric::Cotton, 0);
+        if let Some(&w) = self.wide.get(&k) {
+            return w;
+        }
+        let w = crate::region::has_width(&object_cover(o), width);
+        if self.wide.len() > 4000 {
+            self.wide.clear();
+        }
+        self.wide.insert(k, w);
+        w
+    }
+
     /// Runs of one object as drawn (without design options).
     pub fn object_runs(&mut self, doc: &Document, index: usize) -> Vec<Run> {
         self.runs_for(&doc.objects[index], doc)
@@ -91,7 +140,8 @@ impl Engine {
     pub fn stitched_object<'a>(&mut self, doc: &'a Document, i: usize) -> Option<Cow<'a, Object>> {
         let obj = &doc.objects[i];
         let opts = &doc.options;
-        if !opts.remove_overlaps || !matches!(obj.stitch, StitchParams::Fill(_)) {
+        let lines = matches!(obj.stitch, StitchParams::Running(_)) && opts.trim_running;
+        if !opts.remove_overlaps || !(matches!(obj.stitch, StitchParams::Fill(_)) || lines) || obj.hidden.is_some_and(|h| h.keep) {
             return Some(Cow::Borrowed(obj));
         }
         let b = obj.bounds();
@@ -100,7 +150,7 @@ impl Engine {
         let mut groups: Vec<&str> = Vec::new();
         let above: Vec<&Object> = doc.objects[i + 1..]
             .iter()
-            .filter(|o| covers_others(o) && !see_through(o) && o.bounds().intersects(&b))
+            .filter(|o| may_cover(o, opts) && o.bounds().intersects(&b))
             .filter(|o| match layer_group(o) {
                 Some(g) if Some(g) == own || groups.contains(&g) => false,
                 Some(g) => {
@@ -110,17 +160,51 @@ impl Engine {
                 None => true,
             })
             .collect();
+        // thin objects (outlines, borders, narrow satins) don't hide what lies under them
+        let min_w = opts.cover_min_width;
+        let above: Vec<&Object> = above.into_iter().filter(|o| cover_mode(o) == CoverMode::Always || self.is_wide(o, min_w)).collect();
         if above.is_empty() {
             return Some(Cow::Borrowed(obj));
         }
-        let json = serde_json::to_string(&(&obj.paths, above.iter().map(|o| (&o.paths, &o.stitch)).collect::<Vec<_>>(), opts.overlap_margin))
-            .unwrap_or_default();
+        let json = serde_json::to_string(&(
+            &obj.paths,
+            lines,
+            above.iter().map(|o| (&o.paths, &o.stitch)).collect::<Vec<_>>(),
+            opts.overlap_margin,
+            opts.min_fragment,
+        ))
+        .unwrap_or_default();
         let k = key(&json, doc.fabric, 0);
+        if lines {
+            if !self.lines.contains_key(&k) {
+                let polys: Vec<Vec<Point>> = obj
+                    .paths
+                    .iter()
+                    .map(|sp| {
+                        let mut pts = sp.flatten(0.05);
+                        if sp.closed && pts.len() > 2 {
+                            pts.push(pts[0]);
+                        }
+                        pts
+                    })
+                    .collect();
+                let covers: Vec<Cover> = above.iter().flat_map(|o| object_cover(o)).collect();
+                let cut = crate::region::clip_lines(&polys, &covers, opts.overlap_margin, 0.8);
+                if self.lines.len() > 2000 {
+                    self.lines.clear();
+                }
+                self.lines.insert(k, cut);
+            }
+            return match &self.lines[&k] {
+                None => Some(Cow::Borrowed(obj)),
+                Some(l) if l.is_empty() => None,
+                Some(l) => Some(Cow::Owned(Object { paths: l.iter().map(|p| SubPath::polyline(p, false)).collect(), ..obj.clone() })),
+            };
+        }
         if !self.clips.contains_key(&k) {
             let area = fill_rings(&obj.paths);
             let covers: Vec<Cover> = above.iter().flat_map(|o| object_cover(o)).collect();
-            let res = (b.width().max(b.height()) / 1200.0).clamp(0.05, 0.2);
-            let clipped = subtract(&area, &covers, opts.overlap_margin.max(0.0), res);
+            let clipped = subtract_min(&area, &covers, opts.overlap_margin.max(0.0), opts.min_fragment.max(0.0));
             if self.clips.len() > 2000 {
                 self.clips.clear();
             }
@@ -145,6 +229,8 @@ impl Engine {
                 continue;
             }
             let Some(obj) = self.stitched_object(doc, i) else { continue };
+            // cut by what lies on top: with "keep underlay" the full underlay stays under it
+            let keep_under = doc.options.keep_underlay && matches!(obj, Cow::Owned(_)) && matches!(obj.stitch, StitchParams::Fill(_));
             let obj = match (obj.start, prev) {
                 (None, Some(p)) if starts_near(&obj.stitch) => {
                     let mut o = obj.into_owned();
@@ -153,7 +239,13 @@ impl Engine {
                 }
                 _ => obj,
             };
-            let runs: Vec<Run> = self.runs_for(&obj, doc).into_iter().filter(|r| !r.is_empty()).collect();
+            let mut runs: Vec<Run> = self.runs_for(&obj, doc).into_iter().filter(|r| !r.is_empty()).collect();
+            if keep_under {
+                let full = Object { start: obj.start, ..doc.objects[i].clone() };
+                let (under, _) = split_underlay(self.runs_for(&full, doc));
+                let (_, top) = split_underlay(runs);
+                runs = under.into_iter().chain(top).filter(|r| !r.is_empty()).collect();
+            }
             if let Some(&(q, _)) = runs.last().and_then(|r| r.last()) {
                 prev = Some(q);
             }
@@ -170,6 +262,36 @@ impl Engine {
         prefix.extend(knock);
         assemble_prefixed(doc, &items, &prefix, thread)
     }
+}
+
+/// Runs split into the underlay and the rest (a run that changes over is cut there).
+fn split_underlay(runs: Vec<Run>) -> (Vec<Run>, Vec<Run>) {
+    let (mut under, mut top) = (Vec::new(), Vec::new());
+    for run in runs {
+        let mut cur: Run = Vec::new();
+        let mut is_under = None;
+        for s in run {
+            let u = s.1 & flags::UNDERLAY != 0;
+            if is_under.is_some_and(|x| x != u) {
+                let done = std::mem::take(&mut cur);
+                if is_under == Some(true) {
+                    under.push(done)
+                } else {
+                    top.push(done)
+                }
+            }
+            is_under = Some(u);
+            cur.push(s);
+        }
+        if !cur.is_empty() {
+            if is_under == Some(true) {
+                under.push(cur)
+            } else {
+                top.push(cur)
+            }
+        }
+    }
+    (under, top)
 }
 
 /// Stitch types that start where they are told (running, satins, fills).
@@ -486,6 +608,7 @@ mod tests {
             min_stitch: None,
             min_jump: None,
             clone: None,
+            hidden: None,
             patterns: vec![],
             start: None,
             end: None,
@@ -588,6 +711,112 @@ mod tests {
         let ramp = |a: f64| StitchParams::Fill(FillParams { underlay: false, ramp: Some(crate::model::DensityRamp { from: [0.0, 0.0], to: [a, 0.0], ..Default::default() }), ..Default::default() });
         let d2 = Document { options: d.options.clone(), ..doc(vec![obj("a", square(0.0, 0.0, 30.0), ramp(30.0)), obj("b", square(0.0, 0.0, 30.0), ramp(-30.0))]) };
         assert!(matches!(Engine::new().stitched_object(&d2, 0), Some(Cow::Borrowed(_))), "a blend layer keeps its stitches");
+    }
+
+    /// A 30 mm fill under `top`, hidden stitching removed without a margin.
+    fn under(top: Object) -> Document {
+        let fill = StitchParams::Fill(FillParams { underlay: false, ..Default::default() });
+        let mut d = doc(vec![obj("under", square(0.0, 0.0, 30.0), fill), top]);
+        d.options.remove_overlaps = true;
+        d.options.overlap_margin = 0.0;
+        d
+    }
+    fn is_cut(d: &Document) -> bool {
+        matches!(Engine::new().stitched_object(d, 0), Some(Cow::Owned(_)) | None)
+    }
+
+    #[test]
+    fn thin_objects_do_not_hide_what_is_under_them() {
+        // a 1 mm wide strip of fill over the square: an outline, not a cover
+        let strip = vec![SubPath::polyline(&[pt(5.0, 5.0), pt(25.0, 5.0), pt(25.0, 6.0), pt(5.0, 6.0)], true)];
+        let fill = StitchParams::Fill(FillParams { underlay: false, ..Default::default() });
+        let mut d = under(obj("strip", strip, fill));
+        assert!(!is_cut(&d), "1 mm is under the 1.5 mm cover width");
+        d.options.cover_min_width = 0.5;
+        assert!(is_cut(&d), "with a 0.5 mm cover width it hides");
+    }
+
+    #[test]
+    fn open_and_textured_fills_do_not_hide_what_is_under_them() {
+        let open = StitchParams::Fill(FillParams { underlay: false, row_spacing: 2.0, ..Default::default() });
+        let mut d = under(obj("open", square(5.0, 5.0, 20.0), open));
+        assert!(!is_cut(&d), "rows 2 mm apart are open");
+        d.options.cover_max_spacing = 3.0;
+        assert!(is_cut(&d), "unless open rows are allowed to hide");
+
+        let stipple = StitchParams::Fill(FillParams { underlay: false, method: FillMethod::Stipple, ..Default::default() });
+        let mut d = under(obj("stipple", square(5.0, 5.0, 20.0), stipple));
+        assert!(!is_cut(&d), "a texture shows what is under it");
+        d.options.textured_covers = true;
+        assert!(is_cut(&d));
+    }
+
+    #[test]
+    fn an_object_can_always_or_never_hide_and_can_keep_its_stitches() {
+        let fill = StitchParams::Fill(FillParams { underlay: false, ..Default::default() });
+        let mut top = obj("top", square(5.0, 5.0, 20.0), fill.clone());
+        let d = under(top.clone());
+        assert!(is_cut(&d));
+        top.hidden = Some(HiddenRule { covers: CoverMode::Never, keep: false });
+        assert!(!is_cut(&under(top.clone())), "never hides");
+
+        // a thin strip told to hide anyway
+        let strip = vec![SubPath::polyline(&[pt(5.0, 5.0), pt(25.0, 5.0), pt(25.0, 6.0), pt(5.0, 6.0)], true)];
+        let mut thin = obj("strip", strip, fill.clone());
+        thin.hidden = Some(HiddenRule { covers: CoverMode::Always, keep: false });
+        assert!(is_cut(&under(thin)), "always hides");
+
+        // the fill underneath keeps everything
+        let mut d = under(obj("top", square(5.0, 5.0, 20.0), fill));
+        d.objects[0].hidden = Some(HiddenRule { covers: CoverMode::Auto, keep: true });
+        assert!(!is_cut(&d), "keeps its stitches");
+    }
+
+    #[test]
+    fn small_leftovers_are_not_worth_a_jump() {
+        // the cover leaves a 1 x 30 mm strip on the left (30 mm²) and, through a hole in it, a 3 x 3 mm island
+        let fill = StitchParams::Fill(FillParams { underlay: false, ..Default::default() });
+        let mut cover = vec![SubPath::polyline(&[pt(1.0, -1.0), pt(31.0, -1.0), pt(31.0, 31.0), pt(1.0, 31.0)], true)];
+        cover.extend(square(15.0, 15.0, 3.0));
+        let mut d = under(obj("top", cover, fill));
+        d.options.min_fragment = 0.0;
+        let all = crate::geom::rings_area(&fill_rings(&Engine::new().stitched_object(&d, 0).unwrap().paths));
+        assert!((all - 39.0).abs() < 2.0, "the strip and the island: {all}");
+        d.options.min_fragment = 20.0;
+        let mut eng = Engine::new();
+        let kept = eng.stitched_object(&d, 0).unwrap();
+        let area = crate::geom::rings_area(&fill_rings(&kept.paths));
+        assert!((area - 30.0).abs() < 2.0, "only the strip is left: {area}");
+        d.options.min_fragment = 40.0;
+        assert!(Engine::new().stitched_object(&d, 0).is_none(), "and not even that");
+    }
+
+    #[test]
+    fn keep_underlay_sews_the_whole_underlay() {
+        let under_fill = StitchParams::Fill(FillParams { underlay: true, underlay_auto: false, ..Default::default() });
+        let top = StitchParams::Fill(FillParams { underlay: false, ..Default::default() });
+        let mut d = doc(vec![obj("under", square(0.0, 0.0, 30.0), under_fill), obj("top", square(0.0, 0.0, 25.0), top)]);
+        d.options.remove_overlaps = true;
+        let ul = |d: &Document| Engine::new().plan(d).stitches.iter().filter(|s| s.object == 0 && s.is_stitch() && s.flags & flags::UNDERLAY != 0).count();
+        let cut = ul(&d);
+        d.options.keep_underlay = true;
+        let kept = ul(&d);
+        assert!(kept > cut * 2, "the underlay under the cover stays: {kept} vs {cut}");
+    }
+
+    #[test]
+    fn running_stitches_under_a_cover_can_go_too() {
+        let line = vec![SubPath::polyline(&[pt(0.0, 15.0), pt(40.0, 15.0)], false)];
+        let fill = StitchParams::Fill(FillParams { underlay: false, ..Default::default() });
+        let mut d = doc(vec![obj("line", line, StitchParams::Running(RunningParams::default())), obj("top", square(10.0, 0.0, 20.0), fill)]);
+        d.options.remove_overlaps = true;
+        d.options.overlap_margin = 0.5;
+        assert!(matches!(Engine::new().stitched_object(&d, 0), Some(Cow::Borrowed(_))), "lines stay unless asked");
+        d.options.trim_running = true;
+        let cut = Engine::new().stitched_object(&d, 0).unwrap().into_owned();
+        assert_eq!(cut.paths.len(), 2, "a piece on each side of the cover");
+        let xs: Vec<f64> = cut.paths.iter().flat_map(|p| p.nodes.iter().map(|n| n.p[0])).collect();
+        assert!(xs.iter().all(|&x| x <= 10.6 || x >= 29.4), "reaching 0.5 mm under the cover: {xs:?}");
     }
 
     #[test]

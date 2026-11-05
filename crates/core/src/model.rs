@@ -1247,6 +1247,9 @@ pub struct Object {
     /// its own transform; the editor keeps its shape in step.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub clone: Option<CloneLink>,
+    /// How this object takes part in removing hidden stitching (none: automatic).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hidden: Option<HiddenRule>,
     /// Where stitching should begin (Ink/Stitch "starting point" / "fill start" command).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start: Option<[f64; 2]>,
@@ -1574,6 +1577,29 @@ pub enum Basting {
     Contour,
 }
 
+/// Whether an object hides the stitching under it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum CoverMode {
+    /// By the design's rules (width, row spacing, texture, appliqué).
+    #[default]
+    Auto,
+    /// Always, even when thin or open.
+    Always,
+    /// Never: what's under it is stitched in full.
+    Never,
+}
+
+/// An object's own setting for hidden stitching.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct HiddenRule {
+    /// Does it hide what's under it?
+    pub covers: CoverMode,
+    /// Keep all of its own stitches, even where something hides them.
+    pub keep: bool,
+}
+
 /// Design-wide stitch processing applied when the plan is built
 /// (non-destructive: the objects themselves are not changed).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1583,6 +1609,24 @@ pub struct DesignOptions {
     pub remove_overlaps: bool,
     /// How far a lower fill still reaches under the object above (mm).
     pub overlap_margin: f64,
+    /// Objects with no part at least this wide don't hide what's under
+    /// them (outlines, thin borders, narrow satins), mm.
+    pub cover_min_width: f64,
+    /// Fills and satins with rows further apart than this are open and
+    /// don't hide what's under them, mm.
+    pub cover_max_spacing: f64,
+    /// Textured fills (stipple, meander, Hilbert, cross stitch) hide what's under them.
+    pub textured_covers: bool,
+    /// An appliqué's fabric hides what's under it.
+    pub applique_covers: bool,
+    /// Leftover pieces (and holes) smaller than this are not worth a
+    /// jump: pieces are dropped, holes stitched over, mm².
+    pub min_fragment: f64,
+    /// Keep the full underlay under the parts that are removed (steadier
+    /// fabric under the object on top).
+    pub keep_underlay: bool,
+    /// Running stitches under a cover are removed too.
+    pub trim_running: bool,
     /// Basting stitched first to hold fabric and stabiliser together.
     pub basting: Basting,
     /// Distance of the basting from the design (mm).
@@ -1623,6 +1667,13 @@ impl Default for DesignOptions {
         DesignOptions {
             remove_overlaps: false,
             overlap_margin: 0.6,
+            cover_min_width: 1.5,
+            cover_max_spacing: 1.0,
+            textured_covers: false,
+            applique_covers: true,
+            min_fragment: 2.0,
+            keep_underlay: false,
+            trim_running: false,
             basting: Basting::None,
             basting_margin: 6.0,
             basting_length: 5.0,

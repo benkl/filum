@@ -100,6 +100,10 @@ class EngineClient {
   densityField(doc: StitchDocument, opts: { sigma?: number; maxCells?: number } = {}) {
     return this.call<DensityField>("densityField", [engineJson(doc), JSON.stringify(opts)]);
   }
+  /** The objects cut by hidden-stitch removal as they are stitched (empty paths: hidden completely). */
+  stitchedShapes(doc: StitchDocument) {
+    return this.call<{ index: number; paths: SubPath[] }[]>("stitchedShapes", [engineJson(doc)]);
+  }
   /** Element info (Ink/Stitch): per object and in total; all visible objects when `ids` is empty. */
   elementInfo(doc: StitchDocument, ids: string[]) {
     return this.call<ElementInfo>("elementInfo", [engineJson(doc), JSON.stringify(ids)]);

@@ -363,6 +363,15 @@ export type StitchParams =
 
 export type StitchType = StitchParams["type"];
 
+/** Whether an object hides the stitching under it: by the design's rules, always or never. */
+export type CoverMode = "auto" | "always" | "never";
+/** An object's own setting for hidden stitching. */
+export interface HiddenRule {
+  covers?: CoverMode;
+  /** Keep all of its own stitches, even where something hides them. */
+  keep?: boolean;
+}
+
 export interface DesignObject {
   id: string;
   name: string;
@@ -391,6 +400,8 @@ export interface DesignObject {
   group?: string;
   /** Stitch patterns drawn over the object (Ink/Stitch pattern markers). */
   patterns?: StitchPattern[];
+  /** How it takes part in removing hidden stitching (none: automatic). */
+  hidden?: HiddenRule;
   /** Linked clone: follows another object through its own transform (see lib/clones). */
   clone?: import("./lib/clones").CloneLink;
 }
@@ -442,8 +453,24 @@ export type Basting = "none" | "box" | "contour";
 
 /** Design-wide processing applied when the stitch plan is built. */
 export interface DesignOptions {
+  /** Remove stitching hidden under objects stacked on top. */
   removeOverlaps: boolean;
+  /** How far a lower fill (or line) still reaches under the object on top, mm. */
   overlapMargin: number;
+  /** Objects with no part this wide don't hide what's under them (outlines, thin borders), mm. */
+  coverMinWidth?: number;
+  /** Fills and satins with rows further apart than this are open and don't hide, mm (0: any). */
+  coverMaxSpacing?: number;
+  /** Textured fills (stipple, meander, Hilbert, cross stitch) hide what's under them. */
+  texturedCovers?: boolean;
+  /** An appliqué's fabric hides what's under it. */
+  appliqueCovers?: boolean;
+  /** Leftover pieces and holes smaller than this are dropped / stitched over, mm². */
+  minFragment?: number;
+  /** Keep the full underlay under the removed parts. */
+  keepUnderlay?: boolean;
+  /** Running stitches under a cover are removed too. */
+  trimRunning?: boolean;
   basting: Basting;
   bastingMargin: number;
   bastingLength: number;

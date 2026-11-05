@@ -246,6 +246,7 @@ mod tests {
             min_stitch: None,
             min_jump: None,
             clone: None,
+            hidden: None,
             patterns: vec![],
             start,
             end,
@@ -308,6 +309,7 @@ mod pattern_tests {
             min_jump: None,
             patterns,
             clone: None,
+            hidden: None,
             start: None,
             end: None,
         }

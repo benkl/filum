@@ -311,6 +311,7 @@ export function buildMenus(): Record<string, MenuItem[]> {
       { label: "Optimise stitch order", icon: SewOrder, run: optimizeOrder, hint: "Fewer colour changes, jumps and trims" },
       "-",
       toggle("Remove hidden stitching", !!opts.removeOverlaps, () => setOpts({ removeOverlaps: !opts.removeOverlaps }), undefined, "Leave out what lies under the objects on top"),
+      toggle("Show hidden stitching", s.showHidden, () => s.set({ showHidden: !s.showHidden }), undefined, "Mark what is left out on the canvas (Design ▸ Hidden stitching)"),
       {
         label: "Clean up tiny objects",
         run: () => {

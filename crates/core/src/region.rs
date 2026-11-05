@@ -140,6 +140,13 @@ const SLIVER: f64 = 0.15;
 /// fill. `None` when nothing overlaps (keep the original shape). `_res` is
 /// kept for API compatibility (the operations are exact).
 pub fn subtract(area: &[Ring], covers: &[Cover], margin: f64, _res: f64) -> Option<Vec<Ring>> {
+    subtract_min(area, covers, margin, 0.0)
+}
+
+/// `subtract`, without the leftover pieces and holes smaller than
+/// `min_fragment` mm²: a piece that small isn't worth a jump, and a hole that
+/// small isn't worth cutting (the stitches under it stay).
+pub fn subtract_min(area: &[Ring], covers: &[Cover], margin: f64, min_fragment: f64) -> Option<Vec<Ring>> {
     let a = clip::region(area);
     let total = clip::area(&a);
     if total <= 1e-9 {
@@ -158,7 +165,86 @@ pub fn subtract(area: &[Ring], covers: &[Cover], margin: f64, _res: f64) -> Opti
     if total - clip::area(&rest) < 1e-4 {
         return None;
     }
-    Some(clip::rings(&rest))
+    let mut rings = clip::rings(&rest);
+    if min_fragment > 0.0 {
+        rings.retain(|g| g.len() >= 3 && signed_area(g).abs() >= min_fragment);
+        // nothing left to cut after all
+        if !rings.is_empty() && (total - clip::area(&clip::region(&rings))).abs() < 1e-4 {
+            return None;
+        }
+    }
+    Some(rings)
+}
+
+/// Does any part of the covers reach this wide (mm)? An outline or a thin
+/// border has no part as wide as a fill.
+pub fn has_width(covers: &[Cover], width: f64) -> bool {
+    if width <= 0.0 {
+        return true;
+    }
+    let r = covers_region(covers);
+    clip::area(&clip::offset(&r, -width / 2.0)) > 1e-6
+}
+
+/// Lines with the parts under the covers taken out; they still reach
+/// `margin` mm under a cover. Pieces shorter than `min_len` mm are dropped.
+/// `None` when nothing is hidden.
+pub fn clip_lines(lines: &[Vec<Point>], covers: &[Cover], margin: f64, min_len: f64) -> Option<Vec<Vec<Point>>> {
+    let hidden = clip::rings(&clip::offset(&covers_region(covers), -margin.max(0.0)));
+    if hidden.is_empty() {
+        return None;
+    }
+    let inside = |p: Point| crate::geom::point_in_rings(p, &hidden);
+    let mut out: Vec<Vec<Point>> = Vec::new();
+    let mut cut = false;
+    for line in lines {
+        let mut piece: Vec<Point> = Vec::new();
+        let flush = |piece: &mut Vec<Point>, out: &mut Vec<Vec<Point>>| {
+            if piece.len() >= 2 && crate::geom::polyline_length(piece) >= min_len {
+                out.push(std::mem::take(piece));
+            } else {
+                piece.clear();
+            }
+        };
+        for w in line.windows(2) {
+            let (a, b) = (w[0], w[1]);
+            let n = ((a.dist(b) / 0.2).ceil() as usize).max(1);
+            for k in 0..=n {
+                if k == 0 && !piece.is_empty() {
+                    continue;
+                }
+                let p = a.lerp(b, k as f64 / n as f64);
+                if inside(p) {
+                    cut = true;
+                    flush(&mut piece, &mut out);
+                } else {
+                    piece.push(p);
+                }
+            }
+        }
+        flush(&mut piece, &mut out);
+    }
+    if !cut {
+        return None;
+    }
+    // back to the drawn corners: drop the 0.2 mm samples on straight stretches
+    Some(out.into_iter().map(|l| simplify(&l)).collect())
+}
+
+/// Collinear points removed (the samples `clip_lines` adds).
+fn simplify(pts: &[Point]) -> Vec<Point> {
+    let mut out: Vec<Point> = Vec::with_capacity(pts.len());
+    for &p in pts {
+        if out.len() >= 2 {
+            let (a, b) = (out[out.len() - 2], out[out.len() - 1]);
+            let cross = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+            if cross.abs() < 1e-6 && (b.x - a.x) * (p.x - b.x) + (b.y - a.y) * (p.y - b.y) >= 0.0 {
+                out.pop();
+            }
+        }
+        out.push(p);
+    }
+    out
 }
 
 /// Union of the covers grown by `offset` mm (outline / backing / basting shape).
