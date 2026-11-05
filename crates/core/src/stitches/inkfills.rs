@@ -797,19 +797,26 @@ impl SpatialHash {
 }
 
 /// Flow fill options beyond the field: a row distance that changes over the
-/// shape (density ramps), streamlines that do not depend on the start point
-/// (every layer of a gradient shares them, so the colours interleave), and
-/// the parts of the lines this layer sews.
+/// shape (density ramps), lines shared by the colours of a gradient, and
+/// the travel rules.
 #[derive(Default)]
 pub struct FlowOpts<'a> {
     pub sep: Option<&'a dyn Fn(Point) -> f64>,
-    pub shared_lines: bool,
-    pub keep: Option<&'a dyn Fn(Point) -> bool>,
-    /// Where a later layer sews (it covers this line exactly): the layer may
-    /// travel along its line there, hidden, instead of jumping.
-    pub hidden: Option<&'a dyn Fn(Point) -> bool>,
-    /// Where lines may run at all (inside the shape): a gradient colour's
-    /// part of the shape.
+    /// Shared lines (gradients, colour blends): every colour traces the same
+    /// full-density streamlines, whatever the start point, and every point
+    /// of a line goes to one colour: `pick` gives it from the point and the
+    /// line's dither threshold (0..1). Neighbouring lines get thresholds far
+    /// apart (an ordered dither across the rows), so the colours interleave
+    /// by their shares and together sew every line once: the density stays
+    /// even.
+    pub pick: Option<&'a dyn Fn(Point, f64) -> usize>,
+    /// The colour this layer sews (with `pick`).
+    pub layer: usize,
+    /// The colours after this one are sewn later and cover their parts of
+    /// the lines: this layer travels along its line under them instead of
+    /// leaving it.
+    pub hide_later: bool,
+    /// Where lines may run at all (inside the shape).
     pub zone: Option<&'a dyn Fn(Point) -> bool>,
     /// Where a travel stitch between two lines may run (it lies on top of
     /// what is sewn there): elsewhere the lines are joined by a jump.
@@ -907,7 +914,50 @@ pub fn flow_ex(rings: &[Ring], field: &crate::model::FlowField, spacing: f64, st
         line
     };
     let mut queue: std::collections::VecDeque<Point> = std::collections::VecDeque::new();
-    let accept = |line: Vec<Point>, grid: &mut SpatialHash, queue: &mut std::collections::VecDeque<Point>, lines: &mut Vec<Vec<Point>>| {
+    // shared lines: every line's rank across the rows (its neighbours one
+    // apart), from the nearest line ranked before it and the side it is on
+    let ranked = o.pick.is_some();
+    let mut ranks: Vec<i64> = Vec::new();
+    let mut owner: Owners = Default::default();
+    let okey = |p: Point| ((p.x / dsep).floor() as i64, (p.y / dsep).floor() as i64);
+    let rank_line = |line: &[Point], seed: Point, id: usize, ranks: &mut Vec<i64>, owner: &mut Owners| {
+        let tan = |k: usize| {
+            let k = k.min(line.len() - 2);
+            (line[k + 1] - line[k]).unit()
+        };
+        let k0 = line.iter().position(|p| *p == seed).unwrap_or(0);
+        let reach = sep(seed) * 2.5;
+        let (kx, ky) = okey(seed);
+        let r = (reach / dsep).ceil() as i64;
+        let mut best: Option<(f64, Point, usize, Point)> = None;
+        for y in ky - r..=ky + r {
+            for x in kx - r..=kx + r {
+                for &(q, l, up) in owner.get(&(x, y)).into_iter().flatten() {
+                    let d = q.dist(seed);
+                    if d < reach && best.is_none_or(|b| d < b.0) {
+                        best = Some((d, q, l, up));
+                    }
+                }
+            }
+        }
+        let (rank, side) = match best {
+            Some((_, q, l, up)) => {
+                let d = (seed - q).dot(up) / sep(q);
+                let step = match d.round() as i64 {
+                    0 if d >= 0.0 => 1,
+                    0 => -1,
+                    s => s,
+                };
+                (ranks[l] + step, if tan(k0).perp().dot(up) >= 0.0 { 1.0 } else { -1.0 })
+            }
+            None => (0, 1.0),
+        };
+        ranks.push(rank);
+        for k in (0..line.len()).step_by(2) {
+            owner.entry(okey(line[k])).or_default().push((line[k], id, tan(k).perp() * side));
+        }
+    };
+    let accept = |line: Vec<Point>, seed: Point, grid: &mut SpatialHash, queue: &mut std::collections::VecDeque<Point>, lines: &mut Vec<Vec<Point>>, ranks: &mut Vec<i64>, owner: &mut Owners| {
         if line.is_empty() {
             return;
         }
@@ -917,6 +967,9 @@ pub fn flow_ex(rings: &[Ring], field: &crate::model::FlowField, spacing: f64, st
                 grid.add(*p);
             }
             return;
+        }
+        if ranked {
+            rank_line(&line, seed, lines.len(), ranks, owner);
         }
         // seeds beside the line, one separation away, about every separation
         let mut acc = f64::INFINITY;
@@ -935,7 +988,7 @@ pub fn flow_ex(rings: &[Ring], field: &crate::model::FlowField, spacing: f64, st
     };
     let centre = pt((b.min_x + b.max_x) / 2.0, (b.min_y + b.max_y) / 2.0);
     // shared lines: the same streamlines for every layer, whatever the start
-    let first_seed = if o.shared_lines { None } else { start.filter(|p| inside(*p)) };
+    let first_seed = if ranked { None } else { start.filter(|p| inside(*p)) };
     if let Some(s) = first_seed.or(Some(centre).filter(|p| inside(*p))) {
         queue.push_back(s);
     }
@@ -947,7 +1000,7 @@ pub fn flow_ex(rings: &[Ring], field: &crate::model::FlowField, spacing: f64, st
             }
             if inside(c) && !grid.near(c, sep(c) * 0.95) {
                 let line = trace(c, &grid, &mut budget);
-                accept(line, &mut grid, &mut queue, &mut lines);
+                accept(line, c, &mut grid, &mut queue, &mut lines, &mut ranks, &mut owner);
             }
         }
         // areas the seeds did not reach: scan for the next free spot
@@ -974,8 +1027,21 @@ pub fn flow_ex(rings: &[Ring], field: &crate::model::FlowField, spacing: f64, st
     // a gradient layer sews only its parts of every line; across the parts a
     // later layer sews it travels along the line, hidden (true = travel)
     // every point: (point, this layer sews it, a later layer covers it)
-    let marked: Result<Vec<Vec<(Point, bool, bool)>>, Vec<Vec<Point>>> = match o.keep {
-        Some(keep) => Ok(lines.into_iter().map(|l| l.into_iter().map(|p| (p, keep(p), o.hidden.is_some_and(|h| h(p)))).collect()).collect()),
+    let marked: Result<Vec<Vec<(Point, bool, bool)>>, Vec<Vec<Point>>> = match o.pick {
+        Some(pick) => {
+            // pieces shorter than this go to the colour beside them on the line
+            let min_piece = (base * 3.0).max(1.2);
+            Ok(lines
+                .into_iter()
+                .zip(ranks.iter())
+                .map(|(l, &rank)| {
+                    let tau = dither_threshold(rank);
+                    let mut lab: Vec<usize> = l.iter().map(|p| pick(*p, tau)).collect();
+                    merge_short_pieces(&mut lab, (min_piece / h).ceil() as usize);
+                    l.into_iter().zip(lab).map(|(p, c)| (p, c == o.layer, o.hide_later && c > o.layer)).collect()
+                })
+                .collect())
+        }
         None => Err(lines),
     };
     let lines: Vec<Vec<(Point, bool)>> = match marked {
@@ -1021,6 +1087,52 @@ pub fn flow_ex(rings: &[Ring], field: &crate::model::FlowField, spacing: f64, st
     };
     let order = order_lines(rings, lines, start.unwrap_or(pt(b.min_x, b.min_y)), dsep, o.travel, o.open, o.angle, &stitched);
     join_ordered(order, stitch_len, travel_len, o.sew, f)
+}
+
+/// Points of the ranked lines by grid cell: (point, line, the side its rank grows to).
+type Owners = std::collections::HashMap<(i64, i64), Vec<(Point, usize, Point)>>;
+
+/// The dither threshold of the line of rank `r` (0..1): the van der Corput
+/// sequence, so neighbouring ranks are half the range apart, every second
+/// rank a quarter, ... (a 1-D ordered dither across the rows).
+fn dither_threshold(r: i64) -> f64 {
+    let x = (r.rem_euclid(1 << 16) as u32).reverse_bits() >> 16;
+    (x as f64 + 0.5) / 65536.0
+}
+
+/// Runs of one colour along a line shorter than `min` points go to the
+/// longer run beside them (shortest first), so no colour sews a stub.
+fn merge_short_pieces(lab: &mut [usize], min: usize) {
+    loop {
+        // (start, end exclusive) of every run
+        let mut runs: Vec<(usize, usize)> = Vec::new();
+        let mut a = 0;
+        for k in 1..=lab.len() {
+            if k == lab.len() || lab[k] != lab[a] {
+                runs.push((a, k));
+                a = k;
+            }
+        }
+        if runs.len() < 2 {
+            return;
+        }
+        let Some((i, &(a, b))) = runs.iter().enumerate().filter(|(_, r)| r.1 - r.0 < min).min_by_key(|(_, r)| r.1 - r.0) else { return };
+        let len = |j: usize| runs[j].1 - runs[j].0;
+        let into = match (i.checked_sub(1), (i + 1 < runs.len()).then_some(i + 1)) {
+            (Some(p), Some(n)) => {
+                if len(p) >= len(n) {
+                    p
+                } else {
+                    n
+                }
+            }
+            (Some(p), None) => p,
+            (None, Some(n)) => n,
+            (None, None) => return,
+        };
+        let c = lab[runs[into].0];
+        lab[a..b].iter_mut().for_each(|x| *x = c);
+    }
 }
 
 /// Sew order of streamlines, with Ink/Stitch's travel rule: travel never

@@ -327,6 +327,9 @@ pub struct ShareGrid {
     v: Vec<f32>,
     /// The share of the colours sewn after this one (they cover it).
     later: Vec<f32>,
+    /// Every colour's running sum of shares (the last one is 1): which
+    /// colour sews a point of a shared line.
+    cum: Vec<Vec<f32>>,
 }
 
 impl ShareGrid {
@@ -338,14 +341,28 @@ impl ShareGrid {
         let k = g.layer as usize;
         let mut v = Vec::with_capacity(w * h);
         let mut later = Vec::with_capacity(w * h);
+        let n = g.stops.len().max(1);
+        let mut cum = vec![Vec::with_capacity(w * h); n - 1];
         for j in 0..h {
             for i in 0..w {
                 let wt = weights_at(g, pt(x0 + i as f64 * cell, y0 + j as f64 * cell));
                 v.push(wt.get(k).copied().unwrap_or(0.0) as f32);
                 later.push(wt.iter().skip(k + 1).sum::<f64>() as f32);
+                let mut acc = 0.0;
+                for (c, grid) in cum.iter_mut().enumerate() {
+                    acc += wt.get(c).copied().unwrap_or(0.0);
+                    grid.push(acc as f32);
+                }
             }
         }
-        ShareGrid { x0, y0, cell, w, h, v, later }
+        ShareGrid { x0, y0, cell, w, h, v, later, cum }
+    }
+
+    /// The colour that sews a point of a line with dither threshold `tau`
+    /// (0..1): every colour takes its share of the thresholds, so lines with
+    /// evenly spread thresholds split between the colours by their shares.
+    pub fn colour(&self, q: Point, tau: f64) -> usize {
+        self.cum.iter().take_while(|grid| self.sample(grid, q) <= tau).count()
     }
 
     /// The share at a point (bilinear).

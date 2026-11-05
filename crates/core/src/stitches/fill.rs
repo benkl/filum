@@ -1125,23 +1125,25 @@ fn curved_field(rings: &[Ring], p: &FillParams, strength: f64) -> crate::model::
     super::fields::shape_field(rings, base, strength)
 }
 
-/// A colour's lines stop where its share of a gradient falls below this.
+/// Where a colour's share falls below this its rows count as open (travel
+/// keeps to the edge there).
 const MIN_SHARE: f64 = 0.08;
 
 /// A streamline fill along a field, with a density ramp's row distance.
 ///
-/// Gradient layers blend by density: every colour sews its own continuous
-/// lines, as far apart as its share is small (a quarter share: four times the
-/// row distance), and the shares add up to the full density. Cutting shared
-/// lines into colour pieces instead needs a travel stitch between every two
-/// pieces — across the rows, on top of the other colours.
+/// The colours of a gradient (and the two of a colour blend) share one set
+/// of full-density lines: every point of a line is sewn by exactly one
+/// colour, picked by an ordered dither across the lines, so each colour
+/// takes about its share of the lines and the colours together sew every
+/// line once. The density stays even however the colours mix. A colour
+/// travels along its line under the parts a later colour sews.
 fn streamlines(rings: &[Ring], field: &crate::model::FlowField, p: &FillParams, spacing: f64, density: f64, start: Option<Point>) -> Vec<Run> {
     streamlines_sewn(rings, field, p, spacing, density, start, None)
 }
 
-/// Straight rows of a blended gradient: streamlines of a field that points
-/// along the fill angle everywhere (parallel rows, each colour as far apart
-/// as its share is small), their needle points staggered like tatami rows.
+/// Straight rows of a blended gradient or colour blend: streamlines of a
+/// field that points along the fill angle everywhere (parallel rows shared
+/// by the colours), their needle points staggered like tatami rows.
 fn straight_blend(rings: &[Ring], p: &FillParams, spacing: f64, density: f64, start: Option<Point>) -> Vec<Run> {
     let a = p.angle.to_radians();
     let b = rings_bounds(rings);
@@ -1162,25 +1164,51 @@ fn streamlines_sewn(rings: &[Ring], field: &crate::model::FlowField, p: &FillPar
     let a = p.angle.to_radians();
     let frame = p.ramp.as_ref().map(|r| RampFrame::new(r, density, a));
     let share = p.gradient.as_ref().map(|g| super::gradient::ShareGrid::new(g, rings, spacing));
-    let row = move |q: Point| frame.map_or(spacing, |rf| rf.spacing(q.rotate(a).y));
-    let sep = |q: Point| match &share {
-        Some(s) => row(q) / s.at(q).max(MIN_SHARE),
-        None => row(q),
+    // a colour blend: this layer's ramp and the other layer's opposite one,
+    // sewn as one set of lines at their summed density
+    let other = p.ramp.as_ref().filter(|r| r.additive && r.group.is_some() && share.is_none()).map(|r| crate::model::DensityRamp { reverse: !r.reverse, ..r.clone() });
+    let other_frame = other.as_ref().map(|r| RampFrame::new(r, density, a));
+    // the full row distance (all colours together)
+    let row = move |q: Point| {
+        let y = q.rotate(a).y;
+        match (frame, other_frame) {
+            (Some(f), Some(g)) => 1.0 / (1.0 / f.spacing(y) + 1.0 / g.spacing(y)),
+            (Some(f), None) => f.spacing(y),
+            _ => spacing,
+        }
     };
-    let zone = |q: Point| share.as_ref().is_none_or(|s| s.at(q) >= MIN_SHARE);
+    // this colour's share of the lines
+    let mine = |q: Point| match (&share, frame, other_frame) {
+        (Some(s), _, _) => s.at(q),
+        (None, Some(f), Some(_)) => row(q) / f.spacing(q.rotate(a).y),
+        _ => 1.0,
+    };
+    // the blend's first colour fades out (it is sewn first)
+    let blend_layer = usize::from(p.ramp.as_ref().is_some_and(|r| r.reverse));
+    let pick = |q: Point, tau: f64| match &share {
+        Some(s) => s.colour(q, tau),
+        None => {
+            let first = if blend_layer == 0 { mine(q) } else { 1.0 - mine(q) };
+            usize::from(tau >= first)
+        }
+    };
+    let shared = share.is_some() || other_frame.is_some();
     // travel never on the colours sewn before this one (it would lie on top
     // of them): under later colours or over its own it hardly shows; the
     // order of the lines keeps it off its own sewn lines where it can
     let travel = |q: Point| share.as_ref().is_none_or(|s| 1.0 - s.at(q) - s.later_at(q) <= 0.4);
-    // open rows (the row distance over the normal one): travel keeps to the edge there
-    let open = |q: Point| sep(q) / spacing.max(0.05);
+    // open rows (this colour's row distance over the normal one): travel keeps to the edge there
+    let open = |q: Point| row(q) / mine(q).max(MIN_SHARE) / spacing.max(0.05);
     let o = super::inkfills::FlowOpts {
-        sep: (frame.is_some() || share.is_some()).then_some(&sep as &dyn Fn(Point) -> f64),
-        zone: share.is_some().then_some(&zone as &dyn Fn(Point) -> bool),
+        sep: (frame.is_some() || shared).then_some(&row as &dyn Fn(Point) -> f64),
+        pick: shared.then_some(&pick as &dyn Fn(Point, f64) -> usize),
+        layer: p.gradient.as_ref().map_or(blend_layer, |g| g.layer as usize),
+        // a gradient's layers are sewn in order; a blend's may be reordered
+        hide_later: share.is_some(),
         travel: share.is_some().then_some(&travel as &dyn Fn(Point) -> bool),
         sew,
         angle: a,
-        open: (frame.is_some() || share.is_some()).then_some(&open as &dyn Fn(Point) -> f64),
+        open: (frame.is_some() || shared).then_some(&open as &dyn Fn(Point) -> f64),
         ..Default::default()
     };
     super::inkfills::flow_ex(rings, field, spacing, p.max_stitch_length, p.travel_length, start, &o, 0)
@@ -1333,7 +1361,12 @@ pub fn fill_on(paths: &[SubPath], p: &FillParams, fabric: &crate::model::FabricP
             r
         }
         // a blended gradient in straight rows
-        FillMethod::Tatami if p.gradient.as_ref().is_some_and(|g| g.mix == crate::model::GradientMix::Blend) => straight_blend(&rings, p, spacing, density, top_start),
+        // (and a colour blend: its two colours share the rows)
+        FillMethod::Tatami
+            if p.gradient.as_ref().is_some_and(|g| g.mix == crate::model::GradientMix::Blend) || (p.gradient.is_none() && p.ramp.as_ref().is_some_and(|r| r.additive && r.group.is_some())) =>
+        {
+            straight_blend(&rings, p, spacing, density, top_start)
+        }
         FillMethod::Cross => super::decor::cross_full_ex(
             &rings,
             p.angle,
@@ -1690,6 +1723,81 @@ mod tests {
         let (top, mid, bottom) = (band(&a, 0.0, 8.0) + band(&b, 0.0, 8.0), band(&a, 16.0, 24.0) + band(&b, 16.0, 24.0), band(&a, 32.0, 40.0) + band(&b, 32.0, 40.0));
         for v in [mid, bottom] {
             assert!((v - top).abs() / top < 0.15, "rows/mm {top:.2} {mid:.2} {bottom:.2}");
+        }
+    }
+
+    /// How evenly the colour layers of a fill cover it together: the share of
+    /// the inside further than `gap` from every sewn stitch, and the share of
+    /// sewn points with another layer's stitch closer than `crowd`.
+    fn coverage(layers: &[Vec<Run>], rings: &[Ring], gap: f64, crowd: f64) -> (f64, f64) {
+        let cell = 0.5;
+        let mut hash: std::collections::HashMap<(i64, i64), Vec<(Point, usize)>> = Default::default();
+        let key = |p: Point| ((p.x / cell).floor() as i64, (p.y / cell).floor() as i64);
+        for (l, runs) in layers.iter().enumerate() {
+            for w in runs.iter().flat_map(|r| r.windows(2)).filter(|w| w[1].1 == 0) {
+                let n = (w[0].0.dist(w[1].0) / 0.1).ceil().max(1.0) as usize;
+                for k in 0..=n {
+                    let q = w[0].0 + (w[1].0 - w[0].0) * (k as f64 / n as f64);
+                    hash.entry(key(q)).or_default().push((q, l));
+                }
+            }
+        }
+        let near = |q: Point, r: f64, skip: Option<usize>| {
+            let (kx, ky) = key(q);
+            (kx - 1..=kx + 1).any(|x| (ky - 1..=ky + 1).any(|y| hash.get(&(x, y)).is_some_and(|v| v.iter().any(|(p, l)| Some(*l) != skip && p.dist(q) < r))))
+        };
+        let b = rings_bounds(rings);
+        let (mut inside, mut holes) = (0usize, 0usize);
+        let mut y = b.min_y;
+        while y < b.max_y {
+            let mut x = b.min_x;
+            while x < b.max_x {
+                let q = pt(x, y);
+                if point_in_rings(q, rings) && dist_to_boundary(rings, q) > 1.5 {
+                    inside += 1;
+                    holes += usize::from(!near(q, gap, None));
+                }
+                x += 0.13;
+            }
+            y += 0.13;
+        }
+        let (mut sewn, mut crowded) = (0usize, 0usize);
+        for v in hash.values() {
+            for &(q, l) in v.iter().step_by(5) {
+                if dist_to_boundary(rings, q) > 1.5 {
+                    sewn += 1;
+                    crowded += usize::from(near(q, crowd, Some(l)));
+                }
+            }
+        }
+        (holes as f64 / inside.max(1) as f64, crowded as f64 / sewn.max(1) as f64)
+    }
+
+    #[test]
+    fn gradient_colours_together_cover_evenly() {
+        // the colours share one set of rows: no row left out, none on another
+        let oval: Ring = (0..72).map(|k| { let a = k as f64 / 72.0 * TAU; pt(20.0 + 18.0 * a.cos(), 15.0 + 12.0 * a.sin()) }).collect();
+        let paths = vec![SubPath::polyline(&oval, true)];
+        let rings = vec![oval];
+        let sp = 0.4;
+        let run = |p: FillParams| fill(&paths, &p, 0.0, 1.0, false, 1.0, None, None);
+        for method in [FillMethod::Curved, FillMethod::Tatami] {
+            // a two-colour gradient across the oval
+            let grad = |l: u32| GradientParams { from: [2.0, 15.0], to: [38.0, 15.0], layer: l, group: "g".into(), ..Default::default() };
+            let layers: Vec<Vec<Run>> = (0..2).map(|l| run(FillParams { method, row_spacing: sp, underlay: false, angle: 90.0, gradient: Some(grad(l)), ..Default::default() })).collect();
+            let (holes, crowded) = coverage(&layers, &rings, sp * 0.8, sp * 0.35);
+            assert!(holes < 0.005 && crowded < 0.02, "{method:?} gradient: holes {holes:.3}, crowded {crowded:.3}");
+            // both colours sew: each takes its side
+            assert!(layers.iter().all(|l| l.iter().flatten().filter(|x| x.1 == 0).count() > 200), "{method:?}");
+            // a colour blend: two opposite density ramps
+            let ramp = |reverse: bool| crate::model::DensityRamp { from: [2.0, 15.0], to: [38.0, 15.0], dense: sp, sparse: 4.0, additive: true, reverse, group: Some("b".into()), ..Default::default() };
+            let layers: Vec<Vec<Run>> = [false, true].iter().map(|&r| run(FillParams { method, row_spacing: sp, underlay: false, angle: 90.0, ramp: Some(ramp(r)), ..Default::default() })).collect();
+            let full = 1.0 / (1.0 / sp + 1.0 / 4.0);
+            let (holes, crowded) = coverage(&layers, &rings, full * 0.8, full * 0.35);
+            assert!(holes < 0.005 && crowded < 0.02, "{method:?} blend: holes {holes:.3}, crowded {crowded:.3}");
+            // the first colour where it is dense, the second where it fades in
+            let left = |runs: &Vec<Run>| { let xs: Vec<f64> = runs.iter().flatten().filter(|x| x.1 == 0).map(|x| x.0.x).collect(); xs.iter().filter(|x| **x < 20.0).count() as f64 / xs.len().max(1) as f64 };
+            assert!(left(&layers[0]) > 0.6 && left(&layers[1]) < 0.4, "{method:?} blend sides: {} {}", left(&layers[0]), left(&layers[1]));
         }
     }
 }

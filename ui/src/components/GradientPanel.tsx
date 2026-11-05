@@ -500,7 +500,7 @@ export function GradientSection({ group }: { group: string }) {
         <div className="grad-rows">
           <span className="stat">Mix</span>
           <div className="seg" role="group" aria-label="Mix">
-            <button className={mix === "blend" ? "on" : ""} title="Every colour sews its own rows, closer together where it is stronger (few jumps)" onClick={() => up({ mix: "blend" })}>
+            <button className={mix === "blend" ? "on" : ""} title="The colours share one set of rows: each row is sewn in one colour at a time, more of them where it is stronger, so the density stays even" onClick={() => up({ mix: "blend" })}>
               Blend
             </button>
             <button
@@ -523,8 +523,8 @@ export function GradientSection({ group }: { group: string }) {
         </p>
       ) : blended ? (
         <p className="hint grad-blend-note">
-          <b>Blended by density.</b> Every colour sews its own rows, closer together where it is stronger, and the colours add up to the full
-          density. {straight ? "Rows or Dither for a crisper mix." : "Flow and curved rows always blend."}
+          <b>Blended by rows.</b> The colours share one set of rows, each row sewn in one colour at a time, more of them where a colour is
+          stronger, so the density stays even. {straight ? "Rows or Dither for a crisper mix." : "Flow and curved rows always blend."}
         </p>
       ) : (
         <div className="dither-cards">

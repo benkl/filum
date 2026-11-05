@@ -39,6 +39,6 @@ Filum has three kinds of gradient. All of them use the **Gradient tool** (<kbd>G
 
   Transition curves (*Linear*, *Smooth*, *Ease in*, *Ease out*, *Sharp*, *Steps*) and per-stop midpoints shape the blend.
 - **Density gradients** (**Stitch → Gradient → Density gradient**): one colour that is dense where you start dragging and open where you stop. It's the classic shading effect.
-- **Colour blending** (**Stitch → Gradient → Colour blending**): a second colour fades in over the first, using complementary densities.
+- **Colour blending** (**Stitch → Gradient → Colour blending**): a second colour fades in over the first, using complementary densities. Both colours sew one shared set of rows, each row in one colour at a time, so the fill keeps an even density through the blend. Curved and flow fills do the same for colour gradients.
 
 The density and blend profiles are *Linear*, *Ease in*, *Ease out*, *S-curve*, *Centre dense* and *Centre open*.

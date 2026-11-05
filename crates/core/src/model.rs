@@ -953,9 +953,10 @@ pub enum TransitionCurve {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub enum GradientMix {
-    /// Every colour sews its own rows, closer together where it is stronger;
-    /// the colours add up to the full density (colour blending). Few
-    /// jumps: the rows of a colour run on unbroken.
+    /// The colours share one set of full-density rows: every stretch of a
+    /// row is sewn by one colour, picked by an ordered dither across the
+    /// rows, so a colour takes more rows where it is stronger and the
+    /// density stays even. A row changes colour where its colour fades.
     #[default]
     Blend,
     /// The rows are cut into cells, each sewn in one colour (dithered): a
