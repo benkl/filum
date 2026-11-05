@@ -950,23 +950,25 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
                 {output === "shapes" && !settings.photoZigzag && (
                   <Group title="Look" hint="Each control moves several settings of the tabs together; it shows Custom once those are changed by hand.">
                     <Row label="Outlines" title="Lines of the picture: none, as wide as drawn, or one even satin width (clean logo outlines, sewn as one network; below 1 mm a triple running stitch)">
-                      <span className="dz-inline">
-                        <Seg<Outlines>
-                          value={outlinesOf(settings)}
-                          onChange={(v) => set(outlinesPatch(v, settings.outlineLineMm || OUTLINE_DEFAULT_MM))}
-                          options={[
-                            ["off", "None"],
-                            ["drawn", "As drawn"],
-                            ["even", "Even"],
-                          ]}
-                        />
-                        {outlinesOf(settings) === "even" && (
-                          <Num value={settings.outlineLineMm} unit="mm" step={0.1} min={0.5} max={4} digits={1} onChange={(v) => set({ outlineLineMm: v })} />
-                        )}
-                      </span>
+                      <Seg<Outlines>
+                        full
+                        value={outlinesOf(settings)}
+                        onChange={(v) => set(outlinesPatch(v, settings.outlineLineMm || OUTLINE_DEFAULT_MM))}
+                        options={[
+                          ["off", "None"],
+                          ["drawn", "As drawn"],
+                          ["even", "Even"],
+                        ]}
+                      />
                     </Row>
+                    {outlinesOf(settings) === "even" && (
+                      <Row label="Outline width" title="Every dark line becomes a satin of this width (below 1 mm: a triple running stitch)">
+                        <Slider min={0.5} max={4} step={0.1} unit="mm" value={settings.outlineLineMm} onChange={(v) => set({ outlineLineMm: v })} />
+                      </Row>
+                    )}
                     <Row label="Detail" title="Bold: fewer, simpler shapes. Fine: small shapes and close tracing (more stitches, more trims)">
                       <Seg<Detail | "custom">
+                        full
                         value={detailOf(settings) ?? "custom"}
                         onChange={(v) => v !== "custom" && set(DETAIL[v])}
                         options={[
@@ -977,31 +979,35 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
                         ]}
                       />
                     </Row>
-                    <Row label="Background" title="The colour around the design: left out (the fabric shows, also in plain holes), left out only outside the design (every enclosed area stitched), or stitched">
+                    <Row label="Background" title="The background colour: left out around the design and in plain holes (letter counters), left out only around it (every enclosed area stitched: a logo's white faces), or stitched everywhere">
                       <Seg<Backdrop>
+                        full
                         value={backdropOf(settings)}
                         onChange={(v) => set(backdropPatch(v))}
                         options={[
-                          ["fabric", "Fabric shows"],
-                          ["enclosed", "Fill enclosed"],
-                          ["all", "Stitch all"],
+                          ["fabric", "Left out"],
+                          ["enclosed", "Enclosed"],
+                          ["all", "Stitched"],
                         ]}
                       />
                     </Row>
                     <Row label="Border" title="An outline around the whole design (patches, stickers)">
-                      <span className="dz-inline">
-                        <Seg
-                          value={settings.outline}
-                          onChange={(v) => set({ outline: v })}
-                          options={[
-                            ["none", "None"],
-                            ["running", "Running"],
-                            ["satin", "Satin"],
-                          ]}
-                        />
-                        {settings.outline === "satin" && <Num value={settings.outlineWidthMm} unit="mm" step={0.1} min={0.8} max={6} digits={1} onChange={(v) => set({ outlineWidthMm: v })} />}
-                      </span>
+                      <Seg
+                        full
+                        value={settings.outline}
+                        onChange={(v) => set({ outline: v })}
+                        options={[
+                          ["none", "None"],
+                          ["running", "Running"],
+                          ["satin", "Satin"],
+                        ]}
+                      />
                     </Row>
+                    {settings.outline === "satin" && (
+                      <Row label="Border width">
+                        <Slider min={0.8} max={6} step={0.1} unit="mm" value={settings.outlineWidthMm} onChange={(v) => set({ outlineWidthMm: v })} />
+                      </Row>
+                    )}
                   </Group>
                 )}
                 {output === "shapes" && settings.photoZigzag && (

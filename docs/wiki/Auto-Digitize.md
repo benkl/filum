@@ -28,7 +28,7 @@ Under the presets, **Look** has four quick controls. Each one sets several of th
 
 - **Outlines**: *None*, *As drawn*, or *Even*: every dark line of the picture becomes a satin of the width you set (1.2 mm to start; below 1 mm a column is too narrow to sew cleanly, so it becomes a triple running stitch). Lines that meet are sewn in one go. Each line walks out under a running stitch that its satin covers on the way back, so there are no trims between them.
 - **Detail**: *Bold* (fewer, simpler shapes), *Normal* or *Fine* (small shapes, close tracing, more stitches and trims).
-- **Background**: *Fabric shows* (the background colour is left out, also in plain holes such as letter counters), *Fill enclosed* (left out only around the design: a logo's white faces inside its outlines are stitched), or *Stitch all*.
+- **Background**: *Left out* (around the design and in plain holes such as letter counters), *Enclosed* (left out only around the design: a logo's white faces inside its outlines are stitched), or *Stitched*.
 - **Border**: an outline around the whole design, as running stitch or satin (patches, stickers).
 
 Then set the **size**, or click *Fit hoop*.
