@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { engine } from "../engine/client";
-import { useStore } from "../store";
+import { planOf, useStore } from "../store";
 import { FLAG, type DesignObject, type DesignOptions, type Fabric, type PlanData, type StitchDocument, type SubPath } from "../types";
 import { defaultDesignOptions } from "./geometry";
 
@@ -105,7 +105,15 @@ export function hiddenReport(doc: StitchDocument): Promise<HiddenReport> {
   const hit = reports.get(doc);
   if (hit) return hit;
   const opts = { ...defaultDesignOptions(), ...doc.options };
-  const p = Promise.all([engine.planDetached({ ...doc, options: { ...opts, removeOverlaps: false } }), engine.planDetached({ ...doc, options: { ...opts, removeOverlaps: true } }), engine.stitchedShapes({ ...doc, options: { ...opts, removeOverlaps: true } })]).then(
+  const on = { ...doc, options: { ...opts, removeOverlaps: true } };
+  // with removal: the editor's own plan of this document when it has one
+  // (removal is on whenever the report is asked for), else one of its own
+  const own = hiddenOptions(doc.options).removeOverlaps ? planOf.get(doc) : undefined;
+  const p = Promise.all([
+    engine.planLatest("hidden-without", { ...doc, options: { ...opts, removeOverlaps: false } }),
+    own ? Promise.resolve(own) : engine.planLatest("hidden-with", on),
+    engine.stitchedShapesLatest("hidden-shapes", on),
+  ]).then(
     ([without, withIt, shapes]) => {
       const a = perObject(without);
       const b = perObject(withIt);
@@ -119,6 +127,8 @@ export function hiddenReport(doc: StitchDocument): Promise<HiddenReport> {
     },
   );
   reports.set(doc, p);
+  // a superseded request (a newer document came) is not remembered
+  p.catch(() => reports.delete(doc));
   return p;
 }
 
@@ -154,8 +164,10 @@ useStore.subscribe((s, p) => {
   }
   const doc = s.doc;
   timer = setTimeout(() => {
-    hiddenReport(doc)
-      .then((r) => useStore.getState().doc === doc && useStore.setState({ hiddenShapes: r.shapes }))
+    // the preview needs only the cut shapes, not the report's plans
+    engine
+      .stitchedShapesLatest("hidden-preview", { ...doc, options: { ...defaultDesignOptions(), ...doc.options, removeOverlaps: true } })
+      .then((shapes) => useStore.getState().doc === doc && useStore.setState({ hiddenShapes: shapes }))
       .catch(() => {});
   }, 300);
 });

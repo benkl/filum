@@ -40,6 +40,8 @@ class EngineClient {
   private pending = new Map<number, Pending>();
   private planBusy = false;
   private planQueued: { json: string; resolve: (p: PlanData) => void; reject: (e: Error) => void } | null = null;
+  /** Latest-wins lanes for side requests (reports, previews): one running, the newest queued. */
+  private lanes = new Map<string, { busy: boolean; queued: { op: string; args: unknown[]; resolve: (v: unknown) => void; reject: (e: Error) => void } | null }>();
 
   constructor() {
     this.worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
@@ -59,6 +61,43 @@ class EngineClient {
       this.pending.set(id, { resolve: resolve as (v: unknown) => void, reject });
       this.worker.postMessage({ id, op, args }, transfer);
     });
+  }
+
+  /** A side request in its own latest-wins lane: a newer one replaces the queued one
+   *  (which rejects with "superseded"), so edits never pile requests up on the worker. */
+  latest<T>(lane: string, op: string, args: unknown[]): Promise<T> {
+    let l = this.lanes.get(lane);
+    if (!l) this.lanes.set(lane, (l = { busy: false, queued: null }));
+    const state = l;
+    return new Promise<T>((resolve, reject) => {
+      const job = { op, args, resolve: resolve as (v: unknown) => void, reject };
+      if (state.busy) {
+        state.queued?.reject(new Error("superseded"));
+        state.queued = job;
+        return;
+      }
+      const run = (j: typeof job) => {
+        state.busy = true;
+        this.call<unknown>(j.op, j.args)
+          .then(j.resolve, j.reject)
+          .finally(() => {
+            state.busy = false;
+            const q = state.queued;
+            state.queued = null;
+            if (q) run(q);
+          });
+      };
+      run(job);
+    });
+  }
+
+  /** A plan in a latest-wins lane of its own (not the editor's). */
+  planLatest(lane: string, doc: StitchDocument) {
+    return this.latest<PlanData>(lane, "plan", [engineJson(doc)]);
+  }
+  /** Stitched shapes in a latest-wins lane. */
+  stitchedShapesLatest(lane: string, doc: StitchDocument) {
+    return this.latest<{ index: number; paths: SubPath[] }[]>(lane, "stitchedShapes", [engineJson(doc)]);
   }
 
   /** Latest-wins plan computation. */

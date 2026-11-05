@@ -465,6 +465,9 @@ export const useStore = create<State>((set, get) => ({
   },
 }));
 
+/** The plan of each document the editor planned (side views reuse it instead of planning again). */
+export const planOf = new WeakMap<StitchDocument, PlanData>();
+
 // Re-plan whenever the document changes (latest wins inside the client).
 let planTimer: ReturnType<typeof setTimeout> | null = null;
 let lastPlanned: StitchDocument | null = null;
@@ -484,7 +487,10 @@ useStore.subscribe((s) => {
     useStore.setState({ planning: true });
     engine
       .plan(doc)
-      .then((plan) => useStore.setState({ plan, planning: false, planError: null }))
+      .then((plan) => {
+        planOf.set(doc, plan);
+        useStore.setState({ plan, planning: false, planError: null });
+      })
       .catch((e: Error) => {
         if (e.message !== "superseded") useStore.setState({ planning: false, planError: e.message });
       });
