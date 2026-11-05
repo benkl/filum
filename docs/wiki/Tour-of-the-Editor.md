@@ -36,6 +36,8 @@ The **View** menu has more: jump stitches, underlay, a grid, smart guides, and a
 
 **Layers** lists your objects. The top row is sewn **last**, so it sits on top. Drag rows to change the sew order, click the eye to hide an object, and tick boxes to select several. The **References** list underneath holds pictures you've placed to trace over. They're never stitched.
 
+A **group** (<kbd>Ctrl</kbd>+<kbd>G</kbd>) shows as one header row with its name, how many objects it holds and their thread colours; its members are listed indented under it. Click the arrow (or press <kbd>←</kbd> / <kbd>→</kbd> on a focused header) to fold or unfold it, and the button at the top of the panel folds or unfolds every group at once. Clicking the header selects the whole group, its eye and lock buttons act on all members, and a double-click renames it. Grouping gathers the objects at the place of the topmost one in the sew order. Drag a header to move the whole group; drag an object onto a group's member to put it in the group, or out of the group's rows to take it out. The colour layers of a gradient or tartan show as a group too, and always stay together.
+
 **Issues** checks the design while you work. It flags things like shapes outside the hoop, borders that cross themselves, satins that are too wide or too narrow, lettering too small for the thread, and long stitches that may snag. Click an issue to jump to it. Many issues have a fix button, and **Clean up** removes tiny leftover objects.
 
 ![The Issues tab](images/issues.webp)
