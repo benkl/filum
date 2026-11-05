@@ -673,6 +673,123 @@ pub fn dist_to_boundary(rings: &[Ring], p: Point) -> f64 {
     best
 }
 
+/// Distance from a point to the segment a–b (as `dist_to_boundary` measures it).
+#[inline]
+fn seg_dist(p: Point, a: Point, b: Point) -> f64 {
+    let ab = b - a;
+    let l2 = ab.length_sq();
+    let t = if l2 < 1e-18 { 0.0 } else { ((p - a).dot(ab) / l2).clamp(0.0, 1.0) };
+    (a + ab * t).dist(p)
+}
+
+/// `dist_to_boundary` for many points of one region: the outline's segments
+/// in a grid, searched outwards from the point until no unvisited segment
+/// can be nearer. The result is the same number: the minimum of the same
+/// per-segment distances (a segment left out lies wholly outside the
+/// searched square, further than the nearest one found).
+pub struct BoundaryDist {
+    segs: Vec<(Point, Point)>,
+    x0: f64,
+    y0: f64,
+    cell: f64,
+    w: i64,
+    h: i64,
+    cells: Vec<Vec<u32>>,
+}
+
+impl BoundaryDist {
+    pub fn new(rings: &[Ring]) -> BoundaryDist {
+        let mut segs = Vec::new();
+        for ring in rings {
+            let n = ring.len();
+            for i in 0..n {
+                segs.push((ring[i], ring[(i + 1) % n]));
+            }
+        }
+        let b = rings_bounds(rings);
+        if segs.is_empty() || b.is_empty() {
+            return BoundaryDist { segs, x0: 0.0, y0: 0.0, cell: 1.0, w: 0, h: 0, cells: Vec::new() };
+        }
+        let (bw, bh) = (b.width().max(1e-6), b.height().max(1e-6));
+        let cell = (bw * bh / segs.len() as f64).sqrt().max(bw.max(bh) / 256.0).max(1e-3);
+        let (w, h) = ((bw / cell).floor() as i64 + 1, (bh / cell).floor() as i64 + 1);
+        let mut g = BoundaryDist { segs, x0: b.min_x, y0: b.min_y, cell, w, h, cells: vec![Vec::new(); (w * h) as usize] };
+        // every cell the segment's box touches (a little grown: no segment is
+        // missed in a cell it ends on)
+        let eps = 1e-9 * (1.0 + bw + bh);
+        for (k, &(a, c)) in g.segs.iter().enumerate() {
+            let (i0, j0) = g.key(pt(a.x.min(c.x) - eps, a.y.min(c.y) - eps));
+            let (i1, j1) = g.key(pt(a.x.max(c.x) + eps, a.y.max(c.y) + eps));
+            for j in j0.max(0)..=j1.min(h - 1) {
+                for i in i0.max(0)..=i1.min(w - 1) {
+                    g.cells[(j * w + i) as usize].push(k as u32);
+                }
+            }
+        }
+        g
+    }
+
+    fn key(&self, p: Point) -> (i64, i64) {
+        (((p.x - self.x0) / self.cell).floor() as i64, ((p.y - self.y0) / self.cell).floor() as i64)
+    }
+
+    /// Exactly `dist_to_boundary(rings, p)`.
+    pub fn dist(&self, p: Point) -> f64 {
+        let mut best = f64::INFINITY;
+        if self.cells.is_empty() {
+            for &(a, b) in &self.segs {
+                best = best.min(seg_dist(p, a, b));
+            }
+            return best;
+        }
+        let (ci, cj) = self.key(p);
+        let (w, h) = (self.w, self.h);
+        let lim = 2 * (w + h) + 2;
+        if ci < -lim || cj < -lim || ci > lim || cj > lim {
+            // far away (or not a number): the plain scan
+            for &(a, b) in &self.segs {
+                best = best.min(seg_dist(p, a, b));
+            }
+            return best;
+        }
+        let visit = |i: i64, j: i64, best: &mut f64| {
+            for &k in &self.cells[(j * w + i) as usize] {
+                let (a, b) = self.segs[k as usize];
+                *best = best.min(seg_dist(p, a, b));
+            }
+        };
+        // square rings of cells around the point, from the first that meets
+        // the grid to the one that holds all of it
+        let first = 0.max(-ci).max(ci - (w - 1)).max(-cj).max(cj - (h - 1));
+        let last = ci.max(w - 1 - ci).max(cj).max(h - 1 - cj);
+        for r in first..=last {
+            for j in (cj - r).max(0)..=(cj + r).min(h - 1) {
+                if j == cj - r || j == cj + r {
+                    for i in (ci - r).max(0)..=(ci + r).min(w - 1) {
+                        visit(i, j, &mut best);
+                    }
+                } else {
+                    for i in [ci - r, ci + r] {
+                        if i >= 0 && i < w {
+                            visit(i, j, &mut best);
+                        }
+                    }
+                }
+            }
+            // every point outside the square searched is at least this far
+            let lo_x = self.x0 + (ci - r) as f64 * self.cell;
+            let hi_x = self.x0 + (ci + r + 1) as f64 * self.cell;
+            let lo_y = self.y0 + (cj - r) as f64 * self.cell;
+            let hi_y = self.y0 + (cj + r + 1) as f64 * self.cell;
+            let clear = (p.x - lo_x).min(hi_x - p.x).min(p.y - lo_y).min(hi_y - p.y);
+            if best < clear - 1e-9 * (1.0 + clear.abs()) {
+                return best;
+            }
+        }
+        best
+    }
+}
+
 /// 1-D squared distance transform (Felzenszwalb & Huttenlocher 2012).
 fn edt_1d(f: &[f64], d: &mut [f64], v: &mut [usize], z: &mut [f64]) {
     let n = f.len();
@@ -925,6 +1042,22 @@ pub fn trace_contours(grid: &[bool], w: usize, h: usize) -> Vec<Ring> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn boundary_grid_measures_exactly_as_the_plain_scan() {
+        // a wavy ring with a hole, a thin sliver and a lone segment; points inside, outside and far away
+        let outer: Ring = (0..300).map(|k| { let a = k as f64 / 300.0 * std::f64::consts::TAU; let r = 20.0 + 3.0 * (7.0 * a).sin(); pt(25.0 + r * a.cos(), 22.0 + 0.7 * r * a.sin()) }).collect();
+        let hole: Ring = (0..40).rev().map(|k| { let a = k as f64 / 40.0 * std::f64::consts::TAU; pt(25.0 + 5.0 * a.cos(), 22.0 + 4.0 * a.sin()) }).collect();
+        let sliver = vec![pt(60.0, 0.0), pt(90.0, 0.01), pt(60.0, 0.02)];
+        for rings in [vec![outer.clone(), hole], vec![sliver], vec![vec![pt(1.0, 1.0), pt(1.0, 1.0)]], vec![outer]] {
+            let g = BoundaryDist::new(&rings);
+            let mut rng = crate::prng::Stream::new(7, 1);
+            for _ in 0..4000 {
+                let p = pt(rng.next() * 140.0 - 30.0, rng.next() * 100.0 - 30.0);
+                assert_eq!(g.dist(p).to_bits(), dist_to_boundary(&rings, p).to_bits(), "{p:?}");
+            }
+        }
+    }
 
     fn square(s: f64) -> Ring {
         vec![pt(0.0, 0.0), pt(s, 0.0), pt(s, s), pt(0.0, s)]

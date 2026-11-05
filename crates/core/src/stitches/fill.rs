@@ -420,18 +420,31 @@ pub fn tatami_ramp(
     let mut run: Run = Vec::new();
     let mut pos = middle.or(start.map(|p| p.rotate(a)));
     // travel between sections: Ink/Stitch's travel graph (rows horizontal
-    // in this frame); sewn rows close the edges across them
-    let mut graph = super::travel::TravelGraph::new(&rr, 0.0);
-    // alternate rows: every colour travels along the outline only (Ink/Stitch's
-    // linear gradient fill sews its colours with underpath off); so does a
-    // fill with underpath switched off
-    if rows_mix.is_some() || NO_UNDERPATH.with(|c| c.get()) {
-        graph.forbid(&|_| false);
-    }
-    // a density ramp's open end: travel keeps to the edge there
-    if let Some(rf) = frame {
-        graph.open(&|q: Point| rf.spacing(q.y) / spacing.max(0.05));
-    }
+    // in this frame); sewn rows close the edges across them. Built when a
+    // travel first needs it (a fill of one section never does), with the
+    // rows sewn until then
+    let no_underpath = rows_mix.is_some() || NO_UNDERPATH.with(|c| c.get());
+    let mut graph: Option<super::travel::TravelGraph> = None;
+    let mut sewn_before: Vec<(Point, Point)> = Vec::new();
+    let travel_graph = |graph: &mut Option<super::travel::TravelGraph>, sewn_before: &mut Vec<(Point, Point)>| {
+        if graph.is_none() {
+            let mut g = super::travel::TravelGraph::new(&rr, 0.0);
+            // alternate rows: every colour travels along the outline only (Ink/Stitch's
+            // linear gradient fill sews its colours with underpath off); so does a
+            // fill with underpath switched off
+            if no_underpath {
+                g.forbid(&|_| false);
+            }
+            // a density ramp's open end: travel keeps to the edge there
+            if let Some(rf) = frame {
+                g.open(&|q: Point| rf.spacing(q.y) / spacing.max(0.05));
+            }
+            for (a, b) in sewn_before.drain(..) {
+                g.sewn(&[a, b], false);
+            }
+            *graph = Some(g);
+        }
+    };
     // with an end point, the section that can finish closest to it is sewn last
     let end_r = end.map(|p| p.rotate(a));
     let last_section = end_r.and_then(|e| {
@@ -474,8 +487,10 @@ pub fn tatami_ramp(
         let si = remaining.remove(best.0);
         let sec = &grating.sections[si];
         let (entry, top, ltr0) = section_entries(sec)[best.1];
-        // connect
-        if let Some(p) = pos {
+        // connect (into the first run there is nothing to travel from)
+        if let Some(p) = pos.filter(|_| !run.is_empty()) {
+            travel_graph(&mut graph, &mut sewn_before);
+            let graph = graph.as_ref().unwrap();
             match graph.route(p, entry).or_else(|| travel_path(&rr, p, entry).filter(|path| path.windows(2).all(|w| !graph.crosses_sewn(w[0], w[1])))) {
                 // every corner of the route kept (it goes round sewn rows)
                 Some(path) if !run.is_empty() => {
@@ -541,7 +556,8 @@ pub fn tatami_ramp(
                     }
                     // alternate rows: never straight across the other colours' rows
                     if !followed && rows_mix.is_some() {
-                        match graph.route(prev, start) {
+                        travel_graph(&mut graph, &mut sewn_before);
+                        match graph.as_ref().unwrap().route(prev, start) {
                             Some(path) => {
                                 for q in resample_max(&path, travel_len.max(0.5)).into_iter().skip(1) {
                                     push(&mut run, q, f | flags::TRAVEL);
@@ -609,7 +625,10 @@ pub fn tatami_ramp(
                 None => vec![(*x0, *x1)],
             };
             for (p0, p1) in pieces {
-                graph.sewn(&[pt(p0, *y), pt(p1, *y)], false);
+                match graph.as_mut() {
+                    Some(g) => g.sewn(&[pt(p0, *y), pt(p1, *y)], false),
+                    None => sewn_before.push((pt(p0, *y), pt(p1, *y))),
+                }
             }
         }
         pos = run.last().map(|x| x.0);
