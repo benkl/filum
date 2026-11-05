@@ -6,6 +6,7 @@
 import { engine } from "../engine/client";
 import { useStore } from "../store";
 import type { DesignObject, StitchDocument, StitchParams, SubPath, Vec2 } from "../types";
+import { gatherAtTop, nextGroupName, pruneGroups } from "./layerRows";
 import { defaultApplique, defaultFill, defaultRunning, defaultSatin, normAngle, objectBounds, rotateAbout, scaleAbout, transformObject, translateMat, uid, unionBoxes, type Box } from "./geometry";
 
 type Mat = [number, number, number, number, number, number];
@@ -346,29 +347,30 @@ export async function overlapSavings(doc: StitchDocument): Promise<{ before: num
 // ---------------------------------------------------------------------------
 // Groups and shape booleans
 
-/** Group the selection: it is then picked, moved and transformed as one (Ctrl+G). */
+/**
+ * Group the selection: it is then picked, moved and transformed as one (Ctrl+G).
+ * The members are gathered in stitch order at the topmost one, so a group is
+ * one block in the Layers tab (see lib/layerRows).
+ */
 export function groupSelection() {
   const s = store();
   if (s.selection.length < 2) return s.toast("Select two or more objects to group");
   const g = uid("g");
-  s.commit((d) => ({ ...d, objects: d.objects.map((o) => (s.selection.includes(o.id) ? { ...o, group: g } : o)) }));
+  const sel = new Set(s.selection);
+  s.commit((d) => {
+    const name = nextGroupName(d);
+    const objects = gatherAtTop(d.objects.map((o) => (sel.has(o.id) ? { ...o, group: g } : o)), sel);
+    return pruneGroups({ ...d, objects, groupNames: { ...d.groupNames, [g]: name } });
+  });
   s.toast(`Grouped ${s.selection.length} objects · Ctrl-click picks one inside`);
 }
 
 /** Ungroup (Ctrl+Shift+G). Gradient colour layers stay one gradient. */
 export function ungroupSelection() {
   const s = store();
-  let n = 0;
-  s.commit((d) => ({
-    ...d,
-    objects: d.objects.map((o) => {
-      if (!s.selection.includes(o.id) || !o.group) return o;
-      if (o.stitch.type === "fill" && o.stitch.gradient?.group === o.group) return o;
-      n++;
-      return { ...o, group: undefined };
-    }),
-  }));
-  if (!n) s.toast("Nothing to ungroup");
+  const out = (o: DesignObject) => s.selection.includes(o.id) && !!o.group && !(o.stitch.type === "fill" && o.stitch.gradient?.group === o.group);
+  if (!s.doc.objects.some(out)) return s.toast("Nothing to ungroup");
+  s.commit((d) => pruneGroups({ ...d, objects: d.objects.map((o) => (out(o) ? { ...o, group: undefined } : o)) }));
 }
 
 export type ShapeBooleanOp = "unite" | "minusFront" | "intersect" | "exclude";

@@ -1,4 +1,4 @@
-import { ChevronDown, Info, OctagonAlert, Shapes, TriangleAlert, type LucideIcon, ChevronUp, Eye, EyeOff, GripVertical, ImagePlus, Lock, Move, Sparkles, Trash2, Type, Unlock } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Info, OctagonAlert, Shapes, TriangleAlert, type LucideIcon, ChevronUp, Eye, EyeOff, GripVertical, ImagePlus, Lock, Move, Sparkles, Trash2, Type, Unlock } from "lucide-react";
 import { HiddenStitchingSection, ObjectHiddenSection } from "./HiddenStitching";
 import { DensityMap, Hoop, StitchFill, StitchRunning, StitchSatin } from "../icons/stitch";
 import { CommandsSection } from "./CommandsSection";
@@ -19,7 +19,9 @@ import { MeanderPicker } from "./MeanderPicker";
 import { GradientSection } from "./GradientPanel";
 import { ThreadCard, ThreadPicker } from "./ThreadPicker";
 import { computeIssues, type Issue } from "../lib/issues";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
+import { buildLayerRows, dropRow, groupInfo, moveBlock, pruneGroups, type GroupLayerRow as GroupRow, type ObjectLayerRow as ObjectRow } from "../lib/layerRows";
 import {
   defaultDesignOptions,
   defaultGuide,
@@ -72,18 +74,6 @@ function Thumb({ o, color }: { o: DesignObject; color: string }) {
   return <canvas ref={ref} className="thumb" style={{ width: 26, height: 26 }} />;
 }
 
-/** What a layer row does; one stable object, so rows only re-render when their own object changes. */
-interface LayerCtl {
-  select: (o: DesignObject, e: React.MouseEvent) => void;
-  check: (o: DesignObject, on: boolean) => void;
-  dragStart: (o: DesignObject) => void;
-  dragOver: (i: number) => void;
-  drop: (i: number) => void;
-  dragEnd: () => void;
-  rename: (id: string | null) => void;
-  toggle: (o: DesignObject) => void;
-}
-
 /** How bad an issue is: a shape of its own per level (never colour alone). */
 const SEVERITY: Record<Issue["level"], LucideIcon> = { error: OctagonAlert, warning: TriangleAlert, info: Info };
 
@@ -106,34 +96,94 @@ function SeverityIcon({ level }: { level: Issue["level"] }) {
   return <Icon size={14} className={`lvl-${level}`} aria-label={level} />;
 }
 
-const LayerRow = memo(function LayerRow({ o, i, n, sel, color, dropAbove, renaming, ctl }: { o: DesignObject; i: number; n: number; sel: boolean; color: string; dropAbove: boolean; renaming: boolean; ctl: LayerCtl }) {
+/** What the layer rows do, by row key; one stable object, so rows only re-render when their own data changes. */
+interface LayerCtl {
+  select: (key: string, e: React.MouseEvent | React.KeyboardEvent) => void;
+  check: (key: string, on: boolean) => void;
+  dragStart: (key: string) => void;
+  dragOver: (key: string) => void;
+  drop: (key: string) => void;
+  dragEnd: () => void;
+  rename: (key: string | null) => void;
+  toggle: (o: DesignObject) => void;
+  fold: (group: string, folded: boolean) => void;
+  showGroup: (key: string) => void;
+  lockGroup: (key: string) => void;
+  renameGroup: (group: string, name: string) => void;
+  stepGroup: (key: string, dir: 1 | -1) => void;
+}
+
+/** Fold or unfold groups in the Layers tab (remembered with the view settings, never undone). */
+export function setGroupsFolded(groups: string[], folded: boolean) {
+  const s = useStore.getState();
+  const rest = s.foldedGroups.filter((g) => !groups.includes(g));
+  s.set({ foldedGroups: folded ? [...rest, ...groups].slice(-500) : rest });
+}
+
+/** Panel header button: fold every group, or unfold them all when all are folded. */
+export function FoldAllGroups() {
+  const groups = useStore(useShallow((s) => [...new Set(s.doc.objects.map((o) => o.group).filter((g): g is string => !!g))]));
+  const folded = useStore((s) => s.foldedGroups);
+  if (!groups.length) return null;
+  const allFolded = groups.every((g) => folded.includes(g));
+  const label = allFolded ? "Expand all groups" : "Collapse all groups";
+  return (
+    <button className="icon-btn" title={label} aria-label={label} onClick={() => setGroupsFolded(groups, !allFolded)}>
+      {allFolded ? <ChevronsUpDown size={14} /> : <ChevronsDownUp size={14} />}
+    </button>
+  );
+}
+
+const LayerRow = memo(function LayerRow({
+  o,
+  rowKey,
+  i,
+  n,
+  sel,
+  color,
+  drop,
+  renaming,
+  member,
+  ctl,
+}: {
+  o: DesignObject;
+  rowKey: string;
+  i: number;
+  n: number;
+  sel: boolean;
+  color: string;
+  drop: "above" | "below" | null;
+  renaming: boolean;
+  member: boolean;
+  ctl: LayerCtl;
+}) {
   const s = useStore.getState;
   return (
     <div
-      className={`layer ${sel ? "sel" : ""} ${o.visible ? "" : "hidden-obj"} ${dropAbove ? "drop-above" : ""}`}
-      onClick={(e) => ctl.select(o, e)}
+      className={`layer ${member ? "member" : ""} ${sel ? "sel" : ""} ${o.visible ? "" : "hidden-obj"} ${drop ? `drop-${drop}` : ""}`}
+      onClick={(e) => ctl.select(rowKey, e)}
       draggable
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move";
-        ctl.dragStart(o);
+        ctl.dragStart(rowKey);
       }}
       onDragOver={(e) => {
         e.preventDefault();
-        ctl.dragOver(i);
+        ctl.dragOver(rowKey);
       }}
       onDrop={(e) => {
         e.preventDefault();
-        ctl.drop(i);
+        ctl.drop(rowKey);
       }}
       onDragEnd={() => ctl.dragEnd()}
     >
       <GripVertical size={12} className="grip" />
-      <input type="checkbox" checked={sel} onClick={(e) => e.stopPropagation()} onChange={(e) => ctl.check(o, e.target.checked)} aria-label={`Select ${o.name}`} />
+      <input type="checkbox" checked={sel} onClick={(e) => e.stopPropagation()} onChange={(e) => ctl.check(rowKey, e.target.checked)} aria-label={`Select ${o.name}`} />
       <span className="idx">{i + 1}</span>
       <Thumb o={o} color={color} />
       <span
         className="lname"
-        onDoubleClick={() => (o.text ? s().set({ editingText: o.text.group }) : ctl.rename(o.id))}
+        onDoubleClick={() => (o.text ? s().set({ editingText: o.text.group }) : ctl.rename(rowKey))}
         title={o.text ? "Lettering · double-click to edit the text" : o.name}
       >
         {o.text ? (
@@ -179,56 +229,235 @@ const LayerRow = memo(function LayerRow({ o, i, n, sel, color, dropAbove, renami
   );
 });
 
+const ROLE_LABEL: Record<GroupRow["role"], string> = { group: "Group", gradient: "Gradient", tartan: "Tartan" };
+
+/** A group's header row: fold, select, show / hide and lock its members together, rename it. */
+const GroupHeader = memo(function GroupHeader({
+  r,
+  sel,
+  colors,
+  drop,
+  renaming,
+  first,
+  last,
+  ctl,
+}: {
+  r: GroupRow;
+  sel: "all" | "some" | "none";
+  colors: string[];
+  drop: "above" | "below" | null;
+  renaming: boolean;
+  first: boolean;
+  last: boolean;
+  ctl: LayerCtl;
+}) {
+  const box = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (box.current) box.current.indeterminate = sel === "some";
+  }, [sel]);
+  const shown = colors.slice(0, 5);
+  const what = `${ROLE_LABEL[r.role].toLowerCase()} ${r.name}`;
+  return (
+    <div
+      className={`layer group-head ${sel === "all" ? "sel" : sel === "some" ? "part" : ""} ${r.visible === "none" ? "hidden-obj" : ""} ${drop ? `drop-${drop}` : ""}`}
+      tabIndex={0}
+      aria-label={`${ROLE_LABEL[r.role]} ${r.name}, ${r.count} ${r.count === 1 ? "object" : "objects"}, ${r.folded ? "folded" : "unfolded"}`}
+      onClick={(e) => ctl.select(r.key, e)}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget && (e.target as HTMLElement).tagName === "INPUT") return;
+        const k = e.key;
+        if ((k === "ArrowLeft" && !r.folded) || (k === "ArrowRight" && r.folded)) ctl.fold(r.group, k === "ArrowLeft");
+        else if (k === "Enter" && e.target === e.currentTarget) ctl.select(r.key, e);
+        else if (k === "F2") ctl.rename(r.key);
+        else if (k !== "ArrowLeft" && k !== "ArrowRight") return;
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      draggable={!renaming}
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        ctl.dragStart(r.key);
+      }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        ctl.dragOver(r.key);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        ctl.drop(r.key);
+      }}
+      onDragEnd={() => ctl.dragEnd()}
+    >
+      <GripVertical size={12} className="grip" />
+      <input ref={box} type="checkbox" checked={sel === "all"} onClick={(e) => e.stopPropagation()} onChange={(e) => ctl.check(r.key, e.target.checked)} aria-label={`Select the ${what}`} />
+      <button
+        className={`mini fold ${r.folded ? "" : "open"}`}
+        aria-expanded={!r.folded}
+        aria-label={`${r.folded ? "Unfold" : "Fold"} the ${what}`}
+        title={`${r.folded ? "Unfold" : "Fold"} (← →)`}
+        onClick={(e) => {
+          e.stopPropagation();
+          ctl.fold(r.group, !r.folded);
+        }}
+      >
+        <ChevronRight size={14} />
+      </button>
+      <span className="lname" onDoubleClick={() => ctl.rename(r.key)} title={`${r.name} · ${ROLE_LABEL[r.role].toLowerCase()} of ${r.count} · double-click to rename`}>
+        {renaming ? (
+          <input
+            autoFocus
+            defaultValue={r.name}
+            aria-label={`Name of the ${what}`}
+            onClick={(e) => e.stopPropagation()}
+            onBlur={(e) => {
+              ctl.renameGroup(r.group, e.target.value.trim());
+              ctl.rename(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+              if (e.key === "Escape") ctl.rename(null);
+            }}
+          />
+        ) : (
+          <>
+            {r.name}
+            <span className="grp-n">{r.count}</span>
+          </>
+        )}
+      </span>
+      <span className="grp-sw" role="img" aria-label={`${colors.length} ${colors.length === 1 ? "thread" : "threads"}`}>
+        {shown.map((c, k) => (
+          <i key={k} style={{ background: c }} />
+        ))}
+        {colors.length > shown.length && <em>+{colors.length - shown.length}</em>}
+      </span>
+      <button
+        className={`mini ${r.locked === "some" ? "mixed" : ""}`}
+        title={r.locked === "all" ? `Unlock everything in ${r.name}` : `Lock everything in ${r.name}`}
+        aria-label={r.locked === "all" ? `Unlock the ${what}` : `Lock the ${what}`}
+        aria-pressed={r.locked === "all" ? true : r.locked === "some" ? "mixed" : false}
+        onClick={(e) => {
+          e.stopPropagation();
+          ctl.lockGroup(r.key);
+        }}
+      >
+        {r.locked === "none" ? <Unlock size={13} /> : <Lock size={13} />}
+      </button>
+      <button
+        className={`mini ${r.visible === "some" ? "mixed" : ""}`}
+        title={r.visible === "all" ? `Hide everything in ${r.name}` : `Show everything in ${r.name}`}
+        aria-label={r.visible === "all" ? `Hide the ${what}` : `Show the ${what}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          ctl.showGroup(r.key);
+        }}
+      >
+        {r.visible === "none" ? <EyeOff size={14} /> : <Eye size={14} />}
+      </button>
+      <button className="mini" title={`Move ${r.name} later in stitch order`} onClick={(e) => (e.stopPropagation(), ctl.stepGroup(r.key, 1))} disabled={first}>
+        <ChevronUp size={14} />
+      </button>
+      <button className="mini" title={`Move ${r.name} earlier in stitch order`} onClick={(e) => (e.stopPropagation(), ctl.stepGroup(r.key, -1))} disabled={last}>
+        <ChevronDown size={14} />
+      </button>
+    </div>
+  );
+});
+
 export function LayersPanel() {
   const doc = useStore((s) => s.doc);
   const selection = useStore((s) => s.selection);
+  const foldedGroups = useStore((s) => s.foldedGroups);
   const s = useStore.getState;
   const [renaming, setRenaming] = useState<string | null>(null);
-  const [drag, setDrag] = useState<{ id: string; over: number | null } | null>(null);
+  const [drag, setDrag] = useState<{ key: string; over: string | null; at: "above" | "below" } | null>(null);
   const colors = new Map(doc.threads.map((t) => [t.id, t.color]));
   const n = doc.objects.length;
   const selected = new Set(selection);
-  // top of the list = stitched last (sits on top)
-  // a lettering shows as one row
-  const seenGroups = new Set<string>();
-  const rows = doc.objects
-    .map((o, i) => ({ o, i }))
-    .reverse()
-    .filter(({ o }) => !o.text || (!seenGroups.has(o.text.group) && !!seenGroups.add(o.text.group)));
+  // top of the list = stitched last (sits on top); a lettering shows as one row, a group as a foldable header
+  const rows = useMemo(() => buildLayerRows(doc.objects, new Set(foldedGroups), doc.groupNames), [doc.objects, foldedGroups, doc.groupNames]);
+  const tops = rows.filter((r) => r.kind === "group" || !r.member);
   // the handlers read the current state through a ref: one stable object for every row
-  const cur = useRef({ drag, setDrag, setRenaming });
-  cur.current = { drag, setDrag, setRenaming };
+  const cur = useRef({ drag, setDrag, setRenaming, rows, tops });
+  cur.current = { drag, setDrag, setRenaming, rows, tops };
   const ctl = useRef<LayerCtl | null>(null);
   if (!ctl.current) {
-    const unitIds = (o: DesignObject) => (o.text ? s().doc.objects.filter((x) => x.text?.group === o.text!.group) : [o]).map((x) => x.id);
+    const row = (key: string) => cur.current.rows.find((r) => r.key === key);
+    const setAll = (ids: string[], patch: (o: DesignObject) => Partial<DesignObject>) => {
+      const set = new Set(ids);
+      s().commit((d) => ({ ...d, objects: d.objects.map((x) => (set.has(x.id) ? { ...x, ...patch(x) } : x)) }));
+    };
     ctl.current = {
-      select: (o, e) => {
+      select: (key, e) => {
+        const r = row(key);
+        if (!r) return;
         const sel = s().selection;
-        const ids = unitIds(o);
-        if (e.shiftKey || e.metaKey || e.ctrlKey) s().select(sel.includes(o.id) ? sel.filter((x) => !ids.includes(x)) : [...sel, ...ids]);
+        const ids = r.ids;
+        const on = r.kind === "group" ? ids.every((id) => sel.includes(id)) : sel.includes(r.o.id);
+        if (e.shiftKey || e.metaKey || e.ctrlKey) s().select(on ? sel.filter((x) => !ids.includes(x)) : [...sel.filter((x) => !ids.includes(x)), ...ids]);
         else s().select(ids);
-        s().set({ activeThread: o.thread });
+        if (r.kind === "object") s().set({ activeThread: r.o.thread });
       },
-      check: (o, on) => {
+      check: (key, on) => {
+        const ids = row(key)?.ids ?? [];
         const sel = s().selection;
-        const ids = unitIds(o);
         s().select(on ? [...sel.filter((x) => !ids.includes(x)), ...ids] : sel.filter((x) => !ids.includes(x)));
       },
-      dragStart: (o) => cur.current.setDrag({ id: o.id, over: null }),
-      dragOver: (i) => {
-        const d = cur.current.drag;
-        if (d && d.over !== i) cur.current.setDrag({ ...d, over: i });
+      dragStart: (key) => cur.current.setDrag({ key, over: null, at: "above" }),
+      dragOver: (key) => {
+        const { drag: d, rows: rs } = cur.current;
+        if (!d) return;
+        const from = rs.findIndex((r) => r.key === d.key);
+        const to = rs.findIndex((r) => r.key === key);
+        const t = rs[to];
+        // a group over its own members goes nowhere
+        const none = key === d.key || (rs[from]?.kind === "group" && t?.kind === "object" && t.member === (rs[from] as GroupRow).group);
+        const over = none ? null : key;
+        const at = to < from || (t?.kind === "group" && t.group === (rs[from] as ObjectRow | undefined)?.member) ? "above" : "below";
+        if (d.over !== over || d.at !== at) cur.current.setDrag({ ...d, over, at });
       },
-      drop: (i) => {
+      drop: (key) => {
         const d = cur.current.drag;
-        if (d) s().reorder(d.id, i);
         cur.current.setDrag(null);
+        const from = d && row(d.key);
+        const to = row(key);
+        if (!from || !to) return;
+        const objects = s().doc.objects;
+        if (dropRow(objects, from, to) === objects) return;
+        s().commit((doc) => pruneGroups({ ...doc, objects: dropRow(doc.objects, from, to) }));
       },
       dragEnd: () => cur.current.setDrag(null),
-      rename: (id) => cur.current.setRenaming(id),
+      rename: (key) => cur.current.setRenaming(key),
       toggle: (o) => {
-        const ids = unitIds(o);
-        s().commit((d) => ({ ...d, objects: d.objects.map((x) => (ids.includes(x.id) ? { ...x, visible: !o.visible } : x)) }));
+        const ids = o.text ? s().doc.objects.filter((x) => x.text?.group === o.text!.group).map((x) => x.id) : [o.id];
+        setAll(ids, () => ({ visible: !o.visible }));
+      },
+      fold: (group, folded) => setGroupsFolded([group], folded),
+      showGroup: (key) => {
+        const r = row(key);
+        if (r?.kind === "group") setAll(r.ids, () => ({ visible: r.visible !== "all" }));
+      },
+      lockGroup: (key) => {
+        const r = row(key);
+        if (r?.kind === "group") setAll(r.ids, () => ({ locked: r.locked !== "all" }));
+      },
+      renameGroup: (group, name) => {
+        const names = s().doc.groupNames ?? {};
+        if ((names[group] ?? "") === name) return;
+        const auto = !name || name === groupInfo(s().doc.objects, { ...names, [group]: "" }).get(group)?.name;
+        s().commit((d) => {
+          const { [group]: _, ...rest } = d.groupNames ?? {};
+          const next = auto ? rest : { ...rest, [group]: name };
+          return { ...d, groupNames: Object.keys(next).length ? next : undefined };
+        });
+      },
+      stepGroup: (key, dir) => {
+        const { tops: ts } = cur.current;
+        const k = ts.findIndex((r) => r.key === key);
+        const r = ts[k];
+        const next = ts[k - dir];
+        if (!r || !next) return;
+        s().commit((d) => ({ ...d, objects: moveBlock(d.objects, r.ids, next.ids, dir > 0 ? "above" : "below") }));
       },
     };
   }
@@ -239,25 +468,44 @@ export function LayersPanel() {
         <ReferencesList />
       </>
     );
+  const dropOf = (key: string) => (drag?.over === key ? drag.at : null);
   return (
     <div onDragOver={(e) => e.preventDefault()}>
-      {rows.map(({ o, i }) => (
-        <LayerRow
-          key={o.id}
-          o={o}
-          i={i}
-          n={n}
-          sel={selected.has(o.id)}
-          color={colors.get(o.thread) ?? "#222"}
-          dropAbove={drag?.over === i && drag.id !== o.id}
-          renaming={renaming === o.id}
-          ctl={ctl.current!}
-        />
-      ))}
+      {rows.map((r) =>
+        r.kind === "group" ? (
+          <GroupHeader
+            key={r.key}
+            r={r}
+            sel={tri(r.ids.filter((id) => selected.has(id)).length, r.ids.length)}
+            colors={r.threads.map((t) => colors.get(t) ?? "#222")}
+            drop={dropOf(r.key)}
+            renaming={renaming === r.key}
+            first={tops[0] === r}
+            last={tops[tops.length - 1] === r}
+            ctl={ctl.current!}
+          />
+        ) : (
+          <LayerRow
+            key={r.key}
+            o={r.o}
+            rowKey={r.key}
+            i={r.i}
+            n={n}
+            sel={selected.has(r.o.id)}
+            color={colors.get(r.o.thread) ?? "#222"}
+            drop={dropOf(r.key)}
+            renaming={renaming === r.key}
+            member={!!r.member}
+            ctl={ctl.current!}
+          />
+        ),
+      )}
       <ReferencesList />
     </div>
   );
 }
+
+const tri = (k: number, n: number) => (k === n ? "all" : k ? "some" : "none");
 
 /** Reference pictures: under the stitch layers (they are never stitched). */
 function ReferencesList() {

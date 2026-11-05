@@ -33,7 +33,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import { Applique, BatchLettering, EmbroideryMachine, Fabric as FabricIcon, Hoop, LockStitch, Spool, StitchFill, StitchProcessing, StitchRunning, StitchSatin, TextArc } from "../icons/stitch";
 import { clamp, DEFAULT_LAYOUT, LIMITS, type Layout } from "../lib/layout";
 import { useStore } from "../store";
-import { IssuesPanel, LayersPanel, PropertiesPanel, ScenePanel, useIssueCount } from "./Dock";
+import { FoldAllGroups, IssuesPanel, LayersPanel, PropertiesPanel, ScenePanel, useIssueCount } from "./Dock";
 import { ElementInfoSection } from "./ElementInfo";
 import { openSection, SectionScope } from "./ui";
 
@@ -252,9 +252,12 @@ function OutlinePanel({ side, mainRef }: { side: "left" | "right"; mainRef: Main
           { id: "issues", label: <>Issues{issues > 0 && <span className="count">{issues}</span>}</>, title: "Problems that would sew badly — markers show on the canvas while this tab is open" },
         ]}
         actions={
-          <button className="icon-btn" title="Hide the layers panel" onClick={() => useStore.getState().setLayout({ showOutline: false })}>
-            <Close size={14} />
-          </button>
+          <>
+            {tab === "layers" && <FoldAllGroups />}
+            <button className="icon-btn" title="Hide the layers panel" onClick={() => useStore.getState().setLayout({ showOutline: false })}>
+              <Close size={14} />
+            </button>
+          </>
         }
       />
       <div className="panel-body">{tab === "layers" ? <LayersPanel /> : <IssuesPanel />}</div>

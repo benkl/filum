@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { syncClones } from "./lib/clones";
+import { pruneGroups } from "./lib/layerRows";
 import { mulMat, translateMat, type Mat } from "./lib/geometry";
 import { engine } from "./engine/client";
 import { defaultStitch, uid } from "./lib/geometry";
@@ -134,6 +135,8 @@ export interface State {
   activeThread: string | null;
   /** The tab of the layers panel. */
   outlineTab: "layers" | "issues";
+  /** Object groups folded in the Layers tab (UI state: remembered, not undone). */
+  foldedGroups: string[];
   /** The properties panel: the selection, or the design (follows the selection). */
   inspectorTab: "selection" | "design";
   /** Panel sizes and placement. */
@@ -215,7 +218,7 @@ export interface State {
 const THEME_KEY = "filum.theme";
 /** View toggles remembered between sessions. */
 const VIEW_KEY = "filum.view";
-const VIEW_FIELDS = ["showGrid", "showJumps", "showUnderlay", "showHidden", "smartGuides", "stitchColors", "fabricColor", "fabricTexture", "fabricAll", "fabricWeave", "densityMode"] as const;
+const VIEW_FIELDS = ["showGrid", "showJumps", "showUnderlay", "showHidden", "smartGuides", "stitchColors", "fabricColor", "fabricTexture", "fabricAll", "fabricWeave", "densityMode", "foldedGroups"] as const;
 const savedView: Partial<Pick<State, (typeof VIEW_FIELDS)[number]>> = (() => {
   try {
     return JSON.parse(localStorage.getItem(VIEW_KEY) ?? "{}");
@@ -278,6 +281,7 @@ export const useStore = create<State>((set, get) => ({
   toasts: [],
   activeThread: null,
   outlineTab: "layers",
+  foldedGroups: [],
   inspectorTab: "design",
   layout: loadLayout(),
   showDensity: false,
@@ -381,7 +385,7 @@ export const useStore = create<State>((set, get) => ({
   deleteSelection: () => {
     const sel = new Set(get().selection);
     if (!sel.size) return;
-    get().commit((d) => ({ ...d, objects: d.objects.filter((o) => !sel.has(o.id) || o.locked) }));
+    get().commit((d) => pruneGroups({ ...d, objects: d.objects.filter((o) => !sel.has(o.id) || o.locked) }));
     set({ selection: [] });
   },
   duplicateSelection: () => {

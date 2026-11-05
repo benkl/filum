@@ -511,6 +511,8 @@ export interface StitchDocument {
   threadLocks?: string[];
   /** Pictures to trace over (never stitched, never sent to the engine). */
   references?: ReferenceImage[];
+  /** Names of object groups (`DesignObject.group` → name); unnamed groups show as "Group n". */
+  groupNames?: Record<string, string>;
 }
 
 /** A reference picture on the canvas, for tracing. */
