@@ -37,14 +37,14 @@ check(drawn.photoAngle === 30, "a kept option the preset does not set stays");
 check(DIGITIZE_PRESETS.every((p) => p.opts.backgroundScope !== undefined), "every preset says what happens to the background");
 // logo: even satin outlines, enclosed areas stitched, routed
 const logo = presetSettings("logo");
-check(outlinesOf(logo) === "even" && logo.outlineLineMm >= 0.8, "logo: outlines as even satin");
+check(outlinesOf(logo) === "even" && logo.outlineLineMm >= 1.0, "logo: outlines as even satin");
 check(backdropOf(logo) === "enclosed", "logo: every enclosed area is stitched");
 check(logo.routeLines, "logo: outlines routed as one network");
 check(detailOf(logo) === "normal", "logo: normal detail");
 
 // quick controls round-trip
 for (const o of ["off", "drawn", "even"] as Outlines[]) check(outlinesOf({ ...logo, ...outlinesPatch(o, 1.5) }) === o, `outlines ${o} round-trips`);
-check({ ...logo, ...outlinesPatch("even", 0.3) }.outlineLineMm >= 0.8, "an even outline is at least a sewable satin");
+check({ ...logo, ...outlinesPatch("even", 0.3) }.outlineLineMm >= 0.5, "an even outline is at least a triple stitch's width");
 for (const d of Object.keys(DETAIL) as Detail[]) check(detailOf({ ...logo, ...DETAIL[d] }) === d, `detail ${d} round-trips`);
 check(detailOf({ ...logo, smoothing: 5 }) === null, "a changed detail setting shows as custom");
 for (const b of ["fabric", "enclosed", "all"] as Backdrop[]) check(backdropOf({ ...logo, ...backdropPatch(b) }) === b, `background ${b} round-trips`);

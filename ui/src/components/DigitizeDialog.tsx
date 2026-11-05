@@ -949,7 +949,7 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
                 )}
                 {output === "shapes" && !settings.photoZigzag && (
                   <Group title="Look" hint="Each control moves several settings of the tabs together; it shows Custom once those are changed by hand.">
-                    <Row label="Outlines" title="Lines of the picture: none, as wide as drawn, or one even satin width (clean logo outlines, sewn as one network)">
+                    <Row label="Outlines" title="Lines of the picture: none, as wide as drawn, or one even satin width (clean logo outlines, sewn as one network; below 1 mm a triple running stitch)">
                       <span className="dz-inline">
                         <Seg<Outlines>
                           value={outlinesOf(settings)}
@@ -961,7 +961,7 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
                           ]}
                         />
                         {outlinesOf(settings) === "even" && (
-                          <Num value={settings.outlineLineMm} unit="mm" step={0.1} min={0.8} max={4} digits={1} onChange={(v) => set({ outlineLineMm: v })} />
+                          <Num value={settings.outlineLineMm} unit="mm" step={0.1} min={0.5} max={4} digits={1} onChange={(v) => set({ outlineLineMm: v })} />
                         )}
                       </span>
                     </Row>
@@ -1308,7 +1308,7 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
                       <Row label="Outline width" title="Dark lines (outlines, ink) as satin of one even width — 0: as wide as drawn">
                         <span className="dz-inline">
                           <Toggle on={settings.outlineLineMm > 0} onChange={(v) => set({ outlineLineMm: v ? OUTLINE_DEFAULT_MM : 0 })} />
-                          {settings.outlineLineMm > 0 && <Num value={settings.outlineLineMm} unit="mm" step={0.1} min={0.8} max={4} digits={1} onChange={(v) => set({ outlineLineMm: v })} />}
+                          {settings.outlineLineMm > 0 && <Num value={settings.outlineLineMm} unit="mm" step={0.1} min={0.5} max={4} digits={1} onChange={(v) => set({ outlineLineMm: v })} />}
                         </span>
                       </Row>
                       {settings.outlineLineMm <= 0 && (

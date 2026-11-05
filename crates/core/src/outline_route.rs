@@ -223,9 +223,13 @@ pub fn route_lines(objects: Vec<Object>, cursor: Point) -> Vec<Object> {
             }
             let closed = edges[e].closed;
             if kind == "outback" && !want_satin {
-                // a running line: out and back along itself
-                let back: Vec<Point> = pts.iter().rev().skip(1).copied().collect();
-                pts.extend(back);
+                // a running line: a plain path out, the line itself sewn back
+                // (a triple stitch would lay six passes going out and back)
+                out.push(make(pts.clone(), closed, "path", k));
+                pts.reverse();
+                k += 1;
+                out.push(make(pts, closed, "sew", k));
+                continue;
             }
             if kind != "path" || polyline_length(&pts) > 0.5 {
                 out.push(make(pts, closed, kind, k));
@@ -265,54 +269,110 @@ fn walk(edges: &[Line], tol: f64, pos: &mut Point) -> Vec<Step> {
     let mut used = vec![false; edges.len()];
     let mut seen = vec![false; nodes.len()];
     let mut steps: Vec<Step> = Vec::new();
-    // the nearest node with an edge left starts the next part
-    while let Some(start) = (0..nodes.len()).filter(|&n| adj[n].iter().any(|&e| !used[e])).min_by(|&a, &b| nodes[a].dist(*pos).partial_cmp(&nodes[b].dist(*pos)).unwrap()) {
+    let degree = |n: usize| adj[n].iter().map(|&e| if ends[e].0 == ends[e].1 { 2 } else { 1 }).sum::<usize>();
+    let len_of = |e: usize| polyline_length(&edges[e].pts);
+    // part by part: a free end nearest the needle starts it (else the nearest node)
+    while let Some(start) = (0..nodes.len()).filter(|&n| adj[n].iter().any(|&e| !used[e])).min_by(|&a, &b| {
+        let key = |n: usize| (degree(n) != 1, nodes[n].dist(*pos));
+        key(a).partial_cmp(&key(b)).unwrap()
+    }) {
+        // the depth-first tree: at every node its loops, its edges back to a
+        // node already reached (sewn out and back) and its children
+        let mut items: std::collections::HashMap<usize, Vec<Item>> = Default::default();
+        let mut order: Vec<usize> = vec![start];
         seen[start] = true;
-        // explicit stack: (node, the edge that led here and its direction)
-        let mut stack: Vec<(usize, Option<(usize, bool)>)> = vec![(start, None)];
-        while let Some(&(u, via)) = stack.last() {
-            // the next edge at u: the one leaving nearest the needle's way
-            let next = adj[u].iter().copied().filter(|&e| !used[e]).min_by(|&a, &b| {
-                let la = polyline_length(&edges[a].pts);
-                let lb = polyline_length(&edges[b].pts);
-                la.partial_cmp(&lb).unwrap()
-            });
-            match next {
-                Some(e) => {
-                    used[e] = true;
-                    let (a, b) = ends[e];
-                    let fwd = a == u;
-                    let v = if fwd { b } else { a };
-                    if v == u {
-                        // a loop: sewn round once, back where it began
-                        steps.push(Step::Sew(e, true));
-                    } else if seen[v] || adj[v].iter().all(|&f| used[f]) {
-                        // a dead end or a node already reached: out under itself, back
-                        steps.push(Step::OutBack(e, fwd));
-                    } else {
-                        seen[v] = true;
-                        steps.push(Step::Path(e, fwd));
-                        stack.push((v, Some((e, fwd))));
-                    }
-                }
-                None => {
-                    stack.pop();
-                    if let Some((e, fwd)) = via {
-                        // back along the way it came: the column covers its path
-                        match steps.last() {
-                            Some(Step::Path(pe, _)) if *pe == e => {
-                                steps.pop();
-                                steps.push(Step::OutBack(e, fwd));
-                            }
-                            _ => steps.push(Step::Sew(e, !fwd)),
-                        }
-                    }
+        let mut stack = vec![start];
+        while let Some(&u) = stack.last() {
+            let next = adj[u].iter().copied().filter(|&e| !used[e]).min_by(|&a, &b| len_of(a).partial_cmp(&len_of(b)).unwrap());
+            let Some(e) = next else {
+                stack.pop();
+                continue;
+            };
+            used[e] = true;
+            let (a, b) = ends[e];
+            let fwd = a == u;
+            let v = if fwd { b } else { a };
+            let item = if v == u {
+                Item::Loop(e)
+            } else if seen[v] {
+                Item::Back(e, fwd, v)
+            } else {
+                seen[v] = true;
+                order.push(v);
+                stack.push(v);
+                Item::Child(e, fwd, v)
+            };
+            items.entry(u).or_default().push(item);
+        }
+        // the deepest branch of every node last: the walk ends down it
+        let mut depth: std::collections::HashMap<usize, f64> = Default::default();
+        for &u in order.iter().rev() {
+            let list = items.entry(u).or_default();
+            let d = list.iter().map(|it| if let Item::Child(e, _, v) = it { len_of(*e) + depth.get(v).copied().unwrap_or(0.0) } else { 0.0 }).fold(0.0, f64::max);
+            if let Some(i) = list
+                .iter()
+                .enumerate()
+                .filter_map(|(i, it)| if let Item::Child(e, _, v) = it { Some((i, len_of(*e) + depth.get(v).copied().unwrap_or(0.0))) } else { None })
+                .max_by(|x, y| x.1.partial_cmp(&y.1).unwrap())
+                .map(|x| x.0)
+            {
+                let it = list.remove(i);
+                list.push(it);
+            }
+            depth.insert(u, d);
+        }
+        let end = emit(start, true, &items, &mut steps);
+        *pos = nodes[end];
+    }
+    steps
+}
+
+/// What hangs off a node of the walk's tree.
+#[derive(Clone, Copy)]
+enum Item {
+    /// An edge from the node back to itself.
+    Loop(usize),
+    /// An edge to a node reached already (that node): out under itself and back.
+    Back(usize, bool, usize),
+    /// A tree edge to a child node.
+    Child(usize, bool, usize),
+}
+
+/// The steps of the subtree at `u`. On the final chain the last item is sewn
+/// forward and the walk ends below it; elsewhere every branch comes back.
+/// Returns the node the walk ends at.
+fn emit(u: usize, chain: bool, items: &std::collections::HashMap<usize, Vec<Item>>, steps: &mut Vec<Step>) -> usize {
+    let list = items.get(&u).map(|v| v.as_slice()).unwrap_or(&[]);
+    let n = list.len();
+    for (i, it) in list.iter().enumerate() {
+        let last = chain && i + 1 == n;
+        match *it {
+            Item::Loop(e) => steps.push(Step::Sew(e, true)),
+            Item::Back(e, fwd, v) if last => {
+                // nothing left to come back for: sewn once, ending over there
+                steps.push(Step::Sew(e, fwd));
+                return v;
+            }
+            Item::Back(e, fwd, _) => steps.push(Step::OutBack(e, fwd)),
+            Item::Child(e, fwd, v) if last => {
+                steps.push(Step::Sew(e, fwd));
+                return emit(v, true, items, steps);
+            }
+            Item::Child(e, fwd, v) => {
+                let mark = steps.len();
+                steps.push(Step::Path(e, fwd));
+                emit(v, false, items, steps);
+                if steps.len() == mark + 1 {
+                    // a dead end: one column out under itself and back
+                    steps.pop();
+                    steps.push(Step::OutBack(e, fwd));
+                } else {
+                    steps.push(Step::Sew(e, !fwd));
                 }
             }
         }
-        *pos = nodes[start];
     }
-    steps
+    u
 }
 
 #[cfg(test)]

@@ -75,8 +75,8 @@ export interface DigitizePreset {
   opts: Partial<DigitizeSettings>;
 }
 
-/** A satin narrower than this is a running stitch's job; wider ones need underlay. */
-export const OUTLINE_MIN_MM = 0.8;
+/** The narrowest even outline; below 1 mm it is a triple running stitch, not a satin. */
+export const OUTLINE_MIN_MM = 0.5;
 export const OUTLINE_DEFAULT_MM = 1.2;
 
 export const DIGITIZE_PRESETS: DigitizePreset[] = [
@@ -91,6 +91,7 @@ export const DIGITIZE_PRESETS: DigitizePreset[] = [
       minRegionMm2: 1.5,
       simplifyMm: 0.12,
       maxPixels: 800,
+      overlapMm: 0.3,
       removeBackground: true,
       backgroundScope: "border",
       lineNetworks: true,

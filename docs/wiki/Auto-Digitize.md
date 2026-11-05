@@ -26,7 +26,7 @@ The **Style** tab starts with the output: **Shapes**, **Zig-zag photo** (one col
 
 Under the presets, **Look** has four quick controls. Each one sets several of the detailed settings at once, and shows *Custom* once you change those by hand in their tabs:
 
-- **Outlines**: *None*, *As drawn*, or *Even*: every dark line of the picture becomes a satin of the width you set (1.2 mm to start; 0.8 mm is the narrowest satin that sews cleanly). Lines that meet are sewn in one go. Each line walks out under a running stitch that its satin covers on the way back, so there are no trims between them.
+- **Outlines**: *None*, *As drawn*, or *Even*: every dark line of the picture becomes a satin of the width you set (1.2 mm to start; below 1 mm a column is too narrow to sew cleanly, so it becomes a triple running stitch). Lines that meet are sewn in one go. Each line walks out under a running stitch that its satin covers on the way back, so there are no trims between them.
 - **Detail**: *Bold* (fewer, simpler shapes), *Normal* or *Fine* (small shapes, close tracing, more stitches and trims).
 - **Background**: *Fabric shows* (the background colour is left out, also in plain holes such as letter counters), *Fill enclosed* (left out only around the design: a logo's white faces inside its outlines are stitched), or *Stitch all*.
 - **Border**: an outline around the whole design, as running stitch or satin (patches, stickers).
@@ -76,7 +76,7 @@ They load only when you use them. **Preferences → Digitizer** lists them and c
 
 - Start from the biggest, cleanest version of the picture you have. Flat colours digitize better than gradients.
 - Fewer colours usually stitch better. Try 4–6 for a logo.
-- Outlines narrower than about 0.8 mm can't be a satin; at small sizes an even outline of 0.8–1 mm keeps a logo from looking heavy.
+- Outlines narrower than 1 mm can't be a clean satin. At small sizes an even outline of 1 mm, or a triple stitch below that, keeps a logo from looking heavy.
 - The digitizer sews each colour's fills and lines together where nothing of another colour lies in between, so a logo usually needs one colour change per thread.
 - Small text rarely digitizes well. Delete it and retype it with the [Lettering](Lettering.md) tool, or let the AI text finder do it.
 - Check the result in the **Realistic** view and with the **Density map** (<kbd>Shift</kbd>+<kbd>D</kbd>) before you export.

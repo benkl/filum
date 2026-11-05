@@ -126,7 +126,7 @@ pub struct DigitizeOptions {
     pub thin_triple: bool,
     /// Outline width (mm): dark lines of the picture (outlines, ink) are sewn
     /// as satin of exactly this width, whatever their width in the picture
-    /// (below 0.8 mm: a running stitch). 0 = the picture's width.
+    /// (below 1 mm: a triple running stitch). 0 = the picture's width.
     pub outline_line_mm: f64,
     /// Lines that meet are routed as one network: each sews out under a
     /// running path its column covers on the way back — no trims between them.
@@ -2501,7 +2501,8 @@ fn stroke_object(st: &strokes::Stroke, reverse: bool, s: f64, ctx: &Ctx, fixed: 
         }
     };
     let thin = match fixed {
-        Some(fw) => fw < 0.8,
+        // below 1 mm a column is too narrow to sew cleanly: a triple stitch
+        Some(fw) => fw < 1.0,
         None => (opts.allow_running && width < opts.running_max_width_mm) || !opts.allow_satin,
     };
     if thin {
@@ -2509,7 +2510,7 @@ fn stroke_object(st: &strokes::Stroke, reverse: bool, s: f64, ctx: &Ctx, fixed: 
         if line.len() < 2 {
             return None;
         }
-        let stitch = StitchParams::Running(RunningParams { length: 2.0, bean_repeats: if opts.thin_triple { 2 } else { 0 }, ..Default::default() });
+        let stitch = StitchParams::Running(RunningParams { length: 2.0, bean_repeats: if opts.thin_triple || fixed.is_some() { 2 } else { 0 }, ..Default::default() });
         return Some((vec![SubPath::polyline(&round_pts(&line), st.closed)], stitch));
     }
     let satin = |w: f64| SatinParams { width: r3(w), center_walk: true, contour_underlay: w > 2.5, ..Default::default() };
