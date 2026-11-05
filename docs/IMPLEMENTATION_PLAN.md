@@ -10,6 +10,8 @@ This document covers:
 
 The companion [ALGORITHMS_RESEARCH.md](ALGORITHMS_RESEARCH.md) lists stitching algorithms that Ink/Stitch does not have yet, with sources.
 
+[DIGITIZER_PLAN.md](DIGITIZER_PLAN.md) covers the auto-digitizer's presets and clean output, and stitch calculation speed: findings and the next steps.
+
 ---
 
 ## 1. Inputs
