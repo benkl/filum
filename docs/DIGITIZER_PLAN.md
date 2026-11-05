@@ -71,6 +71,11 @@ In native release builds, a cold plan across all 18 benchmark designs went from 
 - Expand all and collapse all; arrow keys fold and unfold.
 - Grouping makes the members contiguous in stitch order.
 
+### Row spacing
+- Fills now use commercial practice: **0.4 mm rows** for 40 wt thread, in the digitizer, its presets and Filum's own stitch defaults. Before, they used Ink/Stitch's 0.25 mm. A digitizer stacks overlap, underlay and outlines on top of the fill, so denser rows pile up.
+- The *Ink/Stitch* default set keeps 0.25 mm, and files from Ink/Stitch keep their own values.
+- On the suite this sews 10–25 % fewer stitches on most pictures, with the densest spots easing or level, gaps unchanged and the colour match the same or slightly closer. The test logo goes from 12,812 to 11,065 stitches, and its densest spot from 7.3 to 6.9 layers.
+
 ---
 
 ## 3. Weaknesses still in the process
@@ -81,8 +86,7 @@ In native release builds, a cold plan across all 18 benchmark designs went from 
 4. **Only centre-line satins are routed.** Satins that follow the drawn width (two rails) and fills are not, so their trims remain. Between fills of one colour, a travel under the next fill would often replace a trim.
 5. **Small closed letters and loops** in low-resolution pictures can become one blob: the "B" of a small JPEG badge.
 6. **Tiny dark blobs (under about 3 mm²) still become fills** when no centre line fits them.
-7. **Row spacing is Ink/Stitch's 0.25 mm.** Common commercial practice is 0.38–0.40 mm. A digitizer stacks overlap, underlay and outlines on top, so the denser value costs more here. This is an open decision.
-8. **The suite has no logo with even outlines**, so regressions in routing and outline width would go unnoticed.
+7. **The suite has no logo with even outlines**, so regressions in routing and outline width would go unnoticed.
 
 ---
 
@@ -109,7 +113,7 @@ Ordered by impact over effort. Each step names how we'll know it worked.
 
    *Check:* trims on the suite down by a quarter.
 3. **Small marks.** For a dark blob under 3 mm² with no centre line, use a satin along its principal axis. For small closed letters, keep the counter by tracing each loop as its own closed column.
-4. **A density quick control.** *Light / Standard / Dense* drives row and satin spacing, pull compensation, overlap and underlay strength, with the fabric profile underneath. Settle row spacing first (see 3.7).
+4. **A density quick control.** *Light / Standard / Dense* drives row and satin spacing, pull compensation, overlap and underlay strength, with the fabric profile underneath. *Standard* is today's 0.4 mm rows and *Dense* is 0.3 mm. Ink/Stitch's 0.25 mm stays available through its default set.
 
 ### Phase C: speed (medium)
 1. **Travel routes.** `order_lines` (about 1 s of the 3.6 s cold total with removal on) gets the grid distance index in its route check and reuses the Dijkstra buffers between calls. The output stays identical.

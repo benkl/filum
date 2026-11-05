@@ -309,7 +309,8 @@ impl Default for DigitizeOptions {
             allow_running: true,
             fill_method: FillMethod::Tatami,
             fill_angle: None,
-            row_spacing: 0.25,
+            // commercial practice for 40 wt (Ink/Stitch's fill default is 0.25)
+            row_spacing: 0.4,
             underlay: true,
             fixed_colors: Vec::new(),
             skip_colors: Vec::new(),

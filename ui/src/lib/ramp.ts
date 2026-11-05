@@ -148,7 +148,7 @@ function secondThread(first: string): string {
 }
 
 function defaultFill(): Partial<FillParams> {
-  return { type: "fill", method: "tatami", angle: 0, rowSpacing: 0.25, maxStitchLength: 3 } as Partial<FillParams>;
+  return { type: "fill", method: "tatami", angle: 0, rowSpacing: 0.4, maxStitchLength: 3 } as Partial<FillParams>;
 }
 
 /** Change the ramp of an object and its blend partner (the partner keeps its direction). */

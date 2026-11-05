@@ -46,7 +46,8 @@ export const defaultFill = (): FillParams => ({ ...baseFill(), ...fabricDefaults
 const baseFill = (): FillParams => ({
   method: "tatami",
   angle: 0,
-  rowSpacing: 0.25,
+  // commercial practice for 40 wt thread (Ink/Stitch: 0.25 mm, its own default set)
+  rowSpacing: 0.4,
   endRowSpacing: 0,
   maxStitchLength: 3,
   staggers: 4,
@@ -123,22 +124,22 @@ export function fillMethodDefaults(method: FillParams["method"]): Partial<FillPa
     case "meander":
       return { method, maxStitchLength: 2.5, underlay: false, meanderScale: 2.5, smoothness: 0.5 };
     case "guided":
-      return { method, rowSpacing: 0.25, maxStitchLength: 3 };
+      return { method, rowSpacing: 0.4, maxStitchLength: 3 };
     case "circular":
-      return { method, rowSpacing: 0.35, maxStitchLength: 2.5, center: [0.5, 0.5] };
+      return { method, rowSpacing: 0.4, maxStitchLength: 2.5, center: [0.5, 0.5] };
     case "flow":
-      return { method, rowSpacing: 0.3, maxStitchLength: 2.5 };
+      return { method, rowSpacing: 0.4, maxStitchLength: 2.5 };
     case "curved":
-      return { method, rowSpacing: 0.35, maxStitchLength: 2.5, curve: 1 };
+      return { method, rowSpacing: 0.4, maxStitchLength: 2.5, curve: 1 };
     case "cross":
       return { method, crossSize: 2.5, crossCoverage: 0.5, crossKind: "cross", underlay: false };
     case "tartan":
       return { method, rowSpacing: 0.35, maxStitchLength: 3 };
     case "tatami":
-      return { method, rowSpacing: 0.25, maxStitchLength: 3 };
+      return { method, rowSpacing: 0.4, maxStitchLength: 3 };
     case "contour":
     case "spiral":
-      return { method, rowSpacing: 0.35, maxStitchLength: 2.5 };
+      return { method, rowSpacing: 0.4, maxStitchLength: 2.5 };
     case "radial":
       return { method, rowSpacing: 0.3, maxStitchLength: 4, underlay: true };
     case "hilbert":

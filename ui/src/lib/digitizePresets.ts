@@ -28,7 +28,9 @@ export const DIGITIZE_DEFAULTS: DigitizeSettings = {
   allowRunning: true,
   fillMethod: "tatami",
   fillAngle: null,
-  rowSpacing: 0.25,
+  // commercial practice: 0.4 mm rows for 40 wt (an auto-digitizer stacks
+  // overlap, underlay and outlines on top, so denser rows pile up)
+  rowSpacing: 0.4,
   underlay: true,
   outline: "none",
   outlineWidthMm: 1.5,
@@ -101,7 +103,7 @@ export const DIGITIZE_PRESETS: DigitizePreset[] = [
       satinMaxWidthMm: 6,
       allowRunning: true,
       fillMethod: "tatami",
-      rowSpacing: 0.25,
+      rowSpacing: 0.4,
       underlay: true,
       pixelArt: "off",
     },
@@ -110,7 +112,7 @@ export const DIGITIZE_PRESETS: DigitizePreset[] = [
     id: "illustration",
     label: "Illustration",
     hint: "More colours and finer detail; lines keep the width they are drawn with",
-    opts: { colors: 10, denoise: 1, smoothing: 1, minRegionMm2: 0.8, removeBackground: true, backgroundScope: "outside", simplifyMm: 0.1, maxPixels: 900, satinMaxWidthMm: 5, lineNetworks: true, outlineLineMm: 0, fillMethod: "tatami", rowSpacing: 0.25, underlay: true, pixelArt: "off" },
+    opts: { colors: 10, denoise: 1, smoothing: 1, minRegionMm2: 0.8, removeBackground: true, backgroundScope: "outside", simplifyMm: 0.1, maxPixels: 900, satinMaxWidthMm: 5, lineNetworks: true, outlineLineMm: 0, fillMethod: "tatami", rowSpacing: 0.4, underlay: true, pixelArt: "off" },
   },
   {
     id: "drawing",
@@ -150,7 +152,7 @@ export const DIGITIZE_PRESETS: DigitizePreset[] = [
       fillDirection: "axis",
       fillMethod: "flow",
       flowStrength: 1,
-      rowSpacing: 0.3,
+      rowSpacing: 0.4,
       lineNetworks: false,
       pixelArt: "off",
       allowSatin: false,
