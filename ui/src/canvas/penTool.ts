@@ -186,7 +186,8 @@ const unit = (a: Vec2, b: Vec2): Vec2 => {
  */
 export function autoSmooth(nodes: PathNode[], auto: boolean[], closed: boolean): PathNode[] {
   const n = nodes.length;
-  if (n < 2) return nodes.map((x) => ({ ...x }));
+  // two points: a straight line (no handles left from a longer draft)
+  if (n < 3) return nodes.map((x, k) => (auto[k] ? { p: x.p } : { ...x }));
   const out = nodes.map((x) => ({ ...x }));
   const interior = (k: number) => closed || (k > 0 && k < n - 1);
   for (let k = 0; k < n; k++) {

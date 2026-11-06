@@ -10,6 +10,13 @@ import { uid } from "./geometry";
 
 type End = { ref: NodeRef; p: [number, number] };
 
+/** Objects whose paths these commands must not rewrite: a gradient's or tartan's colour layers (they share one shape) and linked clones (their paths follow the original). */
+function untouchable(objs: DesignObject[]): string | null {
+  if (objs.some((o) => o.clone)) return "Linked clones follow their original: unlink them first";
+  if (objs.some((o) => o.stitch.type === "fill" && (o.stitch.gradient || o.stitch.tartan))) return "Gradients and tartans keep one shape for all their colours: remove the gradient or tartan first";
+  return null;
+}
+
 /** The ends of the open paths of an object. */
 function endsOf(o: DesignObject): End[] {
   const out: End[] = [];
@@ -28,6 +35,8 @@ function endsOf(o: DesignObject): End[] {
  */
 export function joinObjects(doc: StitchDocument, ids: string[]): { doc: StitchDocument; error?: string } {
   const objs = doc.objects.filter((o) => ids.includes(o.id) && !o.locked);
+  const no = untouchable(objs);
+  if (no) return { doc, error: no };
   if (objs.some(isRailSatin)) return { doc, error: "Satin rails are joined in pairs: use the satin tool" };
   if (objs.length === 1) {
     const o = objs[0];
@@ -71,6 +80,8 @@ export function joinObjects(doc: StitchDocument, ids: string[]): { doc: StitchDo
  */
 export function makeCompound(doc: StitchDocument, ids: string[]): { doc: StitchDocument; error?: string } {
   const objs = doc.objects.filter((o) => ids.includes(o.id) && !o.locked && !o.text);
+  const no = untouchable(objs);
+  if (no) return { doc, error: no };
   if (objs.length < 2) return { doc, error: "Select two or more shapes" };
   if (objs.some(isRailSatin)) return { doc, error: "Satin columns can't be combined into one path" };
   const base = objs[0];
@@ -87,6 +98,8 @@ export function makeCompound(doc: StitchDocument, ids: string[]): { doc: StitchD
  * group, in their place in stitch order.
  */
 export function releaseCompound(doc: StitchDocument, ids: string[]): { doc: StitchDocument; ids: string[]; error?: string } {
+  const no = untouchable(doc.objects.filter((o) => ids.includes(o.id)));
+  if (no) return { doc, ids, error: no };
   const out: string[] = [];
   let changed = false;
   const objects = doc.objects.flatMap((o) => {

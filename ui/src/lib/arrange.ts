@@ -566,6 +566,16 @@ export function pasteClipboard(inPlace = false) {
       id: uid(),
       group: regroup(c.group, "g"),
       text: c.text ? { ...c.text, group: regroup(c.text.group, "txt")! } : undefined,
+      // a gradient's or tartan's colour layers are one fill again, under the copy's new group
+      ...(c.stitch.type === "fill" && (c.stitch.gradient || c.stitch.tartan)
+        ? {
+            stitch: {
+              ...c.stitch,
+              ...(c.stitch.gradient ? { gradient: { ...c.stitch.gradient, group: regroup(c.stitch.gradient.group, "g")! } } : {}),
+              ...(c.stitch.tartan ? { tartan: { ...c.stitch.tartan, group: regroup(c.stitch.tartan.group, "g")! } } : {}),
+            },
+          }
+        : {}),
       // a clone keeps its link only to an original in this design
       clone: c.clone && ids.has(c.clone.of) ? c.clone : undefined,
     };

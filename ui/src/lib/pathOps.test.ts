@@ -37,6 +37,10 @@ check(c.doc.objects.length === 1 && c.doc.objects[0].paths.length === 2 && c.doc
 const r = releaseCompound(c.doc, ["o"]);
 check(r.doc.objects.length === 2 && r.doc.objects.every((o) => o.paths.length === 1) && r.ids.length === 2, "release: a path per object again");
 check(!!releaseCompound(doc([hole]), ["h"]).error, "nothing to release in a single path");
+const gradLayer = (id: string) => obj(id, [line([[0, 0], [9, 0], [9, 9]], true)], { group: "grd", stitch: { type: "fill", gradient: { group: "grd" } } as unknown as DesignObject["stitch"] });
+check(!!makeCompound(doc([gradLayer("g1"), gradLayer("g2")]), ["g1", "g2"]).error, "a gradient's colour layers aren't merged into one path");
+const clone = obj("c", [line([[0, 0], [9, 0]]), line([[0, 5], [9, 5]])], { clone: { of: "x", m: [1, 0, 0, 1, 0, 0] } } as Partial<DesignObject>);
+check(!!releaseCompound(doc([clone]), ["c"]).error && !!joinObjects(doc([clone]), ["c"]).error, "linked clones are left alone");
 
 // bending a segment: its point at t moves by d, the ends stay
 const seg = line([[0, 0], [30, 0]]);
@@ -65,6 +69,8 @@ check(!!m.i && !!m.o && Math.abs(m.i[1] - 10) < 1e-9 && Math.abs(m.o[1] - 10) < 
 check(near(cubicAt(segmentOf({ nodes: sm, closed: false }, 0), 1), [10, 10]), "the curve passes through the point");
 const corner = autoSmooth([{ p: [0, 0] }, { p: [10, 10] }, { p: [20, 0] }], [true, false, true], false);
 check(!corner[1].i && !corner[1].o, "a corner keeps no handles");
+const twoPts = autoSmooth([{ p: [0, 0], o: [3, 3] }, { p: [10, 0], i: [7, 4] }], [true, true], false);
+check(twoPts.every((n) => !n.i && !n.o), "two smooth points: a straight line, no handles left over");
 
 console.log(failed ? `${failed} FAILED` : "all passed");
 if (failed) throw new Error(`${failed} path checks failed`);

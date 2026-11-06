@@ -5,6 +5,8 @@
 
 import type { DesignObject, StitchDocument, TartanParams } from "../types";
 import { defaultFill, uid } from "./geometry";
+import { parentOf } from "./groups";
+import { pruneGroups } from "./layerRows";
 
 export interface TartanStripe {
   color: string;
@@ -167,10 +169,16 @@ export function removeTartan(doc: StitchDocument, group: string): StitchDocument
   const layers = tartanLayers(doc, group);
   if (!layers.length) return doc;
   const ids = new Set(layers.slice(1).map((o) => o.id));
-  return {
+  // the plain fill leaves the tartan's group for the group around it
+  const around = parentOf(doc, group);
+  return pruneGroups({
     ...doc,
     objects: doc.objects
       .filter((o) => !ids.has(o.id))
-      .map((o) => (o.id === layers[0].id && o.stitch.type === "fill" ? { ...o, name: o.name.replace(/ · colour \d+$/, ""), stitch: { ...o.stitch, method: "tatami", tartan: undefined } } : o)),
-  };
+      .map((o) =>
+        o.id === layers[0].id && o.stitch.type === "fill"
+          ? { ...o, group: o.group === group ? around : o.group, name: o.name.replace(/ · colour \d+$/, ""), stitch: { ...o.stitch, method: "tatami", tartan: undefined } }
+          : o,
+      ),
+  });
 }

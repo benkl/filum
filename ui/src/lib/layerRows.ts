@@ -213,7 +213,7 @@ export function gatherAtTop(objects: DesignObject[], ids: Iterable<string>): Des
 export function pruneGroups(doc: StitchDocument): StitchDocument {
   let objects = doc.objects;
   let parents = doc.groupParents;
-  for (let pass = 0; pass < 64; pass++) {
+  for (;;) {
     const d: GroupDoc = { objects, groupParents: parents };
     const live = liveGroups(d);
     // what sits directly in each live group: its objects and its live groups
@@ -224,13 +224,18 @@ export function pruneGroups(doc: StitchDocument): StitchDocument {
       if (p) size.set(p, (size.get(p) ?? 0) + 1);
     }
     const fixed = new Set(objects.filter(isFixedMember).map((o) => o.group!));
-    const lone = [...live].find((g) => (size.get(g) ?? 0) <= 1 && !fixed.has(g));
-    if (!lone) break;
-    const up = parentOf(d, lone);
-    objects = objects.map((o) => (o.group === lone ? { ...o, group: up } : o));
-    let next = withParent(parents, lone, undefined);
-    for (const [c, p] of Object.entries(next ?? {})) if (p === lone) next = withParent(next, c, up);
-    parents = next;
+    // the lone groups that don't sit in another lone one: dissolved together, then look again
+    const lone = new Set([...live].filter((g) => (size.get(g) ?? 0) <= 1 && !fixed.has(g)));
+    const now = [...lone].filter((g) => !chainOf(d, parentOf(d, g)).some((x) => lone.has(x)));
+    if (!now.length) break;
+    for (const g of now) {
+      const dd: GroupDoc = { objects, groupParents: parents };
+      const up = parentOf(dd, g);
+      objects = objects.map((o) => (o.group === g ? { ...o, group: up } : o));
+      let next = withParent(parents, g, undefined);
+      for (const [c, p] of Object.entries(next ?? {})) if (p === g) next = withParent(next, c, up);
+      parents = next;
+    }
   }
   const live = liveGroups({ objects, groupParents: parents });
   const keptParents = Object.entries(parents ?? {}).filter(([c, p]) => live.has(c) && live.has(p));

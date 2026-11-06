@@ -376,6 +376,7 @@ function trimMarks(plan: PlanData): TrimMark[] {
   for (let i = 0; i < flags.length; i++) {
     if (!(flags[i] & FLAG.TRIM) || plan.hide?.[i]) continue;
     let j = i + 1;
+    while (j < flags.length && flags[j] & FLAG.TRIM) j++;
     while (j < flags.length && flags[j] & FLAG.JUMP && !(flags[j] & (FLAG.COLOR_CHANGE | FLAG.STOP | FLAG.END))) j++;
     out.push({ i, x: coords[2 * i], y: coords[2 * i + 1], to: j > i + 1 ? [coords[2 * (j - 1)], coords[2 * (j - 1) + 1]] : null, uncut: !!plan.uncut?.mask[i] });
   }

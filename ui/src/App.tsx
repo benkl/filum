@@ -63,13 +63,13 @@ function useShortcuts() {
         return;
       }
       // path commands: join, average points, compound paths
-      if (mod && k === "j") {
+      if (mod && (k === "j" || e.code === "KeyJ") && !s.dialog) {
         e.preventDefault();
         if (e.altKey) averageSelectedNodes();
         else joinSelection();
         return;
       }
-      if (mod && (k === "8" || e.code === "Digit8")) {
+      if (mod && (k === "8" || e.code === "Digit8") && !s.dialog) {
         e.preventDefault();
         if (e.altKey && e.shiftKey) releaseSelection();
         else compoundSelection();

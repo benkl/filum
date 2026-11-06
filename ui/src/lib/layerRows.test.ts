@@ -98,3 +98,8 @@ ok(dropOnRow(ndoc(nobjs, parents), outer, inner).objects === nobjs, "a group dro
 // pruning: an outer group left holding only one group dissolves into it
 const lonely = pruneGroups(ndoc([obj("b", { group: "in" }), obj("c", { group: "in" }), obj("e")], parents));
 ok(lonely.groupParents === undefined && lonely.objects[0].group === "in", "a group around just one group dissolves");
+
+// many groups left with one object each dissolve in one go (not 64 at a time)
+const many: DesignObject[] = [];
+for (let k = 0; k < 70; k++) many.push(obj(`m${k}`, { group: `grp${k}` }));
+ok(pruneGroups(doc(many)).objects.every((o) => !o.group), "seventy one-object groups all dissolve");

@@ -277,7 +277,9 @@ export function StitchOutPanel() {
     else setPhase((p) => (p === "closed" ? p : "closing"));
   }, [open]);
 
-  // the track fills the body's width at zoom 1
+  // the track fills the body's width at zoom 1 (measured once the panel is there:
+  // it mounts a render after `open` turns true)
+  const mounted = phase !== "closed";
   useLayoutEffect(() => {
     const el = bodyRef.current;
     if (!el) return;
@@ -285,7 +287,7 @@ export function StitchOutPanel() {
     ro.observe(el);
     setView(Math.max(120, el.clientWidth - LABEL_W));
     return () => ro.disconnect();
-  }, [open]);
+  }, [mounted]);
   const trackW = view * zoom;
   const inner = Math.max(1, trackW - PAD_L - PAD_R);
 

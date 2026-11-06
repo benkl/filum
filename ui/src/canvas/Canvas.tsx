@@ -96,6 +96,7 @@ import { cornerWidgets, radiusFromWidget, roundCorners, shapeToolPath, type Corn
 import { openDroppedFile } from "../lib/actions";
 import { flatten as flattenSub, normAngle } from "../lib/geometry";
 import { copiedParents } from "../lib/groups";
+import { pruneGroups } from "../lib/layerRows";
 
 const hitCtx = (() => {
   const c = document.createElement("canvas");
@@ -935,7 +936,15 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
       id: uid(),
       ...(o.group ? { group: re(o.group, "g") } : {}),
       ...(o.text ? { text: { ...o.text, group: re(o.text.group, "txt") } } : {}),
-      ...(o.stitch.type === "fill" && o.stitch.gradient ? { stitch: { ...o.stitch, gradient: { ...o.stitch.gradient, group: re(o.stitch.gradient.group, "grd") } } } : {}),
+      ...(o.stitch.type === "fill" && (o.stitch.gradient || o.stitch.tartan)
+        ? {
+            stitch: {
+              ...o.stitch,
+              ...(o.stitch.gradient ? { gradient: { ...o.stitch.gradient, group: re(o.stitch.gradient.group, "grd") } } : {}),
+              ...(o.stitch.tartan ? { tartan: { ...o.stitch.tartan, group: re(o.stitch.tartan.group, "trt") } } : {}),
+            },
+          }
+        : {}),
     }));
     return { objects, parents };
   };
@@ -1833,7 +1842,8 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
           if (e.altKey) {
             // Alt-drag: move a copy, leave the original
             const { objects: copies, parents } = cloneObjects(d.orig);
-            s.liveUpdate((doc) => ({ ...doc, objects: [...doc.objects, ...copies], ...(Object.keys(parents).length ? { groupParents: { ...doc.groupParents, ...parents } } : {}) }));
+            // groups the copy holds only one thing of dissolve (copying one object out of a group)
+            s.liveUpdate((doc) => pruneGroups({ ...doc, objects: [...doc.objects, ...copies], ...(Object.keys(parents).length ? { groupParents: { ...doc.groupParents, ...parents } } : {}) }));
             s.select(copies.map((c) => c.id));
             d.orig = copies;
             d.targets = s.smartGuides ? snapTargets(useStore.getState().doc, new Set(copies.map((c) => c.id))) : null;

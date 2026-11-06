@@ -384,7 +384,8 @@ export const useStore = create<State>((set, get) => ({
       const merged = [...d.threads];
       for (const t of threads ?? []) if (!merged.some((m) => m.id === t.id)) merged.push(t);
       const parents = groupParents && Object.keys(groupParents).length ? { ...d.groupParents, ...groupParents } : d.groupParents;
-      return { ...d, threads: merged, objects: [...d.objects, ...objs], ...(parents ? { groupParents: parents } : {}) };
+      // groups a paste holds only one thing of dissolve (one object copied out of a group)
+      return pruneGroups({ ...d, threads: merged, objects: [...d.objects, ...objs], ...(parents ? { groupParents: parents } : {}) });
     }),
   deleteSelection: () => {
     const sel = new Set(get().selection);

@@ -6,6 +6,8 @@
 import { useStore } from "../store";
 import type { DesignObject, DitherMethod, FillParams, FreePoint, GradientKind, GradientMesh, GradientParams, GradientStop, StitchDocument, SubPath, TransitionCurve, Vec2 } from "../types";
 import { defaultFill, normAngle, objectBounds, uid, unionBoxes, type Box } from "./geometry";
+import { parentOf } from "./groups";
+import { pruneGroups } from "./layerRows";
 
 const store = () => useStore.getState();
 
@@ -215,12 +217,14 @@ export function removeGradient(group: string) {
     const ids = new Set(layers.slice(1).map((l) => l.id));
     const { gradient: _g, ...fill } = keep.stitch as GradientFill;
     void _g;
-    return {
+    // the plain fill stays in the group the gradient was in
+    const around = parentOf(d, group);
+    return pruneGroups({
       ...d,
       objects: d.objects
         .filter((o) => !ids.has(o.id))
-        .map((o) => (o.id === keep.id ? { ...o, group: undefined, name: o.name.replace(/ · colour \d+$/, ""), stitch: { ...fill, type: "fill" } } : o)),
-    };
+        .map((o) => (o.id === keep.id ? { ...o, group: around, name: o.name.replace(/ · colour \d+$/, ""), stitch: { ...fill, type: "fill" } } : o)),
+    });
   });
 }
 
