@@ -24,8 +24,18 @@ Filum follows the usual machine-embroidery conventions:
 - **A shorter gap to the next object** is sewn straight across, as Ink/Stitch does, because a cut that short isn't worth a trim. The exception is a connecting stitch longer than 2 mm that nothing sewn later covers: that one would lie across the fabric, so it's trimmed as well (commercial digitizing software trims from 2 mm).
 - **A colour change** is tied off but not trimmed first: the machine cuts the thread itself when it changes colour.
 - **Stops** (appliqué steps) and the end of the design are tied off and trimmed.
+- **Inside a fill**, travel runs under stitching still to come or along sewn rows. Where a part is walled in by rows already sewn, a straight travel may cross them for at most 2 mm; anything longer is trimmed rather than left on top of the finished rows.
 
-Brother and Baby Lock machines only cut jumps longer than their own *jump stitch trimming* length, 5 mm by default. When a PES file has trims on shorter jumps, the export dialog warns you, so you can lower that length on the machine or snip those threads by hand.
+### What your machine cuts
+
+A trim command asks the machine to cut; whether it does depends on its thread cutter. Set it under **Design → Machine → Stitch-out → Thread cutter**:
+- **Cuts every trim**: most multi-needle and commercial machines.
+- **Cuts longer jumps only**: Brother and Baby Lock home machines cut a jump only when it is longer than their *jump stitch trimming* length (5 mm by default, 5 to 50 mm). Their machine presets set this for you.
+- **None: snip by hand**: machines without a cutter.
+
+The jumps your machine won't cut stay on the fabric, so Filum draws them as thread in every view, in the stitch-out and in exported pictures. The export dialog counts them, and the job sheet lists them under *Snip by hand*. When you export a PES with the cutter left at *Cuts every trim*, the export dialog still tells you how many jumps a Brother machine would leave uncut at its default 5 mm.
+
+Turn on **View → Show → Jump stitches** to check the trims: jumps show as dashed lines, a small triangle marks every cut, and a ring marks where the jump lands. Marks in amber are trims your machine leaves uncut.
 
 ## Stitch processing
 

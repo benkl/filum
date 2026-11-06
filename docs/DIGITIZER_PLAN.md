@@ -156,9 +156,10 @@ Three things were changed:
 - **The PES export warns about trims on jumps under 5 mm**, which Brother machines don't cut by default.
 
 Still open:
-- **Gradient colours trim inside their shape.** A colour may not travel over the colours sewn before it, so its pieces are joined by trims: 98 in six 3-colour flow gradients, 96 of which a travel inside the shape could replace. Travelling under the colours sewn later, along the shared rows, would remove most of them.
-- **Travel crossing the rows on top.** In curved and flow fills a little travel runs across rows already sewn: about 13 mm per fill. Travel along the rows lies in their groove and is accepted practice.
-- **A trim with no jump after it** (a trim set on an object whose next one starts at exactly the same point) is lost in PES, which carries trims on jumps.
+- **Gradient colours trim inside their shape** (#3). The trims come from rows that run *along* the gradient: every row is split between the colours, and a colour's pieces 3–5 mm apart can't be joined without lying on an earlier colour. Travelling hidden under the later colours' stretches of the shared lines was tried and saved 2 of 98. With rows *across* the gradient the three straight-row gradients of the test design drop from 51 trims inside their shapes to 3. Done: rows follow the gradient line when it is redrawn, and the Issues list flags straight rows along a gradient with a one-click fix. Curved and flow gradients keep their trims (their rows follow the shape).
+- **Travel crossing the rows on top** (#4). Done: the line order now routes to any line left before it gives up, and the straight travel out of a walled-in pocket may cross sewn rows for at most 2 mm, else it is a trim. In the 16 curved fills: crossing travel 114 → 58 mm, trims 1 → 13. The 13 test pictures are unchanged.
+- **A trim with no jump after it** (#5) was lost in PES. Done: written as a zero-length trim-jump.
+- **What the machine cuts** (#1, #2). Done: a thread cutter setting (every trim, jumps over a length, none), uncut jumps drawn as thread and counted as hand trims, trim marks with *View → Show → Jump stitches*.
 
 ### Phase D: later
 - Tell a face from a frame's inside by learned segmentation (the on-device model the AI tab already uses), not by geometry alone.
