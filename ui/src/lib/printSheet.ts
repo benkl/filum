@@ -124,6 +124,8 @@ export interface SheetInput {
   /** Total thread (m): top and bobbin. */
   threadM: number;
   bobbinM: number;
+  /** Trims the machine leaves uncut (lib/cuts.ts): jumps to snip by hand. */
+  handTrims?: number;
   /** Data URLs: the whole design and every colour block. */
   overview: string;
   blockPictures: string[];
@@ -151,7 +153,7 @@ export function sheetHtml(input: SheetInput, job: PrintJob, s: PrintSettings): s
   <div class="date">${esc(date)}</div>
 </header>`;
   const details = (time: boolean) => `<div class="details">
-  <dl><dt>Unique colours</dt><dd>${colours}</dd><dt>Colour blocks</dt><dd>${blocks.length}</dd><dt>Total stops</dt><dd>${stops}</dd><dt>Total trims</dt><dd>${trims}</dd></dl>
+  <dl><dt>Unique colours</dt><dd>${colours}</dd><dt>Colour blocks</dt><dd>${blocks.length}</dd><dt>Total stops</dt><dd>${stops}</dd><dt>Total trims</dt><dd>${trims}</dd>${input.handTrims ? `<dt>Snip by hand</dt><dd>${input.handTrims} jumps</dd>` : ""}</dl>
   <dl><dt>Design box size</dt><dd>${input.width.toFixed(1)} × ${input.height.toFixed(1)} mm</dd><dt>Total stitch count</dt><dd>${stitches.toLocaleString()}</dd><dt>Total thread used</dt><dd>${input.threadM.toFixed(1)} m top · ${input.bobbinM.toFixed(1)} m bobbin</dd></dl>
   ${time ? `<dl class="time"><dt>Job estimated time</dt><dd>${total}</dd><dt>Machine speed</dt><dd>${s.spm} spm</dd></dl>` : ""}
 </div>`;

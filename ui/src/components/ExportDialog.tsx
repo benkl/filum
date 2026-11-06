@@ -15,6 +15,7 @@ import { useStore } from "../store";
 import { FLAG, type ExportOptions, type FormatInfo, type MachineColorInfo } from "../types";
 import { Dialog, fmtTime, Num } from "./ui";
 import { FrameButtons, MachineOptions } from "./MachineOptions";
+import { cutterOf, DEFAULT_CUT_OVER, uncutTrims } from "../lib/cuts";
 
 const FORMAT_HINT: Record<string, string> = {
   pes: "Brother, Baby Lock",
@@ -176,6 +177,13 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     reach: copies === 1 ? reach : undefined,
     machineFormat,
     distinctColours: distinct,
+    cuts: plan
+      ? {
+          cutter: cutterOf(doc.machine),
+          uncut: (plan.uncut?.count ?? 0) * copies,
+          brother: (uncutTrims(plan.flags, plan.coords, { kind: "jumps", over: DEFAULT_CUT_OVER })?.count ?? 0) * copies,
+        }
+      : undefined,
   });
   // colours the machine screen shows quite differently (the order is right)
   const far = (colours ?? []).filter((c) => c.shown && !c.exact && (c.deltaE ?? 0) > 10).length;

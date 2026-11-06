@@ -5,6 +5,7 @@
 
 import { RotateCcw } from "lucide-react";
 import type { ReactNode } from "react";
+import { cutterOf } from "../lib/cuts";
 import { currentPreset, MACHINES, presetById } from "../lib/machines";
 import { useStore } from "../store";
 import { LockPicker } from "./LockPicker";
@@ -32,6 +33,7 @@ export function MachineSettings() {
     if (p) commit((d) => ({ ...d, machine: { ...p.values, profile: p.id } }));
   };
   const fmtField = (w: number, h: number) => `${w / 10} × ${h / 10} cm`;
+  const cut = cutterOf(m);
   return (
     <>
       <Section title="Machine" hint={preset?.hint ?? "Your own settings — pick a preset to start from a machine."}>
@@ -127,6 +129,25 @@ export function MachineSettings() {
         <Row label="Trim jumps over" title="Longer travel becomes tie-off + trim + jump">
           <Num value={m.trimDistance} unit="mm" step={0.5} min={0.5} onChange={(v) => up({ trimDistance: v })} />
         </Row>
+        <Row label="Thread cutter" title="What the machine cuts: jumps it leaves are shown as thread and counted as hand trims">
+          <select
+            className="select"
+            value={cut.kind}
+            onChange={(e) => {
+              const kind = e.target.value as typeof cut.kind;
+              up(kind === "trims" ? { cutter: undefined, cutOver: undefined } : { cutter: kind, cutOver: kind === "jumps" ? cut.over : undefined });
+            }}
+          >
+            <option value="trims">Cuts every trim</option>
+            <option value="jumps">Cuts longer jumps only</option>
+            <option value="none">None: snip by hand</option>
+          </select>
+        </Row>
+        {cut.kind === "jumps" && (
+          <Row label="Cuts jumps over" title="The machine's jump stitch trimming length (Brother and Baby Lock: 5 mm by default, 5–50 mm)">
+            <Num value={cut.over} unit="mm" step={1} min={0} max={50} digits={0} onChange={(v) => up({ cutOver: v })} />
+          </Row>
+        )}
         <Row label="Min. stitch" title="Shorter stitches are dropped">
           <Num value={m.minStitch} unit="mm" step={0.05} min={0} onChange={(v) => up({ minStitch: v })} />
         </Row>

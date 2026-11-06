@@ -14,11 +14,18 @@ import type {
   SubPath,
   ThreadListEntry,
 } from "../types";
+import { cutterOf, uncutTrims } from "../lib/cuts";
 
 // Promise-based RPC to the engine worker. Plan requests are coalesced so that
 // rapid edits only ever compute the latest document.
 
 type Pending = { resolve: (v: unknown) => void; reject: (e: Error) => void };
+
+/** A plan with the trims the document's machine leaves uncut. */
+const withCuts = (doc: StitchDocument) => (p: PlanData): PlanData => {
+  p.uncut = uncutTrims(p.flags, p.coords, cutterOf(doc.machine));
+  return p;
+};
 
 /** The document as the engine reads it: reference pictures stay in the UI. */
 const engineJson = (doc: StitchDocument) => JSON.stringify(doc.references ? { ...doc, references: undefined } : doc);
@@ -93,7 +100,7 @@ class EngineClient {
 
   /** A plan in a latest-wins lane of its own (not the editor's). */
   planLatest(lane: string, doc: StitchDocument) {
-    return this.latest<PlanData>(lane, "plan", [engineJson(doc)]);
+    return this.latest<PlanData>(lane, "plan", [engineJson(doc)]).then(withCuts(doc));
   }
   /** Stitched shapes in a latest-wins lane. */
   stitchedShapesLatest(lane: string, doc: StitchDocument) {
@@ -103,14 +110,14 @@ class EngineClient {
   /** Latest-wins plan computation. */
   plan(doc: StitchDocument): Promise<PlanData> {
     const json = engineJson(doc);
-    return new Promise((resolve, reject) => {
+    return new Promise<PlanData>((resolve, reject) => {
       if (this.planBusy) {
         this.planQueued?.reject(new Error("superseded"));
         this.planQueued = { json, resolve, reject };
         return;
       }
       this.runPlan(json, resolve, reject);
-    });
+    }).then(withCuts(doc));
   }
 
   private runPlan(json: string, resolve: (p: PlanData) => void, reject: (e: Error) => void) {
@@ -133,7 +140,7 @@ class EngineClient {
   }
   /** The plan as it goes into a file (repeats, frame out on stops) — pictures of the export. */
   exportPlan(doc: StitchDocument, opts: ExportOptions = {}) {
-    return this.call<PlanData>("exportPlan", [engineJson(doc), JSON.stringify(opts)]);
+    return this.call<PlanData>("exportPlan", [engineJson(doc), JSON.stringify(opts)]).then(withCuts(doc));
   }
   /** The density of the design on its fabric: layers, needle holes, added weight (see lib/density.ts). */
   densityField(doc: StitchDocument, opts: { sigma?: number; maxCells?: number } = {}) {
@@ -183,7 +190,7 @@ class EngineClient {
   }
   /** One-off plan that does not take part in the editor's latest-wins queue. */
   planDetached(doc: StitchDocument) {
-    return this.call<PlanData>("plan", [engineJson(doc)]);
+    return this.call<PlanData>("plan", [engineJson(doc)]).then(withCuts(doc));
   }
   /** Union of the objects grown by `offset` mm (negative shrinks) as closed sub-paths. */
   outlineShapes(doc: StitchDocument, ids: string[], offset: number, o: { bridge?: number; outerOnly?: boolean; minArea?: number } = {}) {

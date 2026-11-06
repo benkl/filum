@@ -8,7 +8,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const CSS = resolve(dirname(fileURLToPath(import.meta.url)), "..", "src", "styles.css");
-const src = readFileSync(CSS, "utf8");
+// git may check the file out with CRLF line ends
+const src = readFileSync(CSS, "utf8").replace(/\r\n/g, "\n");
 const start = src.indexOf("* {\n  box-sizing: border-box;");
 if (start < 0) throw new Error("check-design: the end of the token blocks was not found");
 const offset = src.slice(0, start).split("\n").length - 1;

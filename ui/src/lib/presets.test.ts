@@ -3,7 +3,7 @@
 
 import { defaultFill, defaultRunning, defaultSatin } from "./geometry";
 import { HOOPS, hoopIndex, hoopOf } from "./hoops";
-import { areaFits, currentPreset, exportChecks, INKSTITCH_DEFAULTS, jefHoop, MACHINES, machineById, pickFrame, presetById, FILUM_DEFAULTS } from "./machines";
+import { areaFits, currentPreset, cutterFor, exportChecks, INKSTITCH_DEFAULTS, jefHoop, MACHINES, machineById, pickFrame, presetById, profileValues, FILUM_DEFAULTS } from "./machines";
 import { FABRICS, inHoop, threadWeightInfo } from "./materials";
 import { defaultValues, matchesSet, setChanges } from "./stitchDefaults";
 import type { PlanStats, StitchParams } from "../types";
@@ -50,11 +50,17 @@ const stats = { stitches: 1000, width: 220, height: 150, colorChanges: 0 } as Pl
 const jef = exportChecks({ machine: machineById("doc"), frame: null, format: "jef", stats, hoop: { name: "x", width: 300, height: 300 }, outsideHoop: false, machineFormat: true, distinctColours: 1 });
 check(jef.some((c) => c.id === "jef" && c.level === "warn"), "JEF over 200 × 200 mm warns about the 110 × 110 code");
 // trims on short jumps: Brother machines cut only from their trimming length (5 mm)
-const shortTrims = { ...stats, width: 90, height: 90, shortTrims: 3 } as PlanStats;
-const pes = exportChecks({ machine: machineById("doc"), frame: null, format: "pes", stats: shortTrims, hoop: { name: "x", width: 100, height: 100 }, outsideHoop: false, machineFormat: true, distinctColours: 1 });
+const small = { ...stats, width: 90, height: 90 } as PlanStats;
+const base = { machine: machineById("doc"), frame: null, stats: small, hoop: { name: "x", width: 100, height: 100 }, outsideHoop: false, machineFormat: true, distinctColours: 1 };
+const every = { kind: "trims", over: 5 } as const;
+const pes = exportChecks({ ...base, format: "pes", cuts: { cutter: every, uncut: 0, brother: 3 } });
 check(pes.some((c) => c.id === "short-trims" && c.level === "warn"), "PES with trims on jumps under 5 mm: warns that Brother machines may not cut them");
-const dst = exportChecks({ machine: machineById("doc"), frame: null, format: "dst", stats: shortTrims, hoop: { name: "x", width: 100, height: 100 }, outsideHoop: false, machineFormat: true, distinctColours: 1 });
+const dst = exportChecks({ ...base, format: "dst", cuts: { cutter: every, uncut: 0, brother: 3 } });
 check(!dst.some((c) => c.id === "short-trims"), "DST for another machine: no Brother warning");
+const brother = exportChecks({ ...base, format: "pes", cuts: { cutter: { kind: "jumps", over: 5 }, uncut: 3, brother: 3 } });
+check(brother.some((c) => c.id === "hand-trims") && !brother.some((c) => c.id === "short-trims"), "a machine that cuts longer jumps only: the hand trims, once");
+check(cutterFor(machineById("brother-10x10")).kind === "jumps" && cutterFor(machineById("brother-pr10")).kind === "trims", "Brother one-needle machines cut jumps over 5 mm, the PR cuts every trim");
+check(profileValues(machineById("brother-10x10")).cutOver === 5, "the Brother preset sets the 5 mm trimming length");
 
 // materials
 check(FABRICS.every((f) => f.backing && f.topping && f.needle), "every fabric has backing, topping and needle");

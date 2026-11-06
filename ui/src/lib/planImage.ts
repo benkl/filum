@@ -73,6 +73,7 @@ export function blockPlan(plan: PlanData, block: number): PlanData {
     objects: plan.objects.slice(start, end),
     threads: plan.threads[block] ? [plan.threads[block]] : [],
     stats: plan.stats,
+    uncut: plan.uncut ? { mask: plan.uncut.mask.slice(start, end), count: plan.uncut.count } : plan.uncut,
   };
 }
 

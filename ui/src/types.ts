@@ -447,6 +447,11 @@ export interface MachineSettings {
   colorChangeSeconds: number;
   /** The preset these came from: a machine profile id, "filum" or "inkstitch". */
   profile?: string;
+  /** The thread cutter: cuts every trim (the default), cuts only jumps
+   *  longer than `cutOver`, or none (you snip every jump by hand). */
+  cutter?: "trims" | "jumps" | "none";
+  /** "jumps": the machine's jump trimming length (mm, 5 on Brother). */
+  cutOver?: number;
 }
 
 export type Basting = "none" | "box" | "contour";
@@ -559,8 +564,6 @@ export interface PlanStats {
   stitches: number;
   jumps: number;
   trims: number;
-  /** Trims before a jump shorter than 5 mm (Brother machines may leave them uncut). */
-  shortTrims?: number;
   colorChanges: number;
   stops: number;
   width: number;
@@ -633,6 +636,8 @@ export interface PlanData {
   objects: Uint32Array;
   threads: Thread[];
   stats: PlanStats;
+  /** The trims the machine leaves uncut (lib/cuts.ts); null when it cuts all. */
+  uncut?: import("./lib/cuts").Uncut | null;
 }
 
 export const FLAG = {

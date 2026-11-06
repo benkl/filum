@@ -518,6 +518,7 @@ export class StitchGL {
       gl.deleteTexture(b.recObj);
     }
     const { coords, flags } = plan;
+    const uncut = plan.uncut?.mask;
     const chunks = getChunks(plan, showUnderlay);
     // Entry table: [hw, min hw css px, off x | sheen, off y][r g b a premultiplied][part, depth | slot offset, dash css px, kind]
     const entries: number[] = [];
@@ -574,7 +575,16 @@ export class StitchGL {
         const nx = coords[i * 2];
         const ny = coords[i * 2 + 1];
         if (f & (FLAG.COLOR_CHANGE | FLAG.TRIM | FLAG.STOP | FLAG.END)) {
-          pen = false;
+          if (!uncut?.[i]) pen = false;
+          continue;
+        }
+        if (f & FLAG.JUMP && uncut?.[i]) {
+          // a jump the machine doesn't cut stays on the fabric: a thread
+          segs.push(x, y, nx, ny);
+          segRec.push(i);
+          pen = true;
+          x = nx;
+          y = ny;
           continue;
         }
         if (f & FLAG.JUMP) {

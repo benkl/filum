@@ -8,6 +8,7 @@
 // to two general presets — Filum's own defaults and Ink/Stitch's.
 
 import type { MachineSettings, PlanStats } from "../types";
+import { cutterOf, DEFAULT_CUT_OVER, type Cutter } from "./cuts";
 
 export interface Frame {
   id: string;
@@ -50,6 +51,17 @@ export interface MachineProfile {
   /** File names: Brother machines hide names with other characters. */
   fileNames?: "brother";
   notes?: string;
+}
+
+/**
+ * The thread cutter of a machine (see lib/cuts.ts). Brother and Baby Lock
+ * one-needle machines cut a jump only when it is longer than their "jump
+ * stitch trimming" length, 5 mm by default (5–50 mm; Brother manuals); the
+ * others cut at every trim command.
+ */
+export function cutterFor(m: MachineProfile): Cutter {
+  if ((m.brand === "Brother" || m.brand === "Baby Lock") && (m.needles ?? 1) === 1) return { kind: "jumps", over: DEFAULT_CUT_OVER };
+  return { kind: "trims", over: DEFAULT_CUT_OVER };
 }
 
 const BROTHER_FAQ = "Brother support FAQ (embroidery data not recognized)";
@@ -610,7 +622,9 @@ const TYPICAL_SPM = 800;
  */
 export function profileValues(m: MachineProfile): MachineValues {
   const multi = (m.needles ?? 1) > 1;
+  const cut = cutterFor(m);
   return {
+    ...(cut.kind !== "trims" ? { cutter: cut.kind, cutOver: cut.over } : {}),
     trimDistance: 3,
     ties: true,
     minStitch: 0.3,
@@ -648,7 +662,11 @@ export const SETTINGS_PRESETS: SettingsPreset[] = [
 export const presetById = (id?: string) => SETTINGS_PRESETS.find((p) => p.id === id);
 
 const KEYS = Object.keys(FILUM_DEFAULTS) as (keyof MachineValues)[];
-export const sameValues = (a: MachineValues, b: MachineValues) => KEYS.every((k) => a[k] === b[k]);
+const sameCutter = (a: MachineValues, b: MachineValues) => {
+  const [x, y] = [cutterOf(a), cutterOf(b)];
+  return x.kind === y.kind && (x.kind !== "jumps" || x.over === y.over);
+};
+export const sameValues = (a: MachineValues, b: MachineValues) => KEYS.every((k) => a[k] === b[k]) && sameCutter(a, b);
 
 /** The preset the design's settings come from (by id, else by equal values) and whether they were changed since. */
 export function currentPreset(m: MachineSettings): {
@@ -743,6 +761,9 @@ export function exportChecks(opts: {
   reach?: OvalReach;
   machineFormat: boolean;
   distinctColours: number;
+  /** The machine's thread cutter, the trims it leaves uncut, and those a
+   *  Brother machine would leave at its default 5 mm. */
+  cuts?: { cutter: Cutter; uncut: number; brother: number };
 }): ExportCheck[] {
   const { machine, frame, format, stats, hoop } = opts;
   const out: ExportCheck[] = [];
@@ -811,15 +832,31 @@ export function exportChecks(opts: {
       title: `Special frame: ${frame.note}`,
       detail: `${frame.name} — hoop the item as the manual shows`,
     });
-  // Brother machines cut a jump only from their "jump stitch trimming" length
-  // (5 mm by default): shorter trimmed jumps stay as a loose thread
-  const short = stats.shortTrims ?? 0;
-  if (short > 0 && (format === "pes" || format === "pec" || machine.brand === "Brother" || machine.brand === "Baby Lock"))
+  // jumps the machine doesn't cut stay on the fabric (drawn as thread)
+  const cuts = opts.cuts;
+  const n = (k: number) => `${k} jump${k === 1 ? "" : "s"}`;
+  if (cuts && cuts.uncut > 0 && cuts.cutter.kind === "none")
+    out.push({
+      id: "hand-trims",
+      level: "warn",
+      title: `${n(cuts.uncut)} to snip by hand`,
+      detail: "The machine has no thread cutter: the preview shows these jump threads as thread. Snip them after sewing, or as you go where the hoop could catch them",
+    });
+  else if (cuts && cuts.uncut > 0 && cuts.cutter.kind === "jumps")
+    out.push({
+      id: "hand-trims",
+      level: "warn",
+      title: `${n(cuts.uncut)} the machine won't cut`,
+      detail: `It cuts only jumps longer than ${cuts.cutter.over} mm (its jump trimming length): lower that length on the machine, or snip these by hand`,
+    });
+  else if (cuts && cuts.cutter.kind === "trims" && cuts.brother > 0 && (format === "pes" || format === "pec"))
+    // Brother machines cut a jump only from their "jump stitch trimming"
+    // length (5 mm by default): shorter trimmed jumps stay as a loose thread
     out.push({
       id: "short-trims",
       level: "warn",
-      title: `${short} trim${short === 1 ? "" : "s"} on a jump under 5 mm`,
-      detail: "Brother machines leave jumps shorter than their trimming length (5 mm by default) uncut: lower it on the machine, or snip these by hand",
+      title: `${n(cuts.brother)} under 5 mm stay uncut on Brother machines`,
+      detail: "Brother and Baby Lock machines cut only jumps longer than their trimming length (5 mm by default): lower it on the machine or snip these by hand. Set the thread cutter in Machine settings to see them in the preview",
     });
   if (format === "jef") {
     const j = jefHoop(w, h);

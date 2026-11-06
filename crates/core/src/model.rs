@@ -1546,6 +1546,27 @@ pub struct MachineSettings {
     /// The machine / settings preset these came from (UI id; informational).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub profile: Option<String>,
+    /// The thread cutter: which trims the machine really cuts (the UI's
+    /// preview and hand-trim count, `ui/src/lib/cuts.ts`; the plan and the
+    /// files are the same either way).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cutter: Option<Cutter>,
+    /// `Cutter::Jumps`: the machine's jump trimming length (mm).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cut_over: Option<f64>,
+}
+
+/// What a machine's thread cutter cuts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Cutter {
+    /// Every trim command.
+    Trims,
+    /// Only jumps longer than its trimming length (Brother and Baby Lock
+    /// home machines: 5 mm by default).
+    Jumps,
+    /// No cutter: every jump is snipped by hand.
+    None,
 }
 
 impl Default for MachineSettings {
@@ -1563,6 +1584,8 @@ impl Default for MachineSettings {
             trim_seconds: 6.0,
             color_change_seconds: 12.0,
             profile: None,
+            cutter: None,
+            cut_over: None,
         }
     }
 }

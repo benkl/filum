@@ -94,6 +94,7 @@ export function PrintDialog({ onClose }: { onClose: () => void }) {
         blocks,
         threadM: plan.stats.threadM,
         bobbinM: plan.stats.bobbinM,
+        handTrims: plan.uncut?.count,
         overview: pictures.overview,
         blockPictures: pictures.blocks,
         materials: [
