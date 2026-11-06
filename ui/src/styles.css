@@ -5546,6 +5546,57 @@ kbd {
   color: var(--select);
 }
 /* layers: reference pictures */
+/* layers: find, filter and organise */
+.layers-tools {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1-5) var(--sp-1-5) var(--sp-1);
+  background: var(--panel);
+}
+.layers-tools .select {
+  flex: none;
+  width: 96px;
+}
+.layers-search {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: var(--control-md);
+  padding: 0 var(--sp-1-5);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg-3);
+  color: var(--faint);
+}
+.layers-search:focus-within {
+  border-color: var(--select);
+}
+.layers-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+.layers-search input::-webkit-search-cancel-button {
+  display: none;
+}
+.layers-filtered {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--sp-2) var(--sp-1);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
 .refs {
   margin-top: var(--sp-1-5);
   border-top: 1px solid var(--border);

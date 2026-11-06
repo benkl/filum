@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Info, OctagonAlert, Shapes, TriangleAlert, type LucideIcon, ChevronUp, Eye, EyeOff, GripVertical, ImagePlus, Lock, Move, Sparkles, Trash2, Type, Unlock } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Info, OctagonAlert, Shapes, TriangleAlert, type LucideIcon, ChevronUp, Eye, EyeOff, GripVertical, ImagePlus, Lock, Move, Sparkles, Trash2, Type, Unlock, Search, X, FolderTree } from "lucide-react";
 import { HiddenStitchingSection, ObjectHiddenSection } from "./HiddenStitching";
 import { DensityMap, Hoop, StitchFill, StitchRunning, StitchSatin } from "../icons/stitch";
 import { CommandsSection } from "./CommandsSection";
@@ -22,7 +22,11 @@ import { computeIssues, type Issue } from "../lib/issues";
 import { memo, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { buildLayerRows, dropOnRow, groupInfo, moveBlock, pruneGroups, type GroupLayerRow as GroupRow, type LayerListRow, type ObjectLayerRow as ObjectRow } from "../lib/layerRows";
-import { within } from "../lib/groups";
+import { liveGroups, within } from "../lib/groups";
+import { filterRows, groupByKind, groupByThread, groupTargets, KIND_FILTERS, moveToGroup, rangeIds, solo, ungroupAll, type KindFilter } from "../lib/layerTools";
+import { groupSelection, selectSimilar, ungroupSelection } from "../lib/arrange";
+import { Menu } from "./MenuBar";
+import type { MenuItem } from "./menuModel";
 import {
   defaultDesignOptions,
   defaultGuide,
@@ -106,9 +110,12 @@ interface LayerCtl {
   drop: (key: string) => void;
   dragEnd: () => void;
   rename: (key: string | null) => void;
-  toggle: (o: DesignObject) => void;
+  /** Alt: show only this row (again: everything). */
+  toggle: (o: DesignObject, only?: boolean) => void;
   fold: (group: string, folded: boolean) => void;
-  showGroup: (key: string) => void;
+  showGroup: (key: string, only?: boolean) => void;
+  /** Right-click a row: its menu. */
+  menu: (key: string, e: React.MouseEvent) => void;
   lockGroup: (key: string) => void;
   renameGroup: (group: string, name: string) => void;
   stepGroup: (key: string, dir: 1 | -1) => void;
@@ -123,7 +130,8 @@ export function setGroupsFolded(groups: string[], folded: boolean) {
 
 /** Panel header button: fold every group, or unfold them all when all are folded. */
 export function FoldAllGroups() {
-  const groups = useStore(useShallow((s) => [...new Set(s.doc.objects.map((o) => o.group).filter((g): g is string => !!g))]));
+  // every group, the ones inside other groups too
+  const groups = useStore(useShallow((s) => [...liveGroups(s.doc)]));
   const folded = useStore((s) => s.foldedGroups);
   if (!groups.length) return null;
   const allFolded = groups.every((g) => folded.includes(g));
@@ -164,6 +172,7 @@ const LayerRow = memo(function LayerRow({
     <div
       className={`layer ${depth ? "member" : ""} ${sel ? "sel" : ""} ${o.visible ? "" : "hidden-obj"} ${drop ? `drop-${drop}` : ""}`}
       style={depth ? ({ "--depth": depth } as CSSProperties) : undefined}
+      onContextMenu={(e) => ctl.menu(rowKey, e)}
       onClick={(e) => ctl.select(rowKey, e)}
       draggable
       onDragStart={(e) => {
@@ -214,10 +223,10 @@ const LayerRow = memo(function LayerRow({
       </span>
       <button
         className="mini"
-        title={o.visible ? `Hide ${o.name}` : `Show ${o.name}`}
+        title={`${o.visible ? `Hide ${o.name}` : `Show ${o.name}`} · Alt-click: show only this`}
         onClick={(e) => {
           e.stopPropagation();
-          ctl.toggle(o);
+          ctl.toggle(o, e.altKey);
         }}
       >
         {o.visible ? <Eye size={14} /> : <EyeOff size={14} />}
@@ -264,6 +273,7 @@ const GroupHeader = memo(function GroupHeader({
     <div
       className={`layer group-head ${r.depth ? "member" : ""} ${sel === "all" ? "sel" : sel === "some" ? "part" : ""} ${r.visible === "none" ? "hidden-obj" : ""} ${drop ? `drop-${drop}` : ""}`}
       style={r.depth ? ({ "--depth": r.depth } as CSSProperties) : undefined}
+      onContextMenu={(e) => ctl.menu(r.key, e)}
       tabIndex={0}
       aria-label={`${ROLE_LABEL[r.role]} ${r.name}, ${r.count} ${r.count === 1 ? "object" : "objects"}, ${r.folded ? "folded" : "unfolded"}`}
       onClick={(e) => ctl.select(r.key, e)}
@@ -349,11 +359,11 @@ const GroupHeader = memo(function GroupHeader({
       </button>
       <button
         className={`mini ${r.visible === "some" ? "mixed" : ""}`}
-        title={r.visible === "all" ? `Hide everything in ${r.name}` : `Show everything in ${r.name}`}
+        title={`${r.visible === "all" ? `Hide everything in ${r.name}` : `Show everything in ${r.name}`} · Alt-click: show only this`}
         aria-label={r.visible === "all" ? `Hide the ${what}` : `Show the ${what}`}
         onClick={(e) => {
           e.stopPropagation();
-          ctl.showGroup(r.key);
+          ctl.showGroup(r.key, e.altKey);
         }}
       >
         {r.visible === "none" ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -375,14 +385,25 @@ export function LayersPanel() {
   const s = useStore.getState;
   const [renaming, setRenaming] = useState<string | null>(null);
   const [drag, setDrag] = useState<{ key: string; over: string | null; at: "above" | "below" } | null>(null);
+  const [query, setQuery] = useState("");
+  const [kind, setKind] = useState<KindFilter>("all");
+  const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
+  /** Where a Shift-click range starts: the row clicked last. */
+  const anchor = useRef<string | null>(null);
+  const filtering = !!query.trim() || kind !== "all";
   const colors = new Map(doc.threads.map((t) => [t.id, t.color]));
   const n = doc.objects.length;
   const selected = new Set(selection);
   // top of the list = stitched last (sits on top); a lettering shows as one row, a group as a foldable header
-  const rows = useMemo(() => buildLayerRows(doc.objects, new Set(foldedGroups), doc.groupNames, doc.groupParents), [doc.objects, foldedGroups, doc.groupNames, doc.groupParents]);
+  // while filtering, the groups open so what matches shows
+  const allRows = useMemo(
+    () => buildLayerRows(doc.objects, new Set(filtering ? [] : foldedGroups), doc.groupNames, doc.groupParents),
+    [doc.objects, foldedGroups, doc.groupNames, doc.groupParents, filtering],
+  );
+  const rows = useMemo(() => filterRows(allRows, doc, query, kind), [allRows, doc, query, kind]);
   // the handlers read the current state through a ref: one stable object for every row
-  const cur = useRef({ drag, setDrag, setRenaming, rows });
-  cur.current = { drag, setDrag, setRenaming, rows };
+  const cur = useRef({ drag, setDrag, setRenaming, rows, setMenu });
+  cur.current = { drag, setDrag, setRenaming, rows, setMenu };
   const ctl = useRef<LayerCtl | null>(null);
   if (!ctl.current) {
     const row = (key: string) => cur.current.rows.find((r) => r.key === key);
@@ -397,6 +418,13 @@ export function LayersPanel() {
         const sel = s().selection;
         const ids = r.ids;
         const on = r.kind === "group" ? ids.every((id) => sel.includes(id)) : sel.includes(r.o.id);
+        if (e.shiftKey && anchor.current && anchor.current !== key) {
+          // Shift: the rows from the one clicked last to this one (Ctrl+Shift adds them)
+          const range = rangeIds(cur.current.rows, anchor.current, key);
+          s().select(e.metaKey || e.ctrlKey ? [...new Set([...sel, ...range])] : range);
+          return;
+        }
+        anchor.current = key;
         if (e.shiftKey || e.metaKey || e.ctrlKey) s().select(on ? sel.filter((x) => !ids.includes(x)) : [...sel.filter((x) => !ids.includes(x)), ...ids]);
         else s().select(ids);
         if (r.kind === "object") s().set({ activeThread: r.o.thread });
@@ -432,14 +460,65 @@ export function LayersPanel() {
       },
       dragEnd: () => cur.current.setDrag(null),
       rename: (key) => cur.current.setRenaming(key),
-      toggle: (o) => {
+      toggle: (o, only) => {
         const ids = o.text ? s().doc.objects.filter((x) => x.text?.group === o.text!.group).map((x) => x.id) : [o.id];
-        setAll(ids, () => ({ visible: !o.visible }));
+        if (only) s().commit((d) => solo(d, ids));
+        else setAll(ids, () => ({ visible: !o.visible }));
       },
       fold: (group, folded) => setGroupsFolded([group], folded),
-      showGroup: (key) => {
+      showGroup: (key, only) => {
         const r = row(key);
-        if (r?.kind === "group") setAll(r.ids, () => ({ visible: r.visible !== "all" }));
+        if (r?.kind !== "group") return;
+        if (only) s().commit((d) => solo(d, r.ids));
+        else setAll(r.ids, () => ({ visible: r.visible !== "all" }));
+      },
+      menu: (key, e) => {
+        const r = row(key);
+        if (!r) return;
+        e.preventDefault();
+        // the row's objects become the selection unless they are in it already
+        const sel = s().selection;
+        if (!r.ids.every((id) => sel.includes(id))) s().select(r.ids);
+        const ids = s().selection;
+        const doc = s().doc;
+        const objs = doc.objects.filter((o) => ids.includes(o.id));
+        const into = (g: string | undefined) => () => s().commit((d) => moveToGroup(d, s().selection, g));
+        const targets = groupTargets(doc).filter(([g]) => !objs.every((o) => o.group === g) && !(r.kind === "group" && within(doc, g, r.group)));
+        const items: MenuItem[] = [
+          ...(r.kind === "group"
+            ? ([
+                { label: "Rename", run: () => cur.current.setRenaming(key) },
+                { label: r.folded ? "Unfold" : "Fold", run: () => setGroupsFolded([r.group], !r.folded) },
+                "-",
+              ] as MenuItem[])
+            : []),
+          { label: "Group", kbd: "Ctrl+G", run: groupSelection, disabled: ids.length < 2 && r.kind !== "group" },
+          { label: "Ungroup", kbd: "Ctrl+⇧G", run: ungroupSelection, disabled: !objs.some((o) => o.group) },
+          {
+            label: "Move to group",
+            disabled: !targets.length && !objs.some((o) => o.group),
+            sub: [
+              ...targets.map(([g, name]): MenuItem => ({ label: name, run: into(g) })),
+              ...(targets.length ? (["-"] as MenuItem[]) : []),
+              { label: "Out of every group", run: into(undefined), disabled: !objs.some((o) => o.group) },
+            ],
+          },
+          "-",
+          {
+            label: "Select same",
+            sub: [
+              { label: "Colour", run: () => selectSimilar("color") },
+              { label: "Stitch type", run: () => selectSimilar("type") },
+            ],
+          },
+          "-",
+          { label: "Show only this", run: () => s().commit((d) => solo(d, ids)), hint: "Alt-click an eye does the same" },
+          { label: "Show all", run: () => setAll(s().doc.objects.map((o) => o.id), () => ({ visible: true })), disabled: doc.objects.every((o) => o.visible) },
+          { label: objs.every((o) => o.locked) ? "Unlock" : "Lock", run: () => setAll(ids, () => ({ locked: !objs.every((o) => o.locked) })) },
+          "-",
+          { label: "Delete", kbd: "Del", run: () => s().deleteSelection() },
+        ];
+        cur.current.setMenu({ x: e.clientX, y: e.clientY, items });
       },
       lockGroup: (key) => {
         const r = row(key);
@@ -473,8 +552,71 @@ export function LayersPanel() {
       </>
     );
   const dropOf = (key: string) => (drag?.over === key ? drag.at : null);
+  const organise = (e: React.MouseEvent) => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const run = (f: (d: typeof doc) => { doc: typeof doc; made: number }, what: string) => () => {
+      const out = f(s().doc);
+      if (!out.made) return s().toast(`Nothing to group: no two loose objects share a ${what}`);
+      s().commit(() => out.doc);
+      s().toast(`${out.made} group${out.made === 1 ? "" : "s"} by ${what} · the stitch order stays`, "success");
+    };
+    const groups = [...liveGroups(doc)];
+    setMenu({
+      x: r.left,
+      y: r.bottom + 2,
+      items: [
+        { label: "Group loose objects by thread", run: run(groupByThread, "thread"), hint: "One group per thread colour; the stitch order stays" },
+        { label: "Group loose objects by stitch type", run: run(groupByKind, "stitch type"), hint: "Fills, satins, lines and lettering; the stitch order stays" },
+        { label: "Ungroup all", run: () => s().commit((d) => ungroupAll(d)), disabled: !groups.length },
+        "-",
+        { label: "Fold all groups", run: () => setGroupsFolded(groups, true), disabled: !groups.length },
+        { label: "Unfold all groups", run: () => setGroupsFolded(groups, false), disabled: !groups.length },
+        "-",
+        { label: "Select what's listed", run: () => s().select([...new Set(rows.flatMap((x) => x.ids))]), hint: "Every object the filter shows" },
+        { label: "Show all", run: () => s().commit((d) => ({ ...d, objects: d.objects.map((o) => (o.visible ? o : { ...o, visible: true })) })), disabled: doc.objects.every((o) => o.visible) },
+        { label: "Unlock all", run: () => s().commit((d) => ({ ...d, objects: d.objects.map((o) => (o.locked ? { ...o, locked: false } : o)) })), disabled: !doc.objects.some((o) => o.locked) },
+      ],
+    });
+  };
   return (
     <div onDragOver={(e) => e.preventDefault()}>
+      <div className="layers-tools">
+        <label className="layers-search">
+          <Search size={13} aria-hidden="true" />
+          <input
+            type="search"
+            placeholder="Find layers"
+            aria-label="Find layers by name or thread"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Escape" && setQuery("")}
+          />
+          {query && (
+            <button className="mini" aria-label="Clear the search" onClick={() => setQuery("")}>
+              <X size={12} />
+            </button>
+          )}
+        </label>
+        <select className="select" value={kind} aria-label="Show stitch type" onChange={(e) => setKind(e.target.value as KindFilter)}>
+          {KIND_FILTERS.map(([k, label]) => (
+            <option key={k} value={k}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <button className="icon-btn" title="Organise: group by thread or stitch type, fold, show and unlock all" aria-label="Organise layers" onClick={organise}>
+          <FolderTree size={14} />
+        </button>
+      </div>
+      {filtering && (
+        <div className="layers-filtered">
+          {rows.filter((x) => x.kind === "object").length} of {allRows.filter((x) => x.kind === "object").length} rows
+          <button className="btn sm ghost" onClick={() => (setQuery(""), setKind("all"))}>
+            Clear
+          </button>
+        </div>
+      )}
+      {menu && <Menu items={menu.items} x={menu.x} y={menu.y} onClose={() => setMenu(null)} />}
       {rows.map((r) =>
         r.kind === "group" ? (
           <GroupHeader
