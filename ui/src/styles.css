@@ -591,7 +591,9 @@ input[type="range"]:focus-visible {
   grid-auto-flow: column;
   gap: var(--sp-1);
   min-width: 28px;
-  height: 22px;
+  height: var(--control-sm);
+  /* a segment's label stays on one line */
+  white-space: nowrap;
   padding: 0 var(--sp-1-5);
   border: 0;
   background: none;
@@ -2062,6 +2064,8 @@ input[type="checkbox"] {
 }
 .toggle {
   position: relative;
+  /* a switch keeps its size in a crowded row */
+  flex: none;
   width: 30px;
   height: 17px;
   border-radius: var(--r-full);

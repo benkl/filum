@@ -1083,20 +1083,20 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
                   }
                 >
                   <Row label="Background" title="Leave out the colour that dominates the image border">
-                    <span className="dz-inline">
-                      <Toggle on={settings.removeBackground} onChange={(v) => set({ removeBackground: v })} />
-                      <Seg
-                        disabled={!settings.removeBackground}
-                        value={settings.backgroundScope}
-                        onChange={(v) => set({ backgroundScope: v })}
-                        options={[
-                          ["border", "At the edge"],
-                          ["outside", "Outside & holes"],
-                          ["everywhere", "Everywhere"],
-                        ]}
-                      />
-                    </span>
+                    <Toggle on={settings.removeBackground} onChange={(v) => set({ removeBackground: v })} />
                   </Row>
+                  {/* the three choices need the panel's full width */}
+                  <Seg
+                    full
+                    disabled={!settings.removeBackground}
+                    value={settings.backgroundScope}
+                    onChange={(v) => set({ backgroundScope: v })}
+                    options={[
+                      ["border", "At the edge"],
+                      ["outside", "Outside & holes"],
+                      ["everywhere", "Everywhere"],
+                    ]}
+                  />
                   <div className="dz-removed">
                     <span>
                       <b>{(removedShare * 100).toFixed(removedShare < 0.1 ? 1 : 0)}%</b> of the picture left out
