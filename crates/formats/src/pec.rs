@@ -145,6 +145,8 @@ fn encode_stitches(e: &Encoded, out: &mut Vec<u8>) {
     let mut color_two = true;
     let mut jumping = true;
     let mut init = true;
+    // a trim waiting for its jump: PEC carries trims on jumps only
+    let mut trim = false;
     let (mut xx, mut yy) = (0, 0);
     for r in &e.recs {
         let dx = r.x - xx;
@@ -153,6 +155,14 @@ fn encode_stitches(e: &Encoded, out: &mut Vec<u8>) {
         yy = r.y;
         match r.cmd {
             Cmd::Stitch => {
+                if trim && !jumping {
+                    // no jump after the trim (the next stitch starts where the
+                    // last one ended): a zero-length trim-jump keeps the trim
+                    write_value(out, 0, true, TRIM_CODE);
+                    write_value(out, 0, true, TRIM_CODE);
+                    jumping = true;
+                }
+                trim = false;
                 if jumping {
                     if dx != 0 && dy != 0 {
                         write_stitch(out, 0, 0);
@@ -162,12 +172,14 @@ fn encode_stitches(e: &Encoded, out: &mut Vec<u8>) {
                 write_stitch(out, dx, dy);
             }
             Cmd::Jump => {
+                trim = false;
                 jumping = true;
                 let flag = if init { JUMP_CODE } else { TRIM_CODE };
                 write_value(out, dx, true, flag);
                 write_value(out, dy, true, flag);
             }
             Cmd::ColorChange => {
+                trim = false;
                 if jumping {
                     write_stitch(out, 0, 0);
                     jumping = false;
@@ -176,7 +188,8 @@ fn encode_stitches(e: &Encoded, out: &mut Vec<u8>) {
                 color_two = !color_two;
             }
             // Stops were turned into duplicate colours; trims are implied by trim-jumps.
-            Cmd::Stop | Cmd::Trim => {}
+            Cmd::Stop => {}
+            Cmd::Trim => trim = !init,
             Cmd::End => {
                 out.u8(0xFF);
                 break;
@@ -434,6 +447,21 @@ mod tests {
         assert_eq!(&g[33 * 6..34 * 6], &[0x02, 0, 0, 0, 0, 0x40]);
         assert_eq!(&g[34 * 6..35 * 6], &[0x04, 0, 0, 0, 0, 0x20]);
         assert_eq!(&g[222..228], &[0; 6]);
+    }
+
+    #[test]
+    fn a_trim_with_no_jump_after_it_is_kept() {
+        let rec = |x, cmd| Rec { x, y: 0, cmd };
+        let e = Encoded {
+            recs: vec![rec(0, Cmd::Jump), rec(0, Cmd::Stitch), rec(10, Cmd::Stitch), rec(10, Cmd::Trim), rec(10, Cmd::Stitch), rec(20, Cmd::Stitch), rec(20, Cmd::End)],
+            threads: Vec::new(),
+            name: String::new(),
+        };
+        let mut out = Vec::new();
+        encode_stitches(&e, &mut out);
+        let mut raw = RawPattern::new();
+        read_stitches(&out, &mut raw);
+        assert_eq!(raw.recs.iter().filter(|r| r.cmd == Cmd::Trim).count(), 1);
     }
 
     #[test]
