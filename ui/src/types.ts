@@ -518,6 +518,8 @@ export interface StitchDocument {
   references?: ReferenceImage[];
   /** Names of object groups (`DesignObject.group` → name); unnamed groups show as "Group n". */
   groupNames?: Record<string, string>;
+  /** Nested groups: the group each group sits in (absent: the top level). */
+  groupParents?: Record<string, string>;
 }
 
 /** A reference picture on the canvas, for tracing. */
@@ -920,6 +922,7 @@ export type Tool =
   | "pan"
   | "ruler"
   | "pen"
+  | "curve"
   | "freehand"
   | "satin"
   | "rect"

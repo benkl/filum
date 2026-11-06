@@ -6,7 +6,8 @@
 import { engine } from "../engine/client";
 import { useStore } from "../store";
 import type { DesignObject, StitchDocument, StitchParams, SubPath, Vec2 } from "../types";
-import { gatherAtTop, nextGroupName, pruneGroups } from "./layerRows";
+import { gatherAtTop, groupInfo, isFixedMember, nextGroupName, pruneGroups } from "./layerRows";
+import { chainOf, commonGroup, groupsOf, objectsIn, parentOf, parentsOf, selectedUnits, topGroupOf, withParent } from "./groups";
 import { defaultApplique, defaultFill, defaultRunning, defaultSatin, normAngle, objectBounds, rotateAbout, scaleAbout, transformObject, translateMat, uid, unionBoxes, type Box } from "./geometry";
 
 type Mat = [number, number, number, number, number, number];
@@ -18,7 +19,7 @@ function units(doc: StitchDocument, ids: string[]): DesignObject[][] {
   const out = new Map<string, DesignObject[]>();
   for (const o of doc.objects) {
     if (!ids.includes(o.id) || o.locked) continue;
-    const k = o.group ?? o.text?.group ?? o.id;
+    const k = topGroupOf(doc, o) ?? o.text?.group ?? o.id;
     if (!out.has(k)) out.set(k, []);
     out.get(k)!.push(o);
   }
@@ -354,23 +355,53 @@ export async function overlapSavings(doc: StitchDocument): Promise<{ before: num
  */
 export function groupSelection() {
   const s = store();
-  if (s.selection.length < 2) return s.toast("Select two or more objects to group");
-  const g = uid("g");
+  // a gradient's or tartan's colour layers go into a group together
   const sel = new Set(s.selection);
+  for (const o of s.doc.objects) if (sel.has(o.id) && isFixedMember(o)) for (const x of objectsIn(s.doc, o.group!)) sel.add(x.id);
+  const { groups, objects: loose } = selectedUnits(s.doc, sel);
+  if (groups.length + loose.length < 2) return s.toast("Select two or more objects or groups to group");
+  const g = uid("g");
   s.commit((d) => {
-    const name = nextGroupName(d);
-    const objects = gatherAtTop(d.objects.map((o) => (sel.has(o.id) ? { ...o, group: g } : o)), sel);
-    return pruneGroups({ ...d, objects, groupNames: { ...d.groupNames, [g]: name } });
+    // the new group sits in the deepest group that holds everything selected
+    const chains = [...groups.map((x) => chainOf(d, parentOf(d, x))), ...loose.map((o) => groupsOf(d, o))];
+    const around = chains.some((c) => !c.length) ? undefined : commonGroup(chains);
+    let parents = withParent(d.groupParents, g, around);
+    for (const x of groups) parents = withParent(parents, x, g);
+    const inLoose = new Set(loose.map((o) => o.id));
+    const objects = gatherAtTop(
+      d.objects.map((o) => (inLoose.has(o.id) ? { ...o, group: g } : o)),
+      sel,
+    );
+    return pruneGroups({ ...d, objects, groupParents: parents, groupNames: { ...d.groupNames, [g]: nextGroupName(d) } });
   });
-  s.toast(`Grouped ${s.selection.length} objects · Ctrl-click picks one inside`);
+  s.select([...sel]);
+  s.toast(`Grouped ${groups.length + loose.length} items · Ctrl-click picks one inside`);
 }
 
 /** Ungroup (Ctrl+Shift+G). Gradient colour layers stay one gradient. */
 export function ungroupSelection() {
   const s = store();
-  const out = (o: DesignObject) => s.selection.includes(o.id) && !!o.group && !(o.stitch.type === "fill" && o.stitch.gradient?.group === o.group);
-  if (!s.doc.objects.some(out)) return s.toast("Nothing to ungroup");
-  s.commit((d) => pruneGroups({ ...d, objects: d.objects.map((o) => (out(o) ? { ...o, group: undefined } : o)) }));
+  const sel = new Set(s.selection);
+  const { groups, objects: loose } = selectedUnits(s.doc, sel);
+  const roles = groupInfo(s.doc.objects, s.doc.groupNames, s.doc.groupParents);
+  // a selected group opens one level: what is in it moves up into the group around it
+  const open = groups.filter((g) => roles.get(g)?.role === "group");
+  // an object picked inside a group (Ctrl-click) leaves its group
+  const out = loose.filter((o) => o.group && !isFixedMember(o));
+  if (!open.length && !out.length) return s.toast("Nothing to ungroup");
+  s.commit((d) => {
+    let parents = d.groupParents;
+    let objects = d.objects;
+    for (const g of open) {
+      const up = parentOf(d, g);
+      objects = objects.map((o) => (o.group === g ? { ...o, group: up } : o));
+      for (const [c, p] of Object.entries(parents ?? {})) if (p === g) parents = withParent(parents, c, up);
+      parents = withParent(parents, g, undefined);
+    }
+    const leaving = new Set(out.map((o) => o.id));
+    objects = objects.map((o) => (leaving.has(o.id) ? { ...o, group: parentOf(d, o.group!) } : o));
+    return pruneGroups({ ...d, objects, groupParents: parents });
+  });
 }
 
 export type ShapeBooleanOp = "unite" | "minusFront" | "intersect" | "exclude";
@@ -480,7 +511,7 @@ export function unlockAll() {
 
 /** Objects on the clipboard (with their threads); also put on the system clipboard as text. */
 const CLIP_TAG = "filum/objects:";
-let objectClip: { objects: DesignObject[]; threads: StitchDocument["threads"] } | null = null;
+let objectClip: { objects: DesignObject[]; threads: StitchDocument["threads"]; groupParents?: Record<string, string> } | null = null;
 let pastes = 0;
 
 /** The selection as clipboard text (and remembered for Paste). */
@@ -489,7 +520,7 @@ export function copySelection(cut = false): string | null {
   const objects = s.doc.objects.filter((o) => s.selection.includes(o.id));
   if (!objects.length) return null;
   const used = new Set(objects.map((o) => o.thread));
-  objectClip = { objects: structuredClone(objects), threads: s.doc.threads.filter((t) => used.has(t.id)) };
+  objectClip = { objects: structuredClone(objects), threads: s.doc.threads.filter((t) => used.has(t.id)), groupParents: parentsOf(s.doc, objects) };
   pastes = 0;
   if (cut) {
     s.deleteSelection();
@@ -539,6 +570,8 @@ export function pasteClipboard(inPlace = false) {
       clone: c.clone && ids.has(c.clone.of) ? c.clone : undefined,
     };
   });
-  s.addObjects(copies, objectClip.threads);
+  // the nesting of the pasted groups comes along
+  const nested = Object.entries(objectClip.groupParents ?? {}).map(([c, p]) => [regroup(c, "g")!, regroup(p, "g")!]);
+  s.addObjects(copies, objectClip.threads, Object.fromEntries(nested));
   s.select(copies.map((c) => c.id));
 }

@@ -3,7 +3,7 @@
 import { useStore } from "../store";
 import type { StitchDocument, Vec2 } from "../types";
 import { syncGradientGeometry } from "./gradient";
-import { alignNodes, allNodes, breakAtNodes, deleteSelectedNodes, joinNodes, moveNodes, setNodeType, setSegmentType, toggleClosed } from "./nodeOps";
+import { alignNodes, allNodes, averageNodes, breakAtNodes, deleteSelectedNodes, joinNodes, moveNodes, setNodeType, setSegmentType, toggleClosed } from "./nodeOps";
 
 /** Keep gradient layers on the shapes of every object that changed. */
 export function syncAll(before: StitchDocument, after: StitchDocument): StitchDocument {
@@ -33,6 +33,13 @@ export function deleteNodes(keepShape: boolean) {
 export const nodeType = (t: "corner" | "smooth" | "symmetric") => apply((d) => setNodeType(d, useStore.getState().nodeSel, t));
 export const segmentType = (t: "line" | "curve") => apply((d) => setSegmentType(d, useStore.getState().nodeSel, t));
 export const alignSelected = (axis: "h" | "v") => apply((d) => alignNodes(d, useStore.getState().nodeSel, axis));
+
+/** Average (Ctrl+Alt+J): the selected points onto their average point. */
+export function averageSelectedNodes() {
+  const s = useStore.getState();
+  if (s.tool !== "node" || s.nodeSel.length < 2) return s.toast("Select two or more points with the node tool (A)");
+  apply((d) => averageNodes(d, s.nodeSel));
+}
 
 export function breakNodes() {
   apply((d) => breakAtNodes(d, useStore.getState().nodeSel));

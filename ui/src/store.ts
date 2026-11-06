@@ -201,7 +201,7 @@ export interface State {
   setView: (v: Partial<View>) => void;
   updateObject: (id: string, patch: Partial<DesignObject>) => void;
   updateStitch: (id: string, patch: StitchPatch, live?: boolean) => void;
-  addObjects: (objs: DesignObject[], threads?: Thread[]) => void;
+  addObjects: (objs: DesignObject[], threads?: Thread[], groupParents?: Record<string, string>) => void;
   deleteSelection: () => void;
   duplicateSelection: () => void;
   moveInOrder: (id: string, delta: number) => void;
@@ -379,11 +379,12 @@ export const useStore = create<State>((set, get) => ({
     if (live) get().liveUpdate(fn);
     else get().commit(fn);
   },
-  addObjects: (objs, threads) =>
+  addObjects: (objs, threads, groupParents) =>
     get().commit((d) => {
       const merged = [...d.threads];
       for (const t of threads ?? []) if (!merged.some((m) => m.id === t.id)) merged.push(t);
-      return { ...d, threads: merged, objects: [...d.objects, ...objs] };
+      const parents = groupParents && Object.keys(groupParents).length ? { ...d.groupParents, ...groupParents } : d.groupParents;
+      return { ...d, threads: merged, objects: [...d.objects, ...objs], ...(parents ? { groupParents: parents } : {}) };
     }),
   deleteSelection: () => {
     const sel = new Set(get().selection);

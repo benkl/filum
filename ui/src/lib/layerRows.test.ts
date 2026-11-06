@@ -1,5 +1,5 @@
 import type { DesignObject, StitchDocument } from "../types";
-import { buildLayerRows, dropRow, gatherAtTop, moveBlock, nextGroupName, pruneGroups, type LayerListRow } from "./layerRows";
+import { buildLayerRows, dropOnRow, dropRow, gatherAtTop, moveBlock, nextGroupName, pruneGroups, type LayerListRow } from "./layerRows";
 
 function ok(c: unknown, msg: string) {
   if (!c) throw new Error(msg);
@@ -78,3 +78,23 @@ ok(pruned.objects[0].group === undefined && pruned.groupNames === undefined, "a 
 const d0 = doc(objs, { g: "Petals" });
 ok(pruneGroups(d0) === d0, "nothing to prune: the same document");
 ok(pruneGroups(doc(gobjs.slice(0, 1))).objects[0].group === "grd1", "a lone gradient layer keeps its group");
+
+// nested groups: "in" (b, c) sits in "out" (with d); e stands alone
+const nobjs = [obj("a"), obj("b", { group: "in" }), obj("c", { group: "in" }), obj("d", { group: "out" }), obj("e")];
+const parents = { in: "out" };
+const nrows = buildLayerRows(nobjs, new Set(), {}, parents);
+ok(keys(nrows) === "e [out] .d [in] .c .b a", "a group inside a group: its header under the outer one, its members under it");
+const inner = nrows.find((r) => r.key === "g:in")!;
+const outer = nrows.find((r) => r.key === "g:out")!;
+ok(inner.kind === "group" && inner.depth === 1 && inner.parent === "out" && inner.count === 2, "the inner header: one level in, two rows");
+ok(outer.kind === "group" && outer.depth === 0 && outer.count === 2 && outer.ids.join("") === "bcd", "the outer header counts its object and its group, and holds all three objects");
+ok(nrows.find((r) => r.key === "o:b")!.depth === 2, "members of the inner group are two levels in");
+ok(keys(buildLayerRows(nobjs, new Set(["out"]), {}, parents)) === "e [out] a", "folding the outer group hides the inner one too");
+const ndoc = (objects: DesignObject[], groupParents?: Record<string, string>) => ({ objects, groupParents }) as unknown as StitchDocument;
+// dragging a group onto a row in another group puts it there
+const moved = dropOnRow(ndoc(nobjs, parents), inner, nrows.find((r) => r.key === "o:e")!);
+ok(!moved.groupParents?.in, "a group dragged onto a top-level row leaves its group");
+ok(dropOnRow(ndoc(nobjs, parents), outer, inner).objects === nobjs, "a group dropped on a group inside it: nothing changes");
+// pruning: an outer group left holding only one group dissolves into it
+const lonely = pruneGroups(ndoc([obj("b", { group: "in" }), obj("c", { group: "in" }), obj("e")], parents));
+ok(lonely.groupParents === undefined && lonely.objects[0].group === "in", "a group around just one group dissolves");

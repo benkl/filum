@@ -1,7 +1,7 @@
 // One icon per tool, shared by the tool rail, the Tools menu and the command
 // palette so they never disagree.
 
-import { Circle, Combine, Hand, MousePointer2, PenLine, PenTool, Ruler, Slice, Spline, Square, Type, type LucideIcon } from "lucide-react";
+import { Circle, Combine, Hand, MousePointer2, PenLine, PenTool, Ruler, Slice, Spline, Square, Type, Waypoints, type LucideIcon } from "lucide-react";
 import type { Tool } from "../types";
 import { GradientTool, StitchAngle, StitchSatin } from "./stitch";
 
@@ -13,6 +13,7 @@ export const TOOL_ICONS: Record<Tool, LucideIcon> = {
   // a knife: scissors mean a thread trim in embroidery
   cut: Slice,
   pen: PenTool,
+  curve: Waypoints,
   freehand: PenLine,
   satin: StitchSatin,
   guides: StitchAngle,

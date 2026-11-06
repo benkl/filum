@@ -19,9 +19,10 @@ import { MeanderPicker } from "./MeanderPicker";
 import { GradientSection } from "./GradientPanel";
 import { ThreadCard, ThreadPicker } from "./ThreadPicker";
 import { computeIssues, type Issue } from "../lib/issues";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { buildLayerRows, dropRow, groupInfo, moveBlock, pruneGroups, type GroupLayerRow as GroupRow, type ObjectLayerRow as ObjectRow } from "../lib/layerRows";
+import { buildLayerRows, dropOnRow, groupInfo, moveBlock, pruneGroups, type GroupLayerRow as GroupRow, type LayerListRow, type ObjectLayerRow as ObjectRow } from "../lib/layerRows";
+import { within } from "../lib/groups";
 import {
   defaultDesignOptions,
   defaultGuide,
@@ -143,7 +144,7 @@ const LayerRow = memo(function LayerRow({
   color,
   drop,
   renaming,
-  member,
+  depth,
   ctl,
 }: {
   o: DesignObject;
@@ -154,13 +155,15 @@ const LayerRow = memo(function LayerRow({
   color: string;
   drop: "above" | "below" | null;
   renaming: boolean;
-  member: boolean;
+  /** How many groups it is in (its indent). */
+  depth: number;
   ctl: LayerCtl;
 }) {
   const s = useStore.getState;
   return (
     <div
-      className={`layer ${member ? "member" : ""} ${sel ? "sel" : ""} ${o.visible ? "" : "hidden-obj"} ${drop ? `drop-${drop}` : ""}`}
+      className={`layer ${depth ? "member" : ""} ${sel ? "sel" : ""} ${o.visible ? "" : "hidden-obj"} ${drop ? `drop-${drop}` : ""}`}
+      style={depth ? ({ "--depth": depth } as CSSProperties) : undefined}
       onClick={(e) => ctl.select(rowKey, e)}
       draggable
       onDragStart={(e) => {
@@ -259,7 +262,8 @@ const GroupHeader = memo(function GroupHeader({
   const what = `${ROLE_LABEL[r.role].toLowerCase()} ${r.name}`;
   return (
     <div
-      className={`layer group-head ${sel === "all" ? "sel" : sel === "some" ? "part" : ""} ${r.visible === "none" ? "hidden-obj" : ""} ${drop ? `drop-${drop}` : ""}`}
+      className={`layer group-head ${r.depth ? "member" : ""} ${sel === "all" ? "sel" : sel === "some" ? "part" : ""} ${r.visible === "none" ? "hidden-obj" : ""} ${drop ? `drop-${drop}` : ""}`}
+      style={r.depth ? ({ "--depth": r.depth } as CSSProperties) : undefined}
       tabIndex={0}
       aria-label={`${ROLE_LABEL[r.role]} ${r.name}, ${r.count} ${r.count === 1 ? "object" : "objects"}, ${r.folded ? "folded" : "unfolded"}`}
       onClick={(e) => ctl.select(r.key, e)}
@@ -375,11 +379,10 @@ export function LayersPanel() {
   const n = doc.objects.length;
   const selected = new Set(selection);
   // top of the list = stitched last (sits on top); a lettering shows as one row, a group as a foldable header
-  const rows = useMemo(() => buildLayerRows(doc.objects, new Set(foldedGroups), doc.groupNames), [doc.objects, foldedGroups, doc.groupNames]);
-  const tops = rows.filter((r) => r.kind === "group" || !r.member);
+  const rows = useMemo(() => buildLayerRows(doc.objects, new Set(foldedGroups), doc.groupNames, doc.groupParents), [doc.objects, foldedGroups, doc.groupNames, doc.groupParents]);
   // the handlers read the current state through a ref: one stable object for every row
-  const cur = useRef({ drag, setDrag, setRenaming, rows, tops });
-  cur.current = { drag, setDrag, setRenaming, rows, tops };
+  const cur = useRef({ drag, setDrag, setRenaming, rows });
+  cur.current = { drag, setDrag, setRenaming, rows };
   const ctl = useRef<LayerCtl | null>(null);
   if (!ctl.current) {
     const row = (key: string) => cur.current.rows.find((r) => r.key === key);
@@ -410,8 +413,10 @@ export function LayersPanel() {
         const from = rs.findIndex((r) => r.key === d.key);
         const to = rs.findIndex((r) => r.key === key);
         const t = rs[to];
-        // a group over its own members goes nowhere
-        const none = key === d.key || (rs[from]?.kind === "group" && t?.kind === "object" && t.member === (rs[from] as GroupRow).group);
+        // a group over anything inside it goes nowhere
+        const g = rs[from]?.kind === "group" ? (rs[from] as GroupRow).group : null;
+        const doc = s().doc;
+        const none = key === d.key || (!!g && !!t && (t.kind === "object" ? !!t.member && within(doc, t.member, g) : within(doc, t.group, g)));
         const over = none ? null : key;
         const at = to < from || (t?.kind === "group" && t.group === (rs[from] as ObjectRow | undefined)?.member) ? "above" : "below";
         if (d.over !== over || d.at !== at) cur.current.setDrag({ ...d, over, at });
@@ -422,9 +427,8 @@ export function LayersPanel() {
         const from = d && row(d.key);
         const to = row(key);
         if (!from || !to) return;
-        const objects = s().doc.objects;
-        if (dropRow(objects, from, to) === objects) return;
-        s().commit((doc) => pruneGroups({ ...doc, objects: dropRow(doc.objects, from, to) }));
+        if (dropOnRow(s().doc, from, to) === s().doc) return;
+        s().commit((doc) => pruneGroups(dropOnRow(doc, from, to)));
       },
       dragEnd: () => cur.current.setDrag(null),
       rename: (key) => cur.current.setRenaming(key),
@@ -444,7 +448,7 @@ export function LayersPanel() {
       renameGroup: (group, name) => {
         const names = s().doc.groupNames ?? {};
         if ((names[group] ?? "") === name) return;
-        const auto = !name || name === groupInfo(s().doc.objects, { ...names, [group]: "" }).get(group)?.name;
+        const auto = !name || name === groupInfo(s().doc.objects, { ...names, [group]: "" }, s().doc.groupParents).get(group)?.name;
         s().commit((d) => {
           const { [group]: _, ...rest } = d.groupNames ?? {};
           const next = auto ? rest : { ...rest, [group]: name };
@@ -452,7 +456,7 @@ export function LayersPanel() {
         });
       },
       stepGroup: (key, dir) => {
-        const { tops: ts } = cur.current;
+        const ts = siblings(cur.current.rows, key);
         const k = ts.findIndex((r) => r.key === key);
         const r = ts[k];
         const next = ts[k - dir];
@@ -480,8 +484,8 @@ export function LayersPanel() {
             colors={r.threads.map((t) => colors.get(t) ?? "#222")}
             drop={dropOf(r.key)}
             renaming={renaming === r.key}
-            first={tops[0] === r}
-            last={tops[tops.length - 1] === r}
+            first={siblings(rows, r.key)[0] === r}
+            last={siblings(rows, r.key).at(-1) === r}
             ctl={ctl.current!}
           />
         ) : (
@@ -495,7 +499,7 @@ export function LayersPanel() {
             color={colors.get(r.o.thread) ?? "#222"}
             drop={dropOf(r.key)}
             renaming={renaming === r.key}
-            member={!!r.member}
+            depth={r.depth}
             ctl={ctl.current!}
           />
         ),
@@ -506,6 +510,17 @@ export function LayersPanel() {
 }
 
 const tri = (k: number, n: number) => (k === n ? "all" : k ? "some" : "none");
+
+/** The group a row sits in (none at the top level). */
+const containerOf = (r: LayerListRow) => (r.kind === "group" ? r.parent : r.member);
+
+/** The rows next to `key` in the same group, top first. */
+function siblings(rows: LayerListRow[], key: string): LayerListRow[] {
+  const r = rows.find((x) => x.key === key);
+  if (!r) return [];
+  const c = containerOf(r);
+  return rows.filter((x) => containerOf(x) === c);
+}
 
 /** Reference pictures: under the stitch layers (they are never stitched). */
 function ReferencesList() {

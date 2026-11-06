@@ -60,6 +60,8 @@ import { runCutwork } from "./CutworkPanel";
 import { EFFECTS, lineAsFillGuide, openEffect, pathCommand } from "./ShapeEffects";
 import { chooseThreadList } from "./ThreadListDialog";
 import { lastChart } from "./ThreadPicker";
+import { compoundSelection, joinSelection, releaseSelection } from "../lib/pathActions";
+import { averageSelectedNodes } from "../lib/nodeActions";
 
 export type MenuItem =
   | {
@@ -251,12 +253,22 @@ export function buildMenus(): Record<string, MenuItem[]> {
     Path: [
       { label: "Effects", icon: Wand2, disabled: !hasSel, sub: EFFECTS.map((e): MenuItem => ({ label: `${e.label}…`, hint: e.title, run: () => openEffect(e.id), disabled: !hasSel })) },
       { label: "Outlines & offsets…", icon: PatchBorder, run: () => s.setDialog("outline"), disabled: !hasSel },
+      { label: "Join", kbd: `${mod}J`, run: joinSelection, disabled: !hasSel, hint: "Close an open path, or join open paths at their nearest ends" },
+      {
+        label: "Compound path",
+        disabled: !hasSel,
+        sub: [
+          { label: "Make", kbd: `${mod}8`, run: compoundSelection, disabled: !many, hint: "The paths of the selected shapes become one object (inner ones are holes)" },
+          { label: "Release", kbd: `${mod}Alt+⇧8`, run: releaseSelection, disabled: !hasSel, hint: "Every path of an object becomes an object of its own" },
+        ],
+      },
       {
         label: "Nodes",
         icon: Spline,
         disabled: !hasSel,
         sub: [
           { label: "Make all corners sharp", run: () => pathCommand(sharpen, "Corners sharpened"), disabled: !hasSel },
+          { label: "Average points", kbd: `${mod}Alt+J`, run: averageSelectedNodes, disabled: s.tool !== "node" || s.nodeSel.length < 2, hint: "Move the selected points onto their average point (node tool)" },
           { label: "Reverse path direction", run: () => pathCommand(reversePath, "Reversed"), disabled: !hasSel },
         ],
       },
@@ -445,6 +457,7 @@ export function buildMenus(): Record<string, MenuItem[]> {
       tool("cut", "Cutter", "C"),
       "-",
       tool("pen", "Pen", "P"),
+      tool("curve", "Curvature", "U"),
       tool("freehand", "Freehand", "F"),
       tool("satin", "Satin column", "S"),
       tool("rect", "Rectangle", "R"),

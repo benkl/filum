@@ -9,11 +9,12 @@ Every object in Filum is a shape plus a **stitch type**. Draw a shape with a too
 | Tool | Key | What it does |
 |---|---|---|
 | Select | <kbd>V</kbd> | Select, move, scale, rotate and skew. <kbd>Alt</kbd>+drag moves a copy, <kbd>Shift</kbd>-click adds to the selection, and double-clicking an object edits its points. |
-| Edit nodes | <kbd>A</kbd> | Reshape a path: click a segment to add a point, <kbd>Alt</kbd>-click a point to delete it, double-click to switch between smooth and corner. |
+| Edit nodes | <kbd>A</kbd> | Reshape a path: drag a segment to bend the curve, click a segment to add a point, <kbd>Alt</kbd>-click a point to delete it, double-click to switch between smooth and corner. <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>J</kbd> moves the selected points onto their average point. |
 | Cutter | <kbd>C</kbd> | Click a line to split it, or drag across a fill to cut it in two. |
 | Pan | <kbd>H</kbd> or <kbd>Space</kbd> | Move around the canvas. |
 | Ruler | <kbd>M</kbd> | Drag to measure. |
 | Pen | <kbd>P</kbd> | Draw a running-stitch path with Bézier curves. Click for a corner, drag for a curve, <kbd>Enter</kbd> to finish. Close the shape to make a fill. |
+| Curvature | <kbd>U</kbd> | Click points and the path curves smoothly through them; it bends towards the pointer as you go. Double-click a point to make it a corner (and back), drag a point to move it, click the first point to close. |
 | Freehand | <kbd>F</kbd> | Draw by hand. A stabiliser smooths your line into a clean curve, which can become a run, a triple run or a satin. |
 | Satin column | <kbd>S</kbd> | Draw a satin column along a path. The scroll wheel or <kbd>[</kbd> <kbd>]</kbd> sets the width of the next point. |
 | Stitch direction | <kbd>D</kbd> | Draw guide lines across a satin or fill to steer the stitch direction. |
@@ -24,6 +25,14 @@ Every object in Filum is a shape plus a **stitch type**. Draw a shape with a too
 | Shape builder | <kbd>B</kbd> | Drag across overlapping shapes to merge them. <kbd>Alt</kbd>+drag deletes pieces. |
 
 While a tool is active, the hints line at the bottom shows what each click and key does.
+
+### Path commands
+
+Under **Path**:
+- **Join** (<kbd>Ctrl</kbd>+<kbd>J</kbd>): one open path closes; several open paths become one, joined each time at their two nearest ends.
+- **Compound path → Make** (<kbd>Ctrl</kbd>+<kbd>8</kbd>): the paths of the selected shapes become one object with the style of the one sewn first. In a fill, the inner paths are holes. **Release** (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>8</kbd>) makes every path an object of its own again.
+- **Nodes → Average points** (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>J</kbd>, node tool): the selected points meet at their average point.
+- **Outlines & offsets**, **Effects**, **Combine shapes** (unite, minus front, intersect, exclude, divide) and the **Shape builder** work on the selected shapes as before.
 
 ## Line stitches
 

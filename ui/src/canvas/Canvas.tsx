@@ -25,7 +25,7 @@ import {
 } from "../lib/geometry";
 import { useStore } from "../store";
 import type { DesignObject, NodeRef, PathNode, ReferenceImage, StitchDocument, StitchParams, SubPath, Vec2 } from "../types";
-import { handlesCollinear, joinNodes, moveNodes, nodeKey, nodesInBox } from "../lib/nodeOps";
+import { bendSegment, handlesCollinear, joinNodes, moveNodes, nodeKey, nodesInBox } from "../lib/nodeOps";
 import { syncAll } from "../lib/nodeActions";
 import { addReference, refCenter, refContains, refCorners, referenceAt, refRotateKnob, toLocal, toWorld } from "../lib/references";
 import { ReferenceBar } from "../components/ReferenceBar";
@@ -50,6 +50,7 @@ import {
   moveHandle,
   newDraft,
   PEN_HINTS,
+  CURVE_HINTS,
   penHitTest,
   placePoint,
   pullHandles,
@@ -58,6 +59,9 @@ import {
   toggleSmoothInDraft,
   type PenDraft,
   type PenHover,
+  addCurvePoint,
+  curvePreview,
+  smoothDraft,
 } from "./penTool";
 import { extendStroke, finishStroke, isClosedStroke, ropeLength, startStroke, strokeToPath, type FreehandStroke } from "./freehand";
 import { constrainAngle, deleteNode, flattenSubPath, insertNode, nearestOnSubPath, resample, toggleSmooth } from "../lib/bezier";
@@ -91,6 +95,7 @@ import { displayPlan } from "../lib/threads";
 import { cornerWidgets, radiusFromWidget, roundCorners, shapeToolPath, type CornerStyle } from "../lib/shapeOps";
 import { openDroppedFile } from "../lib/actions";
 import { flatten as flattenSub, normAngle } from "../lib/geometry";
+import { copiedParents } from "../lib/groups";
 
 const hitCtx = (() => {
   const c = document.createElement("canvas");
@@ -133,6 +138,7 @@ type Drag =
   | { kind: "handle"; h: Handle; orig: DesignObject; moved: boolean }
   | { kind: "texthandle"; h: Handle; group: string; spec: TextSpec; start: Vec2; moved: boolean }
   | { kind: "pen-new"; idx: number; moved: boolean; last: Vec2 }
+  | { kind: "bend"; o: DesignObject; sp: number; seg: number; t: number; start: Vec2; moved: boolean }
   | { kind: "pen-close"; moved: boolean }
   | { kind: "pen-last"; moved: boolean; keepIn?: Vec2 }
   | { kind: "pen-anchor"; idx: number; orig: PathNode; start: Vec2; moved: boolean }
@@ -358,7 +364,7 @@ export function Canvas() {
             ? computeHandles(s.doc.objects[selIndex], selIndex, s.plan, s.view.scale)
             : [];
       const threadColor = s.doc.threads.find((t) => t.id === (s.activeThread ?? s.doc.threads[0]?.id))?.color ?? "#b3203a";
-      const pd = (s.tool === "pen" || s.tool === "satin") && penRef.current?.nodes.length ? penRef.current : null;
+      const pd = (s.tool === "pen" || s.tool === "satin" || s.tool === "curve") && penRef.current?.nodes.length ? penRef.current : null;
       // the shortcut hints follow the drawing state
       if (!!pd !== s.drafting) queueMicrotask(() => useStore.setState({ drafting: !!pd }));
       let satinOv: InteractiveOverlay["satin"] = null;
@@ -385,9 +391,11 @@ export function Canvas() {
           };
         }
         const len = s.toolOptions.pen.length;
+        // curvature: the curve bends towards the cursor as if a point were there
+        const cp = s.tool === "curve" && withCursor ? curvePreview(pd) : null;
         penOv = {
-          nodes: pd.nodes,
-          rubber: pd.kind === "run" && (withCursor || closing) ? rubberBand(pd, closing) : null,
+          nodes: cp?.nodes ?? pd.nodes,
+          rubber: cp ? cp.rubber : pd.kind === "run" && (withCursor || closing) ? rubberBand(pd, closing) : null,
           hover,
           active,
           color: threadColor,
@@ -874,6 +882,8 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
     iRef.current.tooltip = null;
     if (!d || d.nodes.length < 2) return draw();
     const isClosed = closed && canClose(d);
+    // curvature: closed, the first and last points curve through each other
+    if (isClosed) smoothDraft(d, true);
     let o: DesignObject;
     if (d.kind === "satin") {
       const { paths, width } = buildSatin(d.nodes, d.widths, isClosed);
@@ -913,19 +923,21 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
   };
 
   /** Copies of objects (new ids; groups and letterings get new ids too). */
-  const cloneObjects = (objs: DesignObject[]): DesignObject[] => {
+  const cloneObjects = (objs: DesignObject[]): { objects: DesignObject[]; parents: Record<string, string> } => {
     const map = new Map<string, string>();
     const re = (k: string, p: string) => {
       if (!map.has(k)) map.set(k, uid(p));
       return map.get(k)!;
     };
-    return objs.map((o) => ({
+    const parents = copiedParents(useStore.getState().doc, objs, (g) => re(g, "g"));
+    const objects = objs.map((o) => ({
       ...structuredClone(o),
       id: uid(),
       ...(o.group ? { group: re(o.group, "g") } : {}),
       ...(o.text ? { text: { ...o.text, group: re(o.text.group, "txt") } } : {}),
       ...(o.stitch.type === "fill" && o.stitch.gradient ? { stitch: { ...o.stitch, gradient: { ...o.stitch.gradient, group: re(o.stitch.gradient.group, "grd") } } } : {}),
     }));
+    return { objects, parents };
   };
 
   /** A live corner widget of a selected shape near `p` (node tool). */
@@ -1107,7 +1119,8 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
     const q = snapped ?? placePoint(d, p, e.shiftKey);
     overlayRef.current.snap = null;
     if (d.kind === "satin") d.width = s.toolOptions.satin.width;
-    addPoint(d, q);
+    if (s.tool === "curve") addCurvePoint(d, q);
+    else addPoint(d, q);
     d.cursor = null;
     dragRef.current = { kind: "pen-new", idx: d.nodes.length - 1, moved: false, last: p };
     draw();
@@ -1199,7 +1212,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         return;
       }
       const pd = penRef.current;
-      if (pd && (st.tool === "pen" || st.tool === "satin")) {
+      if (pd && (st.tool === "pen" || st.tool === "satin" || st.tool === "curve")) {
         if (e.key === "Enter" || e.key === "Escape") {
           // finish the path, stay in the tool
           e.preventDefault();
@@ -1455,12 +1468,8 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         }
         const ins = nodeInsertTarget(p, Math.max(tol, 7 / s.view.scale));
         if (ins) {
-          // add a point on the curve and keep dragging it
-          s.checkpoint();
-          const r = insertIntoObject(ins.o, ins.sp, ins.seg, ins.t);
-          s.liveUpdate((doc) => syncGradientGeometry({ ...doc, objects: doc.objects.map((x) => (x.id === r.obj.id ? r.obj : x)) }, r.obj));
-          dragRef.current = { kind: "node", id: r.obj.id, sp: ins.sp, ni: r.index, part: "p", orig: r.obj };
-          s.set({ nodeSel: [{ id: r.obj.id, sp: ins.sp, ni: r.index }] });
+          // on a segment: drag to bend it, click to add a point there
+          dragRef.current = { kind: "bend", o: ins.o, sp: ins.sp, seg: ins.seg, t: ins.t, start: p, moved: false };
           iRef.current.insertAt = null;
           return;
         }
@@ -1482,6 +1491,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         iRef.current.tooltip = null;
         return;
       case "pen":
+      case "curve":
       case "satin":
         penDown(e, p, Math.max(tol, 7 / s.view.scale));
         return;
@@ -1596,7 +1606,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
       return;
     }
     if (!d) {
-      if (s.tool === "satin" || s.tool === "pen") {
+      if (s.tool === "satin" || s.tool === "pen" || s.tool === "curve") {
         const tol = Math.max(6, 7) / s.view.scale;
         const pd = penRef.current;
         const c = canvasRef.current;
@@ -1606,10 +1616,11 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
           const snap = hover.kind === "none" && !e.shiftKey && !e.ctrlKey && s.prefs.snapPoints ? snapToNode(p, tol) : null;
           overlayRef.current.snap = snap;
           pd.cursor = hover.kind === "none" ? (snap ?? placePoint(pd, p, e.shiftKey)) : null;
-          let text = PEN_HINTS[hover.kind];
+          const hints = s.tool === "curve" ? CURVE_HINTS : PEN_HINTS;
+          let text = hints[hover.kind];
           if (hover.kind === "none" && pd.kind === "satin") text = `${pd.width.toFixed(2)} mm · scroll or [ ] for width · ${text}`;
           if (hover.kind === "anchor" && pd.kind === "satin") text = `${pd.widths[hover.index].toFixed(2)} mm · scroll to change · ${text}`;
-          if (hover.kind === "close" && !canClose(pd)) text = PEN_HINTS.none;
+          if (hover.kind === "close" && !canClose(pd)) text = hints.none;
           penHint(text, pd.cursor ?? p);
           if (c) c.style.cursor = hover.kind === "handle" || hover.kind === "anchor" ? "move" : hover.kind === "segment" ? "copy" : hover.kind === "close" || hover.kind === "last" ? "pointer" : "";
         } else {
@@ -1639,7 +1650,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         }
         const ins = nodeInsertTarget(p, 8 / s.view.scale);
         iRef.current.insertAt = ins?.p ?? null;
-        iRef.current.tooltip = ins ? { p, text: "Click to add a point · Alt-click a point to delete · double-click: smooth ↔ corner" } : null;
+        iRef.current.tooltip = ins ? { p, text: "Drag to bend the curve · click to add a point · Alt-click a point to delete · double-click: smooth ↔ corner" } : null;
         if (canvasRef.current) canvasRef.current.style.cursor = ins ? "copy" : "";
         draw();
         return;
@@ -1821,8 +1832,8 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
           s.checkpoint();
           if (e.altKey) {
             // Alt-drag: move a copy, leave the original
-            const copies = cloneObjects(d.orig);
-            s.liveUpdate((doc) => ({ ...doc, objects: [...doc.objects, ...copies] }));
+            const { objects: copies, parents } = cloneObjects(d.orig);
+            s.liveUpdate((doc) => ({ ...doc, objects: [...doc.objects, ...copies], ...(Object.keys(parents).length ? { groupParents: { ...doc.groupParents, ...parents } } : {}) }));
             s.select(copies.map((c) => c.id));
             d.orig = copies;
             d.targets = s.smartGuides ? snapTargets(useStore.getState().doc, new Set(copies.map((c) => c.id))) : null;
@@ -2061,7 +2072,13 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         const pd = penRef.current;
         if (!pd) return;
         const n = pd.nodes[d.idx];
-        if (spaceRef.current) {
+        if (s.tool === "curve") {
+          // curvature: dragging moves the point, the curve follows
+          if (!d.moved && dist(n.p, p) * s.view.scale < 3) return;
+          d.moved = true;
+          pd.nodes[d.idx] = { p };
+          smoothDraft(pd);
+        } else if (spaceRef.current) {
           // Space: reposition the point while placing it
           pd.nodes[d.idx] = moveAnchor(n, [n.p[0] + p[0] - d.last[0], n.p[1] + p[1] - d.last[1]]);
         } else {
@@ -2088,8 +2105,22 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         const n = pd.nodes[pd.nodes.length - 1];
         if (!d.moved && dist(n.p, p) * s.view.scale < 3) return;
         d.moved = true;
-        pullHandles(n, p, { shift: e.shiftKey, onlyOut: true, keepIn: d.keepIn });
+        if (s.tool === "curve") {
+          pd.nodes[pd.nodes.length - 1] = { p };
+          smoothDraft(pd);
+        } else pullHandles(n, p, { shift: e.shiftKey, onlyOut: true, keepIn: d.keepIn });
         draw();
+        return;
+      }
+      case "bend": {
+        // drag a segment: it bends through the pointer, the end points stay
+        if (!d.moved && dist(d.start, p) * s.view.scale < 3) return;
+        if (!d.moved) s.checkpoint();
+        d.moved = true;
+        const paths = [...d.o.paths];
+        paths[d.sp] = bendSegment(d.o.paths[d.sp], d.seg, d.t, [p[0] - d.start[0], p[1] - d.start[1]]);
+        const o = { ...d.o, paths };
+        s.liveUpdate((doc) => syncGradientGeometry({ ...doc, objects: doc.objects.map((x) => (x.id === o.id ? o : x)) }, o));
         return;
       }
       case "pen-anchor": {
@@ -2099,6 +2130,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         d.moved = true;
         const to = e.shiftKey ? constrainAngle(d.orig.p, p, 45) : p;
         pd.nodes[d.idx] = moveAnchor(d.orig, [d.orig.p[0] + to[0] - d.start[0], d.orig.p[1] + to[1] - d.start[1]]);
+        smoothDraft(pd);
         draw();
         return;
       }
@@ -2106,6 +2138,8 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         const pd = penRef.current;
         if (!pd) return;
         pd.nodes[d.idx] = moveHandle(d.orig, d.part, p, e.altKey, e.shiftKey);
+        // a handle set by hand no longer follows the neighbours
+        if (pd.auto) pd.auto[d.idx] = false;
         draw();
         return;
       }
@@ -2323,6 +2357,16 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
       case "pen-handle":
         draw();
         return;
+      case "bend": {
+        if (d.moved) return draw();
+        // a click on a segment adds a point there
+        s.checkpoint();
+        const r = insertIntoObject(d.o, d.sp, d.seg, d.t);
+        s.liveUpdate((doc) => syncGradientGeometry({ ...doc, objects: doc.objects.map((x) => (x.id === r.obj.id ? r.obj : x)) }, r.obj));
+        s.set({ nodeSel: [{ id: r.obj.id, sp: d.sp, ni: r.index }] });
+        draw();
+        return;
+      }
       case "pen-close":
         finishPen(true);
         return;

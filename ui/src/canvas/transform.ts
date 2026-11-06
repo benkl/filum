@@ -3,6 +3,7 @@
 
 import { objectBoundsCached, type Box } from "../lib/geometry";
 import type { DesignObject, StitchDocument, Vec2 } from "../types";
+import { unitOf } from "../lib/groups";
 
 type Mat = [number, number, number, number, number, number];
 
@@ -122,7 +123,6 @@ export const SKEW_CURSOR = svgCursor(
 
 /** Group-aware selection unit of an object (group, lettering or itself). */
 export function unitIds(doc: StitchDocument, o: DesignObject): string[] {
-  if (o.group) return doc.objects.filter((x) => x.group === o.group).map((x) => x.id);
-  if (o.text) return doc.objects.filter((x) => x.text?.group === o.text!.group).map((x) => x.id);
-  return [o.id];
+  // the outermost group (groups nest), a lettering, or the object
+  return unitOf(doc, o);
 }

@@ -416,6 +416,43 @@ export function alignNodes(doc: StitchDocument, sel: NodeRef[], axis: "h" | "v")
   }));
 }
 
+/** Move the selected nodes onto their average point (both axes). */
+export const averageNodes = (doc: StitchDocument, sel: NodeRef[]): StitchDocument => alignNodes(alignNodes(doc, sel, "v"), sel, "h");
+
+/**
+ * Bend segment `seg` of a path so that its point at `t` moves by `d`: both of
+ * its handles move (a straight segment gets handles first), the nearer one
+ * more. A smooth point at either end turns its other handle with it, keeping
+ * its length.
+ */
+export function bendSegment(sp: SubPath, seg: number, t: number, d: Vec2): SubPath {
+  const n = sp.nodes.length;
+  const ia = seg;
+  const ib = (seg + 1) % n;
+  const A = sp.nodes[ia];
+  const B = sp.nodes[ib];
+  const third = (k: number): Vec2 => add(A.p, mul(sub(B.p, A.p), k));
+  const p1 = A.o ?? third(1 / 3);
+  const p2 = B.i ?? third(2 / 3);
+  const u = Math.min(0.95, Math.max(0.05, t));
+  const w1 = 1 - u;
+  const w2 = u;
+  // B(u) moves by 3(1-u)²u·w1·k·d + 3(1-u)u²·w2·k·d = d
+  const k = 1 / (3 * (1 - u) * u * ((1 - u) * w1 + u * w2));
+  const o = add(p1, mul(d, w1 * k));
+  const i = add(p2, mul(d, w2 * k));
+  const turn = (node: PathNode, moved: Vec2, other: Vec2 | undefined): Vec2 | undefined => {
+    if (!other || !handlesCollinear(node)) return other;
+    const dir = norm(sub(node.p, moved));
+    return add(node.p, mul(dir, Math.hypot(other[0] - node.p[0], other[1] - node.p[1])));
+  };
+  const nodes = sp.nodes.map(clone);
+  nodes[ia] = { p: A.p, o, ...(A.i ? { i: turn(A, o, A.i) } : {}) };
+  nodes[ib] = { p: B.p, i, ...(B.o ? { o: turn(B, i, B.o) } : {}) };
+  if (ia === ib) return sp;
+  return { ...sp, nodes };
+}
+
 /** Every node of the given objects. */
 export function allNodes(doc: StitchDocument, ids: string[]): NodeRef[] {
   return doc.objects.filter((o) => ids.includes(o.id) && !o.text && !o.locked).flatMap((o) => o.paths.flatMap((sp, si) => sp.nodes.map((_, ni) => ({ id: o.id, sp: si, ni }))));

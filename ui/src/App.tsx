@@ -23,6 +23,8 @@ import { referenceKey } from "./lib/references";
 import { applyAccent } from "./lib/prefs";
 import { StatusHints } from "./components/StatusHints";
 import type { Tool } from "./types";
+import { compoundSelection, joinSelection, releaseSelection } from "./lib/pathActions";
+import { averageSelectedNodes } from "./lib/nodeActions";
 
 const TOOL_KEYS: Record<string, Tool> = {
   v: "select",
@@ -31,6 +33,7 @@ const TOOL_KEYS: Record<string, Tool> = {
   h: "pan",
   m: "ruler",
   p: "pen",
+  u: "curve",
   f: "freehand",
   s: "satin",
   r: "rect",
@@ -57,6 +60,19 @@ function useShortcuts() {
         e.preventDefault();
         if (e.shiftKey) ungroupSelection();
         else groupSelection();
+        return;
+      }
+      // path commands: join, average points, compound paths
+      if (mod && k === "j") {
+        e.preventDefault();
+        if (e.altKey) averageSelectedNodes();
+        else joinSelection();
+        return;
+      }
+      if (mod && (k === "8" || e.code === "Digit8")) {
+        e.preventDefault();
+        if (e.altKey && e.shiftKey) releaseSelection();
+        else compoundSelection();
         return;
       }
       if (mod && e.shiftKey && (k === "c" || k === "v")) {
@@ -102,7 +118,7 @@ function useShortcuts() {
             return;
           }
         }
-        if (s.tool !== "pen" && s.tool !== "satin") s.deleteSelection();
+        if (s.tool !== "pen" && s.tool !== "satin" && s.tool !== "curve") s.deleteSelection();
         return;
       }
       if (k === "escape") {

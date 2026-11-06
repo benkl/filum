@@ -62,7 +62,10 @@ Press <kbd>?</kbd> in Filum to see this list in the app, with a filter box. On a
 | Right-click | The commands for what is under the pointer (right-drag pans) |
 | Ctrl+D / Alt+D / Del | Duplicate / linked clone / delete |
 | Arrows (Shift) | Nudge 0.5 mm (5 mm) |
-| Ctrl+G / Ctrl+Shift+G | Group / ungroup |
+| Ctrl+G / Ctrl+Shift+G | Group / ungroup (groups nest: group groups; ungroup opens one level) |
+| Ctrl+J | Join: close an open path, or join open paths at their nearest ends |
+| Ctrl+Alt+J | Average: the selected points onto their average point (node tool) |
+| Ctrl+8 / Ctrl+Alt+Shift+8 | Make / release a compound path |
 | Ctrl+Shift+C / Ctrl+Shift+V | Copy / paste stitch properties |
 | [ / ] with a selection | Rotate the fill angle 5° · change the satin width (Shift: more) |
 | Double-click an object | Edit its nodes (lettering: edit its text) |
@@ -123,6 +126,7 @@ Press <kbd>?</kbd> in Filum to see this list in the app, with a filter box. On a
 | <kbd>H</kbd> | Pan |
 | <kbd>M</kbd> | Ruler |
 | <kbd>P</kbd> | Pen (running stitch) |
+| <kbd>U</kbd> | Curvature |
 | <kbd>F</kbd> | Freehand |
 | <kbd>S</kbd> | Satin column |
 | <kbd>D</kbd> | Stitch direction |

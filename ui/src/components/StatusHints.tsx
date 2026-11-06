@@ -85,12 +85,14 @@ function hintsFor(s: ReturnType<typeof useStore.getState>): Hint[] {
             [["Shift", "U"], "Curved segments"],
             [["Shift", "B"], "Break"],
             [["Shift", "J"], "Join"],
+            [[mod, "Alt", "J"], "Average"],
             [["Esc"], "Deselect points"],
           ]
         : [
             [["LMB"], "Select a point"],
             [["Drag"], "Box select points"],
             [["LMB", "path"], "Add a point"],
+            [["Drag", "path"], "Bend the curve"],
             [["Alt", "LMB"], "Delete a point"],
             [["DblClick"], "Smooth ↔ corner"],
             [["Alt", "Drag", "handle"], "Break the handles"],
@@ -118,6 +120,18 @@ function hintsFor(s: ReturnType<typeof useStore.getState>): Hint[] {
           ]
         : [[["LMB"], "Start with a corner"], [["Drag"], "Start with a curve"], [["LMB", "path end"], "Continue that path"], ...width];
     }
+    case "curve":
+      return s.drafting
+        ? [
+            [["LMB"], "Smooth point"],
+            [["Double-click", "point"], "Corner ↔ smooth"],
+            [["Drag", "point"], "Move it"],
+            [["LMB", "first point"], "Close"],
+            [["Alt", "LMB", "point"], "Delete it"],
+            [["Backspace"], "Remove the last point"],
+            [["Enter"], "Finish"],
+          ]
+        : [[["LMB"], "Start the path"], [["LMB", "path end"], "Continue that path"]];
     case "freehand":
       return [[["Drag"], "Draw"], [["Drag", "back to the start"], "Close"]];
     case "rect":

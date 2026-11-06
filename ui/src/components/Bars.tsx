@@ -110,6 +110,7 @@ export function ContextBar() {
   // the stitch count follows the plan as it is recomputed
   useStore((s) => s.plan);
   if (tool === "pen" || tool === "freehand" || tool === "satin") return <ToolOptionsBar tool={tool} />;
+  if (tool === "curve") return <ToolOptionsBar tool="pen" />;
   if (tool === "gradient") return <GradientToolBar />;
   if (tool === "node") return <NodeToolBar />;
   if (tool === "builder") return <BuilderToolBar />;
@@ -299,6 +300,7 @@ const RAIL: ({ tool: Tool; title: string } | "-")[] = [
   { tool: "cut", title: "Cutter (C) — click a line to split it, drag across a fill to cut it" },
   "-",
   { tool: "pen", title: "Pen (P) — click for corners, drag for curves; click first point to close" },
+  { tool: "curve", title: "Curvature (U) — click points, the path curves smoothly through them; double-click a point for a corner" },
   { tool: "freehand", title: "Freehand (F)" },
   { tool: "satin", title: "Satin column (S) — click / drag for curves, scroll or [ ] for width, Enter to finish" },
   { tool: "guides", title: "Stitch direction (D): drag across a satin to guide its stitch angle, drag an end to turn it, Alt-click to delete" },

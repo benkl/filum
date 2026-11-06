@@ -1885,16 +1885,17 @@ body.resizing-y * {
 .layer .mini.mixed {
   opacity: 0.55;
 }
+/* a row inside groups: indented one step per group, a guide line at its group's fold */
 .layer.member {
   position: relative;
-  padding-left: var(--sp-4-5);
+  padding-left: calc(var(--sp-1-5) + var(--depth, 1) * var(--sp-3));
 }
 .layer.member::before {
   content: "";
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 12px;
+  left: calc(var(--depth, 1) * var(--sp-3));
   border-left: 1px solid var(--border);
 }
 .layer.hidden-obj .lname {

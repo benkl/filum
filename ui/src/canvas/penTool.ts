@@ -25,6 +25,9 @@ export interface PenDraft {
   cursor: Vec2 | null;
   /** Object being continued (replaced when the draft is finished). */
   replaces?: string;
+  /** Curvature tool: the points whose handles follow their neighbours, so the
+   *  path runs smoothly through them (false: a corner, or handles set by hand). */
+  auto?: boolean[];
 }
 
 export type PenHover =
@@ -81,6 +84,7 @@ export function placePoint(d: PenDraft, p: Vec2, shift: boolean): Vec2 {
 export function addPoint(d: PenDraft, p: Vec2) {
   d.nodes.push({ p });
   if (d.kind === "satin") d.widths.push(d.width);
+  if (d.auto) d.auto.push(false);
 }
 
 /** Drag from a node: symmetric handles (or only the out-handle). */
@@ -126,6 +130,10 @@ export function moveAnchor(orig: PathNode, to: Vec2): PathNode {
 export function insertInDraft(d: PenDraft, seg: number, t: number): number {
   const r = insertNode(draftPath(d), seg, t);
   d.nodes = r.sp.nodes;
+  if (d.auto) {
+    d.auto.splice(r.index, 0, true);
+    smoothDraft(d);
+  }
   if (d.kind === "satin") {
     const w = d.widths[seg] + (d.widths[seg + 1] - d.widths[seg]) * t;
     d.widths.splice(r.index, 0, w);
@@ -136,15 +144,98 @@ export function insertInDraft(d: PenDraft, seg: number, t: number): number {
 export function deleteFromDraft(d: PenDraft, i: number) {
   d.nodes = deleteNode(draftPath(d), i).nodes;
   if (d.kind === "satin") d.widths.splice(i, 1);
+  if (d.auto) {
+    d.auto.splice(i, 1);
+    smoothDraft(d);
+  }
 }
 
 export function toggleSmoothInDraft(d: PenDraft, i: number) {
+  if (d.auto) {
+    // curvature: smooth (following its neighbours) or a corner
+    d.auto[i] = !d.auto[i];
+    if (!d.auto[i]) d.nodes[i] = { p: d.nodes[i].p };
+    smoothDraft(d);
+    return;
+  }
   d.nodes = toggleSmooth(draftPath(d), i).nodes;
 }
 
 export function removeLast(d: PenDraft) {
   d.nodes.pop();
   if (d.kind === "satin") d.widths.pop();
+  if (d.auto) {
+    d.auto.pop();
+    smoothDraft(d);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Curvature: the path runs smoothly through the points placed
+
+const unit = (a: Vec2, b: Vec2): Vec2 => {
+  const l = vdist(a, b) || 1;
+  return [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
+};
+
+/**
+ * Handles for the points marked `auto`: along the line from the point before
+ * to the point after, a third of the way to each (a smooth curve through every
+ * point, Catmull-Rom style); an end points at its neighbour's handle. Corners
+ * and handles set by hand stay.
+ */
+export function autoSmooth(nodes: PathNode[], auto: boolean[], closed: boolean): PathNode[] {
+  const n = nodes.length;
+  if (n < 2) return nodes.map((x) => ({ ...x }));
+  const out = nodes.map((x) => ({ ...x }));
+  const interior = (k: number) => closed || (k > 0 && k < n - 1);
+  for (let k = 0; k < n; k++) {
+    if (!auto[k] || !interior(k) || n < 3) continue;
+    const p = nodes[k].p;
+    const prev = nodes[(k - 1 + n) % n].p;
+    const next = nodes[(k + 1) % n].p;
+    const t = unit(prev, next);
+    const li = vdist(p, prev) / 3;
+    const lo = vdist(p, next) / 3;
+    out[k] = { p, i: [p[0] - t[0] * li, p[1] - t[1] * li], o: [p[0] + t[0] * lo, p[1] + t[1] * lo] };
+  }
+  if (!closed) {
+    // the ends lean towards the next point's handle
+    const end = (k: number, nb: number, part: "o" | "i") => {
+      if (!auto[k]) return;
+      const p = nodes[k].p;
+      const towards = (part === "o" ? out[nb].i : out[nb].o) ?? nodes[nb].p;
+      const l = vdist(p, nodes[nb].p) / 3;
+      const t = unit(p, towards);
+      out[k] = { p, [part]: [p[0] + t[0] * l, p[1] + t[1] * l] } as PathNode;
+    };
+    end(0, 1, "o");
+    end(n - 1, n - 2, "i");
+  }
+  return out;
+}
+
+/** Recompute the curvature handles of a draft (closed: as a closed path). */
+export function smoothDraft(d: PenDraft, closed = false) {
+  if (d.auto) d.nodes = autoSmooth(d.nodes, d.auto, closed);
+}
+
+/** Curvature: the next point placed at `p`, a smooth one (the draft gets curvature points from here on). */
+export function addCurvePoint(d: PenDraft, p: Vec2) {
+  d.auto ??= d.nodes.map(() => false);
+  addPoint(d, p);
+  d.auto[d.auto.length - 1] = true;
+  smoothDraft(d);
+}
+
+/** Curvature preview: the draft as it would be with a smooth point at the cursor, and the segment to it. */
+export function curvePreview(d: PenDraft): { nodes: PathNode[]; rubber: Cubic } | null {
+  if (!d.cursor || !d.nodes.length) return null;
+  const auto = [...(d.auto ?? d.nodes.map(() => false)), true];
+  const nodes = autoSmooth([...d.nodes, { p: d.cursor }], auto, false);
+  const a = nodes[nodes.length - 2];
+  const b = nodes[nodes.length - 1];
+  return { nodes: nodes.slice(0, -1), rubber: [a.p, a.o ?? a.p, b.i ?? b.p, b.p] };
 }
 
 /** Rubber band from the last point to the cursor. */
@@ -177,4 +268,14 @@ export const PEN_HINTS: Record<PenHover["kind"], string> = {
   anchor: "Drag to move · Alt-click to delete · double-click: smooth ↔ corner",
   handle: "Drag to reshape · Alt: move this handle alone",
   segment: "Click to add a point here",
+};
+
+/** The curvature tool's hints (its points follow their neighbours). */
+export const CURVE_HINTS: Record<PenHover["kind"], string> = {
+  none: "Click to add a point: the path curves through it · snaps to points (Ctrl: off) · Enter to finish",
+  close: "Click to close the path",
+  last: "Click to finish · drag to move the point",
+  anchor: "Drag to move · double-click: corner ↔ smooth · Alt-click to delete",
+  handle: "Drag to reshape (the point keeps these handles from now on)",
+  segment: "Click to add a smooth point here",
 };
