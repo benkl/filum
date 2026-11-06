@@ -368,7 +368,14 @@ export function toggleClosed(doc: StitchDocument, sel: NodeRef[]): StitchDocumen
     return per && [...per.keys()].some((si) => o.paths[si] && !o.paths[si].closed);
   });
   if (!anyOpen) return breakAtNodes(doc, [...g].flatMap(([id, per]) => [...per].map(([sp, list]) => ({ id, sp, ni: list[0] }))));
-  return mapObjects(doc, sel, (o, per) => ({ ...o, paths: o.paths.map((sp, si) => (per.has(si) && sp.nodes.length >= 3 ? { ...sp, closed: true } : sp)) }));
+  // a satin's two rails close together (or not at all)
+  return mapObjects(doc, sel, (o, per) =>
+    isRailSatin(o)
+      ? o.paths.every((sp) => sp.nodes.length >= 3)
+        ? { ...o, paths: o.paths.map((sp) => ({ ...sp, closed: true })) }
+        : o
+      : { ...o, paths: o.paths.map((sp, si) => (per.has(si) && sp.nodes.length >= 3 ? { ...sp, closed: true } : sp)) },
+  );
 }
 
 // ---------------------------------------------------------------------------

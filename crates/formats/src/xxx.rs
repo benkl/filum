@@ -15,7 +15,7 @@ use crate::{Error, Pattern, Thread, WriteOptions};
 pub(crate) const SETTINGS: EncodeSettings = EncodeSettings {
     max_stitch: 124,
     max_jump: 124,
-    full_jump: false,
+    full_jump: true,
 };
 
 pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Vec<u8> {

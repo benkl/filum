@@ -9,6 +9,7 @@ import type { DesignObject, StitchDocument, StitchParams, SubPath, Vec2 } from "
 import { gatherAtTop, groupInfo, isFixedMember, nextGroupName, pruneGroups } from "./layerRows";
 import { chainOf, commonGroup, groupsOf, objectsIn, parentOf, parentsOf, selectedUnits, topGroupOf, withParent } from "./groups";
 import { defaultApplique, defaultFill, defaultRunning, defaultSatin, normAngle, objectBounds, rotateAbout, scaleAbout, transformObject, translateMat, uid, unionBoxes, type Box } from "./geometry";
+import { freshCopies, threadsOf } from "./copies";
 
 type Mat = [number, number, number, number, number, number];
 
@@ -118,16 +119,12 @@ const det = (m: Mat) => m[0] * m[3] - m[1] * m[2];
  * Transform a copy of an object. Mirroring flips the fill angle and turns a
  * lettering into plain shapes (letters can't be mirrored and stay text).
  */
-function transformedCopy(o: DesignObject, m: Mat, rotationDeg: number, groupMap: Map<string, string>, axisDeg = 0): DesignObject {
-  let c = transformObject({ ...o, id: uid() }, m, rotationDeg);
+function transformedCopy(o: DesignObject, m: Mat, rotationDeg: number, axisDeg = 0): DesignObject {
+  let c = transformObject(o, m, rotationDeg);
   if (det(m) < 0) {
     // a reflection across an axis at θ turns a fill angle a into −a − 2θ
     if (c.stitch.type === "fill") c = { ...c, stitch: { ...c.stitch, angle: normAngle(-c.stitch.angle - 2 * axisDeg) } };
     if (c.text) c = { ...c, text: undefined };
-  } else if (c.text) {
-    let g = groupMap.get(c.text.group);
-    if (!g) groupMap.set(c.text.group, (g = uid("txt")));
-    c = { ...c, text: { ...c.text, group: g } };
   }
   return c;
 }
@@ -139,14 +136,9 @@ export function mirrorSelection(axis: "h" | "v") {
   const b = boxOf(sel);
   if (!b) return;
   const m = (axis === "h" ? scaleAbout(-1, 1, b.x + b.w / 2, b.y + b.h / 2) : scaleAbout(1, -1, b.x + b.w / 2, b.y + b.h / 2)) as Mat;
-  const groups = new Map<string, string>();
   s.commit((d) => ({
     ...d,
-    objects: d.objects.map((o) => {
-      if (!sel.includes(o)) return o;
-      const c = transformedCopy(o, m, 0, groups, axis === "h" ? 90 : 0);
-      return { ...c, id: o.id };
-    }),
+    objects: d.objects.map((o) => (sel.includes(o) ? transformedCopy(o, m, 0, axis === "h" ? 90 : 0) : o)),
   }));
 }
 
@@ -183,11 +175,16 @@ export function repeatSelection(opt: RepeatOptions): number {
   const sel = s.doc.objects.filter((o) => s.selection.includes(o.id));
   if (!sel.length) return 0;
   const created: DesignObject[] = [];
+  const parents: Record<string, string> = {};
+  const names: Record<string, string> = {};
   for (const { m, rot, axis } of repeatTransforms(opt)) {
-    const groups = new Map<string, string>();
-    for (const o of sel) created.push(transformedCopy(o, m, rot, groups, axis));
+    // every repeat is a copy of its own: its groups, letterings, gradients and blends
+    const fresh = freshCopies(s.doc, sel);
+    Object.assign(parents, fresh.parents);
+    Object.assign(names, fresh.names);
+    for (const o of fresh.objects) created.push(transformedCopy(o, m, rot, axis));
   }
-  s.commit((d) => ({ ...d, objects: [...d.objects, ...created] }));
+  s.addObjects(created, undefined, parents, names);
   s.select([...sel.map((o) => o.id), ...created.map((o) => o.id)]);
   return created.length;
 }
@@ -519,7 +516,7 @@ export function copySelection(cut = false): string | null {
   const s = store();
   const objects = s.doc.objects.filter((o) => s.selection.includes(o.id));
   if (!objects.length) return null;
-  const used = new Set(objects.map((o) => o.thread));
+  const used = new Set(objects.flatMap(threadsOf));
   objectClip = { objects: structuredClone(objects), threads: s.doc.threads.filter((t) => used.has(t.id)), groupParents: parentsOf(s.doc, objects) };
   pastes = 0;
   if (cut) {
@@ -551,37 +548,14 @@ export function pasteClipboard(inPlace = false) {
   if (!objectClip?.objects.length) return;
   const off = inPlace ? 0 : 5 * ++pastes;
   const m = translateMat(off, off);
-  // pasted groups and lettering are new groups of their own
-  const groups = new Map<string, string>();
-  const regroup = (g: string | undefined, prefix: string) => {
-    if (!g) return g;
-    if (!groups.has(prefix + g)) groups.set(prefix + g, uid(prefix));
-    return groups.get(prefix + g);
-  };
+  // pasted groups, letterings, gradients and blends are new ones of their own (nesting included)
+  const fresh = freshCopies({ objects: objectClip.objects, groupParents: objectClip.groupParents }, objectClip.objects);
   const ids = new Set(s.doc.objects.map((o) => o.id));
-  const copies = objectClip.objects.map((o) => {
-    const c = transformObject(structuredClone(o), m, 0);
-    return {
-      ...c,
-      id: uid(),
-      group: regroup(c.group, "g"),
-      text: c.text ? { ...c.text, group: regroup(c.text.group, "txt")! } : undefined,
-      // a gradient's or tartan's colour layers are one fill again, under the copy's new group
-      ...(c.stitch.type === "fill" && (c.stitch.gradient || c.stitch.tartan)
-        ? {
-            stitch: {
-              ...c.stitch,
-              ...(c.stitch.gradient ? { gradient: { ...c.stitch.gradient, group: regroup(c.stitch.gradient.group, "g")! } } : {}),
-              ...(c.stitch.tartan ? { tartan: { ...c.stitch.tartan, group: regroup(c.stitch.tartan.group, "g")! } } : {}),
-            },
-          }
-        : {}),
-      // a clone keeps its link only to an original in this design
-      clone: c.clone && ids.has(c.clone.of) ? c.clone : undefined,
-    };
+  const copies = fresh.objects.map((o) => {
+    const c = transformObject(o, m, 0);
+    // a clone keeps its link only to an original in this design
+    return { ...c, clone: c.clone && ids.has(c.clone.of) ? c.clone : undefined };
   });
-  // the nesting of the pasted groups comes along
-  const nested = Object.entries(objectClip.groupParents ?? {}).map(([c, p]) => [regroup(c, "g")!, regroup(p, "g")!]);
-  s.addObjects(copies, objectClip.threads, Object.fromEntries(nested));
+  s.addObjects(copies, objectClip.threads, fresh.parents);
   s.select(copies.map((c) => c.id));
 }

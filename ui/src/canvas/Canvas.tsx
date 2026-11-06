@@ -23,7 +23,7 @@ import {
   defaultStitch,
   type Box,
 } from "../lib/geometry";
-import { useStore } from "../store";
+import { activeThreadOf, useStore } from "../store";
 import type { DesignObject, NodeRef, PathNode, ReferenceImage, StitchDocument, StitchParams, SubPath, Vec2 } from "../types";
 import { bendSegment, handlesCollinear, joinNodes, moveNodes, nodeKey, nodesInBox } from "../lib/nodeOps";
 import { syncAll } from "../lib/nodeActions";
@@ -95,8 +95,8 @@ import { displayPlan } from "../lib/threads";
 import { cornerWidgets, radiusFromWidget, roundCorners, shapeToolPath, type CornerStyle } from "../lib/shapeOps";
 import { openDroppedFile } from "../lib/actions";
 import { flatten as flattenSub, normAngle } from "../lib/geometry";
-import { copiedParents } from "../lib/groups";
 import { pruneGroups } from "../lib/layerRows";
+import { freshCopies } from "../lib/copies";
 
 const hitCtx = (() => {
   const c = document.createElement("canvas");
@@ -350,7 +350,7 @@ export function Canvas() {
       const { w, h, dpr } = sizeRef.current;
       if (glRef.current === undefined && glCanvasRef.current) glRef.current = StitchGL.create(glCanvasRef.current);
       const gl = glRef.current;
-      const shownPlan = displayPlan(s.plan && s.finished && s.viewMode !== "vector" ? finishedPlan(s.plan) : s.plan, s.stitchColors, s.colorFocus ? s.activeThread : null, s.fabricColor);
+      const shownPlan = displayPlan(s.plan && s.finished && s.viewMode !== "vector" ? finishedPlan(s.plan) : s.plan, s.stitchColors, s.colorFocus ? activeThreadOf(s) : null, s.fabricColor);
       const useGL = !!gl && s.viewMode !== "vector" && !!s.plan;
       // snap to device pixels once so every layer agrees exactly
       const view = { scale: s.view.scale, ox: Math.round(s.view.ox * dpr) / dpr, oy: Math.round(s.view.oy * dpr) / dpr };
@@ -364,7 +364,7 @@ export function Canvas() {
           : selIndex >= 0
             ? computeHandles(s.doc.objects[selIndex], selIndex, s.plan, s.view.scale)
             : [];
-      const threadColor = s.doc.threads.find((t) => t.id === (s.activeThread ?? s.doc.threads[0]?.id))?.color ?? "#b3203a";
+      const threadColor = s.doc.threads.find((t) => t.id === (activeThreadOf(s) ?? s.doc.threads[0]?.id))?.color ?? "#b3203a";
       const pd = (s.tool === "pen" || s.tool === "satin" || s.tool === "curve") && penRef.current?.nodes.length ? penRef.current : null;
       // the shortcut hints follow the drawing state
       if (!!pd !== s.drafting) queueMicrotask(() => useStore.setState({ drafting: !!pd }));
@@ -572,13 +572,18 @@ export function Canvas() {
     const end = () => {
       if (useStore.getState().live) useStore.getState().liveTransform(null);
     };
+    const blur = () => {
+      end();
+      spaceRef.current = false;
+      if (canvasRef.current) canvasRef.current.style.cursor = "";
+    };
     window.addEventListener("pointerup", end);
     window.addEventListener("pointercancel", end);
-    window.addEventListener("blur", end);
+    window.addEventListener("blur", blur);
     return () => {
       window.removeEventListener("pointerup", end);
       window.removeEventListener("pointercancel", end);
-      window.removeEventListener("blur", end);
+      window.removeEventListener("blur", blur);
     };
   }, []);
 
@@ -806,7 +811,7 @@ export function Canvas() {
 
   const newObject = (paths: SubPath[], stitch: StitchParams, base: string): DesignObject => {
     const s = useStore.getState();
-    let thread = s.activeThread ?? s.doc.threads[0]?.id;
+    let thread = activeThreadOf(s) ?? s.doc.threads[0]?.id;
     if (!thread) thread = s.ensureThread("#b3203a", "Cherry");
     return {
       id: uid(),
@@ -839,7 +844,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
     let id = newId;
     const endAt = (pos: Vec2, skip: string): NodeRef | null => {
       for (const o of doc.objects) {
-        if (o.id === skip || !o.visible || o.locked || o.stitch.type !== "running") continue;
+        if (o.id === skip || !o.visible || o.locked || o.clone || o.stitch.type !== "running") continue;
         for (let si = 0; si < o.paths.length; si++) {
           const sp = o.paths[si];
           if (sp.closed || sp.nodes.length < 2) continue;
@@ -917,35 +922,24 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
 
   /** Transform; lettering that gets mirrored or sheared turns into plain shapes. */
   const xform = (o: DesignObject, m: number[], rot = 0): DesignObject => {
-    const c = transformObject(o, m as never, rot);
+    let c = transformObject(o, m as never, rot);
     const det = m[0] * m[3] - m[1] * m[2];
+    // a flip, skew or stretch turns the fill rows with the shape (a row runs along (cos a, −sin a))
+    if (!rot && c.stitch.type === "fill") {
+      const a = (c.stitch.angle * Math.PI) / 180;
+      const dx = Math.cos(a);
+      const dy = -Math.sin(a);
+      const ex = m[0] * dx + m[2] * dy;
+      const ey = m[1] * dx + m[3] * dy;
+      if (Math.hypot(ex, ey) > 1e-9) c = { ...c, stitch: { ...c.stitch, angle: normAngle(+((Math.atan2(-ey, ex) * 180) / Math.PI).toFixed(3)) } };
+    }
     const similarity = Math.abs(m[0] - m[3]) < 1e-9 && Math.abs(m[1] + m[2]) < 1e-9;
     return o.text && (det < 0 || !similarity) ? { ...c, text: undefined } : c;
   };
 
   /** Copies of objects (new ids; groups and letterings get new ids too). */
   const cloneObjects = (objs: DesignObject[]): { objects: DesignObject[]; parents: Record<string, string> } => {
-    const map = new Map<string, string>();
-    const re = (k: string, p: string) => {
-      if (!map.has(k)) map.set(k, uid(p));
-      return map.get(k)!;
-    };
-    const parents = copiedParents(useStore.getState().doc, objs, (g) => re(g, "g"));
-    const objects = objs.map((o) => ({
-      ...structuredClone(o),
-      id: uid(),
-      ...(o.group ? { group: re(o.group, "g") } : {}),
-      ...(o.text ? { text: { ...o.text, group: re(o.text.group, "txt") } } : {}),
-      ...(o.stitch.type === "fill" && (o.stitch.gradient || o.stitch.tartan)
-        ? {
-            stitch: {
-              ...o.stitch,
-              ...(o.stitch.gradient ? { gradient: { ...o.stitch.gradient, group: re(o.stitch.gradient.group, "grd") } } : {}),
-              ...(o.stitch.tartan ? { tartan: { ...o.stitch.tartan, group: re(o.stitch.tartan.group, "trt") } } : {}),
-            },
-          }
-        : {}),
-    }));
+    const { objects, parents } = freshCopies(useStore.getState().doc, objs);
     return { objects, parents };
   };
 
@@ -1059,7 +1053,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
   /** An end of a selected open path the pen can continue from. */
   const continuable = (p: Vec2, tol: number, kind: PenDraft["kind"]) => {
     const s = useStore.getState();
-    for (const o of s.doc.objects.filter((x) => s.selection.includes(x.id) && !x.locked)) {
+    for (const o of s.doc.objects.filter((x) => s.selection.includes(x.id) && !x.locked && !x.clone)) {
       const ok = kind === "run" ? o.stitch.type === "running" : o.stitch.type === "satin" && !o.stitch.multi;
       if (!ok || o.paths.length !== 1 || o.paths[0].closed || o.paths[0].nodes.length < 2) continue;
       const nodes = o.paths[0].nodes;
@@ -1168,7 +1162,8 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
     if (pair) {
       const other = 1 - si;
       const { n, rev, closed } = pair;
-      const segO = !rev ? seg : closed ? (2 * n - seg - 1) % n : n - 2 - seg;
+      // rung i pairs a[i] with b[n − 1 − i] on reversed rails (as the rung overlay and Delete do)
+      const segO = !rev ? seg : closed ? (2 * n - 2 - seg) % n : n - 2 - seg;
       paths[other] = insertNode(paths[other], segO, rev ? 1 - t : t).sp;
     }
     return { obj: { ...o, paths }, index: r.index };
@@ -1181,8 +1176,8 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
     const paths = [...o.paths];
     paths[si] = deleteNode(sp, ni);
     if (pair) {
-      const { n, rev, closed } = pair;
-      const idx = !rev ? ni : closed ? (n - ni) % n : n - 1 - ni;
+      const { n, rev } = pair;
+      const idx = !rev ? ni : n - 1 - ni;
       paths[1 - si] = deleteNode(paths[1 - si], idx);
     }
     return { ...o, paths };
@@ -1215,6 +1210,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         if (canvasRef.current) canvasRef.current.style.cursor = "grab";
       }
       const st = useStore.getState();
+      if (st.dialog || document.querySelector(".backdrop")) return;
       if (st.tool === "satin" && (e.key === "[" || e.key === "]")) {
         setSatinWidth(st.toolOptions.satin.width + (e.key === "]" ? 1 : -1) * (e.shiftKey ? 0.5 : 0.1));
         e.preventDefault();
@@ -1235,7 +1231,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         return;
       }
       if ((e.key === "[" || e.key === "]") && st.tool === "select" && st.selection.length === 1) {
-        const o = st.doc.objects.find((x) => x.id === st.selection[0]);
+        const o = st.doc.objects.find((x) => x.id === st.selection[0] && !x.locked);
         const k = (e.key === "]" ? 1 : -1) * (e.shiftKey ? 3 : 1);
         if (o?.stitch.type === "fill") st.updateStitch(o.id, { angle: normAngle(o.stitch.angle + k * 5) });
         if (o?.stitch.type === "satin" && o.paths.length === 1) st.updateStitch(o.id, { width: Math.max(0.3, +(o.stitch.width + k * 0.2).toFixed(2)) });
@@ -1405,7 +1401,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
           dragRef.current = {
             kind: "move",
             start: p,
-            orig: s.doc.objects.filter((o) => ids.includes(o.id)),
+            orig: s.doc.objects.filter((o) => ids.includes(o.id) && !o.locked),
             moved: false,
             targets: s.smartGuides ? snapTargets(s.doc, new Set(ids)) : null,
           };
@@ -1423,7 +1419,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         return;
       }
       case "node": {
-        for (const o of s.doc.objects.filter((x) => s.selection.includes(x.id))) {
+        for (const o of s.doc.objects.filter((x) => s.selection.includes(x.id) && !x.locked)) {
           for (let si = 0; si < o.paths.length; si++)
             for (let ni = 0; ni < o.paths[si].nodes.length; ni++) {
               const n = o.paths[si].nodes[ni];
@@ -1887,9 +1883,17 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
           q = [p[0] + snap.dx, p[1] + snap.dy];
           iRef.current.guides = snap.guides;
         }
-        let sx = d.handle === 1 || d.handle === 5 ? 1 : (q[0] - ax) / (hp[0] - ax || 1e-9);
-        let sy = d.handle === 3 || d.handle === 7 ? 1 : (q[1] - ay) / (hp[1] - ay || 1e-9);
-        if (e.shiftKey || d.uniform) {
+        // a flat box (a straight horizontal or vertical line) keeps that axis
+        const flatX = Math.abs(hp[0] - ax) < 1e-6;
+        const flatY = Math.abs(hp[1] - ay) < 1e-6;
+        let sx = d.handle === 1 || d.handle === 5 || flatX ? 1 : (q[0] - ax) / (hp[0] - ax);
+        let sy = d.handle === 3 || d.handle === 7 || flatY ? 1 : (q[1] - ay) / (hp[1] - ay);
+        if ((e.shiftKey || d.uniform) && flatX !== flatY) {
+          // uniform on a flat box: the other axis sets the factor
+          const k = flatX ? sy : sx;
+          sx = flatX ? Math.abs(k) : k;
+          sy = flatY ? Math.abs(k) : k;
+        } else if (e.shiftKey || d.uniform) {
           if (side) {
             // the dragged side sets the factor, the other axis follows it
             const vertical = d.handle === 1 || d.handle === 5;
@@ -2206,6 +2210,8 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
     // the drag's transform is done: the plan follows the document again
     if (s.live) s.liveTransform(null);
     if (!d) return;
+    // a click or a drag that changed nothing: no undo step, the redo steps stay
+    s.dropCheckpoint();
     if (d.kind === "move" || d.kind === "scale" || d.kind === "rotate" || d.kind === "skew" || d.kind === "pivot") {
       iRef.current.guides = null;
       iRef.current.tooltip = null;
@@ -2237,7 +2243,6 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
     }
     if (d.kind === "guideend" || d.kind === "guidemove") {
       iRef.current.tooltip = null;
-      if (!d.moved) s.undo();
       draw();
       return;
     }
@@ -2255,7 +2260,6 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
     }
     if (d.kind === "rampend") {
       iRef.current.tooltip = null;
-      if (!d.moved) s.undo();
       draw();
       return;
     }
@@ -2281,7 +2285,6 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
     if (d.kind === "nodes" || d.kind === "ref") {
       overlayRef.current.snap = null;
       iRef.current.tooltip = null;
-      if (!d.moved) s.undo(); // a click: drop the checkpoint
       draw();
       return;
     }
@@ -2390,7 +2393,6 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
       case "handle":
         iRef.current.activeHandle = null;
         iRef.current.tooltip = null;
-        if (!d.moved) s.undo(); // nothing changed: drop the checkpoint
         draw();
         return;
       case "cut": {
@@ -2571,6 +2573,9 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        // the pointer is gone (cancelled, or the window lost it): the drag ends where it is
+        onPointerCancel={onPointerUp}
+        onLostPointerCapture={(e) => dragRef.current && onPointerUp(e)}
         onPointerLeave={() => {
           setDensityHover(null);
           if (overlayRef.current.hoverId) {

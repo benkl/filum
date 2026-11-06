@@ -252,6 +252,8 @@ pub(crate) fn stitch_row_pub(out: &mut Run, y: f64, x0: f64, x1: f64, row_num: i
 
 /// Stitch positions along one row (Ink/Stitch `stitch_row` with `adjust_stagger`).
 fn stitch_row(out: &mut Run, y: f64, x0: f64, x1: f64, row_num: i64, max_len: f64, staggers: u32, ltr: bool, f: u8) {
+    // a zero, negative or NaN stitch length would never reach the row's end
+    let max_len = if max_len.is_finite() { max_len.max(0.5) } else { 3.0 };
     if let Some(c) = CARVE.with(|c| c.get()) {
         // carved: the needle points on the pattern's lines
         let (beg, end) = if ltr { (x0, x1) } else { (x1, x0) };
@@ -1550,6 +1552,15 @@ fn finish_at(mut runs: Vec<Run>, rings: &[Ring], end: Option<Point>, travel: f64
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_row_ends_whatever_the_stitch_length() {
+        for len in [0.0, -0.5, f64::NAN] {
+            let mut out: Run = Vec::new();
+            stitch_row(&mut out, 0.0, 0.0, 100.0, 0, len, 4, true, 0);
+            assert!(out.len() < 300, "{len}: {} points", out.len());
+        }
+    }
 
     fn square(s: f64) -> SubPath {
         SubPath::polyline(&[pt(0.0, 0.0), pt(s, 0.0), pt(s, s), pt(0.0, s)], true)

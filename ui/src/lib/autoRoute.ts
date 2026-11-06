@@ -6,6 +6,8 @@ import { flattenSubPath } from "./bezier";
 import { uid } from "./geometry";
 import { routeRunning } from "./route";
 import { autoSatin } from "./autoSatin";
+import { withParent } from "./groups";
+import { pruneGroups } from "./layerRows";
 
 // ---------------------------------------------------------------------------
 // The action on the selection
@@ -147,14 +149,16 @@ export function autoRouteSatins(): string | null {
   if (!routed?.length) return "Nothing to route";
   const ids = new Set(sel.map((o) => o.id));
   const at = s.doc.objects.findIndex((o) => ids.has(o.id));
-  const group = uid();
+  const group = uid("g");
   const out = routed.map((o) => ({ ...o, group }));
+  // the route's group sits in the group the columns shared, if any
+  const around = sel.every((o) => o.group === sel[0].group) ? sel[0].group : undefined;
   s.commit((d) => {
     // the originals: removed, or kept hidden so they are not sewn twice
     const rest = opts.keepOriginals ? d.objects.map((o) => (ids.has(o.id) ? { ...o, visible: false, name: o.name.endsWith(" (original)") ? o.name : `${o.name} (original)` } : o)) : d.objects.filter((o) => !ids.has(o.id));
     const pos = opts.keepOriginals ? Math.max(...rest.map((o, i) => (ids.has(o.id) ? i + 1 : 0))) : Math.min(at, rest.length);
     rest.splice(pos, 0, ...out);
-    return { ...d, objects: rest };
+    return pruneGroups({ ...d, objects: rest, groupParents: withParent(d.groupParents, group, around) });
   });
   s.select(out.map((o) => o.id));
   const satins = out.filter((o) => o.stitch.type === "satin").length;

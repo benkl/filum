@@ -98,7 +98,8 @@ impl Engine {
         crate::prof!("runs_for (incl. generate)");
         let json = {
             crate::prof!("runs_for: json key");
-            serde_json::to_string(&(&obj.paths, &obj.stitch, &obj.start, &obj.end)).unwrap_or_default()
+            // everything stitches::generate reads, stitch patterns included
+            serde_json::to_string(&(&obj.paths, &obj.stitch, &obj.start, &obj.end, &obj.patterns)).unwrap_or_default()
         };
         let knockdown = doc.options.knockdown;
         let k = key(&json, fabric, weight) ^ (knockdown as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);

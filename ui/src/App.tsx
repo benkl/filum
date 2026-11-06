@@ -49,8 +49,11 @@ function useShortcuts() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.closest("input,textarea,select,[contenteditable]")) return;
       const s = useStore.getState();
+      // a dialog is open (the store's, or a panel's own, e.g. font info):
+      // keys don't edit the design behind it
+      if (s.dialog || document.querySelector(".backdrop")) return;
       // a picture being adjusted, then the node tool's point selection
-      if (!s.dialog && (referenceKey(e) || nodeToolKey(e))) {
+      if (referenceKey(e) || nodeToolKey(e)) {
         e.preventDefault();
         return;
       }
@@ -63,13 +66,13 @@ function useShortcuts() {
         return;
       }
       // path commands: join, average points, compound paths
-      if (mod && (k === "j" || e.code === "KeyJ") && !s.dialog) {
+      if (mod && (k === "j" || e.code === "KeyJ")) {
         e.preventDefault();
         if (e.altKey) averageSelectedNodes();
         else joinSelection();
         return;
       }
-      if (mod && (k === "8" || e.code === "Digit8") && !s.dialog) {
+      if (mod && (k === "8" || e.code === "Digit8")) {
         e.preventDefault();
         if (e.altKey && e.shiftKey) releaseSelection();
         else compoundSelection();
@@ -109,7 +112,6 @@ function useShortcuts() {
         }
         return;
       }
-      if (s.dialog) return;
       if (k === "delete" || k === "backspace") {
         if (s.tool === "gradient" && s.gradNodes.length) {
           const sg = selectedGradient();
@@ -122,6 +124,8 @@ function useShortcuts() {
         return;
       }
       if (k === "escape") {
+        // drawing with the pen, curvature or satin tool: Esc finishes the path (the canvas does that)
+        if (s.drafting) return;
         if (s.tool === "gradient" && s.gradNodes.length) s.set({ gradNodes: [] });
         else if (s.anim.index != null) s.set({ anim: { ...s.anim, playing: false, index: null } });
         else if (s.tool !== "select") s.setTool("select");
@@ -146,7 +150,7 @@ function useShortcuts() {
       if (k === "4") return s.set({ finished: !s.finished });
       if (k === "0" || k === ")") return fit(e.shiftKey ? "design" : "hoop");
       if (k === "?") return s.setDialog("shortcuts");
-      if (k === "d" && e.altKey) return (e.preventDefault(), cloneSelection());
+      if ((k === "d" || e.code === "KeyD") && e.altKey) return (e.preventDefault(), cloneSelection());
       if (k === "d" && e.shiftKey) return s.set({ showDensity: !s.showDensity });
       if (k === "+" || k === "=") return zoomBy(1.25);
       if (k === "-") return zoomBy(0.8);

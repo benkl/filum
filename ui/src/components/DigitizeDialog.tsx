@@ -387,9 +387,17 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
     setSamMode(false);
     if (!img) return setBmp(null);
     let live = true;
-    createImageBitmap(new Blob([img.bytes as BlobPart])).then((b) => live && setBmp(b));
+    let made: ImageBitmap | null = null;
+    createImageBitmap(new Blob([img.bytes as BlobPart])).then((b) => {
+      made = b;
+      if (live) setBmp(b);
+      else b.close();
+    });
     return () => {
       live = false;
+      // the picture is replaced or the dialog closes: its memory goes
+      URL.revokeObjectURL(img.url);
+      made?.close();
     };
   }, [img]);
 

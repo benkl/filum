@@ -5,7 +5,7 @@
 
 import type { DesignObject, StitchDocument, TartanParams } from "../types";
 import { defaultFill, uid } from "./geometry";
-import { parentOf } from "./groups";
+import { parentOf, withParent } from "./groups";
 import { pruneGroups } from "./layerRows";
 
 export interface TartanStripe {
@@ -104,8 +104,9 @@ export function swatchCss(code: string, px = 3): string {
 
 /** The layer objects of a tartan, by layer. */
 export function tartanLayers(doc: StitchDocument, group: string): DesignObject[] {
+  // linked clones of a layer follow their original: not layers of this tartan
   return doc.objects
-    .filter((o) => o.stitch.type === "fill" && o.stitch.tartan?.group === group)
+    .filter((o) => !o.clone && o.stitch.type === "fill" && o.stitch.tartan?.group === group)
     .sort((a, b) => ((a.stitch as { tartan?: TartanParams }).tartan!.layer ?? 0) - ((b.stitch as { tartan?: TartanParams }).tartan!.layer ?? 0));
 }
 
@@ -156,12 +157,14 @@ export function makeTartan(doc: StitchDocument, objId: string, params: Omit<Tart
   if (!o) return doc;
   const group = uid("tartan");
   const fill = o.stitch.type === "fill" ? o.stitch : { type: "fill" as const, ...defaultFill() };
+  // the layers are kept together by the tartan's own group, inside the object's group
   const first: DesignObject = {
     ...o,
-    group: o.group ?? group,
+    group,
     stitch: { ...fill, method: "tartan", gradient: undefined, ramp: undefined, tartan: { ...params, layer: 0, group } },
   };
-  return syncTartan({ ...doc, objects: doc.objects.map((x) => (x.id === objId ? first : x)) }, group, params);
+  const placed = { ...doc, objects: doc.objects.map((x) => (x.id === objId ? first : x)), groupParents: withParent(doc.groupParents, group, o.group) };
+  return pruneGroups(syncTartan(placed, group, params));
 }
 
 /** The tartan back to a plain fill in its first colour. */

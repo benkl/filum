@@ -154,11 +154,17 @@ export async function recordVideo() {
     s0.toast("Video recording is not supported here", "error");
     return;
   }
+  // WebM where the webview records it, else MP4 (WebKit)
+  const mime = ["video/webm;codecs=vp9", "video/webm", "video/mp4"].find((m) => MediaRecorder.isTypeSupported(m));
+  if (!mime) {
+    s0.toast("Video recording is not supported here", "error");
+    return;
+  }
+  const ext = mime.startsWith("video/mp4") ? "mp4" : "webm";
   recording = true;
   try {
     const canvas = startCapture();
     const stream = canvas.captureStream(30);
-    const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
     const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6_000_000 });
     const chunks: Blob[] = [];
     rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
@@ -179,9 +185,13 @@ export async function recordVideo() {
     rec.stop();
     await done;
     stopCapture();
-    const bytes = new Uint8Array(await new Blob(chunks, { type: "video/webm" }).arrayBuffer());
-    await saveFile(`${s0.doc.name || "design"}-stitchout.webm`, bytes, [{ name: "WebM video", extensions: ["webm"] }]);
+    const bytes = new Uint8Array(await new Blob(chunks, { type: mime.split(";")[0] }).arrayBuffer());
+    await saveFile(`${s0.doc.name || "design"}-stitchout.${ext}`, bytes, [{ name: ext === "mp4" ? "MP4 video" : "WebM video", extensions: [ext] }]);
+  } catch (e) {
+    useStore.getState().toast(`Recording failed: ${(e as Error).message}`, "error");
   } finally {
+    // the canvas stops copying its frames whatever happened
+    stopCapture();
     recording = false;
   }
 }
@@ -261,7 +271,8 @@ export function StitchOutPanel() {
   const [height, setHeight] = useState(loadHeight);
   const [view, setView] = useState(600);
   const [zoom, setZoom] = useState(1);
-  const [hover, setHover] = useState<number | null>(null);
+  const [hover0, setHover] = useState<number | null>(null);
+  // a hover position from a longer plan (the design got smaller under the pointer) is clamped
   const rowsRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   /** Scroll position to apply after a zoom renders (keeps the record under the pointer in place). */
@@ -430,7 +441,8 @@ export function StitchOutPanel() {
   const sewn = tl.stitchAt[at];
   const block = rows[cur];
   const left = tl.secondsAt[total] - tl.secondsAt[at];
-  const hoverRow = hover != null ? rows[blockAt(tl, Math.min(hover, total - 1))] : null;
+  const hover = hover0 != null && total > 0 ? Math.min(hover0, total - 1) : null;
+  const hoverRow = hover != null ? rows[blockAt(tl, hover)] : null;
   const cuts = tl.blocks.reduce((n, b) => n + b.trims.length, 0) + tl.blocks.filter((b) => b.ending === "color").length;
   return (
     <section

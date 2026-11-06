@@ -25,6 +25,8 @@ import {
   type ZigzagOptions,
 } from "./convert";
 import { defaultStitch, uid } from "./geometry";
+import { withParent } from "./groups";
+import { pruneGroups } from "./layerRows";
 
 export type ConvertId = "fillToSatin" | "fillToStroke" | "satinToStroke" | "satinToRails" | "zigzagToSatin" | "patternSatin" | "breakApart" | "dedupe";
 
@@ -152,12 +154,20 @@ function satinStitch(from: DesignObject, patch: Partial<SatinParams> = {}): Stit
 /** Apply a plan to a document. */
 export function applyPlan(d: StitchDocument, plan: ConvertPlan): StitchDocument {
   const objects: DesignObject[] = [];
+  const known = new Set(d.objects.map((o) => o.group).filter(Boolean));
+  let parents = d.groupParents;
   for (const o of d.objects) {
     const r = plan.replace[o.id];
-    if (r) objects.push(...r);
-    else objects.push(o);
+    if (!r) {
+      objects.push(o);
+      continue;
+    }
+    objects.push(...r);
+    // a new group for the parts sits in the group the source was in
+    if (o.group) for (const x of r) if (x.group && !known.has(x.group) && !parents?.[x.group]) parents = withParent(parents, x.group, o.group);
   }
-  return { ...d, objects };
+  // groups left with one thing (or nothing) dissolve
+  return pruneGroups({ ...d, objects, groupParents: parents });
 }
 
 // ---------------------------------------------------------------------------
@@ -348,8 +358,9 @@ type BreakOut = { kind: "valid" } | { kind: "removed" } | { kind: "parts"; parts
 
 /** Ink/Stitch "Break apart fill objects": repair and split the selected fills. */
 export async function planBreakApart(sel: DesignObject[], o: { method: "simple" | "complex"; minArea: number }): Promise<ConvertPlan | string> {
-  const fills = sel.filter(isFillObj);
-  if (!fills.length) return "Select one or more fill shapes";
+  // a gradient's, tartan's or blend's layers share one shape: split together they'd fall apart
+  const fills = sel.filter((x) => isFillObj(x) && !(x.stitch.type === "fill" && (x.stitch.gradient || x.stitch.tartan || x.stitch.ramp?.group)));
+  if (!fills.length) return sel.some(isFillObj) ? "Gradients, tartans and colour blends can't be broken apart: remove them first" : "Select one or more fill shapes";
   const replace: Record<string, DesignObject[]> = {};
   const select: string[] = [];
   let valid = 0;
@@ -376,6 +387,8 @@ export async function planBreakApart(sel: DesignObject[], o: { method: "simple" 
       paths: p.rings.map((rg, k) => (p.source[k] != null ? closed[p.source[k]!] : ring(rg))),
       start: undefined,
       end: undefined,
+      // each part is a shape of its own (a clone's link would rebuild it whole)
+      clone: undefined,
     }));
     parts += made.length;
     select.push(...made.map((m) => m.id));

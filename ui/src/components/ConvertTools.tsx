@@ -173,6 +173,8 @@ export function ConvertDialog({ onClose }: { onClose: () => void }) {
   // closing without Apply restores the shapes
   useEffect(
     () => () => {
+      // a plan still being worked out is dropped (it would land after the restore)
+      run.current++;
       if (!applied.current) restore();
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps

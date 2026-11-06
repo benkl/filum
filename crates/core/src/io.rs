@@ -182,6 +182,11 @@ impl Default for ExportOptions {
 /// the frame moving out to the stop position before every stop.
 pub fn export_plan(doc: &Document, engine: &mut Engine, opts: &ExportOptions) -> StitchPlan {
     let mut plan = engine.plan(doc);
+    // the machine's longest stitch (Settings → Machine): longer ones are split
+    let max = doc.machine.max_stitch;
+    if max.is_finite() && max > 0.0 {
+        plan = plan.split_long_moves(max.max(1.0));
+    }
     if opts.x_repeats > 1 || opts.y_repeats > 1 {
         let (x, y) = (opts.x_repeats.clamp(1, 20), opts.y_repeats.clamp(1, 20));
         plan = plan.make_offsets(&StitchPlan::grid_offsets(x, y, opts.x_spacing, opts.y_spacing));

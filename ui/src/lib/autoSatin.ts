@@ -445,6 +445,7 @@ export function autoSatin(objects: DesignObject[], opts: AutoSatinOptions = {}):
         stopAfter: false,
         text: undefined,
         group: undefined,
+        clone: undefined,
       });
       continue;
     }
@@ -473,6 +474,7 @@ export function autoSatin(objects: DesignObject[], opts: AutoSatinOptions = {}):
       stopAfter: false,
       text: undefined,
       group: undefined,
+      clone: undefined,
     });
   }
   // 8. trims: on the object before each trimmed jump, and the underpath right after it left out

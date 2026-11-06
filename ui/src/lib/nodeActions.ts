@@ -26,7 +26,9 @@ export function deleteNodes(keepShape: boolean) {
   if (!s.nodeSel.length) return;
   const r = deleteSelectedNodes(s.doc, s.nodeSel, keepShape);
   s.commit((d) => syncAll(d, r.doc));
-  s.set({ nodeSel: [] });
+  // paths removed with their last points leave the selection too
+  const left = useStore.getState().doc.objects;
+  s.set({ nodeSel: [], selection: s.selection.filter((id) => left.some((o) => o.id === id)) });
   if (r.removedObjects) s.toast(`${r.removedObjects} path${r.removedObjects > 1 ? "s" : ""} removed (fewer than two points left)`);
 }
 

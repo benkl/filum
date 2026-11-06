@@ -16,7 +16,7 @@ use crate::{Error, Pattern, Thread, WriteOptions};
 pub(crate) const SETTINGS: EncodeSettings = EncodeSettings {
     max_stitch: 121,
     max_jump: 121,
-    full_jump: false,
+    full_jump: true,
 };
 const HEADER_SIZE: usize = 512;
 /// Number of jumps a trim is written as (pystitch `trim_at`).
@@ -321,9 +321,10 @@ mod tests {
         let text = String::from_utf8_lossy(h);
         let lines: Vec<&str> = text.split('\r').collect();
         assert_eq!(lines[0], "LA:Test design     ");
-        // records (no full jump in DST): stitch(-50,-30), stitch(100,0), stitch(0,70),
-        // color change, stitch(-70,0), end => 6.
-        assert_eq!(lines[1], "ST:      6");
+        // records (Ink/Stitch's full jump: a jump to the exact point before the
+        // first stitch of a block): jump(-50,-30), stitch(0,0), stitch(100,0),
+        // stitch(0,70), color change, jump(-70,0), stitch(0,0), end => 8.
+        assert_eq!(lines[1], "ST:      8");
         assert_eq!(lines[2], "CO:  1");
         assert_eq!(lines[3], "+X:   50");
         assert_eq!(lines[4], "-X:   50");

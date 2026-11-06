@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import { engine } from "../engine/client";
 import { useStore } from "../store";
-import { FLAG, type DesignObject, type PlanData, type StitchDocument, type Thread, type ThreadSource } from "../types";
+import { FLAG, type PlanData, type StitchDocument, type Thread, type ThreadSource } from "../types";
 import { objectBounds, uid } from "./geometry";
 import { DEFAULT_MATCH, rankCandidates, solveMatch, type MatchCandidate, type MatchContext, type MatchOptions, type MatchThread } from "./threadMatch";
 import { openFile, saveFile } from "./platform";
@@ -20,6 +20,7 @@ const store = () => useStore.getState();
 export { hexToRgb, rgbToHex, normHex, lab, deltaE } from "./colorMath";
 export type { Lab } from "./colorMath";
 import { hexToRgb, rgbToHex, normHex, lab, deltaE, type Lab } from "./colorMath";
+import { remapThreads, threadsOf } from "./copies";
 
 export const hexDeltaE = (a: string, b: string) => deltaE(lab(a), lab(b));
 
@@ -348,18 +349,7 @@ export function pushRecent(t: RecentThread) {
 // ---------------------------------------------------------------------------
 // Thread operations
 
-/** Every thread an object refers to (its own and its lettering's). */
-const threadsOf = (o: DesignObject) => [o.thread, ...(o.text ? [o.text.thread, o.text.borderThread, ...(o.text.palette ?? [])] : [])];
-
-/** The object with its thread references passed through `f`. */
-function remapObject(o: DesignObject, f: (id: string) => string): DesignObject {
-  if (!threadsOf(o).some((id) => f(id) !== id)) return o;
-  return {
-    ...o,
-    thread: f(o.thread),
-    ...(o.text ? { text: { ...o.text, thread: f(o.text.thread), borderThread: f(o.text.borderThread), ...(o.text.palette ? { palette: o.text.palette.map(f) } : {}) } } : {}),
-  };
-}
+const remapObject = remapThreads;
 
 /** A design thread with this colour (and code, if given) — added when missing. */
 export function threadFor(t: RecentThread): string {

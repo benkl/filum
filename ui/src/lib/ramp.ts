@@ -2,7 +2,7 @@
 // open along a vector (gradient fill), and colour blending — two layers of
 // one shape with opposite density ramps that add up to an even coverage.
 
-import { useStore } from "../store";
+import { activeThreadOf, useStore } from "../store";
 import type { DensityRamp, DesignObject, FillParams, RampProfile, StitchDocument, Vec2 } from "../types";
 import { uid } from "./geometry";
 
@@ -141,7 +141,8 @@ export function applyRamp(id: string, a: Vec2, b: Vec2, mode: "density" | "blend
 /** The colour that fades in: the active thread if it differs, else the next one. */
 function secondThread(first: string): string {
   const s = useStore.getState();
-  if (s.activeThread && s.activeThread !== first) return s.activeThread;
+  const active = activeThreadOf(s);
+  if (active && active !== first) return active;
   const others = s.doc.threads.filter((t) => t.id !== first);
   if (others.length) return others[0].id;
   return s.ensureThread("#3a7bd5", "Blue");

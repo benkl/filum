@@ -106,7 +106,8 @@ export function Slider({
           setLive(null);
         }}
       />
-      <Num value={live ?? value} onChange={onChange} unit={unit} step={step} digits={digits} />
+      {/* a typed value may go past the slider's end, not below its start (a stitch length of 0 never ends) */}
+      <Num value={live ?? value} onChange={onChange} unit={unit} step={step} digits={digits} min={min} />
     </div>
   );
 }

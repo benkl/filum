@@ -390,12 +390,13 @@ function ThreadPopover({ anchor, current, onPick, onClose }: { anchor: HTMLEleme
       if ((e.target as Element).closest?.(".chart-menu")) return;
       if (!ref.current?.contains(e.target as Node) && !anchor.contains(e.target as Node)) onClose();
     };
-    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    // Esc closes only the popover (not the selection or the tool behind it)
+    const key = (e: KeyboardEvent) => e.key === "Escape" && (e.stopPropagation(), onClose());
     window.addEventListener("pointerdown", down, true);
-    window.addEventListener("keydown", key);
+    window.addEventListener("keydown", key, true);
     return () => {
       window.removeEventListener("pointerdown", down, true);
-      window.removeEventListener("keydown", key);
+      window.removeEventListener("keydown", key, true);
     };
   }, [anchor, onClose]);
   const pick = (t: RecentThread) => {

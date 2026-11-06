@@ -127,7 +127,8 @@ pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Vec<u8> {
         match r.cmd {
             Cmd::Stitch => point_count += 1,
             Cmd::Jump | Cmd::ColorChange | Cmd::Stop => point_count += 2,
-            Cmd::Trim => {}
+            // Ink/Stitch writes trims (pystitch `trims: True`, `trim_at` 3)
+            Cmd::Trim => point_count += 2 * TRIM_AT,
             Cmd::End => break,
         }
     }
@@ -173,13 +174,21 @@ pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Vec<u8> {
                 out.i8(dx);
                 out.i8(-dy);
             }
-            Cmd::Trim => {}
+            Cmd::Trim => {
+                // a trim: three jumps that don't move
+                for _ in 0..TRIM_AT {
+                    out.extend_from_slice(&[0x80, 0x02, 0, 0]);
+                }
+            }
             Cmd::End => break,
         }
     }
     out.extend_from_slice(&[0x80, 0x10]);
     out
 }
+
+/// Zero-length jumps that stand for one trim (pystitch `JefWriter` `trim_at`).
+const TRIM_AT: u32 = 3;
 
 pub(crate) fn read(bytes: &[u8]) -> Result<Pattern, Error> {
     let mut r = Reader::new(bytes);
@@ -252,5 +261,29 @@ mod tests {
         assert_eq!(hoop_size(1300, 1900), HOOP_140X200);
         assert_eq!(hoop_size(1900, 1900), HOOP_200X200);
         assert_eq!(hoop_size(3000, 100), HOOP_110X110);
+    }
+
+    #[test]
+    fn trims_are_written() {
+        use crate::{cmd, Stitch};
+        let p = Pattern {
+            stitches: vec![
+                Stitch::new(0.0, 0.0, 0),
+                Stitch::new(1.0, 0.0, 0),
+                Stitch::new(1.0, 0.0, cmd::TRIM),
+                Stitch::new(1.5, 0.0, cmd::JUMP),
+                Stitch::new(1.5, 0.0, 0),
+                Stitch::new(1.5, 0.0, cmd::END),
+            ],
+            ..Default::default()
+        };
+        let bytes = write(&p, &WriteOptions::default());
+        let start = u32::from_le_bytes(bytes[0..4].try_into().unwrap()) as usize;
+        let body = &bytes[start..];
+        // three zero-length jumps after the first two stitches (Ink/Stitch / pystitch)
+        let zero_jumps = body.windows(4).filter(|w| w == &[0x80, 0x02, 0, 0]).count();
+        assert_eq!(zero_jumps, 3);
+        let back = read(&bytes).unwrap();
+        assert!(back.stitches.iter().any(|s| s.flags & cmd::TRIM != 0), "the trim reads back");
     }
 }

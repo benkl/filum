@@ -6,7 +6,7 @@
 import { useStore } from "../store";
 import type { DesignObject, DitherMethod, FillParams, FreePoint, GradientKind, GradientMesh, GradientParams, GradientStop, StitchDocument, SubPath, TransitionCurve, Vec2 } from "../types";
 import { defaultFill, normAngle, objectBounds, uid, unionBoxes, type Box } from "./geometry";
-import { parentOf } from "./groups";
+import { parentOf, withParent } from "./groups";
 import { pruneGroups } from "./layerRows";
 
 const store = () => useStore.getState();
@@ -18,8 +18,9 @@ export const isGradientLayer = (o: DesignObject): o is DesignObject & { stitch: 
 
 /** Layers of a gradient group, in stop order. */
 export function gradientLayers(doc: StitchDocument, group: string): DesignObject[] {
+  // linked clones of a layer follow their original: not layers of this gradient
   return doc.objects
-    .filter((o) => o.stitch.type === "fill" && o.stitch.gradient?.group === group)
+    .filter((o) => !o.clone && o.stitch.type === "fill" && o.stitch.gradient?.group === group)
     .sort((a, b) => (a.stitch as GradientFill).gradient.layer - (b.stitch as GradientFill).gradient.layer);
 }
 
@@ -122,7 +123,8 @@ export function makeGradient(objId: string, from: Vec2, to: Vec2, opts: Partial<
     const i = d.objects.findIndex((x) => x.id === o.id);
     const objects = [...d.objects];
     objects.splice(i, 1, ...layers);
-    return { ...d, objects };
+    // the gradient's group sits where the object was (in its group, if any)
+    return pruneGroups({ ...d, objects, groupParents: withParent(d.groupParents, group, o.group) });
   });
   s.select(layers.map((l) => l.id));
   return group;

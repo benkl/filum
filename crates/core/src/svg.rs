@@ -414,7 +414,8 @@ impl<'a> Ink<'a> {
         self.attrs.get(k).copied().filter(|v| !v.trim().is_empty())
     }
     fn f(&self, k: &str, d: f64) -> f64 {
-        self.get(k).and_then(|v| v.trim().split_whitespace().next()?.parse().ok()).unwrap_or(d)
+        // nan / inf / 1e400 parse as floats but can't go through JSON
+        self.get(k).and_then(|v| v.trim().split_whitespace().next()?.parse().ok()).filter(|v: &f64| v.is_finite()).unwrap_or(d)
     }
     fn b(&self, k: &str, d: bool) -> bool {
         match self.get(k).map(|v| v.to_ascii_lowercase()) {
@@ -427,7 +428,7 @@ impl<'a> Ink<'a> {
     }
     /// All numbers of a value with several ("2 1").
     fn list(&self, k: &str) -> Vec<f64> {
-        self.get(k).map(|v| v.split(|c: char| c.is_whitespace() || c == ',').filter_map(|x| x.parse().ok()).collect()).unwrap_or_default()
+        self.get(k).map(|v| v.split(|c: char| c.is_whitespace() || c == ',').filter_map(|x| x.parse().ok()).filter(|v: &f64| v.is_finite()).collect()).unwrap_or_default()
     }
     /// Ink/Stitch random stitch length (% jitter, 0 = off).
     fn random_length(&self) -> f64 {
@@ -579,7 +580,7 @@ fn ink_fill(ink: &Ink) -> FillParams {
         },
         cross_offset: {
             // "x y", or one value for both
-            let v: Vec<f64> = ink.get("cross_offset_mm").map(|v| v.split_whitespace().filter_map(|x| x.parse().ok()).collect()).unwrap_or_default();
+            let v: Vec<f64> = ink.get("cross_offset_mm").map(|v| v.split_whitespace().filter_map(|x| x.parse().ok()).filter(|v: &f64| v.is_finite()).collect()).unwrap_or_default();
             match v.as_slice() {
                 [x, y, ..] => [x.max(0.0), y.max(0.0)],
                 [x] => [x.max(0.0), x.max(0.0)],

@@ -105,15 +105,15 @@ impl StitchPlan {
         r
     }
 
-    /// Returns a copy where every movement (stitch or jump) longer than `max`
-    /// is broken into evenly spaced shorter movements of the same kind.
+    /// Returns a copy where every stitch longer than `max` is broken into
+    /// evenly spaced shorter stitches (jumps are left to the file writers).
     pub fn split_long_moves(&self, max: f64) -> StitchPlan {
         let mut out = Vec::with_capacity(self.stitches.len());
         let mut cur: Option<Point> = None;
         for s in &self.stitches {
-            let moving = s.is_stitch() || s.is(flags::JUMP);
-            if moving {
-                if let Some(c) = cur {
+            // only stitches: the file writers split jumps at their own limit
+            if s.is_stitch() || s.is(flags::JUMP) {
+                if let (Some(c), true) = (cur, s.is_stitch()) {
                     let d = c.dist(s.pos());
                     if d > max {
                         let n = (d / max).ceil() as usize;

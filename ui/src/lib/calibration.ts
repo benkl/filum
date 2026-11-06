@@ -161,6 +161,8 @@ export interface CalibrationResult {
   satin: { pullComp: number; pushComp: number; /** Sewn narrower than drawn (mm). */ shrink: number; /** Sewn longer than drawn (mm). */ grow: number } | null;
   fill: { pullComp: number; expand: number; shrink: number; grow: number } | null;
   notes: string[];
+  /** Measurements far from what was drawn (most likely typos): nothing is saved while there are any. */
+  odd: string[];
 }
 
 const round = (v: number, step = 0.05) => +(Math.round(v / step) * step).toFixed(2) + 0; // +0: no −0
@@ -209,7 +211,7 @@ export function calibrate(m: Measurements): CalibrationResult {
     }).map((d) => `${p.letter} ${d}`),
   );
   if (odd.length) notes.unshift(`Check ${odd.join(", ")}: that's far from what was drawn. Measure the stitched area only, without thread tails or the lettering.`);
-  return { satin, fill, notes };
+  return { satin, fill, notes, odd };
 }
 
 /** "3,4" and "3.4" → 3.4; empty or not a number → undefined. */

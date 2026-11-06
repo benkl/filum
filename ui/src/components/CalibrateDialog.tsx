@@ -117,7 +117,8 @@ export function CalibrateDialog({ onClose }: { onClose: () => void }) {
     useStore.getState().toast(`${info.label} is back to the standard numbers`);
   };
 
-  const canSave = !!(result.satin || result.fill);
+  // a measurement far off (a typo like 250 for 25) would save extreme settings
+  const canSave = !!(result.satin || result.fill) && !result.odd.length;
   return (
     <Dialog
       title="Calibrate a fabric"
@@ -281,7 +282,7 @@ export function CalibrateDialog({ onClose }: { onClose: () => void }) {
 
       {step === 2 && (
         <div className="cal-result">
-          {!canSave && (
+          {!(result.satin || result.fill) && (
             <p className="cal-empty">
               <Ruler size={14} /> Enter at least one disc or one bar, both along and across ({filled} of 8 so far).
             </p>

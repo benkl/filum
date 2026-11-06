@@ -1,6 +1,6 @@
 // Store-level operations for parametric lettering.
 
-import { useStore } from "../store";
+import { activeThreadOf, useStore } from "../store";
 import type { DesignObject, Vec2 } from "../types";
 import { DEFAULT_FONT, fontLabel, loadFont } from "./fonts";
 import { uid } from "./geometry";
@@ -62,7 +62,7 @@ async function withPalette(spec: TextSpec): Promise<TextSpec> {
 /** New lettering at `p` with the last used settings (and `patch`); returns its group. */
 export async function createTextAt(p: Vec2, content = "Text", patch: Partial<TextSpec> = {}): Promise<string> {
   const s = useStore.getState();
-  let thread = s.activeThread ?? s.doc.threads[0]?.id;
+  let thread = activeThreadOf(s) ?? s.doc.threads[0]?.id;
   if (!thread) thread = s.ensureThread("#1f2a56", "Navy");
   const d = defaults();
   const spec: TextSpec = {

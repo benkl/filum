@@ -1,12 +1,13 @@
 import { create } from "zustand";
 import { syncClones } from "./lib/clones";
 import { pruneGroups } from "./lib/layerRows";
-import { mulMat, translateMat, type Mat } from "./lib/geometry";
+import { transformObject, translateMat, type Mat } from "./lib/geometry";
 import { engine } from "./engine/client";
 import { defaultStitch, uid } from "./lib/geometry";
 import { loadPrefs, savePrefs, type Prefs } from "./lib/prefs";
 import { loadLayout, saveLayout, type Layout } from "./lib/layout";
 import type { DensityMode } from "./lib/density";
+import { freshCopies, mergeThreads, remapThreads } from "./lib/copies";
 import type {
   DensityField,
   DesignObject,
@@ -188,6 +189,8 @@ export interface State {
   // actions
   setDoc: (doc: StitchDocument, opts?: { history?: boolean; keepSelection?: boolean }) => void;
   checkpoint: () => void;
+  /** A drag that changed nothing: take back its checkpoint (the redo steps and saved state come back). */
+  dropCheckpoint: () => void;
   liveUpdate: (fn: (d: StitchDocument) => StitchDocument) => void;
   /** A drag transform: the document and the live matrix together; `null` ends it. */
   liveTransform: (live: { ids: string[]; m: Mat } | null, fn?: (d: StitchDocument) => StitchDocument) => void;
@@ -201,7 +204,7 @@ export interface State {
   setView: (v: Partial<View>) => void;
   updateObject: (id: string, patch: Partial<DesignObject>) => void;
   updateStitch: (id: string, patch: StitchPatch, live?: boolean) => void;
-  addObjects: (objs: DesignObject[], threads?: Thread[], groupParents?: Record<string, string>) => void;
+  addObjects: (objs: DesignObject[], threads?: Thread[], groupParents?: Record<string, string>, groupNames?: Record<string, string>) => void;
   deleteSelection: () => void;
   duplicateSelection: () => void;
   moveInOrder: (id: string, delta: number) => void;
@@ -218,6 +221,8 @@ export interface State {
 }
 
 const THEME_KEY = "filum.theme";
+/** The last checkpoint, so a drag that changed nothing can take it back. */
+let pendingCheckpoint: { doc: StitchDocument; future: StitchDocument[]; saved: boolean } | null = null;
 /** View toggles remembered between sessions. */
 const VIEW_KEY = "filum.view";
 const VIEW_FIELDS = ["showGrid", "showJumps", "finished", "showUnderlay", "showHidden", "smartGuides", "stitchColors", "fabricColor", "fabricTexture", "fabricAll", "fabricWeave", "densityMode", "foldedGroups"] as const;
@@ -257,6 +262,10 @@ export const emptyDoc = (): StitchDocument => ({
     colorChangeSeconds: 12,
   },
 });
+
+/** The thread new objects get: the one last picked, if the design still has it. */
+export const activeThreadOf = (s: { activeThread: string | null; doc: StitchDocument }): string | null =>
+  s.activeThread && s.doc.threads.some((t) => t.id === s.activeThread) ? s.activeThread : null;
 
 export const useStore = create<State>((set, get) => ({
   doc: emptyDoc(),
@@ -312,7 +321,9 @@ export const useStore = create<State>((set, get) => ({
   setDoc: (doc0, opts) => {
     const s = get();
     const doc = syncClones(doc0);
+    pendingCheckpoint = null;
     set({
+      nodeSel: opts?.keepSelection ? s.nodeSel.filter((n) => doc.objects.find((o) => o.id === n.id)?.paths[n.sp]?.nodes[n.ni]) : [],
       doc,
       past: opts?.history === false ? s.past : [...s.past.slice(-99), s.doc],
       future: opts?.history === false ? s.future : [],
@@ -322,23 +333,35 @@ export const useStore = create<State>((set, get) => ({
   },
   checkpoint: () => {
     const s = get();
+    pendingCheckpoint = { doc: s.doc, future: s.future, saved: s.saved };
     set({ past: [...s.past.slice(-99), s.doc], future: [], saved: false });
+  },
+  dropCheckpoint: () => {
+    const s = get();
+    const cp = pendingCheckpoint;
+    pendingCheckpoint = null;
+    if (cp && s.doc === cp.doc && s.past[s.past.length - 1] === cp.doc) set({ past: s.past.slice(0, -1), future: cp.future, saved: cp.saved });
   },
   liveUpdate: (fn) => set({ doc: syncClones(fn(get().doc), get().doc), saved: false }),
   liveTransform: (live, fn) => set(fn ? { live, doc: syncClones(fn(get().doc), get().doc), saved: false } : { live }),
   commit: (fn) => {
     const s = get();
+    pendingCheckpoint = null;
     set({ past: [...s.past.slice(-99), s.doc], future: [], doc: syncClones(fn(s.doc), s.doc), saved: false, live: null });
   },
   undo: () => {
     const s = get();
     const prev = s.past[s.past.length - 1];
     if (!prev) return;
+    pendingCheckpoint = null;
     set({
       doc: prev,
       past: s.past.slice(0, -1),
       future: [s.doc, ...s.future],
       selection: s.selection.filter((id) => prev.objects.some((o) => o.id === id)),
+      // point indices may name other points now
+      nodeSel: [],
+      gradNodes: [],
       saved: false,
     });
   },
@@ -346,11 +369,14 @@ export const useStore = create<State>((set, get) => ({
     const s = get();
     const next = s.future[0];
     if (!next) return;
+    pendingCheckpoint = null;
     set({
       doc: next,
       past: [...s.past, s.doc],
       future: s.future.slice(1),
       selection: s.selection.filter((id) => next.objects.some((o) => o.id === id)),
+      nodeSel: [],
+      gradNodes: [],
       saved: false,
     });
   },
@@ -379,13 +405,22 @@ export const useStore = create<State>((set, get) => ({
     if (live) get().liveUpdate(fn);
     else get().commit(fn);
   },
-  addObjects: (objs, threads, groupParents) =>
+  addObjects: (objs, threads, groupParents, groupNames) =>
     get().commit((d) => {
-      const merged = [...d.threads];
-      for (const t of threads ?? []) if (!merged.some((m) => m.id === t.id)) merged.push(t);
+      // threads from elsewhere (clipboard, another design): the same colour is reused,
+      // an id that is another colour here gets a new one
+      const { add, map } = mergeThreads(d.threads, threads ?? []);
+      const placed = map.size ? objs.map((o) => remapThreads(o, (id) => map.get(id) ?? id)) : objs;
       const parents = groupParents && Object.keys(groupParents).length ? { ...d.groupParents, ...groupParents } : d.groupParents;
+      const names = groupNames && Object.keys(groupNames).length ? { ...d.groupNames, ...groupNames } : d.groupNames;
       // groups a paste holds only one thing of dissolve (one object copied out of a group)
-      return pruneGroups({ ...d, threads: merged, objects: [...d.objects, ...objs], ...(parents ? { groupParents: parents } : {}) });
+      return pruneGroups({
+        ...d,
+        threads: [...d.threads, ...add],
+        objects: [...d.objects, ...placed],
+        ...(parents ? { groupParents: parents } : {}),
+        ...(names ? { groupNames: names } : {}),
+      });
     }),
   deleteSelection: () => {
     const sel = new Set(get().selection);
@@ -396,24 +431,14 @@ export const useStore = create<State>((set, get) => ({
   duplicateSelection: () => {
     const sel = new Set(get().selection);
     if (!sel.size) return;
-    const copies: DesignObject[] = [];
-    for (const o of get().doc.objects)
-      if (sel.has(o.id)) {
-        const c = structuredClone(o);
-        c.id = uid();
-        if (c.clone) c.clone = { ...c.clone, m: mulMat(translateMat(5, 5), c.clone.m) };
-        c.name = `${o.name} copy`;
-        c.paths = c.paths.map((sp) => ({
-          ...sp,
-          nodes: sp.nodes.map((n) => ({
-            p: [n.p[0] + 5, n.p[1] + 5],
-            ...(n.i ? { i: [n.i[0] + 5, n.i[1] + 5] } : {}),
-            ...(n.o ? { o: [n.o[0] + 5, n.o[1] + 5] } : {}),
-          })),
-        })) as DesignObject["paths"];
-        copies.push(c);
-      }
-    get().addObjects(copies);
+    const doc = get().doc;
+    // copies of their own: new groups, letterings, gradients and blends, 5 mm on
+    const fresh = freshCopies(
+      doc,
+      doc.objects.filter((o) => sel.has(o.id)),
+    );
+    const copies = fresh.objects.map((c) => ({ ...transformObject(c, translateMat(5, 5)), name: `${c.name} copy` }));
+    get().addObjects(copies, undefined, fresh.parents, fresh.names);
     set({ selection: copies.map((c) => c.id) });
   },
   moveInOrder: (id, delta) =>

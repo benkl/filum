@@ -418,7 +418,8 @@ export function LayersPanel() {
         const sel = s().selection;
         const ids = r.ids;
         const on = r.kind === "group" ? ids.every((id) => sel.includes(id)) : sel.includes(r.o.id);
-        if (e.shiftKey && anchor.current && anchor.current !== key) {
+        // the row clicked last may be filtered out or folded away: then this is a plain click
+        if (e.shiftKey && anchor.current && anchor.current !== key && row(anchor.current)) {
           // Shift: the rows from the one clicked last to this one (Ctrl+Shift adds them)
           const range = rangeIds(cur.current.rows, anchor.current, key);
           s().select(e.metaKey || e.ctrlKey ? [...new Set([...sel, ...range])] : range);

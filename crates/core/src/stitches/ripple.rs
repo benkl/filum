@@ -39,6 +39,23 @@ fn centroid(ring: &[Point]) -> Point {
     pt(cx / (3.0 * a), cy / (3.0 * a))
 }
 
+/// Centroid of an open line (shapely's `LineString.centroid`, what Ink/Stitch
+/// fans an open ripple towards): segment midpoints weighted by length. The
+/// area centroid of an open S-curve can land far outside it.
+fn line_centroid(line: &[Point]) -> Point {
+    let (mut len, mut cx, mut cy) = (0.0, 0.0, 0.0);
+    for w in line.windows(2) {
+        let d = w[0].dist(w[1]);
+        len += d;
+        cx += (w[0].x + w[1].x) * 0.5 * d;
+        cy += (w[0].y + w[1].y) * 0.5 * d;
+    }
+    if len < 1e-12 {
+        return line.first().copied().unwrap_or(pt(0.0, 0.0));
+    }
+    pt(cx / len, cy / len)
+}
+
 /// Ink/Stitch `_get_steps`: `n` values from `start` to `end`, raised to
 /// `exponent`, optionally flipped (1 − reversed).
 fn steps(n: usize, start: f64, end: f64, exponent: f64, flip: bool) -> Vec<f64> {
@@ -365,7 +382,7 @@ fn single_helper(c: &Ctx, sp: &SubPath, spacing: f64) -> Option<(bool, Vec<Vec<P
         guided_helper(c, &outline, &pts, Some(&rungs), twist)
     } else if p.fan {
         // Ink/Stitch without a guide: fanned towards the target
-        let target = p.target.map(Point::from_arr).unwrap_or_else(|| centroid(&outline));
+        let target = p.target.map(Point::from_arr).unwrap_or_else(|| line_centroid(&outline));
         target_helper(c, &outline, target, 1.0, twist)
     } else {
         // Filum's default: parallel copies `spacing` apart, towards the target side

@@ -2,10 +2,11 @@ import { engine, type SvgText } from "../engine/client";
 import { machineById, presetById } from "./machines";
 import { conjugate, makeClone } from "./clones";
 import { emptyDoc, useStore } from "../store";
-import type { ExportOptions, StitchDocument } from "../types";
+import type { DesignObject, ExportOptions, StitchDocument } from "../types";
 import { objectBounds, transformObject, translateMat, unionBoxes, uid } from "./geometry";
 import { dec, enc, isTauri, openFile, saveFile } from "./platform";
 import { pendingThreadList, THREAD_LIST_EXT } from "./threadList";
+import { freshCopies } from "./copies";
 
 // every embroidery format the engine reads (crates/formats), extension aliases included
 export const MACHINE_EXT = [
@@ -22,7 +23,7 @@ export const fit = (what: "hoop" | "design" | number = "hoop") =>
 function loadDoc(doc: StitchDocument, path: string | null) {
   const s = useStore.getState();
   s.setDoc({ ...emptyDoc(), ...doc, machine: { ...emptyDoc().machine, ...doc.machine } });
-  s.set({ filePath: path, saved: true, past: [], future: [], selection: [], anim: { ...s.anim, index: null, playing: false } });
+  s.set({ filePath: path, saved: true, past: [], future: [], selection: [], nodeSel: [], gradNodes: [], activeThread: null, anim: { ...s.anim, index: null, playing: false } });
   setTimeout(() => fit("hoop"), 0);
 }
 
@@ -81,20 +82,15 @@ async function handleBytes(name: string, path: string | null, bytes: Uint8Array,
       const dx = box ? s.doc.hoop.width / 2 - (box.x + box.w / 2) : 0;
       const dy = box ? s.doc.hoop.height / 2 - (box.y + box.h / 2) : 0;
       const m = translateMat(dx, dy);
-      const remap = new Map<string, string>();
-      const threads = doc.threads.map((t) => {
-        const existing = s.doc.threads.find((x) => x.color.toLowerCase() === t.color.toLowerCase());
-        const id = existing?.id ?? uid("t");
-        remap.set(t.id, id);
-        return { ...t, id };
-      });
-      const ids = new Map(doc.objects.map((o) => [o.id, uid()]));
-      const objs = doc.objects.map((o) => {
-        const t = { ...transformObject(o, m), id: ids.get(o.id)!, thread: remap.get(o.thread) ?? o.thread };
+      // its groups, letterings, gradients and blends get new ids (it may be the same file again);
+      // threads of a colour the design has are shared (addObjects)
+      const fresh = freshCopies(doc, doc.objects);
+      const objs = fresh.objects.map((o) => {
+        const t = transformObject(o, m);
         // a clone moved with its original keeps its place relative to it
-        return o.clone ? { ...t, clone: { ...conjugate(o.clone, m), of: ids.get(o.clone.of) ?? o.clone.of } } : t;
+        return o.clone ? { ...t, clone: { ...conjugate(o.clone, m), of: fresh.ids.get(o.clone.of) ?? o.clone.of } } : t;
       });
-      s.addObjects(objs, threads.filter((t) => !s.doc.threads.some((x) => x.id === t.id)));
+      s.addObjects(objs, doc.threads, fresh.parents, fresh.names);
       s.select(objs.map((o) => o.id));
     }
     for (const w of warnings) s.toast(w);
@@ -186,9 +182,13 @@ export async function optimizeOrder() {
   const s = useStore.getState();
   if (!s.doc.objects.length) return;
   const r = await engine.optimize(s.doc);
-  const byId = new Map(s.doc.objects.map((o) => [o.id, o]));
-  const objects = r.order.map((id) => byId.get(id)!).filter(Boolean);
-  s.commit((d) => ({ ...d, objects }));
+  // the order applied to the design as it is now: edits made meanwhile stay, new objects go last
+  s.commit((d) => {
+    const byId = new Map(d.objects.map((o) => [o.id, o]));
+    const ordered = r.order.map((id) => byId.get(id)).filter((o): o is DesignObject => !!o);
+    const placed = new Set(ordered.map((o) => o.id));
+    return { ...d, objects: [...ordered, ...d.objects.filter((o) => !placed.has(o.id))] };
+  });
   s.toast(
     `Optimised: colour changes ${r.colorChangesBefore} → ${r.colorChangesAfter}, travel ${Math.round(r.travelBeforeMm)} → ${Math.round(r.travelAfterMm)} mm`,
     "success",
