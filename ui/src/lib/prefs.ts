@@ -1,5 +1,6 @@
 // User preferences that outlive a design: look, hints, nudging, autosave.
 // The view toggles (grid, guides, …) are remembered by the store itself.
+import { safeSetItem } from "./storage";
 
 export interface Prefs {
   /** Highlight colour of the interface (hex). */
@@ -54,7 +55,7 @@ export function loadPrefs(): Prefs {
 }
 
 export function savePrefs(p: Prefs) {
-  localStorage.setItem(KEY, JSON.stringify(p));
+  safeSetItem(KEY, JSON.stringify(p));
 }
 
 const rgb = (hex: string) => {

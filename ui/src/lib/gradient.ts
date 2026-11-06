@@ -5,9 +5,12 @@
 
 import { useStore } from "../store";
 import type { DesignObject, DitherMethod, FillParams, FreePoint, GradientKind, GradientMesh, GradientParams, GradientStop, StitchDocument, SubPath, TransitionCurve, Vec2 } from "../types";
+import { gradientLayers, gradientRefusal, plainGroupOf } from "./fillLayers";
 import { defaultFill, normAngle, objectBounds, uid, unionBoxes, type Box } from "./geometry";
 import { parentOf, withParent } from "./groups";
 import { pruneGroups } from "./layerRows";
+
+export { gradientLayers, gradientRefusal, repairGradients, reverseStops } from "./fillLayers";
 
 const store = () => useStore.getState();
 
@@ -15,14 +18,6 @@ export type GradientFill = FillParams & { gradient: GradientParams };
 
 export const isGradientLayer = (o: DesignObject): o is DesignObject & { stitch: { type: "fill" } & GradientFill } =>
   o.stitch.type === "fill" && !!o.stitch.gradient;
-
-/** Layers of a gradient group, in stop order. */
-export function gradientLayers(doc: StitchDocument, group: string): DesignObject[] {
-  // linked clones of a layer follow their original: not layers of this gradient
-  return doc.objects
-    .filter((o) => !o.clone && o.stitch.type === "fill" && o.stitch.gradient?.group === group)
-    .sort((a, b) => (a.stitch as GradientFill).gradient.layer - (b.stitch as GradientFill).gradient.layer);
-}
 
 /** The gradient of the selection (any selected layer), if there is one. */
 export function selectedGradient(): { group: string; params: GradientParams; layers: DesignObject[] } | null {
@@ -76,11 +71,22 @@ function secondThread(first: string): string {
   return s.ensureThread(lum > 128 ? "#1f2a56" : "#f2c14e");
 }
 
-/** Turn a closed object into a two-colour gradient from `from` to `to`. */
+/**
+ * Turn a closed object into a two-colour gradient from `from` to `to`.
+ * Null when it can't be one (a toast says why).
+ */
 export function makeGradient(objId: string, from: Vec2, to: Vec2, opts: Partial<GradientParams> = {}): string | null {
   const s = store();
   const o = s.doc.objects.find((x) => x.id === objId);
-  if (!o || !hasClosed(o) || o.text) return null;
+  if (!o || !hasClosed(o) || o.text) {
+    s.toast(o?.text ? "Lettering can't be a gradient: convert it to shapes first" : "Gradients need a closed shape", "error");
+    return null;
+  }
+  const no = gradientRefusal(s.doc, o);
+  if (no) {
+    s.toast(no, "error");
+    return null;
+  }
   const group = uid("grd");
   const kind = opts.kind ?? "linear";
   const base: GradientParams = {
@@ -102,8 +108,9 @@ export function makeGradient(objId: string, from: Vec2, to: Vec2, opts: Partial<
   };
   const fill: FillParams =
     // a flow fill with its direction field stays one (its layers share the streamlines)
+    // (a one-colour tartan or a density ramp of the source does not carry over)
     o.stitch.type === "fill"
-      ? { ...o.stitch, method: (o.stitch.method === "flow" && o.stitch.flow) || o.stitch.method === "curved" ? o.stitch.method : "tatami" }
+      ? { ...o.stitch, tartan: undefined, ramp: undefined, method: (o.stitch.method === "flow" && o.stitch.flow) || o.stitch.method === "curved" ? o.stitch.method : "tatami" }
       : { ...defaultFill() };
   const angle = kind === "linear" || kind === "reflected" ? rowAngleFor(from, to) : fill.angle;
   const paths: SubPath[] = o.paths.filter((p) => p.closed && p.nodes.length >= 3);
@@ -124,7 +131,7 @@ export function makeGradient(objId: string, from: Vec2, to: Vec2, opts: Partial<
     const objects = [...d.objects];
     objects.splice(i, 1, ...layers);
     // the gradient's group sits where the object was (in its group, if any)
-    return pruneGroups({ ...d, objects, groupParents: withParent(d.groupParents, group, o.group) });
+    return pruneGroups({ ...d, objects, groupParents: withParent(d.groupParents, group, plainGroupOf(d, o)) });
   });
   s.select(layers.map((l) => l.id));
   return group;
@@ -171,7 +178,9 @@ export function stopsOf(doc: StitchDocument, group: string): StopEdit[] {
   const layers = gradientLayers(doc, group);
   const g = (layers[0]?.stitch as GradientFill | undefined)?.gradient;
   if (!g) return [];
-  return g.stops.map((st, i) => ({ ...st, thread: layers[i]?.thread ?? layers[0].thread }));
+  // by layer number (a deleted layer must not shift the colours of the others)
+  const byLayer = new Map(layers.map((l) => [(l.stitch as GradientFill).gradient.layer, l.thread]));
+  return g.stops.map((st, i) => ({ ...st, thread: byLayer.get(i) ?? layers[0].thread }));
 }
 
 /**
@@ -191,6 +200,8 @@ export function setStops(group: string, stops: StopEdit[], live = false, extra: 
       return {
         ...src,
         id: layers[i] ? src.id : uid(),
+        // a new colour layer is shown and editable, whatever the first one is
+        ...(layers[i] ? {} : { visible: true, locked: false }),
         name: `${first.name.replace(/ · colour \d+$/, "")} · colour ${i + 1}`,
         thread: st.thread,
         start: i === 0 ? first.start : undefined,
@@ -780,7 +791,10 @@ export function removeNodes(group: string, idx: number[]) {
 /** Turn a closed shape into a mesh / freeform gradient with a new colour at `click`. */
 export function makeGradient2D(objId: string, click: Vec2, kind: "mesh" | "freeform"): string | null {
   const o = store().doc.objects.find((x) => x.id === objId);
-  if (!o || !hasClosed(o) || o.text) return null;
+  if (!o || !hasClosed(o) || o.text) {
+    store().toast(o?.text ? "Lettering can't be a gradient: convert it to shapes first" : "Gradients need a closed shape", "error");
+    return null;
+  }
   const b = objectBounds(o) ?? { x: 0, y: 0, w: 10, h: 10 };
   const cx = Math.min(b.x + b.w * 0.9, Math.max(b.x + b.w * 0.1, click[0]));
   const cy = Math.min(b.y + b.h * 0.9, Math.max(b.y + b.h * 0.1, click[1]));

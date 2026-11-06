@@ -7,6 +7,7 @@ import { CUTWORK_SECTORS, cutworkSegmentation, type CutworkSector } from "../lib
 import { useStore } from "../store";
 import type { DesignObject } from "../types";
 import { Num, Row, Section, Toggle } from "./ui";
+import { safeSetItem } from "../lib/storage";
 
 const KEY = "filum.cutwork";
 
@@ -32,7 +33,7 @@ export function CutworkSection({ o }: { o: DesignObject }) {
   const [cfg, setCfg] = useState(cutworkSettings);
   const save = (next: typeof cfg) => {
     setCfg(next);
-    localStorage.setItem(KEY, JSON.stringify(next));
+    safeSetItem(KEY, JSON.stringify(next));
   };
   const setSector = (i: number, patch: Partial<CutworkSector>) => save({ ...cfg, sectors: cfg.sectors.map((s, k) => (k === i ? { ...s, ...patch } : s)) });
   if (o.stitch.type !== "running" || o.stitch.ripple) return null;

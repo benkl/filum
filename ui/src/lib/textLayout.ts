@@ -37,10 +37,23 @@ export function pathMap(pts: Vec2[]) {
 
 type Mat = (p: Vec2) => Vec2;
 
-/** Bend a straight layout (baseline y = 0, centred on x = 0 for the arc) along a circle. */
-function arcMap(arcDeg: number, width: number): Mat | null {
-  if (Math.abs(arcDeg) < 0.5 || width <= 0) return null;
+/**
+ * Radius of the arc a straight layout `width` mm wide is bent along. The
+ * letters reach `extent` mm towards the centre (their height above the
+ * baseline for a dip, below it — lower lines, descenders — for an arch): the
+ * circle stays that far plus a margin away, else short text with a strong
+ * arc would wrap round the centre and turn its letters inside out.
+ */
+export function arcRadius(arcDeg: number, width: number, extent = 0): number {
   const R = width / ((Math.abs(arcDeg) * Math.PI) / 180);
+  const ext = Math.max(0, extent);
+  return Math.max(R, ext + Math.max(1, ext * 0.25));
+}
+
+/** Bend a straight layout (baseline y = 0, centred on x = 0 for the arc) along a circle. */
+function arcMap(arcDeg: number, width: number, extent = 0): Mat | null {
+  if (Math.abs(arcDeg) < 0.5 || width <= 0) return null;
+  const R = arcRadius(arcDeg, width, extent);
   if (arcDeg > 0) {
     // centre below the text: ends drop, letters fan outwards
     return ([x, y]) => {
@@ -66,6 +79,29 @@ function mapNodes(paths: SubPath[], f: Mat): SubPath[] {
 
 const shiftX = (paths: SubPath[], dx: number) => (dx ? mapNodes(paths, ([x, y]) => [x + dx, y]) : paths);
 
+/** Per-object sewing settings a font's glyph object carries (Ink/Stitch
+ *  commands and params: ties, force lock, min stitch / jump, stop, start
+ *  and end point). */
+type GlyphCommands = Partial<Pick<DesignObject, "ties" | "forceLock" | "minStitch" | "minJump" | "stopAfter" | "start" | "end">>;
+
+/** A glyph object's own commands, its start / end point mapped like its paths (only the set ones). */
+function glyphCommands(o: DesignObject, f: Mat): GlyphCommands {
+  const c: GlyphCommands = {};
+  if (o.ties && o.ties !== "both") c.ties = o.ties;
+  if (o.forceLock) c.forceLock = true;
+  if (o.minStitch != null) c.minStitch = o.minStitch;
+  if (o.minJump != null) c.minJump = o.minJump;
+  if (o.stopAfter) c.stopAfter = true;
+  if (o.start) c.start = f(o.start);
+  if (o.end) c.end = f(o.end);
+  return c;
+}
+
+/** The commands with the start / end point mapped by `f`. */
+function mapCommands(c: GlyphCommands, f: Mat): GlyphCommands {
+  return { ...c, ...(c.start ? { start: f(c.start) } : {}), ...(c.end ? { end: f(c.end) } : {}) };
+}
+
 /** Which letter, word and line (all counted through the whole text) a piece belongs to. */
 export interface Unit {
   letter: number;
@@ -83,6 +119,8 @@ interface Piece {
   unit?: Unit;
   /** The glyph's own trim (from the font). */
   trimAfter?: boolean;
+  /** The glyph object's own commands (from the font), in the same space as `paths`. */
+  cmd?: GlyphCommands;
 }
 
 /** One laid-out line: its pieces, advance width and ink width (mm). */
@@ -135,7 +173,7 @@ export function blockOffsets(units: number[], distance: number): Map<number, num
 const firstSeen = (ids: number[]) => [...new Set(ids)];
 
 /** Spread the lines of a Block-aligned text to the widest one (in place). */
-function justify<T extends { paths: SubPath[]; unit?: Unit }>(lines: Line<T>[], letters: boolean) {
+function justify<T extends { paths: SubPath[]; unit?: Unit; cmd?: GlyphCommands }>(lines: Line<T>[], letters: boolean) {
   const widest = Math.max(0, ...lines.map((l) => l.ink));
   for (const line of lines) {
     const withUnit = line.items.filter((it) => it.unit);
@@ -148,7 +186,12 @@ function justify<T extends { paths: SubPath[]; unit?: Unit }>(lines: Line<T>[], 
     const distance = widest - line.ink;
     const off = blockOffsets(units, distance);
     if (!off.size) continue;
-    for (const it of line.items) if (it.unit) it.paths = shiftX(it.paths, off.get(it.unit[by]) ?? 0);
+    for (const it of line.items) {
+      const dx = it.unit ? (off.get(it.unit[by]) ?? 0) : 0;
+      if (!dx) continue;
+      it.paths = shiftX(it.paths, dx);
+      if (it.cmd) it.cmd = mapCommands(it.cmd, ([x, y]) => [x + dx, y]);
+    }
     line.width += distance;
     line.ink = widest;
   }
@@ -296,14 +339,16 @@ async function layoutEmbroidery(spec: TextSpec, font: EmbroideryFont): Promise<{
         const dx = x;
         letterNo++;
         if (g.objects.length) inkR = Math.max(inkR, dx + g.width);
+        const at: Mat = ([px, py]) => [(px + dx) * scale, (py + y) * scale];
         g.objects.forEach((o, oi) => {
           const ci = g.colors[oi] ?? 0;
           if (o.stitch.type === "fill") fills.set(o.stitch.method, (fills.get(o.stitch.method) ?? 0) + 1);
           line.push({
-            paths: mapNodes(o.paths, ([px, py]) => [(px + dx) * scale, (py + y) * scale]),
+            paths: mapNodes(o.paths, at),
             stitch: letterFill(o.stitch, spec, scale),
             unit: { letter: letterNo, word: wordNo, line: li },
             trimAfter: o.trimAfter,
+            cmd: glyphCommands(o, at),
             role: "glyph",
             name,
             thread: spec.palette?.[ci] ?? spec.thread,
@@ -378,6 +423,198 @@ function commandsToSubPaths(commands: opentype.PathCommand[]): SubPath[] {
   return subs;
 }
 
+// ---------------------------------------------------------------------------
+// Bidirectional text for outline fonts. opentype.js shapes (Arabic forms,
+// ligatures) but does not reorder: Hebrew comes out reversed, and lines that
+// mix scripts keep their runs in typing order. A small subset of the Unicode
+// bidi algorithm puts them in visual order: the line's direction from its
+// first strong letter, numbers and Latin runs keep their own order inside
+// right-to-left text, neutrals (spaces, punctuation) take the direction
+// around them, and brackets are mirrored in right-to-left runs.
+
+/** Hebrew, Arabic, Syriac, Thaana, NKo … and their presentation forms. */
+const RTL_CHAR = /[\u0590-\u05ff\u0600-\u065f\u066a-\u06ef\u06fa-\u08ff\ufb1d-\ufdff\ufe70-\ufeff]/;
+const DIGIT = /[0-9\u0660-\u0669\u06f0-\u06f9]/;
+const MIRROR: Record<string, string> = { "(": ")", ")": "(", "[": "]", "]": "[", "{": "}", "}": "{", "<": ">", ">": "<", "«": "»", "»": "«", "‹": "›", "›": "‹" };
+
+type BidiType = "L" | "R" | "EN" | "N";
+function bidiType(cluster: string): BidiType {
+  const c = String.fromCodePoint(cluster.codePointAt(0)!);
+  if (RTL_CHAR.test(c)) return "R";
+  if (DIGIT.test(c)) return "EN";
+  return /\p{L}/u.test(c) ? "L" : "N";
+}
+
+/** Characters with their combining marks (one unit when reordering). */
+function clustersOf(text: string): string[] {
+  const out: string[] = [];
+  for (const ch of text) {
+    if (out.length && /[\p{M}\u200d]/u.test(ch)) out[out.length - 1] += ch;
+    else out.push(ch);
+  }
+  return out;
+}
+
+/**
+ * Embedding levels of a line's clusters (Unicode bidi, simplified: W7, N1–N2,
+ * I1–I2, L1): even runs left to right, odd runs right to left. Lines whose
+ * first strong letter is right-to-left are right-to-left paragraphs.
+ */
+export function bidiLevels(text: string): { clusters: string[]; levels: number[]; rtl: boolean } {
+  const clusters = clustersOf(text);
+  const types = clusters.map(bidiType);
+  const rtl = types.find((t) => t === "L" || t === "R") === "R";
+  const sos = rtl ? "R" : "L";
+  // W7: numbers after left-to-right text (or at the start of a left-to-right line) are left to right
+  let strong = sos;
+  for (let i = 0; i < types.length; i++) {
+    if (types[i] === "L" || types[i] === "R") strong = types[i];
+    else if (types[i] === "EN" && strong === "L") types[i] = "L";
+  }
+  // N1, N2: neutrals between the same direction take it (numbers count as right to left), else the line's
+  const dirOf = (t: BidiType) => (t === "L" ? "L" : "R");
+  for (let i = 0; i < types.length; ) {
+    if (types[i] !== "N") {
+      i++;
+      continue;
+    }
+    let j = i;
+    while (j < types.length && types[j] === "N") j++;
+    const before = i > 0 ? dirOf(types[i - 1]) : sos;
+    const after = j < types.length ? dirOf(types[j]) : sos;
+    const t = before === after ? before : sos;
+    for (let k = i; k < j; k++) types[k] = t;
+    i = j;
+  }
+  // I1, I2
+  const levels = types.map((t) => (rtl ? (t === "R" ? 1 : 2) : t === "L" ? 0 : t === "R" ? 1 : 2));
+  // L1: trailing white space at the line's own level
+  for (let i = clusters.length - 1; i >= 0 && /^\s+$/u.test(clusters[i]); i--) levels[i] = rtl ? 1 : 0;
+  return { clusters, levels, rtl };
+}
+
+/** L2: reverse every run at level ≥ k, from the highest level down to 1. */
+export function reorderLevels<T>(items: T[], levels: number[]): T[] {
+  const out = items.slice();
+  const lv = levels.slice();
+  const max = Math.max(0, ...lv);
+  for (let k = max; k >= 1; k--) {
+    for (let i = 0; i < out.length; ) {
+      if (lv[i] < k) {
+        i++;
+        continue;
+      }
+      let j = i;
+      while (j < out.length && lv[j] >= k) j++;
+      const a = out.slice(i, j).reverse();
+      const b = lv.slice(i, j).reverse();
+      out.splice(i, j - i, ...a);
+      lv.splice(i, j - i, ...b);
+      i = j;
+    }
+  }
+  return out;
+}
+
+/** Mirror brackets of right-to-left clusters (L4). */
+const mirrored = (c: string, level: number) => (level % 2 && MIRROR[c[0]] ? MIRROR[c[0]] + c.slice(1) : c);
+
+/** A line in visual order (left to right as drawn); characters keep their marks. */
+export function visualOrder(text: string): string {
+  const { clusters, levels } = bidiLevels(text);
+  return reorderLevels(
+    clusters.map((c, i) => mirrored(c, levels[i])),
+    levels,
+  ).join("");
+}
+
+/** Logical runs of one level (shaped separately: Arabic needs its typing order). */
+function bidiRuns(text: string): { text: string; level: number }[] {
+  const { clusters, levels } = bidiLevels(text);
+  const runs: { text: string; level: number }[] = [];
+  clusters.forEach((c, i) => {
+    const last = runs[runs.length - 1];
+    const m = mirrored(c, levels[i]);
+    if (last && last.level === levels[i]) last.text += m;
+    else runs.push({ text: m, level: levels[i] });
+  });
+  return runs;
+}
+
+// opentype.js reverses every Arabic "sentence" itself after shaping (its char classes)
+const OT_ARABIC = /[\u0600-\u065f\u066a-\u06d2\u06fa-\u06ff\u0610-\u061b\u061e\u0670\u06d6-\u06dc\u06df-\u06e4\u06e7\u06e8\u06ea-\u06ed]/;
+
+type RenderOpts = opentype.RenderOptions & { tracking?: number; script?: string; language?: string };
+type Positioning = { getDefaultScriptName(): string; getKerningTables(script: string, language?: string): unknown; getKerningValue(tables: unknown, left: number, right: number): number };
+
+function toGlyphs(f: opentype.Font, s: string, o: RenderOpts): opentype.Glyph[] {
+  return (f.stringToGlyphs as (this: opentype.Font, s: string, o?: RenderOpts) => opentype.Glyph[]).call(f, s, o);
+}
+
+/** The glyphs of a run in typing order (ligatures and Arabic forms applied). */
+function shapeRun(f: opentype.Font, text: string, o: RenderOpts): opentype.Glyph[] {
+  const out: opentype.Glyph[] = [];
+  let seg = "";
+  let arabic = false;
+  const flush = () => {
+    if (!seg) return;
+    const gs = toGlyphs(f, seg, o);
+    // undo opentype.js's own reversal: the runs are ordered here
+    out.push(...(arabic ? gs.reverse() : gs));
+    seg = "";
+  };
+  for (const ch of text) {
+    const a = OT_ARABIC.test(ch);
+    if (a !== arabic) flush();
+    arabic = a;
+    seg += ch;
+  }
+  flush();
+  return out;
+}
+
+/** A glyph line as drawn: glyphs left to right with their pen positions (opentype.js's forEachGlyph rules). */
+export function placeGlyphs(f: opentype.Font, line: string, size: number, opts: RenderOpts): { glyphs: { glyph: opentype.Glyph; x: number }[]; width: number } {
+  const o: RenderOpts = { ...(f as unknown as { defaultRenderOptions: RenderOpts }).defaultRenderOptions, ...opts };
+  const scale = size / f.unitsPerEm;
+  const pos = (f as unknown as { position?: Positioning }).position;
+  const script = (s: string) => (/[\u0590-\u05ff\ufb1d-\ufb4f]/.test(s) ? "hebr" : /[\u0600-\u08ff\ufb50-\ufeff]/.test(s) ? "arab" : (o.script ?? pos?.getDefaultScriptName() ?? "latn"));
+  type Item = { g: opentype.Glyph; level: number; run: number; i: number; kern: number };
+  const items: Item[] = [];
+  bidiRuns(line).forEach((r, ri) => {
+    const gs = shapeRun(f, r.text, o);
+    const tables = o.kerning && pos ? pos.getKerningTables(script(r.text), o.language) : undefined;
+    const kern = (a: opentype.Glyph, b: opentype.Glyph) => (tables && pos ? pos.getKerningValue(tables, a.index, b.index) : f.getKerningValue(a, b));
+    gs.forEach((g, i) => items.push({ g, level: r.level, run: ri, i, kern: o.kerning && i < gs.length - 1 ? kern(g, gs[i + 1]) : 0 }));
+  });
+  // marks (no advance) stay after their letter when a run turns round
+  const clusters: Item[][] = [];
+  for (const it of items) {
+    const last = clusters[clusters.length - 1];
+    if (last && !it.g.advanceWidth && last[0].run === it.run) last.push(it);
+    else clusters.push([it]);
+  }
+  const visual = reorderLevels(
+    clusters,
+    clusters.map((c) => c[0].level),
+  ).flatMap((c) => c);
+  const glyphs: { glyph: opentype.Glyph; x: number }[] = [];
+  let x = 0;
+  visual.forEach((it, k) => {
+    glyphs.push({ glyph: it.g, x });
+    if (it.g.advanceWidth) x += it.g.advanceWidth * scale;
+    const next = visual[k + 1];
+    // kerning between neighbours in typing order (either way round on the line)
+    if (next && next.run === it.run) {
+      if (next.i === it.i + 1) x += it.kern * scale;
+      else if (next.i === it.i - 1) x += next.kern * scale;
+    }
+    if (o.letterSpacing) x += o.letterSpacing * size;
+    else if (o.tracking) x += (o.tracking / 1000) * size;
+  });
+  return { glyphs, width: x };
+}
+
 /** Straight layout of outline-font glyph contours (per glyph), mm, first baseline at y = 0. */
 function layoutOutline(spec: TextSpec, font: OutlineFont): Line<{ paths: SubPath[]; unit: Unit }>[] {
   const f = font.font;
@@ -391,32 +628,33 @@ function layoutOutline(spec: TextSpec, font: OutlineFont): Line<{ paths: SubPath
   let letterNo = 0;
   let wordNo = 0;
   spec.content.split("\n").forEach((line, li) => {
-    // glyph by glyph: spaces separate words (word spacing, Block alignment)
-    // the same glyph run getPaths renders (ligatures included)
-    const glyphs = (f.stringToGlyphs as (this: opentype.Font, s: string, o?: opentype.RenderOptions) => opentype.Glyph[]).call(f, line, { ...(f as unknown as { defaultRenderOptions: object }).defaultRenderOptions, ...opts });
-    const paths = f.getPaths(line, 0, li * lineH, size, opts);
+    // glyph by glyph, in visual order: spaces separate words (word spacing, Block alignment)
+    const placed = placeGlyphs(f, line, size, opts);
     const items: { paths: SubPath[]; unit: Unit }[] = [];
     let words = 0;
     let inWord = false;
     let inkR = 0;
-    glyphs.forEach((g, gi) => {
+    for (const { glyph: g, x } of placed.glyphs) {
       const space = g.unicode === 32 || (g.unicodes ?? []).includes(32);
       if (space) {
         if (inWord) words++;
         inWord = false;
-        return;
+        continue;
       }
+      // a character the font lacks (.notdef): not stitched — no box — but it keeps its place
+      if (g.index === 0) continue;
       if (!inWord) wordNo++;
       inWord = true;
       letterNo++;
-      const subs = shiftX(commandsToSubPaths(paths[gi]?.commands ?? []), words * ws);
-      if (!subs.length) return;
-      const bb = paths[gi].getBoundingBox();
+      const path = g.getPath(x, li * lineH, size, opts, f);
+      const subs = shiftX(commandsToSubPaths(path.commands), words * ws);
+      if (!subs.length) continue;
+      const bb = path.getBoundingBox();
       inkR = Math.max(inkR, bb.x2 + words * ws);
       items.push({ paths: subs, unit: { letter: letterNo, word: wordNo, line: li } });
-    });
+    }
     const gaps = Math.max(0, line.trim().split(/ +/).length - 1);
-    out.push({ items, width: f.getAdvanceWidth(line, size, opts) + gaps * ws, ink: inkR });
+    out.push({ items, width: placed.width + gaps * ws, ink: inkR });
   });
   return out;
 }
@@ -459,7 +697,13 @@ export async function layoutText(spec: TextSpec, font: LoadedFont): Promise<Desi
   const shiftFor = (w: number) => (spec.align === "center" ? -w / 2 : spec.align === "right" ? -w : 0);
   // arc: bend around the centre of the widest line
   const arcShift = spec.align === "center" ? 0 : spec.align === "right" ? blockW / 2 : -blockW / 2;
-  const bend = arcMap(spec.arc, blockW);
+  // how far the letters reach towards the arc's centre: above the baseline for a dip, below it for an arch
+  let reach = 0;
+  if (Math.abs(spec.arc) >= 0.5)
+    for (const l of lines)
+      for (const it of l.items)
+        for (const sp of it.paths) for (const n of sp.nodes) reach = Math.max(reach, spec.arc > 0 ? n.p[1] : -n.p[1]);
+  const bend = arcMap(spec.arc, blockW, reach);
   const rad = (spec.rotation * Math.PI) / 180;
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
@@ -477,16 +721,18 @@ export async function layoutText(spec: TextSpec, font: LoadedFont): Promise<Desi
     });
   }
   const along = spec.path && spec.path.length >= 2 ? pathMap(spec.pathFlip ? [...spec.path].reverse() : spec.path) : null;
-  const objectOf = (piece: Piece, paths: SubPath[], stitch: StitchParams): DesignObject => ({
+  const objectOf = (piece: Piece, f: Mat, stitch: StitchParams): DesignObject => ({
     id: uid(),
     name: font.kind === "embroidery" ? `${label} · ${piece.name}` : `${label} (${piece.name})`,
     thread: piece.thread,
     visible: true,
     locked: false,
-    paths,
+    paths: mapNodes(piece.paths, f),
     stitch,
     trimAfter: !!piece.trimAfter,
     stopAfter: false,
+    // the glyph's own commands (Ink/Stitch font), its start / end point placed like its paths
+    ...(piece.cmd ? mapCommands(piece.cmd, f) : {}),
     text: { ...spec, role: piece.role, ...(piece.colorIndex !== undefined ? { colorIndex: piece.colorIndex } : {}), ...(fontFill ? { fontFill } : {}) },
   });
   const sortKey = (piece: Piece): [number, number] =>
@@ -507,7 +753,7 @@ export async function layoutText(spec: TextSpec, font: LoadedFont): Promise<Desi
       };
       for (const piece of line.items) {
         sortKeys.push(sortKey(piece));
-        out.push(objectOf(piece, mapNodes(piece.paths, fp), piece.stitch));
+        out.push(objectOf(piece, fp, piece.stitch));
       }
       return;
     }
@@ -524,7 +770,7 @@ export async function layoutText(spec: TextSpec, font: LoadedFont): Promise<Desi
       sortKeys.push(sortKey(piece));
       let stitch = piece.stitch;
       if (stitch.type === "fill" && spec.rotation) stitch = { ...stitch, angle: stitch.angle - spec.rotation };
-      out.push(objectOf(piece, mapNodes(piece.paths, f), stitch));
+      out.push(objectOf(piece, f, stitch));
     }
   });
   // colour sort (embroidery fonts): stable, by scope then colour

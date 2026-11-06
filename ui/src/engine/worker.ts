@@ -137,6 +137,9 @@ self.onmessage = async (e: MessageEvent<Req>) => {
     }
     (self as unknown as Worker).postMessage({ id, ok: true, result }, transfer);
   } catch (err) {
-    (self as unknown as Worker).postMessage({ id, ok: false, error: String((err as Error)?.message ?? err) });
+    const error = String((err as Error)?.message ?? err);
+    // a panic (a trap) leaves the engine unusable: the client starts a new worker
+    const fatal = err instanceof WebAssembly.RuntimeError || /unreachable|recursive use of an object|memory access out of bounds|null pointer passed/i.test(error);
+    (self as unknown as Worker).postMessage({ id, ok: false, error, fatal });
   }
 };

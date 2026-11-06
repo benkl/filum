@@ -25,11 +25,12 @@ import {
 } from "../lib/geometry";
 import { activeThreadOf, useStore } from "../store";
 import type { DesignObject, NodeRef, PathNode, ReferenceImage, StitchDocument, StitchParams, SubPath, Vec2 } from "../types";
-import { bendSegment, handlesCollinear, joinNodes, moveNodes, nodeKey, nodesInBox } from "../lib/nodeOps";
+import { bendSegment, handlesCollinear, isRailSatin, joinNodes, moveNodes, nodeKey, nodesInBox, railMap } from "../lib/nodeOps";
 import { syncAll } from "../lib/nodeActions";
 import { addReference, refCenter, refContains, refCorners, referenceAt, refRotateKnob, toLocal, toWorld } from "../lib/references";
 import { ReferenceBar } from "../components/ReferenceBar";
 import { applyRamp, rampMembers, rampOf, rampRows, selectedRamp, updateRamp } from "../lib/ramp";
+import { builderRefusal } from "../lib/shapeBuilder";
 import { guideAcross, guideHit, guidesOf, selectedSatin, setGuides } from "../lib/satinGuides";
 import { engine, type ShapeRegion } from "../engine/client";
 import { handlePoints, readTheme, Renderer, rotateHandle, RULER, type Overlay, type Theme } from "./render";
@@ -121,7 +122,7 @@ function hitObject(o: DesignObject, p: Vec2, tol: number): boolean {
 type Drag =
   | { kind: "pan"; sx: number; sy: number; ox: number; oy: number }
   | { kind: "marquee"; a: Vec2; add: boolean }
-  | { kind: "move"; start: Vec2; orig: DesignObject[]; moved: boolean; targets: SnapTargets | null }
+  | { kind: "move"; start: Vec2; orig: DesignObject[]; all: DesignObject[]; moved: boolean; targets: SnapTargets | null }
   | { kind: "scale"; handle: number; box: Box; orig: DesignObject[]; uniform: boolean; targets: SnapTargets | null; pivot: Vec2 }
   | { kind: "rotate"; center: Vec2; a0: number; orig: DesignObject[] }
   | { kind: "skew"; handle: number; box: Box; orig: DesignObject[]; start: Vec2; pivot: Vec2 }
@@ -349,7 +350,8 @@ export function Canvas() {
       if (!themeRef.current) themeRef.current = readTheme(c);
       const { w, h, dpr } = sizeRef.current;
       if (glRef.current === undefined && glCanvasRef.current) glRef.current = StitchGL.create(glCanvasRef.current);
-      const gl = glRef.current;
+      // the GPU dropped the context: the 2D drawing takes over until it is back
+      const gl = glRef.current && !glRef.current.isLost() ? glRef.current : null;
       const shownPlan = displayPlan(s.plan && s.finished && s.viewMode !== "vector" ? finishedPlan(s.plan) : s.plan, s.stitchColors, s.colorFocus ? activeThreadOf(s) : null, s.fabricColor);
       const useGL = !!gl && s.viewMode !== "vector" && !!s.plan;
       // snap to device pixels once so every layer agrees exactly
@@ -541,7 +543,7 @@ export function Canvas() {
   // size
   useEffect(() => {
     const el = wrapRef.current!;
-    const ro = new ResizeObserver(() => {
+    const resize = () => {
       const r = el.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
       for (const c of [bgRef.current!, glCanvasRef.current!, canvasRef.current!]) {
@@ -562,9 +564,39 @@ export function Canvas() {
       } else if (prev.w !== r.width || prev.h !== r.height) keepInView(prev, r.width, r.height, autoFitRef);
       // in the same frame: no blank canvas while a panel slides or a sash moves
       paint();
-    });
+    };
+    const ro = new ResizeObserver(resize);
     ro.observe(el);
-    return () => ro.disconnect();
+    // moved to a screen with another scaling: same size in CSS pixels, new backing size
+    let mq: MediaQueryList | null = null;
+    const watchDpr = () => {
+      mq?.removeEventListener("change", onDpr);
+      mq = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+      mq.addEventListener("change", onDpr);
+    };
+    const onDpr = () => {
+      resize();
+      watchDpr();
+    };
+    watchDpr();
+    // the GPU context: lost (driver reset, sleep) and given back
+    const glc = glCanvasRef.current;
+    const lost = (e: Event) => {
+      e.preventDefault(); // lets the browser restore it
+      paint();
+    };
+    const restored = () => {
+      glRef.current = undefined; // made again on the next paint
+      paint();
+    };
+    glc?.addEventListener("webglcontextlost", lost);
+    glc?.addEventListener("webglcontextrestored", restored);
+    return () => {
+      ro.disconnect();
+      mq?.removeEventListener("change", onDpr);
+      glc?.removeEventListener("webglcontextlost", lost);
+      glc?.removeEventListener("webglcontextrestored", restored);
+    };
   }, [draw]);
 
   // a drag that ends outside the canvas (or loses the window) still ends: the plan follows again
@@ -703,10 +735,9 @@ export function Canvas() {
     b.key = key;
     b.ids = ids;
     b.hover = null;
-    if (!ids.length) {
-      b.regions = null;
-      return;
-    }
+    // the old faces don't fit the new design: none until the engine answers
+    b.regions = null;
+    if (!ids.length) return;
     const doc = s.doc;
     engine
       .shapeRegions(doc, ids)
@@ -750,9 +781,13 @@ export function Canvas() {
   const applyBuild = async (faces: number[], del: boolean) => {
     const s = useStore.getState();
     const b = builderRef.current;
-    if (!b.regions || !faces.length) return;
+    // faces of another design or selection would cut the wrong pieces
+    if (!b.regions || !faces.length || b.doc !== s.doc) return;
     const ids = b.ids;
     const first = b.regions[faces[0]];
+    if (!first) return;
+    const no = builderRefusal(s.doc.objects.filter((o) => ids.includes(o.id)));
+    if (no) return s.toast(no, "error");
     try {
       const r = await engine.shapeBuild(s.doc, ids, faces, del ? "delete" : "merge");
       const style = s.doc.objects.find((o) => o.id === first.owners[first.owners.length - 1]);
@@ -937,11 +972,8 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
     return o.text && (det < 0 || !similarity) ? { ...c, text: undefined } : c;
   };
 
-  /** Copies of objects (new ids; groups and letterings get new ids too). */
-  const cloneObjects = (objs: DesignObject[]): { objects: DesignObject[]; parents: Record<string, string> } => {
-    const { objects, parents } = freshCopies(useStore.getState().doc, objs);
-    return { objects, parents };
-  };
+  /** Copies of objects beside the originals (in their groups; whole groups, letterings and gradients new). */
+  const cloneObjects = (objs: DesignObject[]) => freshCopies(useStore.getState().doc, objs, { inPlace: true });
 
   /** A live corner widget of a selected shape near `p` (node tool). */
   const cornerWidgetHit = (p: Vec2, tol: number) => {
@@ -1130,13 +1162,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
   };
 
   /** Two-rail satin whose nodes pair up as rungs (inserting / deleting keeps the pairs). */
-  const railPair = (o: DesignObject) => {
-    if (o.stitch.type !== "satin" || o.stitch.multi || o.paths.length !== 2) return null;
-    const [a, b] = o.paths;
-    const n = a.nodes.length;
-    if (n !== b.nodes.length || n < 2) return null;
-    return { rev: dist(a.nodes[0].p, b.nodes[0].p) > dist(a.nodes[0].p, b.nodes[n - 1].p), n, closed: a.closed };
-  };
+  const railPair = (o: DesignObject) => (isRailSatin(o) ? railMap(o.paths[0], o.paths[1]) : null);
 
   /** Where a node-tool click would add a point (on a selected path, away from nodes). */
   const nodeInsertTarget = (p: Vec2, tol: number) => {
@@ -1160,11 +1186,8 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
     const r = insertNode(paths[si], seg, t);
     paths[si] = r.sp;
     if (pair) {
-      const other = 1 - si;
-      const { n, rev, closed } = pair;
-      // rung i pairs a[i] with b[n − 1 − i] on reversed rails (as the rung overlay and Delete do)
-      const segO = !rev ? seg : closed ? (2 * n - 2 - seg) % n : n - 2 - seg;
-      paths[other] = insertNode(paths[other], segO, rev ? 1 - t : t).sp;
+      // the same rung on the other rail (the pairing is its own inverse)
+      paths[1 - si] = insertNode(paths[1 - si], pair.seg(seg), pair.rev ? 1 - t : t).sp;
     }
     return { obj: { ...o, paths }, index: r.index };
   };
@@ -1175,11 +1198,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
     const pair = railPair(o);
     const paths = [...o.paths];
     paths[si] = deleteNode(sp, ni);
-    if (pair) {
-      const { n, rev } = pair;
-      const idx = !rev ? ni : n - 1 - ni;
-      paths[1 - si] = deleteNode(paths[1 - si], idx);
-    }
+    if (pair) paths[1 - si] = deleteNode(paths[1 - si], pair.at(ni));
     return { ...o, paths };
   };
 
@@ -1401,7 +1420,9 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
           dragRef.current = {
             kind: "move",
             start: p,
+            // locked objects stay put; an Alt-drag copy takes them along
             orig: s.doc.objects.filter((o) => ids.includes(o.id) && !o.locked),
+            all: s.doc.objects.filter((o) => ids.includes(o.id)),
             moved: false,
             targets: s.smartGuides ? snapTargets(s.doc, new Set(ids)) : null,
           };
@@ -1533,7 +1554,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
             draw();
             return;
           }
-          if (!makeGradient2D(target.id, p, mode as "mesh" | "freeform")) s.toast("Gradients need a closed shape", "error");
+          makeGradient2D(target.id, p, mode as "mesh" | "freeform");
           draw();
           return;
         }
@@ -1837,9 +1858,15 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
           s.checkpoint();
           if (e.altKey) {
             // Alt-drag: move a copy, leave the original
-            const { objects: copies, parents } = cloneObjects(d.orig);
-            // groups the copy holds only one thing of dissolve (copying one object out of a group)
-            s.liveUpdate((doc) => pruneGroups({ ...doc, objects: [...doc.objects, ...copies], ...(Object.keys(parents).length ? { groupParents: { ...doc.groupParents, ...parents } } : {}) }));
+            const { objects: copies, parents, names } = cloneObjects(d.all);
+            s.liveUpdate((doc) =>
+              pruneGroups({
+                ...doc,
+                objects: [...doc.objects, ...copies],
+                ...(Object.keys(parents).length ? { groupParents: { ...doc.groupParents, ...parents } } : {}),
+                ...(Object.keys(names).length ? { groupNames: { ...doc.groupNames, ...names } } : {}),
+              }),
+            );
             s.select(copies.map((c) => c.id));
             d.orig = copies;
             d.targets = s.smartGuides ? snapTargets(useStore.getState().doc, new Set(copies.map((c) => c.id))) : null;
@@ -2231,7 +2258,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
       }
       if (d.group) updateGradient(d.group, { from: draft.a, to: draft.b });
       else if (d.target) {
-        if (!makeGradient(d.target, draft.a, draft.b)) s.toast("Gradients need a closed shape", "error");
+        makeGradient(d.target, draft.a, draft.b); // says why when it can't
       } else s.toast("Select a closed shape, then drag across it");
       draw();
       return;

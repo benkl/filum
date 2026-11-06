@@ -60,6 +60,7 @@ import { useStore } from "../store";
 import type { Thread, ThreadSource } from "../types";
 import { ChartBrowser, lastChart, setLastChart, threadTitle, useChart } from "./ThreadPicker";
 import { Dialog, Num } from "./ui";
+import { safeSetItem } from "../lib/storage";
 
 const fmtK = (n: number) => (n >= 10000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString());
 
@@ -507,7 +508,7 @@ export function ThreadManager({ onClose }: { onClose: () => void }) {
   const [side, setSide] = useState<"charts" | "mine">(() => (localStorage.getItem("filum.tm.side") === "mine" ? "mine" : "charts"));
   const pickSide = (v: "charts" | "mine") => {
     setSide(v);
-    localStorage.setItem("filum.tm.side", v);
+    safeSetItem("filum.tm.side", v);
   };
   const mineCount = useMyThreads().length;
   const chartEntries = useChart(chart);
@@ -526,7 +527,7 @@ export function ThreadManager({ onClose }: { onClose: () => void }) {
   const [target, setTargetState] = useState<string>(() => localStorage.getItem("filum.tm.fit") ?? "mine");
   const setTarget = (v: string) => {
     setTargetState(v);
-    localStorage.setItem("filum.tm.fit", v);
+    safeSetItem("filum.tm.fit", v);
   };
   const fitTarget: FitTarget = parseFitTarget(target).kind === "chart" ? { kind: "chart", chart } : parseFitTarget(target);
   const [report, setReport] = useState<FitReport | null>(null);

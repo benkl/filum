@@ -4,18 +4,24 @@
 
 import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { parsePalette, paletteCode, swatchCss, syncTartan, tartanColors, type TartanStripe } from "../lib/tartan";
+import { parsePalette, paletteCode, paletteProblem, patchTartan, swatchCss, syncTartan, tartanColors, tartanMirrored, type TartanStripe } from "../lib/tartan";
 import { useStore } from "../store";
 import type { TartanParams } from "../types";
 import { Num, Row, Section, Slider, Toggle } from "./ui";
 
 export function TartanSection({ t }: { t: TartanParams }) {
   const set = (patch: Partial<TartanParams>) => {
-    const { layer: _l, group, ...rest } = { ...t, ...patch };
+    const s = useStore.getState();
+    // a code with nothing to sew would remove every layer: refused
+    const problem = patch.palette !== undefined ? paletteProblem(patch.palette) : null;
+    if (problem) return s.toast(problem, "error");
+    const { layer: _l, group, ...rest } = patchTartan(t, patch);
     void _l;
-    useStore.getState().commit((d) => syncTartan(d, group, rest));
+    s.commit((d) => syncTartan(d, group, rest));
   };
-  const { warp, weft, symmetric, equal } = parsePalette(t.palette);
+  const { warp, weft, equal } = parsePalette(t.palette);
+  // what the engine mirrors (old tartans may have the flag without "/" pivots)
+  const symmetric = tartanMirrored(t);
   const [side, setSide] = useState<"warp" | "weft">("warp");
   const stripes = side === "weft" && !equal ? weft : warp;
   const setStripes = (next: TartanStripe[], sym = symmetric) =>
@@ -23,7 +29,7 @@ export function TartanSection({ t }: { t: TartanParams }) {
   const colours = tartanColors(t.palette);
   return (
     <Section title="Tartan">
-      <div className="tartan-swatch" style={{ background: swatchCss(t.palette), height: 46, borderRadius: 6, border: "1px solid var(--border)", marginBottom: 8, transform: `rotate(${t.rotate}deg)` }} title="The sett: warp stripes across, weft stripes down" />
+      <div className="tartan-swatch" style={{ background: swatchCss(t.palette, 3, symmetric),height: 46, borderRadius: 6, border: "1px solid var(--border)", marginBottom: 8, transform: `rotate(${t.rotate}deg)` }} title="The sett: warp stripes across, weft stripes down" />
       <p className="hint" style={{ margin: "0 0 6px" }}>
         {colours.length} thread colour{colours.length === 1 ? "" : "s"}, each sewn as its own layer.
       </p>
@@ -57,7 +63,7 @@ export function TartanSection({ t }: { t: TartanParams }) {
         </button>
       </div>
       <Row label="Mirrored" title="A symmetric sett: the stripes reflect at the first and the last one (the usual tartan)">
-        <Toggle on={symmetric} onChange={(v) => setStripes(stripes, v)} />
+        <Toggle on={symmetric} onChange={(v) => set({ palette: equal ? paletteCode(warp, v) : paletteCode(warp, v, weft), symmetry: v })} />
       </Row>
       <Row label="Warp ≠ weft" title="Different stripes across and down">
         <Toggle on={!equal} onChange={(v) => set({ palette: v ? paletteCode(warp, symmetric, warp) : paletteCode(warp, symmetric) })} />

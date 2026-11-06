@@ -30,7 +30,13 @@ export function ReferenceBar({ id }: { id: string }) {
           max={100}
           step={1}
           value={Math.round(r.opacity * 100)}
+          // one undo step per drag or key press; a click that changes nothing leaves none
           onPointerDown={() => useStore.getState().checkpoint()}
+          onPointerUp={() => useStore.getState().dropCheckpoint()}
+          onKeyDown={(e) => {
+            if (!e.repeat && /^(Arrow|Page|Home|End)/.test(e.key)) useStore.getState().checkpoint();
+          }}
+          onKeyUp={() => useStore.getState().dropCheckpoint()}
           onChange={(e) => opacityLive(+e.target.value)}
         />
         <span className="stat">{Math.round(r.opacity * 100)} %</span>

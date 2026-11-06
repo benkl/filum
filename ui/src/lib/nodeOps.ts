@@ -34,6 +34,25 @@ function grouped(sel: NodeRef[]): Map<string, Map<number, number[]>> {
 /** Two-rail satins pair their nodes as rungs: point edits there would break the pairs. */
 export const isRailSatin = (o: DesignObject) => o.stitch.type === "satin" && !o.stitch.multi && o.paths.length === 2;
 
+/**
+ * How a satin's second rail pairs its nodes with the first's, as the engine
+ * makes its rungs: `at(i)` is the node of `b` paired with node i of `a`,
+ * `seg(s)` the segment of `b` beside segment s of `a` (walked the other way
+ * when `rev`). A reversed closed rail keeps node 0 paired with node 0
+ * (the engine reverses the ring with its repeated start point).
+ */
+export function railMap(a: SubPath, b: SubPath): { rev: boolean; closed: boolean; at: (i: number) => number; seg: (s: number) => number } | null {
+  const n = a.nodes.length;
+  if (n < 2 || n !== b.nodes.length) return null;
+  const closed = a.closed;
+  if (closed) {
+    const rev = n > 2 && vdist(a.nodes[1].p, b.nodes[1].p) > vdist(a.nodes[1].p, b.nodes[n - 1].p);
+    return { rev, closed, at: (i) => (rev ? (n - i) % n : i), seg: (s) => (rev ? (2 * n - s - 1) % n : s) };
+  }
+  const rev = vdist(a.nodes[0].p, b.nodes[0].p) > vdist(a.nodes[0].p, b.nodes[n - 1].p);
+  return { rev, closed, at: (i) => (rev ? n - 1 - i : i), seg: (s) => (rev ? n - 2 - s : s) };
+}
+
 function mapObjects(doc: StitchDocument, sel: NodeRef[], fn: (o: DesignObject, per: Map<number, number[]>) => DesignObject | null): StitchDocument {
   const g = grouped(sel);
   return {
@@ -157,13 +176,14 @@ export function deleteSelectedNodes(doc: StitchDocument, sel: NodeRef[], keepSha
     if (isRailSatin(o)) {
       // keep the rung pairs: delete the same rung on both rails
       const [a, b] = o.paths;
+      const map = railMap(a, b);
+      if (!map) return o;
       const n = a.nodes.length;
-      if (n !== b.nodes.length) return o;
-      const rev = vdist(a.nodes[0].p, b.nodes[0].p) > vdist(a.nodes[0].p, b.nodes[n - 1].p);
+      // b's node j pairs with a's node at(j) too (the pairing is its own inverse)
       const rungs = new Set<number>();
-      for (const [si, list] of per) for (const ni of list) rungs.add(si === 0 || !rev ? ni : n - 1 - ni);
+      for (const [si, list] of per) for (const ni of list) rungs.add(si === 0 ? ni : map.at(ni) % n);
       const ra = removeNodes(a, [...rungs].sort((x, y) => x - y), keepShape);
-      const rb = removeNodes(b, [...rungs].map((k) => (rev ? n - 1 - k : k)).sort((x, y) => x - y), keepShape);
+      const rb = removeNodes(b, [...rungs].map((k) => map.at(k)).sort((x, y) => x - y), keepShape);
       if (!ra || !rb) return o;
       return { ...o, paths: [ra, rb] };
     }

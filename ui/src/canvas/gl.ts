@@ -456,6 +456,11 @@ export class StitchGL {
   private uf: Record<string, WebGLUniformLocation | null> = {};
   private built: Built | null = null;
 
+  /** The GPU dropped the context (driver reset, sleep): nothing draws until it's made again. */
+  isLost(): boolean {
+    return this.gl.isContextLost();
+  }
+
   static create(canvas: HTMLCanvasElement): StitchGL | null {
     const gl = canvas.getContext("webgl2", { antialias: false, depth: true, premultipliedAlpha: true, preserveDrawingBuffer: true, alpha: true });
     if (!gl) return null;

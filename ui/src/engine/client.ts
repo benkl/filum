@@ -42,7 +42,7 @@ export interface ShapeBuildResult {
 }
 
 class EngineClient {
-  private worker: Worker;
+  private worker!: Worker;
   private seq = 0;
   private pending = new Map<number, Pending>();
   private planBusy = false;
@@ -51,15 +51,38 @@ class EngineClient {
   private lanes = new Map<string, { busy: boolean; queued: { op: string; args: unknown[]; resolve: (v: unknown) => void; reject: (e: Error) => void } | null }>();
 
   constructor() {
-    this.worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
-    this.worker.onmessage = (e) => {
-      const { id, ok, result, error } = e.data;
+    this.spawn();
+  }
+
+  private spawn() {
+    const w = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
+    w.onmessage = (e) => {
+      if (w !== this.worker) return;
+      const { id, ok, result, error, fatal } = e.data;
       const p = this.pending.get(id);
-      if (!p) return;
-      this.pending.delete(id);
-      if (ok) p.resolve(result);
-      else p.reject(new Error(error));
+      if (p) {
+        this.pending.delete(id);
+        if (ok) p.resolve(result);
+        else p.reject(new Error(error));
+      }
+      if (fatal) this.restart();
     };
+    // the worker itself died (out of memory, a load error)
+    w.onerror = () => w === this.worker && this.restart();
+    this.worker = w;
+  }
+
+  /**
+   * A panic in the engine leaves it unusable (every later call fails): start
+   * a fresh worker. What was waiting on the old one fails once; the queued
+   * plan then runs on the new one.
+   */
+  private restart() {
+    this.worker.terminate();
+    const waiting = [...this.pending.values()];
+    this.pending.clear();
+    this.spawn();
+    for (const p of waiting) p.reject(new Error("The stitch engine stopped and was restarted"));
   }
 
   private call<T>(op: string, args: unknown[], transfer: Transferable[] = []): Promise<T> {

@@ -18,6 +18,7 @@ import { emptyDoc, useStore } from "../store";
 import type { DesignObject, FormatInfo, Thread } from "../types";
 import { DesignView } from "../canvas/DesignView";
 import { Dialog, Num, Row, Section, Toggle } from "./ui";
+import { safeSetItem } from "../lib/storage";
 
 /** Stitch directions of Ink/Stitch font variants. */
 export const VARIANT_LABELS: Record<string, { arrow: string; name: string }> = {
@@ -62,7 +63,7 @@ export function BatchSection({ group, spec }: { group: string; spec: TextSpec })
   const patch = (p: Partial<typeof state>) => {
     const next = { ...state, ...p };
     setState(next);
-    localStorage.setItem(BATCH_KEY, JSON.stringify(next));
+    safeSetItem(BATCH_KEY, JSON.stringify(next));
   };
   const texts = useMemo(() => batchTexts(state.text, state.separator), [state.text, state.separator]);
   const quick = QUICK_FORMATS.filter((e) => formats.some((f) => f.extension === e));
@@ -153,7 +154,7 @@ export function FontSection({ group, spec, font }: { group: string; spec: TextSp
   const [editing, setEditing] = useState<string | null>(null);
   const installed = spec.font.startsWith("inkfont:");
   const sample = async () => {
-    localStorage.setItem("filum.sampleWidth", String(width));
+    safeSetItem("filum.sampleWidth", String(width));
     const g = await insertFontSample(spec.font, { size: spec.size, maxWidth: width, variant: spec.variant });
     if (g) {
       selectGroup(g);

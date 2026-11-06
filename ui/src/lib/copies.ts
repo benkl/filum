@@ -4,8 +4,9 @@
 // reaches back into the original (and the original's edits never delete the copy).
 
 import type { DesignObject, Thread } from "../types";
-import { uid } from "./geometry";
-import { copiedParents, type GroupDoc } from "./groups";
+import { conjugate } from "./clones";
+import { transformObject, uid, type Mat } from "./geometry";
+import { copiedParents, objectsIn, type GroupDoc } from "./groups";
 
 /** Every thread an object refers to (its own and its lettering's). */
 export const threadsOf = (o: DesignObject): string[] => [o.thread, ...(o.text ? [o.text.thread, o.text.borderThread, ...(o.text.palette ?? [])] : [])];
@@ -30,7 +31,8 @@ export function mergeThreads(have: Thread[], incoming: Thread[]): { add: Thread[
   const add: Thread[] = [];
   const all = [...have];
   for (const t of incoming) {
-    const sameColor = (x: Thread) => x.color.toLowerCase() === t.color.toLowerCase();
+    // the same colour of the same thread (a Madeira red and an Isacord red stay two threads)
+    const sameColor = (x: Thread) => x.color.toLowerCase() === t.color.toLowerCase() && (x.code ?? "") === (t.code ?? "") && (x.brand ?? "") === (t.brand ?? "");
     const same = all.find((x) => x.id === t.id && sameColor(x)) ?? all.find(sameColor);
     if (same) {
       map.set(t.id, same.id);
@@ -47,20 +49,35 @@ export function mergeThreads(have: Thread[], incoming: Thread[]): { add: Thread[
 
 /**
  * Copies of `objs` (taken from `doc`) with new ids for the objects and for
- * every group they belong to. `parents` is the nesting of the new groups,
- * `names` their names, `ids` how the object ids map (for linked clones).
+ * the groups they belong to. `inPlace` (duplicate, Alt-drag, repeat): a
+ * group copied only in part keeps the copies (they stay beside the
+ * originals); without it (paste, import) every group is new. Gradients,
+ * tartans, blends and letterings are always new. A linked clone whose
+ * original is copied too follows that copy. `parents` is the nesting of the
+ * new groups, `names` their names, `ids` how the object ids map.
  */
-export function freshCopies(doc: GroupDoc, objs: DesignObject[]): { objects: DesignObject[]; parents: Record<string, string>; names: Record<string, string>; ids: Map<string, string> } {
+export function freshCopies(
+  doc: GroupDoc,
+  objs: DesignObject[],
+  opts: { inPlace?: boolean } = {},
+): { objects: DesignObject[]; parents: Record<string, string>; names: Record<string, string>; ids: Map<string, string> } {
   const map = new Map<string, string>();
   const re = (k: string, prefix: string) => {
     if (!map.has(k)) map.set(k, uid(prefix));
     return map.get(k)!;
   };
   const ids = new Map(objs.map((o) => [o.id, uid()]));
-  const parents = copiedParents(doc, objs, (g) => re(g, "g"));
+  const fixed = new Set(doc.objects.flatMap((o) => (o.stitch.type === "fill" ? [o.stitch.gradient?.group, o.stitch.tartan?.group].filter((g): g is string => !!g) : [])));
+  const whole = (g: string) => objectsIn(doc, g).every((o) => ids.has(o.id));
+  const reGroup = (g: string) => (!opts.inPlace || fixed.has(g) || whole(g) ? re(g, "g") : g);
+  const parents = copiedParents(doc, objs, reGroup);
+  // groups kept as they are already have their parents
+  const made = new Set(map.values());
+  for (const k of Object.keys(parents)) if (!made.has(k)) delete parents[k];
   const objects = objs.map((o) => {
     const c: DesignObject = { ...structuredClone(o), id: ids.get(o.id)! };
-    if (c.group) c.group = re(c.group, "g");
+    if (c.clone && ids.has(c.clone.of)) c.clone = { ...c.clone, of: ids.get(c.clone.of)! };
+    if (c.group) c.group = reGroup(c.group);
     if (c.text) c.text = { ...c.text, group: re(c.text.group, "txt") };
     if (c.stitch.type === "fill") {
       const st = c.stitch;
@@ -76,4 +93,18 @@ export function freshCopies(doc: GroupDoc, objs: DesignObject[]): { objects: Des
   const names: Record<string, string> = {};
   for (const [old, now] of map) if (doc.groupNames?.[old]) names[now] = doc.groupNames[old];
   return { objects, parents, names, ids };
+}
+
+/**
+ * Copies moved by `m` (and turned by `rot`): a linked clone that follows a
+ * copy moved with it keeps its place relative to that copy.
+ */
+export function placeCopies(copies: DesignObject[], m: Mat, rot = 0, tf: (o: DesignObject, m: Mat, rot: number) => DesignObject = transformObject): DesignObject[] {
+  const copied = new Set(copies.map((c) => c.id));
+  return copies.map((c) => {
+    const t = tf(c, m, rot);
+    if (!c.clone || !copied.has(c.clone.of) || !t.clone) return t;
+    // the original moved too: the link turns with the move (not on top of it)
+    return { ...t, clone: { ...conjugate(c.clone, m), of: c.clone.of } };
+  });
 }

@@ -17,6 +17,7 @@
 
 import { defaultFill, defaultSatin, ellipsePath, uid } from "./geometry";
 import type { DesignObject, Fabric, FillParams, MachineSettings, SatinParams, StitchDocument, SubPath, ThreadWeight, Vec2 } from "../types";
+import { safeSetItem } from "./storage";
 
 export type PieceId = "a" | "b" | "c" | "d";
 export type Direction = "along" | "across";
@@ -253,7 +254,7 @@ export function saveCalibration(c: Calibration | { fabric: Fabric; clear: true }
   if ("clear" in c) delete next[c.fabric];
   else next[c.fabric] = c;
   cache = next;
-  localStorage.setItem(KEY, JSON.stringify(next));
+  safeSetItem(KEY, JSON.stringify(next));
 }
 
 /** What new objects on a fabric start from (nothing when it isn't calibrated). */

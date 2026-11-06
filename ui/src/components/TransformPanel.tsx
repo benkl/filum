@@ -9,6 +9,7 @@ import { skewAbout } from "../canvas/transform";
 import { useStore } from "../store";
 import type { DesignObject, Vec2 } from "../types";
 import { Num } from "./ui";
+import { safeSetItem } from "../lib/storage";
 
 const REF_KEY = "filum.refPoint";
 const LOCK_KEY = "filum.lockRatio";
@@ -56,7 +57,7 @@ export function TransformPanel({ objects }: { objects: DesignObject[] }) {
   };
   const pickRef = (r: [number, number]) => {
     setRef(r);
-    localStorage.setItem(REF_KEY, JSON.stringify(r));
+    safeSetItem(REF_KEY, JSON.stringify(r));
   };
   return (
     <div className={`transform-panel ${locked ? "disabled" : ""}`}>
@@ -91,7 +92,7 @@ export function TransformPanel({ objects }: { objects: DesignObject[] }) {
           title={lock ? "Proportions locked" : "Proportions free"}
           onClick={() => {
             setLock(!lock);
-            localStorage.setItem(LOCK_KEY, lock ? "0" : "1");
+            safeSetItem(LOCK_KEY, lock ? "0" : "1");
           }}
         >
           {lock ? <Link2 size={14} /> : <Link2Off size={14} />}

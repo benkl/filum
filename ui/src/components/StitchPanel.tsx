@@ -373,7 +373,7 @@ export function StylePicker({ o }: { o: DesignObject }) {
     }
     if (r === "gradient") {
       const [a, b] = defaultVector([o]);
-      makeGradient(o.id, a, b);
+      if (!makeGradient(o.id, a, b)) return;
       useStore.getState().toast("Gradient created — drag across the shape with the gradient tool (G) to set its direction");
       return;
     }

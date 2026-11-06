@@ -89,6 +89,8 @@ export function pictureSize(plan: PlanData, opts: Pick<PictureOptions, "dpi" | "
 let glCanvas: HTMLCanvasElement | null = null;
 let gl: StitchGL | null | undefined;
 function sharedGL(): StitchGL | null {
+  // a lost context is made again (else every picture comes out blank)
+  if (gl?.isLost()) gl = undefined;
   if (gl === undefined) {
     glCanvas = document.createElement("canvas");
     gl = StitchGL.create(glCanvas);

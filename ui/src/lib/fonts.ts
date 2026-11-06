@@ -14,7 +14,7 @@ import { buildFont, fontMetrics, variantId, VARIANTS, type PackedFont } from "./
 import { engine } from "../engine/client";
 import { installedItems, onDownloadsChange, storedFont } from "./downloadStore";
 import { flatten, unionBoxes } from "./geometry";
-import { fontNameFromFiles, letterOfFile, wrapGlyphLayer } from "./letteringTools";
+import { fontNameFromFiles, letterOfFile, withDefaultVariant, wrapGlyphLayer } from "./letteringTools";
 import type { DesignObject, StitchDocument, Vec2 } from "../types";
 
 export type FontKind = "embroidery" | "outline";
@@ -299,7 +299,7 @@ export async function saveInkFontInfo(key: string, info: Record<string, unknown>
   const id = key.slice(8);
   const pack = (await inkPacks()).find(([k]) => k === id)?.[1];
   if (!pack) throw new Error("The font is not installed");
-  const font: PackedFont = { ...pack.font, ...fontMetrics(info) };
+  const font: PackedFont = withDefaultVariant({ ...pack.font, ...fontMetrics(info) }, info.default_variant);
   await putPack(id, { ...pack, font, info });
   loaded.delete(key);
   fontNames.set(key, font.name);
@@ -349,6 +349,8 @@ export async function importFontFile(name: string, bytes: Uint8Array): Promise<s
     t.oncomplete = () => res();
     t.onerror = () => rej(t.error);
   });
+  // a font imported again under the same file name: not the old one from the cache
+  loaded.delete(`file:${name}`);
   return `file:${name}`;
 }
 

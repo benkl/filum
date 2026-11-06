@@ -50,8 +50,21 @@ function useShortcuts() {
       if ((e.target as HTMLElement)?.closest("input,textarea,select,[contenteditable]")) return;
       const s = useStore.getState();
       // a dialog is open (the store's, or a panel's own, e.g. font info):
-      // keys don't edit the design behind it
-      if (s.dialog || document.querySelector(".backdrop")) return;
+      // keys don't edit the design behind it. Saving still works, and undo in
+      // the dialogs that edit the design themselves (threads, palette).
+      if (s.dialog || document.querySelector(".backdrop")) {
+        const k = e.key.toLowerCase();
+        if (!(e.ctrlKey || e.metaKey)) return;
+        if (k === "s") {
+          e.preventDefault();
+          void saveDocument(e.shiftKey);
+        } else if ((k === "z" || k === "y") && (s.dialog === "threads" || s.dialog === "palette")) {
+          e.preventDefault();
+          if (k === "y" || e.shiftKey) s.redo();
+          else s.undo();
+        }
+        return;
+      }
       // a picture being adjusted, then the node tool's point selection
       if (referenceKey(e) || nodeToolKey(e)) {
         e.preventDefault();

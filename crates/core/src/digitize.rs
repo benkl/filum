@@ -413,9 +413,21 @@ pub struct DigitizePreview {
     pub region_reason: Vec<u8>,
 }
 
-/// Decode an image file into RGBA8.
+/// Decode an image file into RGBA8, upright: the EXIF orientation (phone
+/// photos are usually stored sideways with a rotation tag) is applied.
 pub fn decode_image(bytes: &[u8]) -> Result<(Vec<u8>, u32, u32), String> {
-    let img = image::load_from_memory(bytes).map_err(|e| format!("could not decode image: {e}"))?;
+    use image::metadata::Orientation;
+    use image::ImageDecoder;
+    let err = |e: &dyn std::fmt::Display| format!("could not decode image: {e}");
+    let mut decoder = image::ImageReader::new(std::io::Cursor::new(bytes))
+        .with_guessed_format()
+        .map_err(|e| err(&e))?
+        .into_decoder()
+        .map_err(|e| err(&e))?;
+    // a malformed EXIF block is no reason to reject the picture
+    let orientation = decoder.orientation().unwrap_or(Orientation::NoTransforms);
+    let mut img = image::DynamicImage::from_decoder(decoder).map_err(|e| err(&e))?;
+    img.apply_orientation(orientation);
     let rgba = img.to_rgba8();
     let (w, h) = rgba.dimensions();
     Ok((rgba.into_raw(), w, h))
@@ -3138,8 +3150,26 @@ fn quantize(px: &[[u8; 4]], w: usize, h: usize, opts: &DigitizeOptions) -> Quant
         for &i in &opaque {
             labels[i] = nearest(&cents, &labs[i], None) as u8;
         }
-        let k = fixed.len();
-        return Quant { labels, colors: fixed, palette_idx: vec![None; k] };
+        // colours stay verbatim, but one that is (practically) a chart entry
+        // keeps that entry's name, code and brand
+        const SAME_THREAD_DE: f64 = 2.0;
+        let pal_lab: Vec<[f64; 3]> = opts.palette.iter().map(|e| rgb_to_lab(e.rgb)).collect();
+        let palette_idx = fixed
+            .iter()
+            .zip(&cents)
+            .map(|(rgb, lab)| {
+                opts.palette.iter().position(|e| e.rgb == *rgb).or_else(|| {
+                    pal_lab
+                        .iter()
+                        .map(|pl| vision::delta_e(*lab, *pl))
+                        .enumerate()
+                        .filter(|&(_, d)| d <= SAME_THREAD_DE)
+                        .min_by(|a, b| a.1.total_cmp(&b.1))
+                        .map(|(e, _)| e)
+                })
+            })
+            .collect();
+        return Quant { labels, colors: fixed, palette_idx };
     }
     let k = opts.colors.clamp(2, 24);
     let mut rng = Rng(SEED);
@@ -4036,6 +4066,50 @@ fn skeleton_paths(skel: &[bool], w: usize, min_cells: usize, max_paths: usize) -
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A JPEG as a phone writes it: pixels stored sideways plus an EXIF
+    /// orientation tag (6 = rotate 90° clockwise to view).
+    #[test]
+    fn decode_applies_exif_orientation() {
+        // 8×4 stored: left half red, right half blue
+        let (w, h) = (8u32, 4u32);
+        let mut raw = Vec::new();
+        for _ in 0..h {
+            for x in 0..w {
+                raw.extend_from_slice(if x < w / 2 { &[255, 0, 0] } else { &[0, 0, 255] });
+            }
+        }
+        let mut jpeg = Vec::new();
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 100)
+            .encode(&raw, w, h, image::ExtendedColorType::Rgb8)
+            .unwrap();
+        // APP1 "Exif": big-endian TIFF header, one IFD entry 0x0112 SHORT = 6
+        let mut tiff = vec![b'M', b'M', 0, 42, 0, 0, 0, 8, 0, 1];
+        tiff.extend_from_slice(&[0x01, 0x12, 0, 3, 0, 0, 0, 1, 0, 6, 0, 0]);
+        tiff.extend_from_slice(&[0, 0, 0, 0]);
+        let mut app1 = vec![0xFF, 0xE1];
+        let len = (2 + 6 + tiff.len()) as u16;
+        app1.extend_from_slice(&len.to_be_bytes());
+        app1.extend_from_slice(b"Exif\0\0");
+        app1.extend_from_slice(&tiff);
+        assert_eq!(&jpeg[..2], &[0xFF, 0xD8]);
+        let mut tagged = jpeg[..2].to_vec();
+        tagged.extend_from_slice(&app1);
+        tagged.extend_from_slice(&jpeg[2..]);
+
+        let (px, tw, th) = decode_image(&tagged).unwrap();
+        assert_eq!((tw, th), (h, w), "upright: 4 wide, 8 tall");
+        let at = |x: u32, y: u32| {
+            let i = ((y * tw + x) * 4) as usize;
+            [px[i], px[i + 1], px[i + 2]]
+        };
+        // rotated clockwise, the stored left (red) half is now on top
+        assert!(at(2, 1)[0] > 200 && at(2, 1)[2] < 60, "{:?}", at(2, 1));
+        assert!(at(2, 6)[2] > 200 && at(2, 6)[0] < 60, "{:?}", at(2, 6));
+        // without the tag nothing turns
+        let (_, uw, uh) = decode_image(&jpeg).unwrap();
+        assert_eq!((uw, uh), (w, h));
+    }
 
     #[test]
     fn sliding_extremes_match_a_direct_scan() {

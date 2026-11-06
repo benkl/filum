@@ -8,6 +8,7 @@ import { routeRunning } from "./route";
 import { autoSatin } from "./autoSatin";
 import { withParent } from "./groups";
 import { pruneGroups } from "./layerRows";
+import { safeSetItem } from "./storage";
 
 // ---------------------------------------------------------------------------
 // The action on the selection
@@ -132,7 +133,7 @@ export function autoSatinOptions(): { trim: boolean; preserveOrder: boolean; kee
   }
 }
 export function setAutoSatinOptions(o: Partial<ReturnType<typeof autoSatinOptions>>) {
-  localStorage.setItem(SATIN_OPTS, JSON.stringify({ ...autoSatinOptions(), ...o }));
+  safeSetItem(SATIN_OPTS, JSON.stringify({ ...autoSatinOptions(), ...o }));
 }
 
 /**

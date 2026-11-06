@@ -10,6 +10,7 @@ import { FLAG } from "../types";
 import { cubicAt, type Cubic } from "../lib/bezier";
 import { rowDir, type Handle } from "./handles";
 import type { PenHover } from "./penTool";
+import { railMap } from "../lib/nodeOps";
 
 export interface InteractiveOverlay {
   handles?: Handle[];
@@ -224,10 +225,8 @@ export function paintInteractive(c: Ctx, o: { selected: DesignObject[]; overlay:
   for (const obj of o.selected) {
     if (obj.stitch.type !== "satin" || obj.paths.length !== 2) continue;
     const [a, b] = obj.paths;
-    if (a.nodes.length !== b.nodes.length) continue;
-    const rev =
-      Math.hypot(a.nodes[0].p[0] - b.nodes[0].p[0], a.nodes[0].p[1] - b.nodes[0].p[1]) >
-      Math.hypot(a.nodes[0].p[0] - b.nodes[b.nodes.length - 1].p[0], a.nodes[0].p[1] - b.nodes[b.nodes.length - 1].p[1]);
+    const map = railMap(a, b);
+    if (!map) continue;
     ctx.save();
     ctx.strokeStyle = c.select;
     ctx.globalAlpha = 0.7;
@@ -235,7 +234,7 @@ export function paintInteractive(c: Ctx, o: { selected: DesignObject[]; overlay:
     ctx.setLineDash([3 / scale, 2 / scale]);
     ctx.beginPath();
     a.nodes.forEach((n, i) => {
-      const m = b.nodes[rev ? b.nodes.length - 1 - i : i];
+      const m = b.nodes[map.at(i)];
       ctx.moveTo(n.p[0], n.p[1]);
       ctx.lineTo(m.p[0], m.p[1]);
     });

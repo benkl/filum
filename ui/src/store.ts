@@ -1,13 +1,17 @@
 import { create } from "zustand";
 import { syncClones } from "./lib/clones";
 import { pruneGroups } from "./lib/layerRows";
-import { transformObject, translateMat, type Mat } from "./lib/geometry";
+import { translateMat, type Mat } from "./lib/geometry";
 import { engine } from "./engine/client";
 import { defaultStitch, uid } from "./lib/geometry";
 import { loadPrefs, savePrefs, type Prefs } from "./lib/prefs";
 import { loadLayout, saveLayout, type Layout } from "./lib/layout";
 import type { DensityMode } from "./lib/density";
-import { freshCopies, mergeThreads, remapThreads } from "./lib/copies";
+import { freshCopies, mergeThreads, placeCopies, remapThreads } from "./lib/copies";
+import { settleTexts } from "./lib/textSettle";
+import { repairGradients } from "./lib/fillLayers";
+import { safeSetItem } from "./lib/storage";
+import { checkDoc } from "./lib/docCheck";
 import type {
   DensityField,
   DesignObject,
@@ -234,6 +238,7 @@ const savedView: Partial<Pick<State, (typeof VIEW_FIELDS)[number]>> = (() => {
   }
 })();
 const DOC_KEY = "filum.autosave";
+const DIRTY_KEY = "filum.autosave.dirty";
 /** The stitch-out player's speed and follow setting, remembered between sessions. */
 const PLAYER_KEY = "filum.player";
 function playerPrefs(): { speed: number; follow: boolean } {
@@ -320,7 +325,7 @@ export const useStore = create<State>((set, get) => ({
 
   setDoc: (doc0, opts) => {
     const s = get();
-    const doc = syncClones(doc0);
+    const doc = settleTexts(syncClones(doc0));
     pendingCheckpoint = null;
     set({
       nodeSel: opts?.keepSelection ? s.nodeSel.filter((n) => doc.objects.find((o) => o.id === n.id)?.paths[n.sp]?.nodes[n.ni]) : [],
@@ -342,12 +347,13 @@ export const useStore = create<State>((set, get) => ({
     pendingCheckpoint = null;
     if (cp && s.doc === cp.doc && s.past[s.past.length - 1] === cp.doc) set({ past: s.past.slice(0, -1), future: cp.future, saved: cp.saved });
   },
-  liveUpdate: (fn) => set({ doc: syncClones(fn(get().doc), get().doc), saved: false }),
-  liveTransform: (live, fn) => set(fn ? { live, doc: syncClones(fn(get().doc), get().doc), saved: false } : { live }),
+  // clones follow their originals; a lettering moved apart letter by letter becomes plain shapes
+  liveUpdate: (fn) => set({ doc: settleTexts(syncClones(fn(get().doc), get().doc), get().doc), saved: false }),
+  liveTransform: (live, fn) => set(fn ? { live, doc: settleTexts(syncClones(fn(get().doc), get().doc), get().doc), saved: false } : { live }),
   commit: (fn) => {
     const s = get();
     pendingCheckpoint = null;
-    set({ past: [...s.past.slice(-99), s.doc], future: [], doc: syncClones(fn(s.doc), s.doc), saved: false, live: null });
+    set({ past: [...s.past.slice(-99), s.doc], future: [], doc: settleTexts(syncClones(fn(s.doc), s.doc), s.doc), saved: false, live: null });
   },
   undo: () => {
     const s = get();
@@ -384,7 +390,7 @@ export const useStore = create<State>((set, get) => ({
   setTool: (tool) => set({ tool, nodeSel: [], refEdit: null }),
   setViewMode: (viewMode) => set({ viewMode }),
   setTheme: (theme) => {
-    localStorage.setItem(THEME_KEY, theme);
+    safeSetItem(THEME_KEY, theme);
     set({ theme });
   },
   setView: (v) => set({ view: { ...get().view, ...v } }),
@@ -425,7 +431,8 @@ export const useStore = create<State>((set, get) => ({
   deleteSelection: () => {
     const sel = new Set(get().selection);
     if (!sel.size) return;
-    get().commit((d) => pruneGroups({ ...d, objects: d.objects.filter((o) => !sel.has(o.id) || o.locked) }));
+    // a gradient that lost colour layers is renumbered (one layer left: a plain fill)
+    get().commit((d) => pruneGroups(repairGradients({ ...d, objects: d.objects.filter((o) => !sel.has(o.id) || o.locked) })));
     set({ selection: [] });
   },
   duplicateSelection: () => {
@@ -436,8 +443,9 @@ export const useStore = create<State>((set, get) => ({
     const fresh = freshCopies(
       doc,
       doc.objects.filter((o) => sel.has(o.id)),
+      { inPlace: true },
     );
-    const copies = fresh.objects.map((c) => ({ ...transformObject(c, translateMat(5, 5)), name: `${c.name} copy` }));
+    const copies = placeCopies(fresh.objects, translateMat(5, 5)).map((c) => ({ ...c, name: `${c.name} copy` }));
     get().addObjects(copies, undefined, fresh.parents, fresh.names);
     set({ selection: copies.map((c) => c.id) });
   },
@@ -490,7 +498,7 @@ export const useStore = create<State>((set, get) => ({
   openSettings: (tab) => set({ dialog: "settings", ...(tab ? { settingsTab: tab } : {}) }),
   setToolOptions: (tool, patch) => {
     const toolOptions = { ...get().toolOptions, [tool]: { ...get().toolOptions[tool], ...patch } };
-    localStorage.setItem(TOOL_OPTS_KEY, JSON.stringify(toolOptions));
+    safeSetItem(TOOL_OPTS_KEY, JSON.stringify(toolOptions));
     set({ toolOptions });
   },
 }));
@@ -558,29 +566,41 @@ useStore.subscribe((s, p) => {
 // Autosave to local storage (desktop users also get real files via Save).
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 useStore.subscribe((s, prev) => {
-  if (s.anim.speed !== prev.anim.speed || s.anim.follow !== prev.anim.follow) localStorage.setItem(PLAYER_KEY, JSON.stringify({ speed: s.anim.speed, follow: s.anim.follow }));
-  if (VIEW_FIELDS.some((k) => s[k] !== prev[k])) localStorage.setItem(VIEW_KEY, JSON.stringify(Object.fromEntries(VIEW_FIELDS.map((k) => [k, s[k]]))));
-  if (s.doc === prev.doc || !s.prefs.autosave) return;
+  if (s.anim.speed !== prev.anim.speed || s.anim.follow !== prev.anim.follow) safeSetItem(PLAYER_KEY, JSON.stringify({ speed: s.anim.speed, follow: s.anim.follow }));
+  if (VIEW_FIELDS.some((k) => s[k] !== prev[k])) safeSetItem(VIEW_KEY, JSON.stringify(Object.fromEntries(VIEW_FIELDS.map((k) => [k, s[k]]))));
+  if (!s.prefs.autosave) return;
+  // whether the autosaved design has changes not in a file (asked about before it's replaced)
+  if (s.saved !== prev.saved) safeSetItem(DIRTY_KEY, s.saved ? "0" : "1");
+  if (s.doc === prev.doc) return;
   if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    const doc = useStore.getState().doc;
-    try {
-      localStorage.setItem(DOC_KEY, JSON.stringify(doc));
-    } catch {
-      // quota: keep the design, drop the reference pictures from the autosave
-      try {
-        localStorage.setItem(DOC_KEY, JSON.stringify({ ...doc, references: undefined }));
-      } catch {
-        /* quota */
-      }
-    }
-  }, 600);
+  saveTimer = setTimeout(flushAutosave, 600);
 });
 
-export function loadAutosave(): StitchDocument | null {
+let autosaveWarned = false;
+/** Write the autosave now (also when the window closes). */
+export function flushAutosave() {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = null;
+  const s = useStore.getState();
+  if (!s.prefs.autosave) return;
+  safeSetItem(DIRTY_KEY, s.saved ? "0" : "1");
+  if (safeSetItem(DOC_KEY, JSON.stringify(s.doc))) return;
+  // quota: keep the design, drop the reference pictures from the autosave
+  if (safeSetItem(DOC_KEY, JSON.stringify({ ...s.doc, references: undefined }))) return;
+  // not even that: an old autosave must not come back in its place
+  localStorage.removeItem(DOC_KEY);
+  if (!autosaveWarned) {
+    autosaveWarned = true;
+    s.toast("The design is too big to autosave: save it to a file", "error");
+  }
+}
+
+/** The autosaved design (checked), and whether it had unsaved changes. */
+export function loadAutosave(): { doc: StitchDocument; dirty: boolean } | null {
   try {
     const raw = localStorage.getItem(DOC_KEY);
-    return raw ? (JSON.parse(raw) as StitchDocument) : null;
+    const checked = raw ? checkDoc(JSON.parse(raw), emptyDoc()) : null;
+    return checked ? { doc: checked.doc, dirty: localStorage.getItem(DIRTY_KEY) === "1" } : null;
   } catch {
     return null;
   }

@@ -364,10 +364,16 @@ export function transformObject(o: DesignObject, m: Mat, rotationDeg = 0): Desig
       anchor: applyMat(m, t.anchor),
       size: +(t.size * scale).toFixed(3),
       letterSpacing: t.letterSpacing * scale,
+      ...(t.wordSpacing ? { wordSpacing: t.wordSpacing * scale } : {}),
       borderWidth: +(t.borderWidth * scale).toFixed(3),
       rotation: +(t.rotation + rotationDeg).toFixed(3),
+      // text on a path: the path moves with the letters
+      ...(t.path ? { path: t.path.map((p) => applyMat(m, p)) } : {}),
     };
   }
+  // the start / end points move with the shape (and a regenerated lettering keeps them in place)
+  if (o.start) out.start = applyMat(m, o.start);
+  if (o.end) out.end = applyMat(m, o.end);
   return out;
 }
 

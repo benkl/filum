@@ -17,6 +17,7 @@ import { createKnockdown, DEFAULT_KNOCKDOWN, type JoinStyle, type KnockdownSelec
 import { useStore } from "../store";
 import type { DesignOptions } from "../types";
 import { Dialog, Num, Row, Toggle } from "./ui";
+import { safeSetItem } from "../lib/storage";
 
 type Scope = "design" | "selection";
 let pendingScope: Scope | null = null;
@@ -177,7 +178,7 @@ export function KnockdownDialog({ onClose }: { onClose: () => void }) {
   const setSelection = (p: Partial<KnockdownSelectionOptions>) =>
     setKd((v) => {
       const next = { ...v, ...p };
-      localStorage.setItem(KEY, JSON.stringify(next));
+      safeSetItem(KEY, JSON.stringify(next));
       return next;
     });
   const setDesign = (p: Partial<DesignOptions>) => useStore.getState().commit((d) => ({ ...d, options: { ...(d.options ?? defaultDesignOptions()), ...p } }));

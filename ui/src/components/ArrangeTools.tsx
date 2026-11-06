@@ -10,6 +10,7 @@ import { applyMat, objectBounds, unionBoxes } from "../lib/geometry";
 import { useStore } from "../store";
 import type { DesignObject, Vec2 } from "../types";
 import { Dialog, Num, Row, Toggle } from "./ui";
+import { safeSetItem } from "../lib/storage";
 
 /** Align / distribute / mirror buttons for the context bar. */
 export function ArrangeButtons({ count }: { count: number }) {
@@ -215,7 +216,7 @@ export function OutlineDialog({ onClose }: { onClose: () => void }) {
   const set = (p: Partial<OutlineSettings>) =>
     setO((v) => {
       const next = { ...v, ...p };
-      localStorage.setItem(OUTLINE_KEY, JSON.stringify(next));
+      safeSetItem(OUTLINE_KEY, JSON.stringify(next));
       return next;
     });
   const opt: OutlineOptions = { kind: o.kind, offset: o.offset, width: o.width, thread, behind, bridge: o.bridge, outerOnly: o.outerOnly };

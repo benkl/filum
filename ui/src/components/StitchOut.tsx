@@ -12,6 +12,7 @@ import { useStore } from "../store";
 import type { PlanData } from "../types";
 import { fmtTime } from "./ui";
 import { threadTitle } from "./ThreadPicker";
+import { safeSetItem } from "../lib/storage";
 
 // ---------------------------------------------------------------------------
 // Playback
@@ -430,7 +431,7 @@ export function StitchOutPanel() {
     const up = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
-      localStorage.setItem(HEIGHT_KEY, String(h));
+      safeSetItem(HEIGHT_KEY, String(h));
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);

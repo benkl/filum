@@ -342,6 +342,35 @@ fn skip_colours_and_fixed_palette() {
 }
 
 #[test]
+fn fixed_palette_keeps_chart_names() {
+    use filum_core::threads::PaletteEntry;
+    let img = two_shapes();
+    let palette = vec![
+        PaletteEntry { name: "Chart Red".into(), code: "1147".into(), rgb: [210, 22, 35] },
+        PaletteEntry { name: "Chart Blue".into(), code: "1076".into(), rgb: [35, 79, 181] },
+    ];
+    let opts = DigitizeOptions {
+        width_mm: 100.0,
+        palette: palette.clone(),
+        palette_brand: "Madeira".into(),
+        // locked: white (no chart entry), the chart red verbatim, and a blue
+        // a hair off the chart's
+        fixed_colors: vec![[255, 255, 255], [210, 22, 35], [36, 79, 181]],
+        ..Default::default()
+    };
+    let r = img.run(&opts);
+    assert_eq!(r.colors.iter().map(|c| c.rgb).collect::<Vec<_>>(), opts.fixed_colors, "colours stay as locked");
+    let red = r.colors.iter().find(|c| c.rgb == [210, 22, 35]).unwrap();
+    assert_eq!((red.name.as_str(), red.code.as_str()), ("Chart Red", "1147"));
+    let t = r.threads.iter().find(|t| t.color == "#d21623").expect("red thread");
+    assert_eq!((t.name.as_str(), t.code.as_str(), t.brand.as_str()), ("Chart Red", "1147", "Madeira"));
+    let t = r.threads.iter().find(|t| t.color == "#244fb5").expect("blue thread");
+    assert_eq!((t.name.as_str(), t.code.as_str(), t.brand.as_str()), ("Chart Blue", "1076", "Madeira"));
+    let white = r.colors.iter().find(|c| c.rgb == [255, 255, 255]).unwrap();
+    assert!(white.code.is_empty(), "far from every chart entry: no code");
+}
+
+#[test]
 fn stitch_type_switches_and_fill_settings() {
     let mut img = Img::new(400, 300, [255, 255, 255]);
     img.paint([25, 25, 60], |x, y| seg_dist(x, y, (50.0, 60.0), (350.0, 240.0)) <= 4.0);

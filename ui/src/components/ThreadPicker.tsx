@@ -32,10 +32,11 @@ import {
 } from "../lib/threads";
 import { useStore } from "../store";
 import type { Thread } from "../types";
+import { safeSetItem } from "../lib/storage";
 
 const CHART_KEY = "filum.chart";
 export const lastChart = () => localStorage.getItem(CHART_KEY) ?? DEFAULT_CHART;
-export const setLastChart = (c: string) => localStorage.setItem(CHART_KEY, c);
+export const setLastChart = (c: string) => safeSetItem(CHART_KEY, c);
 
 const RECENT_CHARTS_KEY = "filum.recentCharts";
 function recentCharts(): string[] {
@@ -45,7 +46,7 @@ function recentCharts(): string[] {
     return [];
   }
 }
-const touchChart = (id: string) => localStorage.setItem(RECENT_CHARTS_KEY, JSON.stringify([id, ...recentCharts().filter((x) => x !== id)].slice(0, 6)));
+const touchChart = (id: string) => safeSetItem(RECENT_CHARTS_KEY, JSON.stringify([id, ...recentCharts().filter((x) => x !== id)].slice(0, 6)));
 
 const SOURCE_TAG: Record<ChartMeta["source"], string> = { mine: "MY", inkstitch: "IS", embroiderynerd: "EN", madeira: "MD", custom: "★" };
 

@@ -7,6 +7,7 @@ import { objectBounds, transformObject, translateMat, unionBoxes, uid } from "./
 import { dec, enc, isTauri, openFile, saveFile } from "./platform";
 import { pendingThreadList, THREAD_LIST_EXT } from "./threadList";
 import { freshCopies } from "./copies";
+import { checkDoc } from "./docCheck";
 
 // every embroidery format the engine reads (crates/formats), extension aliases included
 export const MACHINE_EXT = [
@@ -22,14 +23,23 @@ export const fit = (what: "hoop" | "design" | number = "hoop") =>
 
 function loadDoc(doc: StitchDocument, path: string | null) {
   const s = useStore.getState();
-  s.setDoc({ ...emptyDoc(), ...doc, machine: { ...emptyDoc().machine, ...doc.machine } });
+  // a design from a file: the fields every part of the app reads are there
+  const checked = checkDoc(doc, emptyDoc());
+  if (!checked) throw new Error("not a Filum design");
+  if (checked.dropped) s.toast(`${checked.dropped} damaged object${checked.dropped === 1 ? " was" : "s were"} left out`, "error");
+  s.setDoc(checked.doc);
   s.set({ filePath: path, saved: true, past: [], future: [], selection: [], nodeSel: [], gradNodes: [], activeThread: null, anim: { ...s.anim, index: null, playing: false } });
   setTimeout(() => fit("hoop"), 0);
 }
 
-export function newDocument() {
+/** Whether the design may be replaced: saved, empty, or the user says so. */
+export function confirmDiscard(): boolean {
   const s = useStore.getState();
-  if (!s.saved && s.doc.objects.length && !confirm("Discard unsaved changes?")) return;
+  return s.saved || !s.doc.objects.length || confirm("Discard unsaved changes?");
+}
+
+export function newDocument() {
+  if (!confirmDiscard()) return;
   loadDoc(newDesign(), null);
 }
 
@@ -75,6 +85,7 @@ async function handleBytes(name: string, path: string | null, bytes: Uint8Array,
       doc = await engine.importEmbroidery(bytes, name);
     }
     if (mode === "open" && (ext === "filum" || ext === "json" || !s.doc.objects.length)) {
+      if (!confirmDiscard()) return;
       loadDoc(doc, ext === "filum" ? path : null);
     } else {
       // merge into the current design, centred in the hoop
@@ -101,7 +112,7 @@ async function handleBytes(name: string, path: string | null, bytes: Uint8Array,
 }
 
 export async function openDocument() {
-  const f = await openFile([
+  const f = await pickFile([
     { name: "All supported", extensions: ["filum", "svg", ...MACHINE_EXT, ...IMAGE_EXT] },
     { name: "Filum project", extensions: ["filum"] },
     { name: "Ink/Stitch SVG", extensions: ["svg"] },
@@ -110,8 +121,18 @@ export async function openDocument() {
   if (f) await handleBytes(f.name, f.path, f.bytes, "open");
 }
 
+/** The file picker; a file that can't be read says so. */
+async function pickFile(filters: Parameters<typeof openFile>[0]) {
+  try {
+    return await openFile(filters);
+  } catch (e) {
+    useStore.getState().toast(`Could not open the file: ${(e as Error)?.message ?? e}`, "error");
+    return null;
+  }
+}
+
 export async function importFile() {
-  const f = await openFile([
+  const f = await pickFile([
     { name: "Artwork & embroidery", extensions: ["svg", ...MACHINE_EXT, ...IMAGE_EXT] },
   ]);
   if (f) await handleBytes(f.name, f.path, f.bytes, "import");
@@ -130,11 +151,12 @@ export async function openLaunchFiles() {
     import("@tauri-apps/api/event"),
     import("@tauri-apps/plugin-fs"),
   ]);
-  const openQueued = async (atLaunch: boolean) => {
+  const openQueued = async () => {
     const [path, ...rest] = await invoke<string[]>("startup_files");
     if (!path) return;
     const s = useStore.getState();
-    if (!atLaunch && !s.saved && s.doc.objects.length && !confirm("Discard unsaved changes?")) return;
+    // a restored design with unsaved changes is asked about at launch too
+    if (!confirmDiscard()) return;
     const name = path.split(/[\\/]/).pop() ?? path;
     let bytes: Uint8Array;
     try {
@@ -147,22 +169,30 @@ export async function openLaunchFiles() {
     await handleBytes(name, path, bytes, "open");
     if (rest.length) s.toast(`Opened ${name}. Open the other ${rest.length === 1 ? "file" : `${rest.length} files`} with File → Open…`);
   };
-  await listen("open-files", () => void openQueued(false));
-  await openQueued(true);
+  await listen("open-files", () => void openQueued());
+  await openQueued();
 }
 
 export async function openDroppedFile(file: File) {
   await handleBytes(file.name, null, new Uint8Array(await file.arrayBuffer()), "import");
 }
 
-export async function saveDocument(saveAs = false) {
+export async function saveDocument(saveAs = false): Promise<boolean> {
   const s = useStore.getState();
-  const bytes = enc.encode(JSON.stringify(s.doc, null, 1));
-  const path = await saveFile(`${s.doc.name || "design"}.filum`, bytes, [{ name: "Filum project", extensions: ["filum"] }], saveAs ? null : s.filePath);
-  if (path) {
-    s.set({ saved: true, filePath: path.includes("/") || path.includes("\\") ? path : s.filePath });
-    s.toast("Saved", "success");
+  const doc = s.doc;
+  const bytes = enc.encode(JSON.stringify(doc, null, 1));
+  let path: string | null;
+  try {
+    path = await saveFile(`${doc.name || "design"}.filum`, bytes, [{ name: "Filum project", extensions: ["filum"] }], saveAs ? null : s.filePath);
+  } catch (e) {
+    s.toast(`Could not save: ${(e as Error)?.message ?? e}`, "error");
+    return false;
   }
+  if (!path) return false;
+  // saved is what was written: edits made while the file was written stay unsaved
+  s.set({ saved: useStore.getState().doc === doc, filePath: path.includes("/") || path.includes("\\") ? path : s.filePath });
+  s.toast("Saved", "success");
+  return true;
 }
 
 /** Export; `fileName` (without extension) defaults to the document name. */

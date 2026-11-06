@@ -12,6 +12,7 @@ import { blockStats, duration, jobSeconds, PRINT_DEFAULTS, sheetHtml, type Print
 import { useStore } from "../store";
 import { Dialog, Num, Row, Section, Toggle } from "./ui";
 import "../output.css";
+import { safeSetItem } from "../lib/storage";
 
 const KEY = "filum.print";
 const VIEWS: [PrintView, string, string][] = [
@@ -39,7 +40,7 @@ function saveSettings(s: PrintSettings) {
   void _b;
   void _c;
   try {
-    localStorage.setItem(KEY, JSON.stringify(rest));
+    safeSetItem(KEY, JSON.stringify(rest));
   } catch {
     /* a large logo may not fit */
   }

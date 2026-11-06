@@ -4,6 +4,7 @@
 import { engine } from "../engine/client";
 import { useStore } from "../store";
 import type { DesignObject } from "../types";
+import { layeredRefusal } from "./fillLayers";
 import { uid } from "./geometry";
 
 /** The selected objects the Shape Builder works on: visible closed fills. */
@@ -12,11 +13,21 @@ export function builderTargets(): DesignObject[] {
   return s.doc.objects.filter((o) => s.selection.includes(o.id) && o.visible && o.stitch.type === "fill" && o.paths.some((sp) => sp.closed));
 }
 
+/**
+ * Why the Shape Builder can't work on these objects: its pieces copy the
+ * style of a shape, which would split the colour layers of a gradient,
+ * tartan or colour blend apart, and linked clones would snap back to their
+ * original.
+ */
+export const builderRefusal = (objs: DesignObject[]): string | null => layeredRefusal(objs);
+
 /** Divide: every overlap region becomes its own shape, in the style of the shape on top there. */
 export async function divideSelection() {
   const s = useStore.getState();
   const targets = builderTargets();
   if (!targets.length) return s.toast("Select overlapping fills to divide");
+  const no = builderRefusal(targets);
+  if (no) return s.toast(no, "error");
   const ids = targets.map((o) => o.id);
   const r = await engine.shapeBuild(s.doc, ids, [], "divide");
   const byOwner = new Map<string, DesignObject[]>();

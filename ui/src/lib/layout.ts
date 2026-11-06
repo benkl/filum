@@ -1,6 +1,7 @@
 // The workspace layout: two docked side panels (fixed but resizable panels
 // are faster to work in than floating ones), their widths, which side the
 // layers sit on and which panels are shown. Remembered across sessions.
+import { safeSetItem } from "./storage";
 
 export interface Layout {
   /** Layers & issues panel width (px). */
@@ -44,5 +45,5 @@ export function loadLayout(): Layout {
 }
 
 export function saveLayout(l: Layout) {
-  localStorage.setItem(KEY, JSON.stringify(l));
+  safeSetItem(KEY, JSON.stringify(l));
 }

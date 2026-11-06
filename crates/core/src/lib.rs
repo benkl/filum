@@ -10,6 +10,7 @@
 #[macro_use]
 pub mod prof;
 pub mod assemble;
+pub mod bezfit;
 pub mod locks;
 pub mod clip;
 pub mod density;

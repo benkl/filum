@@ -3,7 +3,7 @@
 // font-info editor's live metrics (Edit JSON). Pure — the store-level
 // actions are in textOps.ts.
 
-import { fontMetrics } from "./inkFontPack.mjs";
+import { fontMetrics, variantId, type PackedFont } from "./inkFontPack.mjs";
 import type { EmbroideryFont } from "./fonts";
 
 const PX = 25.4 / 96;
@@ -113,8 +113,14 @@ export const FONT_INFO_DEFAULTS = {
 export function withFontInfo(font: EmbroideryFont, info: Record<string, unknown>): EmbroideryFont {
   const m = fontMetrics(info);
   const mm = (o: Record<string, number>) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v * PX]));
+  // the default direction (default_variant), if the font has that variant
+  const want = typeof info.default_variant === "string" && info.default_variant ? variantId(info.default_variant) : font.variant;
+  const variant = font.variants.includes(want) ? want : font.variant;
   return {
     ...font,
+    variant,
+    variants: [variant, ...font.variants.filter((v) => v !== variant)],
+    names: font.namesOf(variant),
     name: m.name,
     size: m.size || 20,
     minScale: m.min_scale || 1,
@@ -129,6 +135,24 @@ export function withFontInfo(font: EmbroideryFont, info: Record<string, unknown>
     direction: m.text_direction === "rtl" ? "rtl" : "ltr",
     reversible: m.reversible !== false,
   };
+}
+
+/**
+ * The packed font with another default variant (font.json `default_variant`,
+ * the font editor's Default direction): that variant's glyph chunks become
+ * the default ones, the old default's go with the other variants. A variant
+ * the font doesn't have changes nothing.
+ */
+export function withDefaultVariant(font: PackedFont, wanted: unknown): PackedFont {
+  if (typeof wanted !== "string" || !wanted) return font;
+  const v = variantId(wanted);
+  const cur = variantId(font.variant ?? "ltr");
+  const chunks = font.variants?.[v];
+  if (v === cur || !chunks?.length) return font;
+  const others: Record<string, PackedFont["chunks"]> = { ...(font.variants ?? {}) };
+  delete others[v];
+  if (font.chunks.length) others[cur] = font.chunks;
+  return { ...font, variant: v, chunks, variants: others };
 }
 
 /** Kerning pairs as rows ("A V" keys; legacy two-letter keys split), sorted. */

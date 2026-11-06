@@ -9,7 +9,8 @@ import type { DesignObject, StitchDocument, StitchParams, SubPath, Vec2 } from "
 import { gatherAtTop, groupInfo, isFixedMember, nextGroupName, pruneGroups } from "./layerRows";
 import { chainOf, commonGroup, groupsOf, objectsIn, parentOf, parentsOf, selectedUnits, topGroupOf, withParent } from "./groups";
 import { defaultApplique, defaultFill, defaultRunning, defaultSatin, normAngle, objectBounds, rotateAbout, scaleAbout, transformObject, translateMat, uid, unionBoxes, type Box } from "./geometry";
-import { freshCopies, threadsOf } from "./copies";
+import { freshCopies, placeCopies, threadsOf } from "./copies";
+import { layerSetOf, oneLayerEach, plainGroupOf, plainLayerStitch } from "./fillLayers";
 
 type Mat = [number, number, number, number, number, number];
 
@@ -179,10 +180,10 @@ export function repeatSelection(opt: RepeatOptions): number {
   const names: Record<string, string> = {};
   for (const { m, rot, axis } of repeatTransforms(opt)) {
     // every repeat is a copy of its own: its groups, letterings, gradients and blends
-    const fresh = freshCopies(s.doc, sel);
+    const fresh = freshCopies(s.doc, sel, { inPlace: true });
     Object.assign(parents, fresh.parents);
     Object.assign(names, fresh.names);
-    for (const o of fresh.objects) created.push(transformedCopy(o, m, rot, axis));
+    created.push(...placeCopies(fresh.objects, m, rot, (o, mm, r) => transformedCopy(o, mm, r, axis)));
   }
   s.addObjects(created, undefined, parents, names);
   s.select([...sel.map((o) => o.id), ...created.map((o) => o.id)]);
@@ -406,17 +407,22 @@ export type ShapeBooleanOp = "unite" | "minusFront" | "intersect" | "exclude";
 /**
  * Shape booleans on the selected objects (their stitched areas).
  * The result replaces them; Minus front keeps the bottom object's style,
- * the others keep the top object's.
+ * the others keep the top object's. A gradient, tartan or colour blend
+ * takes part as one shape (its layers share it) and goes whole; the result
+ * is a plain fill in the colour of the layer it is styled on.
  */
 export async function combineShapes(op: ShapeBooleanOp) {
   const s = store();
-  const sel = s.doc.objects.filter((o) => s.selection.includes(o.id) && !o.locked);
+  const doc = s.doc;
+  const picked = doc.objects.filter((o) => s.selection.includes(o.id) && !o.locked);
+  // identical layers would cancel out (Minus front, Exclude): one shape per set
+  const sel = oneLayerEach(picked);
   if (sel.length < 2) return s.toast("Select two or more shapes");
-  const shapes = await engine.booleanShapes(s.doc, sel.map((o) => o.id), op);
+  const shapes = await engine.booleanShapes(doc, sel.map((o) => o.id), op);
   if (!shapes.length) return s.toast("The result is empty", "error");
   const style = op === "minusFront" ? sel[0] : sel[sel.length - 1];
   const stitch: StitchParams =
-    style.stitch.type === "fill" ? { ...style.stitch, gradient: undefined } : style.stitch.type === "applique" ? style.stitch : { type: "fill", ...defaultFill() };
+    style.stitch.type === "fill" ? plainLayerStitch(style.stitch) : style.stitch.type === "applique" ? style.stitch : { type: "fill", ...defaultFill() };
   const label = { unite: "Unite", minusFront: "Minus front", intersect: "Intersect", exclude: "Exclude" }[op];
   const result: DesignObject = {
     id: uid(),
@@ -429,12 +435,16 @@ export async function combineShapes(op: ShapeBooleanOp) {
     trimAfter: false,
     stopAfter: false,
   };
+  // it stays in the group its style object was in (a layer's own gradient / tartan group: the one around it)
+  const group = plainGroupOf(doc, style);
+  if (group) result.group = group;
+  const sets = new Set(picked.map(layerSetOf).filter(Boolean));
   const st = store();
-  const ids = new Set(sel.map((o) => o.id));
   st.commit((d) => {
+    const ids = new Set([...picked.map((o) => o.id), ...d.objects.filter((o) => !o.clone && sets.has(layerSetOf(o))).map((o) => o.id)]);
     const at = d.objects.findIndex((o) => ids.has(o.id));
     const rest = d.objects.filter((o) => !ids.has(o.id));
-    return { ...d, objects: [...rest.slice(0, at), result, ...rest.slice(at)] };
+    return pruneGroups({ ...d, objects: [...rest.slice(0, at), result, ...rest.slice(at)] });
   });
   st.select([result.id]);
   st.toast(`${label}: ${shapes.length} part${shapes.length > 1 ? "s" : ""}`, "success");
@@ -508,7 +518,7 @@ export function unlockAll() {
 
 /** Objects on the clipboard (with their threads); also put on the system clipboard as text. */
 const CLIP_TAG = "filum/objects:";
-let objectClip: { objects: DesignObject[]; threads: StitchDocument["threads"]; groupParents?: Record<string, string> } | null = null;
+let objectClip: { objects: DesignObject[]; threads: StitchDocument["threads"]; groupParents?: Record<string, string>; groupNames?: Record<string, string> } | null = null;
 let pastes = 0;
 
 /** The selection as clipboard text (and remembered for Paste). */
@@ -517,7 +527,9 @@ export function copySelection(cut = false): string | null {
   const objects = s.doc.objects.filter((o) => s.selection.includes(o.id));
   if (!objects.length) return null;
   const used = new Set(objects.flatMap(threadsOf));
-  objectClip = { objects: structuredClone(objects), threads: s.doc.threads.filter((t) => used.has(t.id)), groupParents: parentsOf(s.doc, objects) };
+  const groups = new Set(objects.flatMap((o) => groupsOf(s.doc, o)));
+  const groupNames = Object.fromEntries(Object.entries(s.doc.groupNames ?? {}).filter(([g]) => groups.has(g)));
+  objectClip = { objects: structuredClone(objects), threads: s.doc.threads.filter((t) => used.has(t.id)), groupParents: parentsOf(s.doc, objects), groupNames };
   pastes = 0;
   if (cut) {
     s.deleteSelection();
@@ -549,13 +561,10 @@ export function pasteClipboard(inPlace = false) {
   const off = inPlace ? 0 : 5 * ++pastes;
   const m = translateMat(off, off);
   // pasted groups, letterings, gradients and blends are new ones of their own (nesting included)
-  const fresh = freshCopies({ objects: objectClip.objects, groupParents: objectClip.groupParents }, objectClip.objects);
-  const ids = new Set(s.doc.objects.map((o) => o.id));
-  const copies = fresh.objects.map((o) => {
-    const c = transformObject(o, m, 0);
-    // a clone keeps its link only to an original in this design
-    return { ...c, clone: c.clone && ids.has(c.clone.of) ? c.clone : undefined };
-  });
-  s.addObjects(copies, objectClip.threads, fresh.parents);
+  const fresh = freshCopies({ objects: objectClip.objects, groupParents: objectClip.groupParents, groupNames: objectClip.groupNames }, objectClip.objects);
+  const ids = new Set([...s.doc.objects, ...fresh.objects].map((o) => o.id));
+  // a clone keeps its link only to an original in this design (or pasted with it)
+  const copies = placeCopies(fresh.objects, m).map((c) => (c.clone && !ids.has(c.clone.of) ? { ...c, clone: undefined } : c));
+  s.addObjects(copies, objectClip.threads, fresh.parents, fresh.names);
   s.select(copies.map((c) => c.id));
 }

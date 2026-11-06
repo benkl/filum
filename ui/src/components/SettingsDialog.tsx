@@ -13,6 +13,7 @@ import { loadMatchOptions, saveMatchOptions, useMyThreads } from "../lib/threads
 import { MATCH_PRESETS } from "../lib/threadMatch";
 import { DEFAULT_TOOL_OPTIONS, useStore } from "../store";
 import { Dialog, Num, Row, Toggle } from "./ui";
+import { safeSetItem } from "../lib/storage";
 
 type Tab = "appearance" | "canvas" | "export" | "threads" | "digitizer" | "downloads" | "files" | "keys";
 const TABS: { id: Tab; label: string; icon: ReactNode }[] = [
@@ -54,7 +55,7 @@ function useStored(key: string, fallback: string): [string, (v: string) => void]
   return [
     v,
     (x) => {
-      localStorage.setItem(key, x);
+      safeSetItem(key, x);
       setV(x);
     },
   ];

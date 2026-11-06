@@ -39,6 +39,7 @@ import { ChartSelect } from "./ThreadPicker";
 import { RegionEditor, regionAt } from "./RegionEditor";
 import { chartLabel, loadChart } from "../lib/threads";
 import { Dialog, fmtTime, Num, Row, Slider, Toggle } from "./ui";
+import { safeSetItem } from "../lib/storage";
 
 type Rgb = [number, number, number];
 
@@ -307,7 +308,7 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
   });
   const [cross, setCrossState] = useState<CrossSettings>(loadCross);
   const setCross = (p: Partial<CrossSettings>) => setCrossState((c) => ({ ...c, ...p }));
-  useEffect(() => localStorage.setItem(CROSS_KEY, JSON.stringify(cross)), [cross]);
+  useEffect(() => void safeSetItem(CROSS_KEY, JSON.stringify(cross)), [cross]);
   const [widthMm, setWidthMm] = useState(() => Math.round(doc.hoop.width * 0.8));
   const [fixedColors, setFixedColors] = useState<Rgb[]>([]);
   const [skipColors, setSkipColors] = useState<Rgb[]>([]);
@@ -353,6 +354,10 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
   const box = useBoxSize(boxRef);
   const imgRef = useRef<HTMLImageElement>(null);
   const runId = useRef(0);
+  // the picture now (async work checks it is still the one it started on)
+  const picRef = useRef(img);
+  picRef.current = img;
+  const mounted = useRef(false);
 
   const set = (p: Partial<Settings>) => {
     setSettings((s) => ({ ...s, ...p }));
@@ -366,15 +371,15 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
   const pane: Pane = PANES_OF[output].includes(paneState) ? paneState : output === "cross" && ["shapes", "lines", "stitches"].includes(paneState) ? "cross" : output === "shapes" && paneState === "cross" ? "stitches" : "style";
   const setPane = (p: Pane) => {
     setPaneState(p);
-    localStorage.setItem(PANE_KEY, p);
+    safeSetItem(PANE_KEY, p);
   };
   const setOutput = (o: Output) => {
     setOutputState(o);
-    localStorage.setItem(OUTPUT_KEY, o);
+    safeSetItem(OUTPUT_KEY, o);
   };
   const direction: Direction = settings.fillAngle != null ? "fixed" : settings.fillDirection === "image" ? "image" : "axis";
 
-  useEffect(() => localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)), [settings]);
+  useEffect(() => void safeSetItem(SETTINGS_KEY, JSON.stringify(settings)), [settings]);
 
   useEffect(() => {
     setSam(null);
@@ -385,7 +390,9 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
     setTextLines(null);
     setTextPick([]);
     setSamMode(false);
-    if (!img) return setBmp(null);
+    // the old picture's bitmap is closed below: nothing may use it meanwhile
+    setBmp(null);
+    if (!img) return;
     let live = true;
     let made: ImageBitmap | null = null;
     createImageBitmap(new Blob([img.bytes as BlobPart])).then((b) => {
@@ -395,11 +402,20 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
     });
     return () => {
       live = false;
-      // the picture is replaced or the dialog closes: its memory goes
-      URL.revokeObjectURL(img.url);
       made?.close();
+      // the picture is replaced or the dialog closes: its memory goes (checked a
+      // moment later: a development re-run of this effect keeps the same picture)
+      setTimeout(() => {
+        if (picRef.current !== img || !mounted.current) URL.revokeObjectURL(img.url);
+      }, 0);
     };
   }, [img]);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   // learned edges for line art
   const wantMap = settings.lineArt === "edges" || settings.lineArt === "drawing" ? settings.lineArt : null;
@@ -447,9 +463,13 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
     setTab("original");
     setSamMode(true);
     if (sam) return;
+    const forImg = picRef.current;
     try {
       setBusy("Analysing objects (AI)…");
-      setSam(await (await ml()).samEncode(bmp));
+      const enc = await (await ml()).samEncode(bmp);
+      // another picture was loaded meanwhile: this analysis is of the old one
+      if (picRef.current !== forImg) return;
+      setSam(enc);
     } catch (e) {
       setError("Segmentation model: " + (e as Error).message);
       setSamMode(false);
@@ -461,8 +481,10 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
     if (!sam) return;
     const pts = [...samPts, pt];
     setSamPts(pts);
+    const forImg = picRef.current;
     try {
-      setCurMask(await (await ml()).samMask(sam, pts));
+      const mask = await (await ml()).samMask(sam, pts);
+      if (picRef.current === forImg) setCurMask(mask);
     } catch (e) {
       setError("Segmentation model: " + (e as Error).message);
     }
@@ -475,9 +497,11 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
   };
   const runOcr = async () => {
     if (!img) return;
+    const forImg = img;
     try {
       setBusy("Reading text (AI)…");
       const lines = await (await ml()).findText(img.bytes);
+      if (picRef.current !== forImg) return;
       setTextLines(lines);
       setTextPick(lines.map(() => false));
       if (!lines.length) useStore.getState().toast("No text found");
@@ -513,6 +537,8 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     if (!img) return;
     const id = ++runId.current;
+    // busy from the change on: Add can't take the result of the settings before
+    setBusy("Reducing colours…");
     const t = setTimeout(async () => {
       try {
         setError(null);
@@ -576,6 +602,8 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
   const planRun = useRef(0);
   useEffect(() => {
     if (!recoloured?.objects.length) {
+      // a plan still being made for the previous result is dropped
+      planRun.current++;
       setPlan(null);
       return;
     }
@@ -590,9 +618,14 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
 
   // inputs: file picker, drag & drop, paste
   const loadBytes = useCallback((name: string, bytes: Uint8Array) => {
+    // the colour choices belong to the old picture
     setOverrides({});
     setFixedColors([]);
     setSkipColors([]);
+    setLineColors([]);
+    setFillColors([]);
+    setEdgeColors([]);
+    setColorOrder([]);
     setRegionEdits([]);
     setTraced(null);
     setPlan(null);

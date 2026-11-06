@@ -4,6 +4,7 @@
 
 import { activeThreadOf, useStore } from "../store";
 import type { DensityRamp, DesignObject, FillParams, RampProfile, StitchDocument, Vec2 } from "../types";
+import { rampMembers, rampOf, removeRampDoc } from "./fillLayers";
 import { uid } from "./geometry";
 
 export const RAMP_PROFILES: { id: RampProfile; label: string; hint: string }[] = [
@@ -65,16 +66,7 @@ export function angleAcross(a: Vec2, b: Vec2): number {
   return Math.round((((deg % 180) + 180) % 180) * 10) / 10;
 }
 
-export const rampOf = (o: DesignObject | undefined): DensityRamp | undefined => (o?.stitch.type === "fill" ? o.stitch.ramp : undefined);
-
-/** The objects of a ramp: one, or both layers of a colour blend. */
-export function rampMembers(doc: StitchDocument, id: string): DesignObject[] {
-  const o = doc.objects.find((x) => x.id === id);
-  const r = rampOf(o);
-  if (!o || !r) return [];
-  if (!r.group) return [o];
-  return doc.objects.filter((x) => rampOf(x)?.group === r.group);
-}
+export { rampMembers, rampOf, removeRampDoc } from "./fillLayers";
 
 /** The selected object that has a ramp (or the first selected closed fill). */
 export function selectedRamp(): DesignObject | undefined {
@@ -173,16 +165,11 @@ export function updateRamp(id: string, patch: Partial<DensityRamp>, live = false
   else s.commit(fn);
 }
 
-/** Remove the ramp: a plain fill again (a blend keeps its first layer). */
+/** Remove the ramp: a plain fill again (a blend keeps its first layer, or the one that is left). */
 export function removeRamp(id: string) {
   const s = useStore.getState();
-  const members = rampMembers(s.doc, id);
-  const drop = new Set(members.filter((m) => rampOf(m)?.reverse).map((m) => m.id));
-  s.commit((d) => ({
-    ...d,
-    objects: d.objects
-      .filter((x) => !drop.has(x.id))
-      .map((x) => (members.some((m) => m.id === x.id) && x.stitch.type === "fill" ? { ...x, stitch: { ...x.stitch, ramp: undefined, underlay: true } } : x)),
-  }));
-  s.select(members.filter((m) => !drop.has(m.id)).map((m) => m.id));
+  const { keep } = removeRampDoc(s.doc, id);
+  if (!keep.length) return;
+  s.commit((d) => removeRampDoc(d, id).doc);
+  s.select(keep);
 }

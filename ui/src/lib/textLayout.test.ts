@@ -2,9 +2,11 @@
 // back-and-forth lines and stitch-direction variants, as Ink/Stitch's
 // Font.render_text lays them out.
 
-import { blockOffsets, layoutText, lineVariant, reversedVariant, reverseLine } from "./textLayout";
+import opentype from "opentype.js";
+import { arcRadius, bidiLevels, blockOffsets, layoutText, lineVariant, placeGlyphs, reversedVariant, reverseLine, visualOrder } from "./textLayout";
+import { transformObject, type Mat } from "./geometry";
 import { buildFont, fontMetrics, variantId } from "./inkFontPack.mjs";
-import type { EmbroideryFont, EmbroideryGlyph } from "./fonts";
+import type { EmbroideryFont, EmbroideryGlyph, OutlineFont } from "./fonts";
 import type { TextSpec } from "./text";
 import type { DesignObject, SubPath } from "../types";
 
@@ -17,7 +19,7 @@ const near = (a: number, b: number) => Math.abs(a - b) < 1e-6;
 
 // a fake font: every glyph a 4 mm wide box; the variant shows in the stitch length
 const LEN: Record<string, number> = { ltr: 3, rtl: 2, ttb: 4, btt: 5 };
-function fakeFont(variant = "ltr", variants = ["ltr", "rtl"], reversible = true): EmbroideryFont {
+function fakeFont(variant = "ltr", variants = ["ltr", "rtl"], reversible = true, own: Partial<DesignObject> = {}): EmbroideryFont {
   const names = new Set("ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""));
   const box = (w: number, h: number): SubPath => ({ closed: true, nodes: [{ p: [0, -h] }, { p: [w, -h] }, { p: [w, 0] }, { p: [0, 0] }] });
   return {
@@ -53,6 +55,7 @@ function fakeFont(variant = "ltr", variants = ["ltr", "rtl"], reversible = true)
         stitch: { type: "running", length: LEN[used], tolerance: 0.2, repeats: 0, beanRepeats: 0, method: "running" } as unknown as DesignObject["stitch"],
         trimAfter: false,
         stopAfter: false,
+        ...own,
       };
       return { name, objects: [o], colors: [0], width: 4, minX: 0 };
     },
@@ -152,6 +155,123 @@ check(variantId("→") === "ltr" && variantId("↓") === "ttb" && variantId("btt
   check(pack.font.reversible === true && pack.font.sortable === false, "reversible by default, not sortable (Ink/Stitch defaults)");
   const m = fontMetrics({ name: "X", reversible: false, horiz_adv_x_space: 30, kerning_pairs: { "A V": -2, "A B": 0 } });
   check(m.reversible === false && m.horiz_adv_x_space === 30 && Object.keys(m.kerning_pairs).length === 1, "font metrics from font.json (zero kerning dropped)");
+
+  // --- the font's own commands per glyph object ---------------------------------
+  const cmdFont = fakeFont("ltr", ["ltr"], true, { ties: "none", forceLock: true, minStitch: 0.5, minJump: 2, stopAfter: true, start: [1, -5], end: [3, -1] });
+  objs = await layoutText(spec({ content: "AB", anchor: [10, 20] }), cmdFont);
+  const b = objs[1];
+  check(b.ties === "none" && b.forceLock === true && b.minStitch === 0.5 && b.minJump === 2 && b.stopAfter === true, "glyph objects keep the font's ties, force lock, min stitch / jump and stop");
+  check(!!b.start && near(b.start[0], 15) && near(b.start[1], 15) && !!b.end && near(b.end[0], 17) && near(b.end[1], 19), `start / end points move with the letter (${b.start} ${b.end})`);
+  objs = await layoutText(spec({ content: "A", anchor: [0, 0], size: 20, rotation: 90 }), cmdFont);
+  check(!!objs[0].start && near(objs[0].start[0], 10) && near(objs[0].start[1], 2), `start point scaled and turned with the letter (${objs[0].start})`);
+  objs = await layoutText(spec({ content: "A B\nAAAAAAA", align: "block" }), cmdFont);
+  check(minX(objs[1]) > 7 && !!objs[1].start && near(objs[1].start[0], minX(objs[1]) + 1), `start point follows Block alignment (${objs[1].start})`);
+  objs = await layoutText(spec({ content: "AB" }), f);
+  check(objs.every((o) => o.start === undefined && o.ties === undefined && !o.stopAfter), "glyphs without commands get none");
+
+  // --- arcs on short text ----------------------------------------------------------
+  check(near(arcRadius(90, 10), 10 / (Math.PI / 2)), "arc radius: the width over the angle");
+  check(arcRadius(-300, 4, 10) >= 12.5 && arcRadius(-300, 4, 0) >= 1, "arc radius stays above the letters' height and a margin");
+  objs = await layoutText(spec({ content: "A", align: "center", arc: -300 }), f);
+  const nodes = objs[0].paths[0].nodes.map((n) => n.p);
+  // box: top-left, top-right, bottom-right, bottom-left
+  check(nodes[0][0] < nodes[1][0] && nodes[0][1] < nodes[3][1] && nodes.every((p) => isFinite(p[0]) && isFinite(p[1])), `a strong dip on one letter keeps it the right way round (${JSON.stringify(nodes)})`);
+  objs = await layoutText(spec({ content: "A\nA", align: "center", arc: 300 }), f);
+  const low = objs[1].paths[0].nodes.map((n) => n.p);
+  check(low[0][0] < low[1][0] && low[0][1] < low[3][1], `a strong arch keeps the lower line the right way round (${JSON.stringify(low)})`);
+
+  // --- bidi (outline fonts) --------------------------------------------------------
+  check(visualOrder("abc") === "abc" && visualOrder("12 ab") === "12 ab", "left-to-right lines stay");
+  check(visualOrder("אבג") === "גבא", "Hebrew is drawn right to left");
+  check(visualOrder("אבג 123") === "123 גבא", "numbers keep their order in right-to-left lines");
+  check(visualOrder("אבג abc def") === "abc def גבא", "Latin runs keep their order in right-to-left lines");
+  check(visualOrder("abc אבג def") === "abc גבא def", "a Hebrew run inside a left-to-right line turns round in place");
+  check(visualOrder("שלום (עולם)") === "(םלוע) םולש", `brackets mirror in right-to-left text (${visualOrder("שלום (עולם)")})`);
+  check(visualOrder("בָּא") === "אבָּ", "marks stay with their letter");
+  check(bidiLevels("אב").rtl && !bidiLevels("ab אב").rtl, "the line's direction is its first strong letter's");
+
+  // a real (in-memory) outline font: boxes of different heights, a kerning pair
+  const box = (name: string, unicode: number, w: number, h: number) => {
+    const p = new opentype.Path();
+    if (h) {
+      p.moveTo(50, 0);
+      p.lineTo(w - 50, 0);
+      p.lineTo(w - 50, h);
+      p.lineTo(50, h);
+      p.close();
+    }
+    return new opentype.Glyph({ name, unicode, advanceWidth: w, path: p });
+  };
+  const notdefPath = new opentype.Path();
+  notdefPath.moveTo(0, 0);
+  notdefPath.lineTo(500, 0);
+  notdefPath.lineTo(500, 700);
+  notdefPath.close();
+  const notdef = new opentype.Glyph({ name: ".notdef", advanceWidth: 500, path: notdefPath });
+  const ot = opentype.parse(
+    new opentype.Font({
+      familyName: "T",
+      styleName: "R",
+      unitsPerEm: 1000,
+      ascender: 800,
+      descender: -200,
+      glyphs: [
+        notdef,
+        box("space", 32, 250, 0),
+        box("A", 65, 600, 700),
+        box("B", 66, 600, 650),
+        box("alefhe", 0x5d0, 500, 600),
+        box("bethe", 0x5d1, 500, 400),
+        box("alef", 0x627, 300, 700),
+        box("beh", 0x628, 500, 300),
+        box("teh", 0x62a, 500, 350),
+        box("one", 0x31, 500, 690),
+        box("two", 0x32, 500, 680),
+      ],
+    }).toArrayBuffer(),
+  );
+  const iA = ot.charToGlyphIndex("A");
+  const iB = ot.charToGlyphIndex("B");
+  (ot as unknown as { kerningPairs: Record<string, number> }).kerningPairs = { [`${iA},${iB}`]: -80 };
+  const names = (line: string) =>
+    placeGlyphs(ot, line, 10, { kerning: true })
+      .glyphs.map((g) => g.glyph.name)
+      .join(" ");
+  // left to right: the same positions as opentype.js's own getPaths
+  const opts = { kerning: true, letterSpacing: 0.05 } as opentype.RenderOptions;
+  const mine = placeGlyphs(ot, "AB A", 10, opts);
+  const theirs = ot.getPaths("AB A", 0, 0, 10, opts);
+  const samePos = mine.glyphs.every((g, i) => {
+    const a = g.glyph.getPath(g.x, 0, 10, opts, ot).getBoundingBox();
+    const t = theirs[i].getBoundingBox();
+    return a.isEmpty() ? t.isEmpty() : near(a.x1, t.x1);
+  });
+  check(mine.glyphs.length === theirs.length && samePos && near(mine.width, ot.getAdvanceWidth("AB A", 10, opts)), "left-to-right glyph positions match opentype.js (kerning, letter spacing)");
+  check(near(mine.glyphs[1].x - mine.glyphs[0].x, 6 - 0.8 + 0.5), `the kerning pair applies (${mine.glyphs[1].x})`);
+  check(names("אב") === "bethe alefhe", `Hebrew glyphs right to left (${names("אב")})`);
+  check(names("ابت") === "teh beh alef", `Arabic glyphs right to left, not reversed twice (${names("ابت")})`);
+  check(names("ابت 12") === "one two space teh beh alef", `Arabic with numbers (${names("ابت 12")})`);
+  check(names("AB אב") === "A B space bethe alefhe", `mixed line: Latin, then Hebrew turned (${names("AB אב")})`);
+  const outline: OutlineFont = { kind: "outline", key: "ttf:test", font: ot };
+  const ospec = (content: string) => spec({ content, font: "ttf:test", style: "fill", size: 7, align: "left" });
+  objs = await layoutText(ospec("אב"), outline);
+  const tops = objs[0].paths.map((sp) => ({ x: Math.min(...sp.nodes.map((n) => n.p[0])), top: Math.min(...sp.nodes.map((n) => n.p[1])) }));
+  const alefBox = tops.reduce((a, c) => (c.top < a.top ? c : a));
+  const betBox = tops.reduce((a, c) => (c.top > a.top ? c : a));
+  check(tops.length === 2 && alefBox.x > betBox.x, "outline lettering: Hebrew stitched in visual order (alef on the right)");
+  objs = await layoutText(ospec("A一"), outline);
+  check(objs.length === 1 && objs[0].paths.length === 1, "missing characters: no .notdef box stitched");
+  objs = await layoutText(ospec("一丁"), outline);
+  check(objs.length === 0, "only missing characters: nothing (so another font can be used)");
+
+  // --- transforms keep the lettering parametric ---------------------------------------
+  {
+    const o = (await layoutText(spec({ content: "A", path: [[0, 0], [10, 0]], wordSpacing: 2 }), f))[0];
+    const m: Mat = [2, 0, 0, 2, 5, 5];
+    const t = transformObject({ ...o, start: [1, 1] }, m);
+    check(JSON.stringify(t.text!.path) === JSON.stringify([[5, 5], [25, 5]]) && t.text!.wordSpacing === 4, "text on a path: the path and word spacing follow a move / scale");
+    check(!!t.start && t.start[0] === 7 && t.start[1] === 7, "a letter's start point follows the transform");
+  }
 
   if (failed) throw new Error(`${failed} lettering layout check(s) failed`);
   console.log("all passed");

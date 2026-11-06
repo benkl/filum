@@ -250,10 +250,16 @@ pub(crate) fn stitch_row_pub(out: &mut Run, y: f64, x0: f64, x1: f64, row_num: i
     stitch_row(out, y, x0, x1, row_num, max_len, staggers, ltr, f)
 }
 
+/// Fill stitch length as used: Ink/Stitch's floor of 0.1 mm
+/// (`max(max_stitch_length_mm, 0.1 mm)`); a NaN or infinite length, which
+/// would never reach a row's end, falls back to the default 3 mm.
+pub(crate) fn fill_stitch_len(max_len: f64) -> f64 {
+    if max_len.is_finite() { max_len.max(0.1) } else { 3.0 }
+}
+
 /// Stitch positions along one row (Ink/Stitch `stitch_row` with `adjust_stagger`).
 fn stitch_row(out: &mut Run, y: f64, x0: f64, x1: f64, row_num: i64, max_len: f64, staggers: u32, ltr: bool, f: u8) {
-    // a zero, negative or NaN stitch length would never reach the row's end
-    let max_len = if max_len.is_finite() { max_len.max(0.5) } else { 3.0 };
+    let max_len = fill_stitch_len(max_len);
     if let Some(c) = CARVE.with(|c| c.get()) {
         // carved: the needle points on the pattern's lines
         let (beg, end) = if ltr { (x0, x1) } else { (x1, x0) };
@@ -416,7 +422,7 @@ pub fn tatami_ramp(
     let mask = gradient.filter(|g| g.mix != crate::model::GradientMix::Rows).map(|g| LayerMask::new(g, &rr, a, spacing));
     let own_rows = rows_mix.map(|g| row_colours(g, &grating, a));
     let owns_row = |rn: i64| own_rows.as_ref().is_none_or(|m| m.get(&rn).copied() == Some(rows_mix.map_or(0, |g| g.layer.min(255) as u8)));
-    let max_len = max_len.max(0.5);
+    let max_len = fill_stitch_len(max_len);
     let mut remaining: Vec<usize> = (0..grating.sections.len()).filter(|i| !grating.sections[*i].rows.is_empty()).collect();
     let mut runs: Vec<Run> = Vec::new();
     let mut run: Run = Vec::new();
@@ -1558,7 +1564,9 @@ mod tests {
         for len in [0.0, -0.5, f64::NAN] {
             let mut out: Run = Vec::new();
             stitch_row(&mut out, 0.0, 0.0, 100.0, 0, len, 4, true, 0);
-            assert!(out.len() < 300, "{len}: {} points", out.len());
+            // Ink/Stitch's floor: at least 0.1 mm per stitch
+            assert!(out.len() <= 1003, "{len}: {} points", out.len());
+            assert!((out.last().unwrap().0.x - 100.0).abs() < 1e-9, "{len}: row reaches its end");
         }
     }
 

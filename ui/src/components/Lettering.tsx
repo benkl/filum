@@ -22,7 +22,7 @@ import { objectBoundsCached, unionBoxes } from "../lib/geometry";
 import { openFile, openFolder } from "../lib/platform";
 import { MACHINE_EXT } from "../lib/actions";
 import { members, type TextSpec, type TextStyle } from "../lib/text";
-import { selectedTextGroup, updateText } from "../lib/textOps";
+import { lockedToast, selectedTextGroup, textLocked, updateText } from "../lib/textOps";
 import { onDownloadsChange } from "../lib/downloadStore";
 import { useStore } from "../store";
 import type { FillParams } from "../types";
@@ -31,6 +31,7 @@ import { BatchSection, FontSection, VARIANT_LABELS } from "./LetteringTools";
 import { TransformPanel } from "./TransformPanel";
 import { CommandsSection } from "./CommandsSection";
 import { ElementInfoSection } from "./ElementInfo";
+import { safeSetItem } from "../lib/storage";
 
 /** Reactive spec of a lettering group. */
 export function useTextSpec(group: string | null): TextSpec | null {
@@ -212,6 +213,8 @@ export function TextProperties({ group }: { group: string }) {
   // the glyph objects of this lettering (transform, commands and info act on all of them)
   const groupObjects = doc.objects.filter((o) => o.text?.group === group);
   const live = (patch: Partial<TextSpec>) => {
+    // locked: refused before an (empty) undo step is taken
+    if (textLocked(group)) return lockedToast();
     if (!typing.current) {
       useStore.getState().checkpoint();
       typing.current = true;
@@ -473,6 +476,12 @@ export function TextEditorOverlay() {
   const [value, setValue] = useState(spec?.content ?? "");
   const started = useRef(false);
   useEffect(() => {
+    // a locked lettering can't be edited (double-click on the canvas or in Layers)
+    if (group && textLocked(group)) {
+      lockedToast();
+      useStore.getState().set({ editingText: null });
+      return;
+    }
     setValue(spec?.content ?? "");
     started.current = false;
     setTimeout(() => {
@@ -487,8 +496,8 @@ export function TextEditorOverlay() {
   const top = view.oy + (box.y + box.h) * view.scale + 12;
   const close = () => {
     const s = useStore.getState();
-    if (!value.trim()) {
-      // emptied text removes the lettering
+    if (!value.trim() && !textLocked(group)) {
+      // emptied text removes the lettering (not a locked one)
       s.commit((d) => ({ ...d, objects: d.objects.filter((o) => o.text?.group !== group) }));
     }
     s.set({ editingText: null });
@@ -618,7 +627,7 @@ export function FontPickerDialog({ onClose }: { onClose: () => void }) {
       await updateText(group, { font: key });
     } else {
       const d = JSON.parse(localStorage.getItem("filum.textDefaults") ?? "{}");
-      localStorage.setItem("filum.textDefaults", JSON.stringify({ ...d, font: key }));
+      safeSetItem("filum.textDefaults", JSON.stringify({ ...d, font: key }));
       useStore.getState().toast(`${fontLabel(key)} will be used for new text`);
     }
     onClose();

@@ -1,6 +1,7 @@
 import { ChevronRight, GripHorizontal, GripVertical, X } from "lucide-react";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { openExternal } from "../lib/platform";
+import { safeSetItem } from "../lib/storage";
 
 export function Num({
   value,
@@ -106,8 +107,7 @@ export function Slider({
           setLive(null);
         }}
       />
-      {/* a typed value may go past the slider's end, not below its start (a stitch length of 0 never ends) */}
-      <Num value={live ?? value} onChange={onChange} unit={unit} step={step} digits={digits} min={min} />
+      <Num value={live ?? value} onChange={onChange} unit={unit} step={step} digits={digits} />
     </div>
   );
 }
@@ -178,7 +178,7 @@ export function Section({ title, children, defaultOpen = true, extra }: { title:
     setOpenState(v);
     if (!key) return;
     openMemory[key] = v;
-    localStorage.setItem(OPEN_KEY, JSON.stringify(openMemory));
+    safeSetItem(OPEN_KEY, JSON.stringify(openMemory));
   };
   const setRef = useRef(setOpen);
   setRef.current = setOpen;
@@ -310,7 +310,7 @@ export function useMovable(remember?: string) {
   const save = (o: [number, number]) => {
     if (!remember) return;
     moved[remember] = o;
-    localStorage.setItem(MOVED_KEY, JSON.stringify(moved));
+    safeSetItem(MOVED_KEY, JSON.stringify(moved));
   };
   const grip = {
     onPointerDown: (e: React.PointerEvent<HTMLElement>) => {

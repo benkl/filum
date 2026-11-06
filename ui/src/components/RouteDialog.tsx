@@ -8,6 +8,7 @@ import { useState } from "react";
 import { autoRouteSatins, autoRouteSelection, autoSatinOptions, jumpsToStrokes, setAutoSatinOptions } from "../lib/autoRoute";
 import { useStore } from "../store";
 import { Dialog, Num, Row, Toggle } from "./ui";
+import { safeSetItem } from "../lib/storage";
 
 export type RouteTab = "running" | "satin" | "jumps";
 let pendingTab: RouteTab | null = null;
@@ -61,7 +62,7 @@ export function RouteDialog({ onClose }: { onClose: () => void }) {
   const set = (p: Partial<RouteOptions>) =>
     setO((v) => {
       const next = { ...v, ...p };
-      localStorage.setItem(KEY, JSON.stringify(next));
+      safeSetItem(KEY, JSON.stringify(next));
       return next;
     });
   const flip = (k: keyof typeof satin) => {

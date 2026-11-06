@@ -10,6 +10,7 @@ import { useStore } from "../store";
 import type { DesignObject, StitchParams, SubPath } from "../types";
 import { Dialog, Num, Row, Toggle } from "./ui";
 import "../output.css";
+import { safeSetItem } from "../lib/storage";
 
 /** Ink/Stitch's outline options (mm, threshold mm²). */
 interface OutlineParams {
@@ -131,7 +132,7 @@ export function RebuildShapesDialog({ onClose }: { onClose: () => void }) {
   const set = (q: Partial<OutlineParams>) => {
     const next = { ...p, ...q };
     setP(next);
-    localStorage.setItem(KEY, JSON.stringify(next));
+    safeSetItem(KEY, JSON.stringify(next));
   };
   const apply = () => {
     if (!result) return;

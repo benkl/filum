@@ -12,6 +12,7 @@ import { flattenSubPath } from "../lib/bezier";
 import { patternSatin, SATIN_PATTERNS, type SatinPattern, type ZigzagPattern } from "../lib/convert";
 import { applies, applyPlan, DEFAULT_CONVERT, planConversion, UNDERLAYS, type ConvertId, type ConvertOptions, type ConvertPlan } from "../lib/convertActions";
 import { Dialog, Num, Row, Slider, Toggle } from "./ui";
+import { safeSetItem } from "../lib/storage";
 
 const KEY = "filum.convert";
 let pending: ConvertId | null = null;
@@ -122,7 +123,10 @@ const ZIGZAGS: { id: ZigzagPattern; label: string; pts: Vec2[]; title: string }[
 
 export function ConvertDialog({ onClose }: { onClose: () => void }) {
   // the document and selection as they were when the dialog opened
-  const base = useMemo(() => useStore.getState().doc.objects, []);
+  const base = useMemo(() => {
+    const d = useStore.getState().doc;
+    return { objects: d.objects, groupParents: d.groupParents, groupNames: d.groupNames };
+  }, []);
   const sel = useMemo(() => {
     const s = useStore.getState();
     return s.doc.objects.filter((o) => s.selection.includes(o.id) && !o.locked);
@@ -141,7 +145,8 @@ export function ConvertDialog({ onClose }: { onClose: () => void }) {
     pending = null;
   }, []);
 
-  const restore = () => useStore.getState().liveUpdate((d) => ({ ...d, objects: base }));
+  // the objects and their groups as they were (a preview may dissolve or add groups)
+  const restore = () => useStore.getState().liveUpdate((d) => ({ ...d, ...base }));
 
   // compute the plan (debounced) and preview it on the canvas
   useEffect(() => {
@@ -164,7 +169,7 @@ export function ConvertDialog({ onClose }: { onClose: () => void }) {
       }
       setPlan(r);
       setError(null);
-      if (preview) useStore.getState().liveUpdate((d) => applyPlan({ ...d, objects: base }, r as ConvertPlan));
+      if (preview) useStore.getState().liveUpdate((d) => applyPlan({ ...d, ...base }, r as ConvertPlan));
       else restore();
     }, 120);
     return () => clearTimeout(t);
@@ -184,12 +189,12 @@ export function ConvertDialog({ onClose }: { onClose: () => void }) {
   const set = <K extends keyof ConvertOptions>(k: K, patch: Partial<ConvertOptions[K]>) =>
     setOpts((p) => {
       const next = { ...p, [k]: { ...p[k], ...patch } };
-      localStorage.setItem(KEY, JSON.stringify(next));
+      safeSetItem(KEY, JSON.stringify(next));
       return next;
     });
   const choose = (k: ConvertId) => {
     setId(k);
-    localStorage.setItem(KEY + ".last", k);
+    safeSetItem(KEY + ".last", k);
   };
   const apply = () => {
     if (!plan) return;

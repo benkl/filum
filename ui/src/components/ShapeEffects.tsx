@@ -11,6 +11,7 @@ import { applyEffect, DEFAULT_EFFECTS, WARPS, type Box, type EffectId, type Effe
 import { useStore } from "../store";
 import type { DesignObject, StitchDocument, SubPath } from "../types";
 import { Dialog, Row, Slider, Toggle } from "./ui";
+import { safeSetItem } from "../lib/storage";
 
 const KEY = "filum.effects";
 let pending: EffectId | null = null;
@@ -117,12 +118,12 @@ export function ShapeEffectsDialog({ onClose }: { onClose: () => void }) {
   const set = <K extends EffectId>(k: K, patch: Partial<EffectParams[K]>) =>
     setParams((p) => {
       const next = { ...p, [k]: { ...p[k], ...patch } };
-      localStorage.setItem(KEY, JSON.stringify(next));
+      safeSetItem(KEY, JSON.stringify(next));
       return next;
     });
   const choose = (k: EffectId) => {
     setId(k);
-    localStorage.setItem(KEY + ".last", k);
+    safeSetItem(KEY + ".last", k);
   };
   const apply = () => {
     const s = useStore.getState();

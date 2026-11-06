@@ -795,6 +795,36 @@ input[type="range"]:focus-visible {
   font-size: var(--fs-md);
 }
 
+/* ---------------- error screen (components/ErrorBoundary.tsx) ---------------- */
+.crash {
+  max-width: 520px;
+  margin: 15vh auto 0;
+  padding: var(--sp-6);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--bg-2);
+  color: var(--text);
+}
+.crash h2 {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-xl);
+}
+.crash pre {
+  max-height: 120px;
+  overflow: auto;
+  padding: var(--sp-2);
+  border-radius: var(--r-md);
+  background: var(--bg-3);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  white-space: pre-wrap;
+}
+.crash-actions {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: var(--sp-4);
+}
+
 /* ---------------- bottom bar ---------------- */
 .bottombar {
   /* its own row of .center, whether the player above it is open or not */

@@ -147,21 +147,50 @@ pub fn rings(r: &Region) -> Vec<Ring> {
 // ---------------------------------------------------------------------------
 // Polygon → smooth Bézier sub-path (kurbo)
 
+/// A ring the curve fitter can take: finite points only, no (near-)duplicate
+/// neighbours, and no zero-width spikes (a vertex the outline doubles back
+/// through, which would put a cusp in the fitted curve).
+fn clean_ring(ring: &[Point]) -> Vec<Point> {
+    const EPS: f64 = 1e-6;
+    let mut r: Vec<Point> = Vec::with_capacity(ring.len());
+    for &q in ring {
+        if q.x.is_finite() && q.y.is_finite() && r.last().map_or(true, |l: &Point| l.dist(q) > EPS) {
+            r.push(q);
+        }
+    }
+    while r.len() > 2 && r[0].dist(*r.last().unwrap()) <= EPS {
+        r.pop();
+    }
+    // each pass removes at least one point or stops, so this terminates
+    loop {
+        let n = r.len();
+        if n < 3 {
+            return r;
+        }
+        let spike = (0..n).find(|&i| {
+            let (a, b, c) = (r[(i + n - 1) % n], r[i], r[(i + 1) % n]);
+            let (u, v) = (b - a, c - b);
+            let (lu, lv) = (u.length(), v.length());
+            // collinear and reversing: c lies back along a→b
+            a.dist(c) <= EPS || (u.cross(v).abs() <= 1e-9 * lu * lv && u.dot(v) < 0.0)
+        });
+        let Some(i) = spike else { return r };
+        let (a, c) = (r[(i + n - 1) % n], r[(i + 1) % n]);
+        r.remove(i);
+        // the spike's two sides may now meet in a duplicate
+        if a.dist(c) <= EPS && r.len() > 2 {
+            let j = i % r.len();
+            r.remove(j);
+        }
+    }
+}
+
 /// Fit a closed polygon with smooth cubic Béziers, keeping corners that turn
 /// more than `corner_deg`. `accuracy` is the allowed deviation (mm).
 pub fn fit_ring(ring: &[Point], accuracy: f64, corner_deg: f64) -> SubPath {
-    use kurbo::simplify::{simplify_bezpath, SimplifyOptions};
     use kurbo::{BezPath, PathEl};
-    // no duplicate points: kurbo's fitter needs regular tangents
-    let mut ring: Vec<Point> = ring.iter().copied().fold(Vec::new(), |mut v, q| {
-        if v.last().map_or(true, |l: &Point| l.dist(q) > 1e-6) {
-            v.push(q);
-        }
-        v
-    });
-    if ring.len() > 2 && ring[0].dist(*ring.last().unwrap()) < 1e-6 {
-        ring.pop();
-    }
+    let accuracy = if accuracy.is_finite() && accuracy > 0.0 { accuracy } else { 0.02 };
+    let ring = clean_ring(ring);
     let ring = &ring[..];
     let n = ring.len();
     if n < 3 {
@@ -206,8 +235,8 @@ pub fn fit_ring(ring: &[Point], accuracy: f64, corner_deg: f64) -> SubPath {
         path.push(PathEl::CurveTo(k(ring[i] + out_i), k(ring[j] + in_j), k(ring[j])));
     }
     path.close_path();
-    let opts = SimplifyOptions::default().angle_thresh(0.2);
-    let simple = simplify_bezpath(path, accuracy, &opts);
+    // our port of kurbo's simplifier: kurbo's own can loop forever (bezfit.rs)
+    let simple = crate::bezfit::simplify_bezpath(path, accuracy, 0.2);
     let mut nodes: Vec<Node> = Vec::new();
     let mut last_out: Option<[f64; 2]> = None;
     for el in simple.elements() {
@@ -333,5 +362,58 @@ mod fit_tests {
         let sq: Ring = vec![pt(0.0, 0.0), pt(10.0, 0.0), pt(10.0, 10.0), pt(0.0, 10.0)];
         let sp = fit_ring(&sq, 0.02, 30.0);
         assert!(sp.nodes.iter().all(|n| n.i.is_none() && n.o.is_none()), "{:?}", sp.nodes);
+    }
+
+    /// From auto-digitizing a 97×97 noise image: kurbo 0.13's simplifier
+    /// never returned on this ring (a 1e12-long candidate arm sent its
+    /// arc-length root finder into an endless loop).
+    #[test]
+    fn fit_ring_terminates_on_degenerate_tangents() {
+        let r = [
+            (0.066, 48.471000000000004), (0.089, 48.481), (1.738, 49.306000000000004), (1.776, 49.343),
+            (1.817, 49.377), (1.821, 49.388), (1.827, 49.394), (1.829, 49.408), (1.846, 49.452),
+            (2.6710000000000003, 54.4), (2.652, 54.524), (2.564, 54.612), (2.474, 54.633), (0.0, 54.633),
+            (-0.11900000000000001, 54.594), (-0.191, 54.492000000000004), (-0.2, 54.433), (-0.2, 51.959),
+            (-0.161, 51.84), (-0.059000000000000004, 51.768), (-0.02, 51.76), (0.716, 51.686),
+            (1.036, 51.583), (1.208, 51.441), (1.325, 51.218), (1.41, 50.774), (1.439, 49.813),
+            (0.089, 50.488), (-0.034, 50.506), (-0.14400000000000002, 50.447), (-0.198, 50.335),
+            (-0.2, 50.309), (-0.2, 48.660000000000004), (-0.161, 48.541000000000004),
+            (-0.059000000000000004, 48.469),
+        ];
+        let ring: Ring = r.iter().map(|&(x, y)| pt(x, y)).collect();
+        let t = std::time::Instant::now();
+        let sp = fit_ring(&ring, 0.02, 35.0);
+        assert!(t.elapsed().as_secs_f64() < 2.0, "{:?}", t.elapsed());
+        assert!(sp.nodes.len() >= 3);
+        // the fit stays on the outline
+        for q in sp.flatten(0.01) {
+            let d = (0..ring.len())
+                .map(|i| {
+                    let (a, b) = (ring[i], ring[(i + 1) % ring.len()]);
+                    let e = b - a;
+                    let t = ((q - a).dot(e) / e.length_sq()).clamp(0.0, 1.0);
+                    (a + e * t).dist(q)
+                })
+                .fold(f64::INFINITY, f64::min);
+            assert!(d < 0.1, "{q:?} is {d} off");
+        }
+    }
+
+    #[test]
+    fn fit_ring_survives_bad_points() {
+        let nan = f64::NAN;
+        let rings: Vec<Ring> = vec![
+            vec![pt(0.0, 0.0), pt(nan, 1.0), pt(10.0, 0.0), pt(10.0, 10.0), pt(0.0, 10.0)],
+            // a zero-width spike and repeated points
+            vec![pt(0.0, 0.0), pt(10.0, 0.0), pt(15.0, 0.0), pt(10.0, 0.0), pt(10.0, 0.0), pt(10.0, 10.0), pt(0.0, 10.0)],
+            vec![pt(0.0, 0.0), pt(1.0, 0.0), pt(0.0, 0.0)],
+            vec![pt(1.0, 1.0); 5],
+            vec![],
+        ];
+        for r in &rings {
+            let sp = fit_ring(r, 0.02, 35.0);
+            assert!(sp.nodes.iter().all(|n| n.p[0].is_finite() && n.p[1].is_finite()), "{:?}", sp.nodes);
+        }
+        assert!(fit_ring(&rings[0], f64::NAN, 35.0).nodes.len() >= 3);
     }
 }

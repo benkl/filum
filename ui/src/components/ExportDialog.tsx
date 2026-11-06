@@ -16,6 +16,7 @@ import { FLAG, type ExportOptions, type FormatInfo, type MachineColorInfo } from
 import { Dialog, fmtTime, Num } from "./ui";
 import { FrameButtons, MachineOptions } from "./MachineOptions";
 import { cutterOf, DEFAULT_CUT_OVER, uncutTrims } from "../lib/cuts";
+import { safeSetItem } from "../lib/storage";
 
 const FORMAT_HINT: Record<string, string> = {
   pes: "Brother, Baby Lock",
@@ -231,11 +232,11 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     useStore.getState().commit((d) => ({ ...d, hoop: { name: `${machine.brand} ${f.name}`.trim(), width: f.width, height: f.height, ...(f.shape ? { shape: f.shape } : {}) } }));
   const doExport = () => {
     // the default format (Preferences ▸ Export) is a file format, not a picture
-    if (!isPicture(fmt) && fmt !== "threadlist") localStorage.setItem("filum.format", fmt);
-    localStorage.setItem("filum.pesVersion", String(pesVersion));
-    localStorage.setItem("filum.zip", zipMode ? "1" : "0");
-    localStorage.setItem("filum.zipTargets", JSON.stringify(zipTargets));
-    localStorage.setItem("filum.pictures", JSON.stringify(pics));
+    if (!isPicture(fmt) && fmt !== "threadlist") safeSetItem("filum.format", fmt);
+    safeSetItem("filum.pesVersion", String(pesVersion));
+    safeSetItem("filum.zip", zipMode ? "1" : "0");
+    safeSetItem("filum.zipTargets", JSON.stringify(zipTargets));
+    safeSetItem("filum.pictures", JSON.stringify(pics));
     onClose();
     if (zipMode) exportZip(zipTargets, opts, pics, fileName);
     else exportTarget(fmt, opts, pics, fileName);

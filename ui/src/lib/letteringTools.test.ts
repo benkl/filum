@@ -2,7 +2,8 @@
 // (Ink/Stitch's batch_lettering.py), the ZIP they are packed in, font sample
 // sheets and the font editor's live metrics.
 
-import { batchFileName, batchTexts, fontJsonText, fontSampleText, kerningRows, sampleGlyphNames, withFontInfo } from "./letteringTools";
+import { batchFileName, batchTexts, fontJsonText, fontSampleText, kerningRows, sampleGlyphNames, withDefaultVariant, withFontInfo } from "./letteringTools";
+import type { PackedFont } from "./inkFontPack.mjs";
 import { crc32, makeZip, readZip } from "./zip";
 import type { EmbroideryFont, EmbroideryGlyph } from "./fonts";
 
@@ -75,6 +76,16 @@ check(sampleGlyphNames(["b", "A", "ل.init", "a", "1", " "]).join("") === "1Aab"
   check(f2.name === "Edited" && f2.size === 12 && near(f2.leading, 25.4) && near(f2.space, 12.7), "font info: metrics px → mm");
   check(near(f2.kerning["A V"], -2.54) && near(f2.adv.A, 25.4) && f2.reversible === false, "font info: kerning, advances, reversible");
   check(f2.glyph === font.glyph, "font info: the glyphs stay");
+  // Default direction (default_variant): the preview and the stored font switch variant
+  const two = { ...font, variants: ["ltr", "rtl"], namesOf: (v?: string) => new Set(v === "rtl" ? ["A"] : Object.keys(glyphW)) } as EmbroideryFont;
+  const f3 = withFontInfo(two, { name: "X", default_variant: "rtl" });
+  check(f3.variant === "rtl" && f3.variants.join() === "rtl,ltr" && f3.names.size === 1, "font info: the default direction switches the preview's variant");
+  check(withFontInfo(two, { name: "X", default_variant: "ttb" }).variant === "ltr", "font info: a direction the font lacks keeps the default");
+  const chunk = (file: string) => ({ file, glyphs: ["A"], baseline: 0 }) as unknown as PackedFont["chunks"][number];
+  const packed = { variant: "ltr", chunks: [chunk("glyphs-0.json")], variants: { rtl: [chunk("rtl-glyphs-0.json")] } } as unknown as PackedFont;
+  const sw = withDefaultVariant(packed, "←");
+  check(sw.variant === "rtl" && sw.chunks[0].file === "rtl-glyphs-0.json" && sw.variants?.ltr?.[0].file === "glyphs-0.json" && !sw.variants?.rtl, "saved font info: the default variant's chunks swap with the old default's");
+  check(withDefaultVariant(packed, "ttb") === packed && withDefaultVariant(packed, "ltr") === packed && withDefaultVariant(packed, undefined) === packed, "saved font info: a missing or unchanged variant changes nothing");
   const rows = kerningRows({ "B A": 1, "A V": -2, AT: 3 });
   check(rows.map((r) => `${r.left}|${r.right}`).join(",") === "A|T,A|V,B|A", "kerning rows: legacy pairs split, sorted");
   check(JSON.parse(fontJsonText({ name: "x", kerning_pairs: {} })).name === "x", "font.json text parses back");

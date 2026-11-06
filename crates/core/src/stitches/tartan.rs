@@ -267,7 +267,7 @@ pub fn tartan(rings: &[Ring], p: &FillParams, t: &TartanParams, spacing: f64, st
     let (weft_bands, weft_lines) = bands(&weft, color, lo - t.offset[1].abs(), hi);
     let rot = t.rotate.to_radians();
     let rpt = t.rows_per_thread.max(1) as i64;
-    let max_len = p.max_stitch_length.max(0.5);
+    let max_len = super::fill::fill_stitch_len(p.max_stitch_length);
 
     // rows at the twill angle (herringbone: +angle and −angle in alternate columns)
     let passes: Vec<(f64, Option<(f64, bool)>)> = if t.herringbone > 0.0 { vec![(t.angle, Some((t.herringbone, false))), (-t.angle, Some((t.herringbone, true)))] } else { vec![(t.angle, None)] };
@@ -414,5 +414,32 @@ mod tests {
         // herringbone too
         let h: usize = tartan(&sq, &p, &TartanParams { palette: code.into(), layer: 0, herringbone: 6.0, ..Default::default() }, 0.4, None, 0).iter().map(|r| r.len()).sum();
         assert!(h > 300);
+    }
+
+    #[test]
+    fn unreadable_colours_are_left_out_and_unreadable_widths_skipped() {
+        // the UI reads palettes the same way (ui/src/lib/tartan.ts parsePalette, tartan.test.ts)
+        let (warp, _, _) = parse_palette("(foo)4 (#00ff00)2 (rgb(255,0,0))4 (#abc)1 (Navy)/2 (#11223344)1 (#12345)1 (#ff0000)1.2.3 (#0000ff)3.");
+        assert_eq!(warp.len(), 7);
+        assert_eq!((warp[0].color.as_str(), warp[0].render), ("#000000", 0));
+        assert_eq!(warp[5].render, 0, "five hex digits");
+        assert_eq!(warp[6].width, 3.0);
+        let cs: Vec<String> = [2, 3, 4].iter().map(|&i| parse_color(&warp[i].color).unwrap()).collect();
+        assert_eq!(cs, vec!["#aabbcc", "#000080", "#112233"]);
+        assert_eq!(tartan_colors("(foo)4 (#00ff00)2 (#ff0000)?1"), vec!["#00ff00"]);
+        assert_eq!(parse_palette("(#ff0000) ? / 4").0[0].render, 0);
+    }
+
+    #[test]
+    fn mirroring_follows_the_pivots_or_the_flag() {
+        let sq: Vec<Ring> = vec![vec![pt(0.0, 0.0), pt(40.0, 0.0), pt(40.0, 40.0), pt(0.0, 40.0)]];
+        let p = FillParams::default();
+        let runs = |palette: &str, symmetry: bool| tartan(&sq, &p, &TartanParams { palette: palette.into(), layer: 1, symmetry, ..Default::default() }, 0.4, None, 0);
+        let flat = "(#ff0000)8 (#0000ff)2 (#00ff00)2";
+        let pivots = "(#ff0000)/8 (#0000ff)2 (#00ff00)/2";
+        // the UI's Mirrored switch writes both the pivots and the flag; the flag alone (older tartans) still mirrors
+        assert_ne!(runs(flat, false), runs(pivots, true), "not mirrored without pivots and flag");
+        assert_eq!(runs(flat, true), runs(pivots, true));
+        assert_eq!(runs(pivots, false), runs(pivots, true));
     }
 }

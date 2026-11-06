@@ -20,6 +20,7 @@ import {
   meshValid,
   removeGradient,
   removeNodes,
+  reverseStops,
   setGradientKind,
   setStops,
   stopsOf,
@@ -474,7 +475,7 @@ export function GradientSection({ group }: { group: string }) {
                 at
                 <Num value={Math.round(stop.pos * 100)} unit="%" step={5} min={0} max={100} digits={0} onChange={(v) => setStops(group, stops.map((x, i) => (i === s ? { ...x, pos: v / 100 } : x)))} />
               </label>
-              <button className="btn sm ghost" title="Reverse the colours" onClick={() => setStops(group, stops.map((x) => ({ ...x, pos: 1 - x.pos, mid: 1 - x.mid })).reverse())}>
+              <button className="btn sm ghost" title="Reverse the colours" onClick={() => setStops(group, reverseStops(stops))}>
                 <ArrowLeftRight size={12} />
               </button>
               <button className="btn sm ghost" disabled={stops.length <= 2} title="Delete this stop" onClick={() => setStops(group, stops.filter((_, i) => i !== s))}>

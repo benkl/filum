@@ -21,6 +21,7 @@ export { hexToRgb, rgbToHex, normHex, lab, deltaE } from "./colorMath";
 export type { Lab } from "./colorMath";
 import { hexToRgb, rgbToHex, normHex, lab, deltaE, type Lab } from "./colorMath";
 import { remapThreads, threadsOf } from "./copies";
+import { safeSetItem } from "./storage";
 
 export const hexDeltaE = (a: string, b: string) => deltaE(lab(a), lab(b));
 
@@ -114,7 +115,7 @@ const mineMeta = (): ChartMeta => ({ id: MY_CHART, name: "My threads", brand: "M
 const localMeta = () => [mineMeta(), ...customMeta()];
 const mineListeners = new Set<() => void>();
 function saveMine(list: OwnedThread[]) {
-  localStorage.setItem(MINE_KEY, JSON.stringify(list));
+  safeSetItem(MINE_KEY, JSON.stringify(list));
   chartCache.delete(MY_CHART);
   setCharts([...localMeta(), ...charts.filter((c) => c.source !== "custom" && c.source !== "mine")]);
   mineListeners.forEach((f) => f());
@@ -298,14 +299,14 @@ export async function installPalette(): Promise<ChartMeta | null> {
   const name = (pal.name || f.name).replace(/^(Ink\/Stitch|InkStitch|Embroidery Nerds):\s*/, "").replace(/\.gpl$/i, "").trim() || "Palette";
   const id = `custom/${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   const entry: CustomChart = { id, name, entries: pal.entries.map((e) => ({ name: e.name || rgbToHex(e.rgb).toUpperCase(), code: e.code, color: rgbToHex(e.rgb) })) };
-  localStorage.setItem(CUSTOM_KEY, JSON.stringify([entry, ...customCharts().filter((c) => c.id !== id)]));
+  safeSetItem(CUSTOM_KEY, JSON.stringify([entry, ...customCharts().filter((c) => c.id !== id)]));
   chartCache.delete(id);
   setCharts([...localMeta(), ...charts.filter((c) => c.source !== "custom" && c.source !== "mine")]);
   return chartMeta(id) ?? null;
 }
 
 export function removeInstalledChart(id: string) {
-  localStorage.setItem(CUSTOM_KEY, JSON.stringify(customCharts().filter((c) => c.id !== id)));
+  safeSetItem(CUSTOM_KEY, JSON.stringify(customCharts().filter((c) => c.id !== id)));
   chartCache.delete(id);
   setCharts(charts.filter((c) => c.id !== id));
 }
@@ -343,7 +344,7 @@ export function recentThreads(): RecentThread[] {
 
 export function pushRecent(t: RecentThread) {
   const list = [t, ...recentThreads().filter((x) => !(x.color.toLowerCase() === t.color.toLowerCase() && x.code === t.code))].slice(0, 16);
-  localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+  safeSetItem(RECENT_KEY, JSON.stringify(list));
 }
 
 // ---------------------------------------------------------------------------
@@ -429,7 +430,7 @@ export function mergeTolerance(): number {
   return v >= 1 && v <= 30 ? v : 6;
 }
 export function setMergeTolerance(v: number) {
-  localStorage.setItem(MERGE_KEY, String(Math.round(v)));
+  safeSetItem(MERGE_KEY, String(Math.round(v)));
 }
 /** Merge similar colours at the remembered tolerance, and say what happened. */
 export function mergeSimilarColours() {
@@ -556,7 +557,7 @@ export function loadMatchOptions(): MatchOptions {
   }
 }
 export function saveMatchOptions(o: MatchOptions) {
-  localStorage.setItem(MATCH_KEY, JSON.stringify(o));
+  safeSetItem(MATCH_KEY, JSON.stringify(o));
 }
 
 /** Locked threads keep their spool when fitting. */

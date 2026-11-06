@@ -7,6 +7,7 @@ import { Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { commandScore as score } from "../lib/commandSearch";
 import { buildMenus, flattenMenus, type MenuEntry } from "./menuModel";
+import { safeSetItem } from "../lib/storage";
 
 const RECENT_KEY = "filum.palette.recent";
 const recent = (): string[] => {
@@ -64,7 +65,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
 
   const run = (c: { key: string; item: MenuEntry }) => {
     if (c.item.disabled) return;
-    localStorage.setItem(RECENT_KEY, JSON.stringify([c.key, ...recent().filter((k) => k !== c.key)].slice(0, 12)));
+    safeSetItem(RECENT_KEY, JSON.stringify([c.key, ...recent().filter((k) => k !== c.key)].slice(0, 12)));
     onClose();
     c.item.run?.();
   };

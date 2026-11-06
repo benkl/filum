@@ -2,7 +2,9 @@
 // through tartans and conversions (npm run test:match).
 
 import type { DesignObject, StitchDocument, SubPath, Thread } from "../types";
-import { freshCopies, mergeThreads } from "./copies";
+import { freshCopies, mergeThreads, placeCopies } from "./copies";
+import { railMap } from "./nodeOps";
+import { checkDoc } from "./docCheck";
 import { makeTartan, removeTartan, tartanLayers } from "./tartan";
 import { toggleClosed } from "./nodeOps";
 import { calibrate } from "./calibration";
@@ -64,6 +66,47 @@ check(closed.objects[0].paths.every((sp) => sp.closed), "closing a satin rail cl
 
 // a calibration measurement far off is flagged (and the dialog won't save it)
 check(calibrate({ aAlong: 250, aAcross: 25, bAlong: 25, bAcross: 25 } as never).odd.length > 0, "a typo like 250 for 25 is flagged");
+
+
+// duplicate / Alt-drag / repeat: copies stay in a group copied only in part; a whole group is new, in the same place
+const nest = { objects: [obj("p", { group: "In" }), obj("q", { group: "In" }), obj("r", { group: "Out" })], groupParents: { In: "Out" } };
+const part = freshCopies(nest, [nest.objects[0]], { inPlace: true });
+check(part.objects[0].group === "In" && !Object.keys(part.parents).length, "a copy of one member stays in its group");
+const inner = freshCopies(nest, nest.objects.slice(0, 2), { inPlace: true });
+check(inner.objects[0].group !== "In" && inner.parents[inner.objects[0].group!] === "Out", "a whole inner group copied: a new group in the same outer group");
+check(freshCopies(nest, [nest.objects[0]]).objects[0].group !== "In", "a paste makes groups of its own");
+
+// a clone copied with its original follows the copy, offset like the original pair
+const orig = obj("o0");
+const cl = obj("c0", { clone: { of: "o0", m: [1, 0, 0, 1, 20, 0], rot: 0 } } as Partial<DesignObject>);
+const both = freshCopies({ objects: [orig, cl] }, [orig, cl]);
+const moved = placeCopies(both.objects, [1, 0, 0, 1, 5, 5]);
+check(moved[1].clone!.of === moved[0].id, "a clone copied with its original links to the copy");
+check(Math.abs(moved[1].clone!.m[4] - 20) < 1e-9 && Math.abs(moved[1].clone!.m[5]) < 1e-9, "and keeps its offset from it");
+const alone = freshCopies({ objects: [orig, cl] }, [cl]);
+check(alone.objects[0].clone!.of === "o0", "a clone copied alone still follows the original");
+
+// threads: a red of another brand is another thread
+const madeira = { id: "m", name: "Red", color: "#ff0000", brand: "Madeira", code: "1147" } as Thread;
+const isacord = { id: "i", name: "Red", color: "#ff0000", brand: "Isacord", code: "1903" } as Thread;
+check(mergeThreads([madeira], [isacord]).add.length === 1, "the same colour from another brand stays its own thread");
+
+// satin rails: the engine's rungs (a reversed closed rail keeps node 0 with node 0)
+const ring = (pts: number[][]): SubPath => ({ closed: true, nodes: pts.map((p) => ({ p: p as [number, number] })) });
+const ra = ring([[0, 0], [10, 0], [10, 10], [0, 10]]);
+const rb = ring([[-1, -1], [-1, 11], [11, 11], [11, -1]]);
+const rm = railMap(ra, rb)!;
+check(rm.rev && rm.at(0) === 0 && rm.at(1) === 3 && rm.at(3) === 1, "a reversed closed rail pairs node i with node (n − i) mod n");
+const ol = (pts: number[][]): SubPath => ({ closed: false, nodes: pts.map((p) => ({ p: p as [number, number] })) });
+const om = railMap(ol([[0, 0], [10, 0], [20, 0]]), ol([[20, 2], [10, 2], [0, 2]]))!;
+check(om.rev && om.at(0) === 2 && om.seg(0) === 1, "a reversed open rail pairs node i with node n − 1 − i");
+
+// a design from a file or the autosave: what can't load is left out, the rest is safe
+const base = { objects: [], threads: [], machine: { spm: 800 }, hoop: { width: 100, height: 100 }, options: {} } as unknown as StitchDocument;
+check(checkDoc({ nope: 1 }, base) === null && checkDoc(null, base) === null, "not a design: refused");
+const bad = checkDoc({ objects: [obj("ok"), { id: "x" }, obj("ok")], threads: null }, base)!;
+check(bad.doc.objects.length === 1 && bad.dropped === 2, "damaged and repeated objects are left out");
+check(bad.doc.threads.length === 1 && bad.doc.objects[0].thread === bad.doc.threads[0].id, "objects without their thread get one");
 
 console.log(failed ? `${failed} FAILED` : "all passed");
 if (failed) throw new Error(`${failed} copy checks failed`);

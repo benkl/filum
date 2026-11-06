@@ -1,14 +1,16 @@
 // Store-level operations for parametric lettering.
 
 import { activeThreadOf, useStore } from "../store";
-import type { DesignObject, Vec2 } from "../types";
+import type { DesignObject, StitchDocument, Vec2 } from "../types";
 import { DEFAULT_FONT, fontLabel, loadFont } from "./fonts";
 import { uid } from "./geometry";
 import { flattenSubPath } from "./bezier";
 import { DEFAULT_TEXT, generateText, members, type TextSpec } from "./text";
 import { batchFileName, fontSampleText } from "./letteringTools";
+import { carryOver } from "./textSettle";
 import type { ZipEntry } from "./zip";
 import { engine } from "../engine/client";
+import { safeSetItem } from "./storage";
 
 const LAST_KEY = "filum.textDefaults";
 
@@ -23,7 +25,7 @@ function defaults(): Partial<TextSpec> {
 function remember(s: TextSpec) {
   // per-lettering layout (spacing, arc, rotation) is not carried over to new text
   const { font, size, style, borderWidth, lineSpacing, align, fillAngle } = s;
-  localStorage.setItem(LAST_KEY, JSON.stringify({ font, size, style, borderWidth, lineSpacing, align, fillAngle }));
+  safeSetItem(LAST_KEY, JSON.stringify({ font, size, style, borderWidth, lineSpacing, align, fillAngle }));
 }
 
 /** The lettering group of the current selection (all selected objects in one group). */
@@ -90,51 +92,153 @@ export async function createTextAt(p: Vec2, content = "Text", patch: Partial<Tex
   return spec.group;
 }
 
-const seq = new Map<string, number>();
+/** Is a lettering locked (any of its letters)? Locked letterings are not regenerated. */
+export function textLocked(group: string): boolean {
+  return members(useStore.getState().doc.objects, group).some((o) => o.locked);
+}
+
+let lockToastAt = 0;
+/** Tell that a lettering is locked (once in a while: sliders and typing ask many times). */
+export function lockedToast() {
+  const now = Date.now();
+  if (now - lockToastAt < 2000) return;
+  lockToastAt = now;
+  useStore.getState().toast("The lettering is locked — unlock it in Layers to edit it", "error");
+}
+
+/** A spec as a key (the per-letter fields left out). */
+function specKey(spec: TextSpec): string {
+  const rest: Record<string, unknown> = { ...spec };
+  delete rest.role;
+  delete rest.colorIndex;
+  delete rest.fontFill;
+  return JSON.stringify(rest, Object.keys(rest).sort());
+}
+
+/** The last layout of each lettering, by its spec: what the font gave its letters (see carryOver). */
+const lastLayout = new Map<string, { key: string; objs: DesignObject[] }>();
+
+/** A lettering's current spec laid out again (null if its font can't be loaded). */
+async function layoutOf(group: string, spec: TextSpec): Promise<DesignObject[] | null> {
+  const key = specKey(spec);
+  const hit = lastLayout.get(group);
+  if (hit?.key === key) return hit.objs;
+  try {
+    const objs = await generateText({ ...spec, role: undefined, colorIndex: undefined });
+    lastLayout.set(group, { key, objs });
+    return objs;
+  } catch {
+    return null;
+  }
+}
+
+interface Edit {
+  patch: Partial<TextSpec>;
+  live: boolean;
+  /** More changes in the same undo step (applied after the lettering's). */
+  also?: (d: StitchDocument) => StitchDocument;
+  done: ((applied: boolean) => void)[];
+}
+/** Edits waiting while one of the same lettering is generated: merged into one. */
+const waiting = new Map<string, Edit>();
+const busy = new Set<string>();
 
 /**
  * Regenerate a lettering with a changed spec. `live` updates without adding
  * an undo step (call `useStore.getState().checkpoint()` once before a live
- * edit session). Out-of-order results of fast edits are dropped.
+ * edit session). Edits of one lettering run one after the other: edits made
+ * while one is generated (a font loading) are merged into one, which starts
+ * from the lettering as it is then. A result whose lettering changed
+ * meanwhile (undo, another document) is dropped. Locked letterings are
+ * refused. Resolves to whether the edit was applied.
  */
-export async function updateText(group: string, patch: Partial<TextSpec>, live = false): Promise<void> {
-  const cur = textSpec(group);
-  if (!cur) return;
+export function updateText(group: string, patch: Partial<TextSpec>, live = false): Promise<boolean> {
+  return queueEdit(group, patch, live);
+}
+
+function queueEdit(group: string, patch: Partial<TextSpec>, live: boolean, also?: Edit["also"]): Promise<boolean> {
+  if (textLocked(group)) {
+    lockedToast();
+    return Promise.resolve(false);
+  }
+  return new Promise((resolve) => {
+    const w = waiting.get(group);
+    if (w) {
+      w.patch = { ...w.patch, ...patch };
+      w.live = w.live && live;
+      if (also) {
+        const prev = w.also;
+        w.also = prev ? (d) => also(prev(d)) : also;
+      }
+      w.done.push(resolve);
+    } else waiting.set(group, { patch, live, also, done: [resolve] });
+    if (!busy.has(group)) void drain(group);
+  });
+}
+
+async function drain(group: string) {
+  busy.add(group);
+  try {
+    for (let e = waiting.get(group); e; e = waiting.get(group)) {
+      waiting.delete(group);
+      let ok = false;
+      try {
+        ok = await applyEdit(group, e);
+      } catch (err) {
+        useStore.getState().toast(`Lettering: ${(err as Error).message}`, "error");
+      }
+      for (const f of e.done) f(ok);
+    }
+  } finally {
+    busy.delete(group);
+  }
+}
+
+async function applyEdit(group: string, { patch, live, also }: Edit): Promise<boolean> {
+  const before = members(useStore.getState().doc.objects, group);
+  if (!before.length) return false;
+  if (before.some((o) => o.locked)) {
+    lockedToast();
+    return false;
+  }
+  // the spec as it is now (earlier edits applied)
+  const cur = before[0].text!;
   let spec: TextSpec = { ...cur, ...patch, role: undefined, colorIndex: undefined };
   // another font has other colours
   if (patch.font && patch.font !== cur.font && !patch.palette) spec.palette = undefined;
-  const n = (seq.get(group) ?? 0) + 1;
-  seq.set(group, n);
   let objs: DesignObject[];
+  let base: DesignObject[] | null;
   try {
     spec = await withPalette(spec);
-    objs = await generateText(spec);
+    [objs, base] = await Promise.all([generateText(spec), layoutOf(group, cur)]);
   } catch (e) {
     useStore.getState().toast(`Lettering: ${(e as Error).message}`, "error");
-    return;
-  }
-  if (seq.get(group) !== n) return; // a newer edit is on its way
-  if (!objs.length) {
-    // nothing to stitch (font lacks these letters): keep the current lettering
-    if (spec.content.trim() && !live) useStore.getState().toast(`${fontLabel(spec.font)} has no letters for this text`, "error");
-    return;
+    return false;
   }
   const s = useStore.getState();
   const old = members(s.doc.objects, group);
-  if (!old.length) return;
+  // undone, replaced or changed otherwise while the font loaded: the result is out of date
+  if (old.length !== before.length || old.some((o, i) => o !== before[i])) return false;
+  if (!objs.length) {
+    // nothing to stitch (font lacks these letters): keep the current lettering
+    if (spec.content.trim() && !live) s.toast(`${fontLabel(spec.font)} has no letters for this text`, "error");
+    return false;
+  }
+  lastLayout.set(group, { key: specKey(spec), objs });
+  // what was set on the old letters (group, commands, lock, ids for clones …) stays
+  const next = carryOver(old, base, objs);
   const wasSelected = old.some((o) => s.selection.includes(o.id));
-  const keepVisible = old.every((o) => o.visible);
-  if (!keepVisible) for (const o of objs) o.visible = false;
-  const apply = (d: typeof s.doc) => {
+  const apply = (d: StitchDocument) => {
     const at = d.objects.findIndex((o) => o.text?.group === group);
     const rest = d.objects.filter((o) => o.text?.group !== group);
-    const objects = [...rest.slice(0, at), ...objs, ...rest.slice(at)];
-    return { ...d, objects };
+    const out = { ...d, objects: [...rest.slice(0, at), ...next, ...rest.slice(at)] };
+    return also ? also(out) : out;
   };
   if (live) s.liveUpdate(apply);
   else s.commit(apply);
-  if (wasSelected) useStore.getState().select(objs.map((o) => o.id));
+  if (wasSelected) useStore.getState().select(next.map((o) => o.id));
   remember(spec);
+  return true;
 }
 
 /**
@@ -176,16 +280,18 @@ export async function textOnPath(): Promise<string | null> {
   if (!group || !line) return "Select a lettering and a line";
   const sp = line.paths.find((p) => p.nodes.length >= 2)!;
   const path = flattenSubPath(sp, 0.1);
-  s.commit((d) => ({ ...d, objects: d.objects.filter((o) => o.id !== line.id) }));
-  await updateText(group, { path, pathAlign: textSpec(group)?.pathAlign ?? "center" });
+  // one undo step, once the lettering is on the line: the line goes with it
+  await queueEdit(group, { path, pathAlign: textSpec(group)?.pathAlign ?? "center" }, false, (d) => ({ ...d, objects: d.objects.filter((o) => o.id !== line.id) }));
   return null;
 }
 
 /** Regenerate every lettering that uses a font (after its font info changed). */
 export async function refreshLetterings(fontKey: string): Promise<number> {
-  const groups = [...new Set(useStore.getState().doc.objects.filter((o) => o.text?.font === fontKey).map((o) => o.text!.group))];
-  for (const g of groups) await updateText(g, {});
-  return groups.length;
+  // locked letterings stay as they are
+  const groups = [...new Set(useStore.getState().doc.objects.filter((o) => o.text?.font === fontKey).map((o) => o.text!.group))].filter((g) => !textLocked(g));
+  let n = 0;
+  for (const g of groups) if (await updateText(g, {})) n++;
+  return n;
 }
 
 /**

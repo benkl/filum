@@ -373,9 +373,8 @@ fn seg_near(sg: &Seg, pts: &[Point], tol: f64) -> bool {
     samples.into_iter().all(|q| q.x.is_finite() && q.y.is_finite() && dist(q) <= tol)
 }
 
-/// Catmull-Rom through the points, simplified with kurbo into few cubics.
+/// Catmull-Rom through the points, simplified into few cubics.
 fn fit_smooth(pts: &[Point], closed: bool, accuracy: f64) -> Vec<Seg> {
-    use kurbo::simplify::{simplify_bezpath, SimplifyOptions};
     use kurbo::{BezPath, PathEl};
     let n = pts.len();
     if n < 2 {
@@ -404,7 +403,7 @@ fn fit_smooth(pts: &[Point], closed: bool, accuracy: f64) -> Vec<Seg> {
     if closed {
         path.close_path();
     }
-    let simple = simplify_bezpath(path, accuracy, &SimplifyOptions::default().angle_thresh(0.05));
+    let simple = crate::bezfit::simplify_bezpath(path, accuracy, 0.05);
     let mut out = Vec::new();
     let mut cur = pts[0];
     let p = |q: kurbo::Point| pt(q.x, q.y);
