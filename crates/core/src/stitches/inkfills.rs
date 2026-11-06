@@ -1184,6 +1184,10 @@ fn merge_short_pieces(lab: &mut [usize], min: usize) {
     }
 }
 
+/// The longest travel that may lie on top of sewn lines (mm): what a
+/// connecting stitch between objects may show (see `assemble`).
+const ON_TOP_MAX: f64 = 2.0;
+
 /// Sew order of streamlines, with Ink/Stitch's travel rule: travel never
 /// crosses a line already sewn (see `super::travel`). From where a line ends
 /// the next line is the one reached by the shortest travel: a short hop
@@ -1258,11 +1262,34 @@ fn order_lines(rings: &[Ring], lines: Vec<Vec<(Point, bool)>>, start: Point, dse
                     .min_by(|x, y| polyline_length(&x.1).partial_cmp(&polyline_length(&y.1)).unwrap());
             }
         }
-        // no route left (a pocket walled in by sewn lines): as Ink/Stitch,
-        // travel straight rather than fail — short ones only, else a jump
+        // none of the nearest ends is reached: the route to any line left
+        if pick.is_none() && !out.is_empty() && left.len() * 2 > ends.len() {
+            crate::prof!("flow: order routes to every end");
+            let all: Vec<(f64, usize, bool)> = left.iter().enumerate().flat_map(|(i, l)| [(l[0].0.dist(pos), i, false), (l[l.len() - 1].0.dist(pos), i, true)]).collect();
+            let targets: Vec<Point> = all.iter().map(|&(_, i, rev)| if rev { left[i][left[i].len() - 1].0 } else { left[i][0].0 }).collect();
+            if let Some((k, r)) = graph
+                .routes(pos, &targets)
+                .into_iter()
+                .enumerate()
+                .filter_map(|(k, r)| r.filter(|r| allowed(r)).map(|r| (k, r)))
+                .min_by(|x, y| polyline_length(&x.1).partial_cmp(&polyline_length(&y.1)).unwrap())
+            {
+                ends = vec![all[k]];
+                pick = Some((0, r));
+            }
+        }
+        // no route left (a pocket walled in by sewn lines): travel straight
+        // where that crosses nothing sewn; across sewn lines only as far as a
+        // connecting stitch may show (it lies on top of them), else a jump
+        // (Ink/Stitch travels straight up to any length here)
         if pick.is_none() && !out.is_empty() {
             let e = end_of(&ends[0]);
-            pick = travel_path(rings, pos, e).filter(|p| polyline_length(p) <= 10.0 && allowed(p)).map(|p| (0, p));
+            pick = travel_path(rings, pos, e)
+                .filter(|p| {
+                    let len = polyline_length(p);
+                    len <= 10.0 && allowed(p) && (len <= ON_TOP_MAX || p.windows(2).all(|w| !graph.crosses_sewn(w[0], w[1])))
+                })
+                .map(|p| (0, p));
         }
         let (ci, travel) = match pick {
             Some((ci, path)) => (ci, Some(path)),

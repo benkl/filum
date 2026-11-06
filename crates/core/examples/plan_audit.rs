@@ -31,6 +31,10 @@ struct Report {
     restarts_no_tie_in: usize,
     trims_needless: usize,
     trims_inside_object: usize,
+    /// In-object trims by object index (`--verbose`).
+    inside_by_object: std::collections::BTreeMap<u32, usize>,
+    /// Their gap lengths (mm).
+    inside_gaps: Vec<f64>,
     /// Of those, where the straight way lies inside the object (a travel could do it).
     trims_inside_travelable: usize,
     colour_changes: usize,
@@ -55,17 +59,21 @@ struct Report {
 struct SegGrid {
     cell: f64,
     map: filum_core::geom::CellMap<Vec<(usize, Point, Point)>>,
+    underlay: std::collections::HashSet<usize>,
 }
 
 impl SegGrid {
     fn new(plan: &StitchPlan) -> SegGrid {
-        let mut g = SegGrid { cell: 1.0, map: Default::default() };
+        let mut g = SegGrid { cell: 1.0, map: Default::default(), underlay: Default::default() };
         let s = &plan.stitches;
         for i in 1..s.len() {
             if !s[i].is_stitch() || !s[i - 1].is_stitch() {
                 continue;
             }
             let (a, b) = (s[i - 1].pos(), s[i].pos());
+            if s[i].is(flags::UNDERLAY) {
+                g.underlay.insert(i);
+            }
             let n = (a.dist(b) / g.cell).ceil().max(1.0) as usize;
             let mut seen = std::collections::HashSet::new();
             for k in 0..=n {
@@ -79,8 +87,9 @@ impl SegGrid {
         g
     }
 
-    /// Does a direction `d` at `p` cross the stitches sewn before `before`
-    /// near it (the nearest within 0.6 mm more than 25° off)?
+    /// Does a direction `d` at `p` cross the top stitches sewn before `before`
+    /// near it (the nearest within 0.6 mm more than 25° off)? Underlay is
+    /// left out: travel over it lies under the top stitching.
     fn across_before(&self, p: Point, d: Point, before: usize) -> bool {
         let (kx, ky) = ((p.x / self.cell).floor() as i64, (p.y / self.cell).floor() as i64);
         let mut best: Option<(f64, Point)> = None;
@@ -88,7 +97,7 @@ impl SegGrid {
             for x in kx - 1..=kx + 1 {
                 for &(i, a, b) in self.map.get(&(x, y)).into_iter().flatten() {
                     let dd = seg_dist(p, a, b);
-                    if i < before && dd < 0.6 && a.dist(b) > 0.3 && best.is_none_or(|q| dd < q.0) {
+                    if i < before && dd < 0.6 && a.dist(b) > 0.3 && !self.underlay.contains(&i) && best.is_none_or(|q| dd < q.0) {
                         best = Some((dd, b - a));
                     }
                 }
@@ -167,6 +176,8 @@ fn audit(doc: &Document, plan: &StitchPlan, trim_distance: f64) -> Report {
                 let before = last_stitch_before(i).map(|k| s[k].object);
                 if !cmd_between && st.object != u32::MAX && before == Some(s[j].object) {
                     r.trims_inside_object += 1;
+                    *r.inside_by_object.entry(s[j].object).or_default() += 1;
+                    r.inside_gaps.push(st.pos().dist(s[j].pos()));
                     if let Some(rr) = rings.get(st.object as usize).filter(|r| !r.is_empty()) {
                         let (a, b) = (st.pos(), s[j].pos());
                         let n = (a.dist(b) / 0.3).ceil().max(1.0) as usize;
@@ -348,6 +359,13 @@ fn main() -> Result<(), String> {
             let mut v = r.connections_exposed.clone();
             v.sort_by(|a, b| b.partial_cmp(a).unwrap());
             println!("    exposed connections (mm): {:?}", v.iter().map(|x| (x * 10.0).round() / 10.0).collect::<Vec<_>>());
+            if !r.inside_by_object.is_empty() {
+                let by: Vec<String> = r.inside_by_object.iter().map(|(o, n)| format!("{}: {n}", doc.objects.get(*o as usize).map_or("?", |x| x.name.as_str()))).collect();
+                println!("    trims inside an object: {}", by.join(", "));
+                let mut g = r.inside_gaps.clone();
+                g.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                println!("    their gaps (mm): {:?}", g.iter().map(|x| (x * 10.0).round() / 10.0).collect::<Vec<_>>());
+            }
         }
         // per-axis limits: DST 12.1 mm, EXP and JEF 12.7 mm (one signed byte);
         // PES (PEC long form) and VP3 carry long moves

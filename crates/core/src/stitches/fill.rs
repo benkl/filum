@@ -1910,16 +1910,18 @@ mod travel_tests {
     #[test]
     fn travel_never_crosses_sewn_rows() {
         // Ink/Stitch's rule: tatami, flow and curved fills route their travel
-        // around what is already sewn, and need no jumps for it
+        // around what is already sewn
         let (shape, rings) = ring_shape();
         for method in [FillMethod::Tatami, FillMethod::Flow, FillMethod::Curved] {
             let p = FillParams { method, row_spacing: 0.4, underlay: false, angle: 30.0, ..Default::default() };
             let runs = fill(&shape, &p, 0.0, 1.0, false, 1.0, None, None);
-            // a pocket walled in by sewn lines is left by a short straight
-            // travel (as Ink/Stitch does when no route is left), not a jump
-            assert!(crossings(&runs, &rings) <= 2, "{method:?}: {} crossings", crossings(&runs, &rings));
-            assert_eq!(runs.len(), 1, "{method:?}: no jumps");
+            // a pocket walled in by sewn lines is left by a straight travel of
+            // at most 2 mm on top of them, else a jump (Ink/Stitch: any length)
+            assert_eq!(crossings(&runs, &rings), 0, "{method:?}: crossings");
+            assert!(runs.len() <= 2, "{method:?}: {} runs", runs.len());
         }
+        let p = FillParams { method: FillMethod::Tatami, row_spacing: 0.4, underlay: false, angle: 30.0, ..Default::default() };
+        assert_eq!(fill(&shape, &p, 0.0, 1.0, false, 1.0, None, None).len(), 1, "tatami: no jumps");
     }
 
     #[test]
