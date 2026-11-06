@@ -88,7 +88,7 @@ export function TartanSection({ t }: { t: TartanParams }) {
           </span>
         </Row>
         <Row label="Code" title="Ink/Stitch palette code — paste one from Ink/Stitch's tartan editor">
-          <input className="input" style={{ width: "100%", fontSize: 11 }} defaultValue={t.palette} key={t.palette} onBlur={(e) => e.target.value.trim() && e.target.value !== t.palette && set({ palette: e.target.value.trim() })} />
+          <input className="input" style={{ width: "100%", fontSize: "var(--fs-xs)" }} defaultValue={t.palette} key={t.palette} onBlur={(e) => e.target.value.trim() && e.target.value !== t.palette && set({ palette: e.target.value.trim() })} />
         </Row>
       </Section>
     </Section>

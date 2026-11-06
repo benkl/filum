@@ -112,7 +112,7 @@ export function ThreadListDialog({ onClose }: { onClose: () => void }) {
         thread list that came with it.
       </p>
       {!file.bytes.length && <p className="hint">Choose a thread list: Ink/Stitch's TXT (ZIP export), another program's TXT, COL, EDR or INF.</p>}
-      {error && <p className="hint" style={{ color: "#d0453a" }}>{file.name}: {error}</p>}
+      {error && <p className="hint" style={{ color: "var(--danger-text)" }}>{file.name}: {error}</p>}
       {list && (
         <>
           <div className="tl-summary">

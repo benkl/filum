@@ -241,7 +241,7 @@ export function TextProperties({ group }: { group: string }) {
       <Section title="Text">
         <textarea
           className="input"
-          style={{ width: "100%", height: 64, fontSize: 14 }}
+          style={{ width: "100%", height: 64, fontSize: "var(--fs-lg)" }}
           value={draft}
           onChange={(e) => {
             setDraft(e.target.value);
@@ -756,7 +756,7 @@ export function FontPickerDialog({ onClose }: { onClose: () => void }) {
               ) : f.kind === "embroidery" && f.preview ? (
                 <img src={f.preview} alt="" loading="lazy" />
               ) : f.kind === "embroidery" ? (
-                <span style={{ fontSize: 13, opacity: 0.7 }}>Installed font</span>
+                <span style={{ fontSize: "var(--fs-md)", color: "var(--muted)" }}>Installed font</span>
               ) : f.source === "system" ? (
                 <span style={{ fontFamily: `"${f.description}", sans-serif`, fontSize: 24 }}>{sample}</span>
               ) : (

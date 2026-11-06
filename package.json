@@ -13,7 +13,7 @@
     "desktop:build": "npm run wasm && tauri build",
     "android:dev": "tauri android dev",
     "ios:dev": "tauri ios dev",
-    "test": "cargo test --workspace --exclude filum-desktop && npm --prefix ui run typecheck && npm --prefix ui run test:match && node scripts/check-wording.mjs"
+    "test": "cargo test --workspace --exclude filum-desktop && npm --prefix ui run typecheck && npm --prefix ui run test:match && node scripts/check-wording.mjs && node ui/scripts/check-design.mjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2"

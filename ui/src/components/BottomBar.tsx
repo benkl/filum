@@ -90,7 +90,7 @@ export function BottomBar() {
         <button
           key={z}
           className="btn sm ghost bb-zoom"
-          style={Math.abs(view.scale / actual - z) < 0.02 ? { color: "var(--accent)", fontWeight: 600 } : undefined}
+          style={Math.abs(view.scale / actual - z) < 0.02 ? { color: "var(--accent-text)", fontWeight: "var(--fw-semibold)" } : undefined}
           title={z === 1 ? "Zoom 1× (actual size)" : `Zoom ${z}×`}
           onClick={() => fit(z)}
         >

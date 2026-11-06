@@ -94,7 +94,7 @@ export function BatchSection({ group, spec }: { group: string; spec: TextSpec })
       </p>
       <textarea
         className="input"
-        style={{ width: "100%", height: 84, fontSize: 13 }}
+        style={{ width: "100%", height: 84, fontSize: "var(--fs-md)" }}
         placeholder={state.separator ? `Anna${state.separator}Ben${state.separator}Cleo` : "Anna\nBen\nCleo"}
         value={state.text}
         onChange={(e) => patch({ text: e.target.value })}
@@ -317,7 +317,7 @@ export function FontInfoDialog({ fontKey, onClose }: { fontKey: string; onClose:
   );
   const kernRow = (key: string, left: string, right: string) => (
     <div key={key} className="row" style={{ gridTemplateColumns: "70px 1fr 28px" }}>
-      <label className="mono" style={{ fontSize: 14 }}>
+      <label className="mono" style={{ fontSize: "var(--fs-lg)" }}>
         {left} {right}
       </label>
       <Num value={kern[key] ?? kern[left + right] ?? 0} unit="px" step={0.5} digits={1} onChange={(v) => setIn("kerning_pairs", kern[key] === undefined && kern[left + right] !== undefined ? left + right : key, v || null)} />
@@ -459,7 +459,7 @@ export function FontInfoDialog({ fontKey, onClose }: { fontKey: string; onClose:
                     const v = map(info.horiz_adv_x)[g];
                     return (
                       <div key={g} className="row" style={{ gridTemplateColumns: "34px 1fr" }} title={v === undefined ? "Default advance" : "Own advance — set to 0 for the default"}>
-                        <label className="mono" style={{ fontSize: 14 }}>
+                        <label className="mono" style={{ fontSize: "var(--fs-lg)" }}>
                           {g}
                         </label>
                         <Num value={v ?? 0} unit="px" step={0.5} digits={1} onChange={(n) => setIn("horiz_adv_x", g, n || null)} />

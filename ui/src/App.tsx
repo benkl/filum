@@ -167,7 +167,7 @@ function EmptyHint() {
   if (n) return null;
   return (
     <div className="empty-hint">
-      <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>Start a design</div>
+      <div style={{ fontSize: "var(--fs-xl)", fontWeight: "var(--fw-semibold)", color: "var(--text)" }}>Start a design</div>
       <div>Draw with the tools on the left, or drop an SVG, image or embroidery file here.</div>
       <div className="cards">
         <button className="card" onClick={() => setDialog("digitize")}>
