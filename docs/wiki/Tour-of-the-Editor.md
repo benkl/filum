@@ -42,6 +42,8 @@ A **group** (<kbd>Ctrl</kbd>+<kbd>G</kbd>) shows as one header row with its name
 
 Groups nest. Select a group and another object (or another group) and press <kbd>Ctrl</kbd>+<kbd>G</kbd>: the group goes inside the new one, and the panel shows it one level further in. A click on the canvas selects the outermost group; <kbd>Ctrl</kbd>-click picks a single object inside. Ungroup (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd>) opens one level at a time. Drag a group header onto a row inside another group to put it there.
 
+To find your way in a big design, type in the search box at the top of the Layers tab: it finds objects by name or thread, and groups by name (the groups open around what matches). The list next to it shows one stitch type only (fills, satins, lines or lettering). <kbd>Shift</kbd>-click selects every row between the one you clicked last and this one; <kbd>Ctrl</kbd>-click adds or removes one. <kbd>Alt</kbd>-click an eye to show only that row, and again to show everything. Right-click a row for its commands: group, ungroup, **Move to group** (or out of every group), select the same colour or stitch type, show only this, lock and delete. The **Organise** button groups the loose objects by thread or by stitch type without changing the stitch order, ungroups everything, folds or unfolds every group, and shows or unlocks everything.
+
 **Issues** checks the design while you work. It flags things like shapes outside the hoop, borders that cross themselves, satins that are too wide or too narrow, lettering too small for the thread, and long stitches that may snag. Click an issue to jump to it. Many issues have a fix button, and **Clean up** removes tiny leftover objects.
 
 ![The Issues tab](images/issues.webp)
