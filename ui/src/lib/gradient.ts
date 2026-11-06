@@ -37,6 +37,20 @@ export function rowAngleFor(from: Vec2, to: Vec2): number {
   return normAngle(-(phi + 90));
 }
 
+/** How far two row angles are apart (degrees, 0 to 90: rows are undirected). */
+export function rowAngleDiff(a: number, b: number): number {
+  return Math.abs((((a - b) % 180) + 270) % 180 - 90);
+}
+
+/** Straight rows that run more along a linear gradient than across it: every
+ *  row is split between the colours, so each colour sews short pieces joined
+ *  by trims. */
+export function rowsAlongGradient(st: FillParams & { gradient?: GradientParams }): boolean {
+  const g = st.gradient;
+  if (!g || (g.kind !== "linear" && g.kind !== "reflected") || st.method !== "tatami") return false;
+  return rowAngleDiff(st.angle, rowAngleFor(g.from, g.to)) > 45;
+}
+
 const hasClosed = (o: DesignObject) => o.paths.some((p) => p.closed && p.nodes.length >= 3);
 
 /** The most contrasting colour of the palette (or a new contrasting one). */
@@ -116,6 +130,13 @@ export function makeGradient(objId: string, from: Vec2, to: Vec2, opts: Partial<
 export function updateGradient(group: string, patch: Partial<GradientParams> & { angle?: number; rowSpacing?: number }, live = false) {
   const s = store();
   const { angle, rowSpacing, ...gp } = patch;
+  // straight rows across the old gradient line stay across the new one
+  const follow = (st: GradientFill) => {
+    const g = st.gradient;
+    if (angle !== undefined || (!gp.from && !gp.to) || (g.kind !== "linear" && g.kind !== "reflected") || st.method !== "tatami") return undefined;
+    if (rowAngleDiff(st.angle, rowAngleFor(g.from, g.to)) > 1) return undefined;
+    return rowAngleFor(gp.from ?? g.from, gp.to ?? g.to);
+  };
   const fn = (d: StitchDocument) => ({
     ...d,
     objects: d.objects.map((o) =>
@@ -125,6 +146,7 @@ export function updateGradient(group: string, patch: Partial<GradientParams> & {
             stitch: {
               ...o.stitch,
               ...(angle !== undefined ? { angle } : {}),
+              ...(follow(o.stitch as GradientFill) !== undefined ? { angle: follow(o.stitch as GradientFill) } : {}),
               ...(rowSpacing !== undefined ? { rowSpacing } : {}),
               gradient: { ...o.stitch.gradient, ...gp, layer: o.stitch.gradient.layer, group },
             },

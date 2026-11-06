@@ -5,6 +5,7 @@
 import type { DesignObject, PlanData, StitchDocument, Vec2 } from "../types";
 import { FLAG } from "../types";
 import { objectBoundsCached, transformObject, translateMat } from "./geometry";
+import { rowAngleFor, rowsAlongGradient } from "./gradient";
 import { ovalNorm, threadWeightInfo } from "./materials";
 import { shapeProblems } from "./shapeCheck";
 
@@ -15,7 +16,9 @@ export interface Issue {
   title: string;
   detail: string;
   at: Vec2;
-  fix?: { label: string; apply: (o: DesignObject) => DesignObject };
+  /** A one-click fix: `apply` to the object, or to every object `scope` picks
+   *  (all the layers of a gradient). */
+  fix?: { label: string; apply: (o: DesignObject) => DesignObject; scope?: (o: DesignObject) => boolean };
 }
 
 const cache = new WeakMap<StitchDocument, { plan: PlanData | null; issues: Issue[] }>();
@@ -174,6 +177,22 @@ export function computeIssues(doc: StitchDocument, plan: PlanData | null): Issue
       }
     }
     if (st.type === "fill") {
+      // once per gradient (its first colour), the fix turns every layer
+      if (st.gradient?.layer === 0 && rowsAlongGradient(st)) {
+        const g = st.gradient;
+        const across = rowAngleFor(g.from, g.to);
+        add({
+          level: "warning",
+          title: "Rows run along the gradient",
+          detail: "Every row is split between the colours, so each colour sews short pieces joined by trims. Rows across the gradient give each colour whole rows.",
+          at: c,
+          fix: {
+            label: "Turn rows across",
+            apply: (x) => (x.stitch.type === "fill" ? { ...x, stitch: { ...x.stitch, angle: across } } : x),
+            scope: (x) => x.stitch.type === "fill" && x.stitch.gradient?.group === g.group,
+          },
+        });
+      }
       if (Math.max(b.w, b.h) < 2.5) {
         add({ level: "info", title: "Very small fill", detail: "Fills under ~2.5 mm look lumpy; consider satin or running stitch.", at: c });
       }

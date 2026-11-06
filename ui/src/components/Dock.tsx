@@ -1605,7 +1605,7 @@ export function IssuesPanel() {
                 className="btn sm"
                 onClick={(e) => {
                   e.stopPropagation();
-                  useStore.getState().commit((d) => ({ ...d, objects: d.objects.map((x) => (x.id === o.id ? i.fix!.apply(x) : x)) }));
+                  useStore.getState().commit((d) => ({ ...d, objects: d.objects.map((x) => ((i.fix!.scope ? i.fix!.scope(x) : x.id === o.id) ? i.fix!.apply(x) : x)) }));
                 }}
               >
                 {i.fix.label}
