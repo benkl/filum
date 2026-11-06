@@ -120,6 +120,8 @@ export interface State {
   saved: boolean;
   filePath: string | null;
   showJumps: boolean;
+  /** The finished piece: the jump threads you snip by hand and the basting left out. */
+  finished: boolean;
   showGrid: boolean;
   /** Grid spacing (mm; 0 = automatic). */
   gridStep: number;
@@ -218,7 +220,7 @@ export interface State {
 const THEME_KEY = "filum.theme";
 /** View toggles remembered between sessions. */
 const VIEW_KEY = "filum.view";
-const VIEW_FIELDS = ["showGrid", "showJumps", "showUnderlay", "showHidden", "smartGuides", "stitchColors", "fabricColor", "fabricTexture", "fabricAll", "fabricWeave", "densityMode", "foldedGroups"] as const;
+const VIEW_FIELDS = ["showGrid", "showJumps", "finished", "showUnderlay", "showHidden", "smartGuides", "stitchColors", "fabricColor", "fabricTexture", "fabricAll", "fabricWeave", "densityMode", "foldedGroups"] as const;
 const savedView: Partial<Pick<State, (typeof VIEW_FIELDS)[number]>> = (() => {
   try {
     return JSON.parse(localStorage.getItem(VIEW_KEY) ?? "{}");
@@ -271,6 +273,7 @@ export const useStore = create<State>((set, get) => ({
   saved: true,
   filePath: null,
   showJumps: false,
+  finished: false,
   showGrid: true,
   gridStep: 0,
   showUnderlay: true,

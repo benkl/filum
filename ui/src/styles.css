@@ -155,6 +155,8 @@
   --dur-instant: 80ms;
   --dur-fast: 120ms;
   --dur-base: 180ms;
+  /* panels that slide open (the stitch-out player) */
+  --dur-slide: 240ms;
   /* hover intent: wait this long before revealing a hover-only affordance */
   --delay-intent: 250ms;
   /* layers, bottom to top (1 to 9 stay local to a component) */
@@ -721,6 +723,7 @@ input[type="range"]:focus-visible {
   touch-action: none;
 }
 .viewmodes {
+  align-items: center;
   position: absolute;
   top: 34px;
   right: 12px;
@@ -794,6 +797,8 @@ input[type="range"]:focus-visible {
 
 /* ---------------- bottom bar ---------------- */
 .bottombar {
+  /* its own row of .center, whether the player above it is open or not */
+  grid-row: 3;
   display: flex;
   align-items: center;
   gap: var(--sp-2);
@@ -933,6 +938,7 @@ input[type="range"]:focus-visible {
    one lane per block in sew order, a colour-sequence ribbon on the ruler,
    the needle as a line; it zooms (Ctrl+wheel) and scrolls both ways */
 .stitchout {
+  grid-row: 2;
   position: relative;
   display: grid;
   grid-template-rows: 40px minmax(0, 1fr);
@@ -941,6 +947,28 @@ input[type="range"]:focus-visible {
   border-top: 1px solid var(--border);
   background: var(--panel);
   transition: height var(--dur-base) var(--ease);
+}
+/* the player slides up out of the bottom bar, and back into it */
+.stitchout.opening,
+.stitchout.closing {
+  overflow: hidden;
+}
+.stitchout.opening {
+  animation: so-open var(--dur-slide) var(--ease);
+}
+.stitchout.closing {
+  animation: so-close var(--dur-slide) var(--ease) forwards;
+  pointer-events: none;
+}
+@keyframes so-open {
+  from {
+    height: 0;
+  }
+}
+@keyframes so-close {
+  to {
+    height: 0;
+  }
 }
 .so-grip {
   position: absolute;

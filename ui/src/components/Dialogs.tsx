@@ -58,6 +58,7 @@ const SHORTCUTS: { group: string; rows: [string, string][] }[] = [
     group: "View",
     rows: [
       ["1 / 2 / 3", "Vector · Stitch · Realistic view"],
+      ["4", "Finished piece: without the jump threads you snip and the basting"],
       ["0 / Shift+0", "Fit hoop / fit design"],
       ["+ / − · wheel / pinch", "Zoom (at the cursor)"],
       ["Space + drag · middle mouse", "Pan"],

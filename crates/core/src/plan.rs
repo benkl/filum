@@ -67,6 +67,10 @@ pub struct StitchPlan {
     pub stitches: Vec<Stitch>,
     /// Thread for each colour block, in sewing order.
     pub threads: Vec<Thread>,
+    /// The records of the basting, `[start, end)`: stitched first and pulled
+    /// out after sewing (the finished view leaves them out).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub basting: Option<(usize, usize)>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -123,7 +127,7 @@ impl StitchPlan {
             }
             out.push(*s);
         }
-        StitchPlan { stitches: out, threads: self.threads.clone() }
+        StitchPlan { stitches: out, threads: self.threads.clone(), basting: None }
     }
 
     /// Translate so the design is centred on (0,0) — embroidery files are
@@ -180,7 +184,7 @@ impl StitchPlan {
             let last = out[out.len() - 1];
             out.extend(block[body..].iter().map(|s| Stitch { x: last.x, y: last.y, ..*s }));
         }
-        StitchPlan { stitches: out, threads: self.threads.clone() }
+        StitchPlan { stitches: out, threads: self.threads.clone(), basting: None }
     }
 
     /// Ink/Stitch "stop position" (frame out): the frame moves to `p` before
@@ -195,7 +199,7 @@ impl StitchPlan {
                 out.push(*s);
             }
         }
-        StitchPlan { stitches: out, threads: self.threads.clone() }
+        StitchPlan { stitches: out, threads: self.threads.clone(), basting: None }
     }
 
     /// Offsets of an x × y grid of repeats `dx`, `dy` apart (Ink/Stitch order:
@@ -284,6 +288,7 @@ mod tests {
         let plan = StitchPlan {
             stitches: vec![st(0.0, 0.0, flags::JUMP), st(0.0, 0.0, 0), st(1.0, 0.0, 0), st(1.0, 0.0, flags::TRIM), st(1.0, 0.0, flags::COLOR_CHANGE), st(5.0, 5.0, flags::JUMP), st(5.0, 5.0, 0), st(6.0, 5.0, 0), st(6.0, 5.0, flags::END)],
             threads: vec![],
+            ..Default::default()
         };
         let r = plan.make_offsets(&StitchPlan::grid_offsets(2, 1, 10.0, 0.0));
         let f: Vec<(f64, u8)> = r.stitches.iter().map(|s| (s.x, s.flags)).collect();
@@ -303,7 +308,7 @@ mod tests {
 
     #[test]
     fn frames_out_before_stops() {
-        let plan = StitchPlan { stitches: vec![st(1.0, 1.0, 0), st(1.0, 1.0, flags::TRIM), st(1.0, 1.0, flags::STOP), st(2.0, 2.0, flags::JUMP), st(2.0, 2.0, 0)], threads: vec![] };
+        let plan = StitchPlan { stitches: vec![st(1.0, 1.0, 0), st(1.0, 1.0, flags::TRIM), st(1.0, 1.0, flags::STOP), st(2.0, 2.0, flags::JUMP), st(2.0, 2.0, 0)], threads: vec![], ..Default::default() };
         let r = plan.with_stop_position(Point { x: 50.0, y: -10.0 });
         let f: Vec<(f64, u8)> = r.stitches.iter().map(|s| (s.y, s.flags)).collect();
         assert_eq!(f, vec![(1.0, 0), (1.0, flags::TRIM), (-10.0, flags::JUMP), (-10.0, flags::STOP), (2.0, flags::JUMP), (2.0, 0)]);

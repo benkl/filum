@@ -159,7 +159,7 @@ fn plan_js(plan: &filum_core::StitchPlan, doc: &Document) -> JsValue {
     }
     let m = &doc.machine;
     let stats = plan.stats(m.spm, m.trim_seconds, m.color_change_seconds);
-    let meta = serde_json::json!({ "threads": plan.threads, "stats": stats, "bounds": plan.bounds() });
+    let meta = serde_json::json!({ "threads": plan.threads, "stats": stats, "bounds": plan.bounds(), "basting": plan.basting });
     let o = Object::new();
     set(&o, "coords", &Float32Array::from(&coords[..]).into());
     set(&o, "flags", &Uint8Array::from(&fl[..]).into());

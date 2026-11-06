@@ -371,6 +371,7 @@ export function buildMenus(): Record<string, MenuItem[]> {
       mode("vector", "Vector", "1"),
       mode("stitch", "Stitches", "2"),
       mode("realistic", "Realistic", "3"),
+      { label: "Finished piece", kbd: "4", run: () => s.set({ finished: !s.finished }), checked: s.finished, hint: "The jump threads you snip by hand and the basting left out" },
       "-",
       {
         label: "Show",

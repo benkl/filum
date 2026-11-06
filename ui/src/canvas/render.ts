@@ -160,6 +160,7 @@ function trace(plan: PlanData, start: number, end: number, pen: boolean, x: numb
   const { coords, flags } = plan;
   // jumps the machine doesn't cut stay on the fabric: drawn as thread
   const uncut = plan.uncut?.mask;
+  const hide = plan.hide;
   const path = new Path2D();
   const jumps = new Path2D();
   const dots: number[] = [];
@@ -181,6 +182,12 @@ function trace(plan: PlanData, start: number, end: number, pen: boolean, x: numb
     const f = flags[i];
     const nx = coords[i * 2];
     const ny = coords[i * 2 + 1];
+    if (hide?.[i]) {
+      pen = false;
+      x = nx;
+      y = ny;
+      continue;
+    }
     if (f & (FLAG.COLOR_CHANGE | FLAG.TRIM | FLAG.STOP | FLAG.END)) {
       if (!uncut?.[i]) pen = false;
       continue;
@@ -367,7 +374,7 @@ function trimMarks(plan: PlanData): TrimMark[] {
   const { flags, coords } = plan;
   const out: TrimMark[] = [];
   for (let i = 0; i < flags.length; i++) {
-    if (!(flags[i] & FLAG.TRIM)) continue;
+    if (!(flags[i] & FLAG.TRIM) || plan.hide?.[i]) continue;
     let j = i + 1;
     while (j < flags.length && flags[j] & FLAG.JUMP && !(flags[j] & (FLAG.COLOR_CHANGE | FLAG.STOP | FLAG.END))) j++;
     out.push({ i, x: coords[2 * i], y: coords[2 * i + 1], to: j > i + 1 ? [coords[2 * (j - 1)], coords[2 * (j - 1) + 1]] : null, uncut: !!plan.uncut?.mask[i] });

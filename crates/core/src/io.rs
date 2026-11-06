@@ -81,6 +81,7 @@ pub fn pattern_to_plan(p: &fmts::Pattern) -> StitchPlan {
                 weight: None,
             })
             .collect(),
+        basting: None,
     }
 }
 
@@ -302,7 +303,7 @@ mod origin_tests {
 
     #[test]
     fn the_origin_becomes_zero() {
-        let plan = StitchPlan { stitches: vec![Stitch { x: 10.0, y: 20.0, flags: 0, object: 0 }, Stitch { x: 30.0, y: 40.0, flags: 0, object: 0 }], threads: vec![] };
+        let plan = StitchPlan { stitches: vec![Stitch { x: 10.0, y: 20.0, flags: 0, object: 0 }, Stitch { x: 30.0, y: 40.0, flags: 0, object: 0 }], threads: vec![], ..Default::default() };
         let at = plan_to_pattern_at(&plan, "t", Some([10.0, 20.0]));
         assert_eq!((at.stitches[0].x, at.stitches[0].y), (0.0, 0.0));
         let centred = plan_to_pattern_at(&plan, "t", None);

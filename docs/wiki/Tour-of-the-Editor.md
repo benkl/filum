@@ -11,7 +11,7 @@ From top to bottom, the window has:
 5. **Layers / Issues** (left panel): every object in the design, in sew order.
 6. **Canvas**: the hoop and your design, with rulers. The buttons in its top-right corner switch the view.
 7. **Selection / Design** (right panel): the settings for what you've selected, or for the whole design.
-8. **Bottom bar**: the threads in sew order, the stitch count, size and sewing time, **Animate** and **Video**. **Animate** opens the stitch-out player above the bar: a timeline of the colour blocks with their trims and thread changes.
+8. **Bottom bar**: the threads in sew order, the stitch count, size and sewing time, **Animate** and **Video**. **Animate** slides the stitch-out player up out of the bar: a timeline of the colour blocks with their trims and thread changes. The canvas makes room for it: when the hoop no longer fits, the view zooms out to keep all of it in sight, and zooms back when the player closes.
 9. **Hints line**: what the mouse and keys do right now. Hold <kbd>Shift</kbd>, <kbd>Ctrl</kbd> or <kbd>Alt</kbd> and it shows only what that key changes.
 
 ## The three views
@@ -21,6 +21,8 @@ From top to bottom, the window has:
 | <kbd>1</kbd> | **Vector** | Drawing and editing shapes: clean, flat colours |
 | <kbd>2</kbd> | **Stitch** | Checking stitch direction, density and underlay |
 | <kbd>3</kbd> | **Realistic** | Seeing how it will look sewn, with thread sheen and fabric |
+
+<kbd>4</kbd> (the scissors in the same switcher, or **View → Finished piece**) shows the stitch or realistic view as the finished piece: without the jump threads you snip by hand (the ones your machine doesn't cut, see [What your machine cuts](Production-Tools#what-your-machine-cuts)) and without the basting you pull out after sewing.
 
 ![Vector, stitch and realistic views](images/views.webp)
 

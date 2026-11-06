@@ -63,6 +63,7 @@ import { extendStroke, finishStroke, isClosedStroke, ropeLength, startStroke, st
 import { constrainAngle, deleteNode, flattenSubPath, insertNode, nearestOnSubPath, resample, toggleSmooth } from "../lib/bezier";
 import { defaultRunning, type Mat } from "../lib/geometry";
 import { ROTATE_CURSOR, SKEW_CURSOR, rotateZone, skewAbout, snapBox, snapTargets, unitIds, type SnapTargets } from "./transform";
+import { finishedPlan } from "../lib/cuts";
 import {
   commit2D,
   is2D,
@@ -203,6 +204,49 @@ function liveFrame(doc: StitchDocument, live: { ids: string[]; m: Mat } | null) 
   return { key, mask: liveMask.mask, m: live.m };
 }
 
+interface AutoFit {
+  scale: number;
+  set: { scale: number; ox: number; oy: number };
+}
+
+/**
+ * The canvas changed size (a panel opened or closed, the window, a sash):
+ * the middle of the view stays where it was. When the hoop was all in view
+ * and no longer fits, the view zooms out to fit it; as the canvas grows
+ * back, the view returns to the zoom it had (unless it was changed since).
+ */
+function keepInView(prev: { w: number; h: number }, w: number, h: number, auto: { current: AutoFit | null }) {
+  const s = useStore.getState();
+  const v = s.view;
+  const hoop = { x: 0, y: 0, w: s.doc.hoop.width, h: s.doc.hoop.height };
+  const inView = (q: { scale: number; ox: number; oy: number }, W: number, H: number) =>
+    q.ox >= RULER - 0.5 && q.oy >= RULER - 0.5 && hoop.w * q.scale + q.ox <= W + 0.5 && hoop.h * q.scale + q.oy <= H + 0.5;
+  const same = (a: { scale: number; ox: number; oy: number }, b: { scale: number; ox: number; oy: number }) =>
+    Math.abs(a.scale - b.scale) < 1e-6 && Math.abs(a.ox - b.ox) < 0.5 && Math.abs(a.oy - b.oy) < 0.5;
+  let next = { scale: v.scale, ox: v.ox + (w - prev.w) / 2, oy: v.oy + (h - prev.h) / 2 };
+  const a = auto.current;
+  if (a && same(v, a.set)) {
+    const f = fitView(w, h, hoop);
+    if (f.scale >= a.scale) {
+      // room again: back to the zoom it had, about the middle
+      const k = a.scale / f.scale;
+      const [cx, cy] = [(RULER + w) / 2, (RULER + h) / 2];
+      next = { scale: a.scale, ox: cx - (cx - f.ox) * k, oy: cy - (cy - f.oy) * k };
+      auto.current = null;
+    } else {
+      next = f;
+      auto.current = { scale: a.scale, set: f };
+    }
+  } else if (inView(v, prev.w, prev.h) && !inView(next, w, h)) {
+    const f = fitView(w, h, hoop);
+    if (f.scale < v.scale) {
+      auto.current = { scale: v.scale, set: f };
+      next = f;
+    } else auto.current = null;
+  } else auto.current = null;
+  s.setView(next);
+}
+
 export function fitView(width: number, height: number, box: Box) {
   const pad = 40;
   const w = Math.max(10, width - RULER - pad * 2);
@@ -278,6 +322,8 @@ export function Canvas() {
   const handlesRef = useRef<Handle[]>([]);
   const spaceRef = useRef(false);
   const rafRef = useRef(0);
+  /** The hoop was zoomed out to fit a shrinking canvas: the zoom to return to, and the view set then. */
+  const autoFitRef = useRef<AutoFit | null>(null);
   const rendererRef = useRef<Renderer>(new Renderer());
   // layers, bottom to top: background (2D) · stitches (WebGL2) · overlays + input (2D)
   const bgRef = useRef<HTMLCanvasElement>(null);
@@ -285,9 +331,10 @@ export function Canvas() {
   const glRef = useRef<StitchGL | null | undefined>(undefined);
   const glDirtyRef = useRef(false);
 
-  const draw = useCallback(() => {
+  /** Paint now (a resized canvas is blank until it is painted again). */
+  const paint = useCallback(() => {
     cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(() => {
+    {
       const c = canvasRef.current;
       const bg = bgRef.current;
       if (!c || !bg) return;
@@ -296,7 +343,7 @@ export function Canvas() {
       const { w, h, dpr } = sizeRef.current;
       if (glRef.current === undefined && glCanvasRef.current) glRef.current = StitchGL.create(glCanvasRef.current);
       const gl = glRef.current;
-      const shownPlan = displayPlan(s.plan, s.stitchColors, s.colorFocus ? s.activeThread : null, s.fabricColor);
+      const shownPlan = displayPlan(s.plan && s.finished && s.viewMode !== "vector" ? finishedPlan(s.plan) : s.plan, s.stitchColors, s.colorFocus ? s.activeThread : null, s.fabricColor);
       const useGL = !!gl && s.viewMode !== "vector" && !!s.plan;
       // snap to device pixels once so every layer agrees exactly
       const view = { scale: s.view.scale, ox: Math.round(s.view.ox * dpr) / dpr, oy: Math.round(s.view.oy * dpr) / dpr };
@@ -475,8 +522,12 @@ export function Canvas() {
       captureFrame();
       // zoom refinement continues over the next frames
       if (more) draw();
-    });
+    }
   }, []);
+  const draw = useCallback(() => {
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(paint);
+  }, [paint]);
 
   // size
   useEffect(() => {
@@ -493,13 +544,15 @@ export function Canvas() {
       layers.bg = bgRef.current;
       layers.gl = glCanvasRef.current;
       layers.top = canvasRef.current;
-      const first = sizeRef.current.w === 800 && sizeRef.current.h === 600;
+      const prev = sizeRef.current;
+      const first = prev.w === 800 && prev.h === 600;
       sizeRef.current = { w: r.width, h: r.height, dpr };
       if (first) {
         const d = useStore.getState().doc;
         useStore.getState().setView(fitView(r.width, r.height, { x: 0, y: 0, w: d.hoop.width, h: d.hoop.height }));
-      }
-      draw();
+      } else if (prev.w !== r.width || prev.h !== r.height) keepInView(prev, r.width, r.height, autoFitRef);
+      // in the same frame: no blank canvas while a panel slides or a sash moves
+      paint();
     });
     ro.observe(el);
     return () => ro.disconnect();

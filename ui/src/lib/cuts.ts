@@ -4,7 +4,7 @@
 // thread cutter at all. The jump threads they leave are drawn as thread in
 // every view and counted as hand trims.
 
-import type { MachineSettings } from "../types";
+import type { MachineSettings, PlanData } from "../types";
 import { FLAG } from "../types";
 
 export type CutterKind = "trims" | "jumps" | "none";
@@ -28,6 +28,33 @@ export interface Uncut {
 }
 
 const cache = new WeakMap<Uint8Array, { key: string; uncut: Uncut | null }>();
+const finishedCache = new WeakMap<PlanData, PlanData>();
+/** Plan records outside any object (basting, knockdown). */
+const NO_OBJECT = 0xffffffff;
+
+/**
+ * The plan as the finished piece shows it: the jump threads you snip by hand
+ * are cut and the basting is pulled out. The same record indices (the
+ * stitch-out still counts every record); the plan itself when nothing goes.
+ */
+export function finishedPlan(plan: PlanData): PlanData {
+  if (!plan.uncut && !plan.basting) return plan;
+  const hit = finishedCache.get(plan);
+  if (hit) return hit;
+  let hide: Uint8Array | null = null;
+  if (plan.basting) {
+    const { flags, objects } = plan;
+    // the basting, then its tie-off, trim and jump away (no object either)
+    let end = Math.min(plan.basting[1], flags.length);
+    while (end < flags.length && objects[end] === NO_OBJECT && flags[end] & (FLAG.TIE | FLAG.TRIM)) end++;
+    while (end < flags.length && objects[end] === NO_OBJECT && flags[end] & FLAG.JUMP) end++;
+    hide = new Uint8Array(flags.length);
+    hide.fill(1, plan.basting[0], end);
+  }
+  const out = { ...plan, uncut: null, hide };
+  finishedCache.set(plan, out);
+  return out;
+}
 
 /**
  * The trims `cutter` leaves uncut: a trim followed by a jump the machine

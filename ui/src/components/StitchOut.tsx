@@ -269,6 +269,13 @@ export function StitchOutPanel() {
   const tl = useMemo(() => (plan ? timelineOf(plan, doc.machine) : null), [plan, doc.machine]);
   const seq = useMemo(() => colorSequence(doc, plan), [doc, plan]);
   const open = index != null;
+  // the panel slides in and out (the canvas follows it, see Canvas keepInView):
+  // it stays mounted while it closes
+  const [phase, setPhase] = useState<"closed" | "opening" | "open" | "closing">(open ? "open" : "closed");
+  useEffect(() => {
+    if (open) setPhase((p) => (p === "open" ? p : "opening"));
+    else setPhase((p) => (p === "closed" ? p : "closing"));
+  }, [open]);
 
   // the track fills the body's width at zoom 1
   useLayoutEffect(() => {
@@ -362,7 +369,7 @@ export function StitchOutPanel() {
     return out;
   }, [tl, seq, plan, doc.objects]);
 
-  if (!open || !tl || !total) return null;
+  if (phase === "closed" || !tl || !total) return null;
 
   const stitches = tl.stitchAt[total];
   const gap = Math.max(1, Math.ceil((total * 3) / inner));
@@ -424,7 +431,10 @@ export function StitchOutPanel() {
   const hoverRow = hover != null ? rows[blockAt(tl, Math.min(hover, total - 1))] : null;
   const cuts = tl.blocks.reduce((n, b) => n + b.trims.length, 0) + tl.blocks.filter((b) => b.ending === "color").length;
   return (
-    <section className={`stitchout ${playing ? "playing" : ""}`} style={{ height: Math.min(height, fit), ["--so-label" as string]: `${LABEL_W}px`, ["--so-row" as string]: `${ROW}px` }} aria-label="Stitch-out">
+    <section
+      className={`stitchout ${playing ? "playing" : ""} ${phase === "opening" || phase === "closing" ? phase : ""}`}
+      onAnimationEnd={(e) => e.target === e.currentTarget && setPhase(phase === "closing" ? "closed" : "open")}
+      style={{ height: Math.min(height, fit), ["--so-label" as string]: `${LABEL_W}px`, ["--so-row" as string]: `${ROW}px` }} aria-label="Stitch-out">
       <div className="so-grip" onPointerDown={resizeFrom} title="Drag to resize" />
       <div className="so-head">
         <div className="so-transport" role="group" aria-label="Transport">

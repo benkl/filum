@@ -348,6 +348,7 @@ mod tests {
                 crate::plan::Stitch { x: 10.0, y: 5.0, flags: 0, object: 0 },
             ],
             threads: vec![t.clone(), thread("b", "#0000ff")],
+            ..Default::default()
         };
         let s = thread_list_text(&plan, "Rose");
         assert!(s.starts_with("Design Details\n==============================\n\nTitle: Rose\nSize (mm): 10.0 x 5.0\nStitches: 2\nColors: 2\n"));

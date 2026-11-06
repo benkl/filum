@@ -4,7 +4,7 @@ import { hideSelection, lockSelection, orderSelection, showAll, unlockAll } from
 import { DensityLegend } from "./components/DensityPanel";
 import { is2D, removeNodes, selectedGradient } from "./lib/gradient";
 import { TextEditorOverlay } from "./components/Lettering";
-import { Box, Mountain, Spline, Type, Upload } from "lucide-react";
+import { Box, Mountain, Scissors, Spline, Type, Upload } from "lucide-react";
 import { Digitize, StitchRunning } from "./icons/stitch";
 import { useEffect } from "react";
 import { Canvas } from "./canvas/Canvas";
@@ -127,6 +127,7 @@ function useShortcuts() {
       if (k === "1") return s.setViewMode("vector");
       if (k === "2") return s.setViewMode("stitch");
       if (k === "3") return s.setViewMode("realistic");
+      if (k === "4") return s.set({ finished: !s.finished });
       if (k === "0" || k === ")") return fit(e.shiftKey ? "design" : "hoop");
       if (k === "?") return s.setDialog("shortcuts");
       if (k === "d" && e.altKey) return (e.preventDefault(), cloneSelection());
@@ -146,6 +147,7 @@ function useShortcuts() {
 function ViewModes() {
   const mode = useStore((s) => s.viewMode);
   const set = useStore((s) => s.setViewMode);
+  const finished = useStore((s) => s.finished);
   return (
     <div className="viewmodes" role="group" aria-label="View mode">
       <button className={`icon-btn ${mode === "vector" ? "on" : ""}`} title="Vector view (1)" onClick={() => set("vector")}>
@@ -156,6 +158,16 @@ function ViewModes() {
       </button>
       <button className={`icon-btn ${mode === "realistic" ? "on" : ""}`} title="Realistic view (3)" onClick={() => set("realistic")}>
         <Box size={15} />
+      </button>
+      <span className="vsep" />
+      <button
+        className={`icon-btn ${finished ? "on" : ""}`}
+        title="Finished piece (4): the jump threads you snip by hand and the basting left out"
+        aria-pressed={finished}
+        disabled={mode === "vector"}
+        onClick={() => useStore.getState().set({ finished: !finished })}
+      >
+        <Scissors size={15} />
       </button>
     </div>
   );

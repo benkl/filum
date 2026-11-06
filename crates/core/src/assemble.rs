@@ -280,10 +280,11 @@ impl Engine {
         // when there is one
         crate::prof!("plan: basting/knockdown/assemble");
         let mut prefix = basting_runs(doc, &items);
+        let basting = prefix.iter().filter(|r| !r.is_empty()).count();
         let knock = knockdown_runs(doc, &items);
         let thread = (!knock.is_empty()).then(|| knockdown_thread(doc));
         prefix.extend(knock);
-        assemble_prefixed(doc, &items, &prefix, thread)
+        assemble_basted(doc, &items, &prefix, thread, basting)
     }
 }
 
@@ -659,6 +660,13 @@ pub fn assemble_with(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[Run]
 /// Assemble with stitches sewn before the design (basting, knockdown): in
 /// `prefix_thread`, or in the first object's thread.
 pub fn assemble_prefixed(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[Run], prefix_thread: Option<Thread>) -> StitchPlan {
+    assemble_basted(doc, items, prefix, prefix_thread, 0)
+}
+
+/// [`assemble_prefixed`] whose first `basting` prefix runs are the basting:
+/// the plan records where it ends.
+fn assemble_basted(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[Run], prefix_thread: Option<Thread>, basting: usize) -> StitchPlan {
+    let mut basting_end = None;
     let ahead = Ahead { runs: items.iter().flat_map(|(_, runs)| runs.iter()).collect(), grid: None };
     let mut b = Builder {
         m: &doc.machine,
@@ -690,8 +698,11 @@ pub fn assemble_prefixed(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[
                 cur_thread = Some(t.as_str());
             }
         }
-        for run in prefix.iter().filter(|r| !r.is_empty()) {
+        for (k, run) in prefix.iter().filter(|r| !r.is_empty()).enumerate() {
             b.run(run, u32::MAX);
+            if k + 1 == basting {
+                basting_end = Some(b.out.len());
+            }
         }
         // in its own colour the colour change before the design trims
         if prefix_thread.is_none() {
@@ -746,7 +757,7 @@ pub fn assemble_prefixed(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[
         b.out.push(Stitch::new(p, flags::TRIM, u32::MAX));
         b.out.push(Stitch::new(p, flags::END, u32::MAX));
     }
-    StitchPlan { stitches: b.out, threads }
+    StitchPlan { stitches: b.out, threads, basting: basting_end.map(|e| (0, e)) }
 }
 
 #[cfg(test)]
@@ -1168,5 +1179,23 @@ mod trim_tests {
         first.min_jump = Some(3.0);
         let set = plan(vec![first, line("2", "a", &[(22.5, 0.0), (40.0, 0.0)])]);
         assert_eq!(trims(&set), 1);
+    }
+    #[test]
+    fn the_plan_knows_where_the_basting_ends() {
+        let objects = vec![line("1", "a", &[(0.0, 0.0), (20.0, 0.0)])];
+        assert_eq!(plan(objects.clone()).basting, None, "no basting");
+        let d = Document {
+            threads: vec![thread("a", "#000000")],
+            objects,
+            options: DesignOptions { basting: Basting::Box, ..Default::default() },
+            ..Default::default()
+        };
+        let p = crate::Engine::new().plan(&d);
+        let (a, b) = p.basting.expect("basting");
+        assert_eq!(a, 0);
+        // the basting has no object; the line's stitches come after it
+        assert!(p.stitches[a..b].iter().all(|s| s.object == u32::MAX));
+        assert!(p.stitches[b..].iter().any(|s| s.object == 0 && s.is_stitch()));
+        assert!(p.stitches[a..b].iter().filter(|s| s.is_stitch()).count() > 10, "the box around the design");
     }
 }

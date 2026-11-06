@@ -638,6 +638,10 @@ export interface PlanData {
   stats: PlanStats;
   /** The trims the machine leaves uncut (lib/cuts.ts); null when it cuts all. */
   uncut?: import("./lib/cuts").Uncut | null;
+  /** The basting's records [start, end): pulled out after sewing. */
+  basting?: [number, number] | null;
+  /** Records the canvas leaves out (the finished view), 1 = hidden. */
+  hide?: Uint8Array | null;
 }
 
 export const FLAG = {

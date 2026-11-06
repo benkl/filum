@@ -519,6 +519,7 @@ export class StitchGL {
     }
     const { coords, flags } = plan;
     const uncut = plan.uncut?.mask;
+    const hide = plan.hide;
     const chunks = getChunks(plan, showUnderlay);
     // Entry table: [hw, min hw css px, off x | sheen, off y][r g b a premultiplied][part, depth | slot offset, dash css px, kind]
     const entries: number[] = [];
@@ -574,6 +575,12 @@ export class StitchGL {
         const f = flags[i];
         const nx = coords[i * 2];
         const ny = coords[i * 2 + 1];
+        if (hide?.[i]) {
+          pen = false;
+          x = nx;
+          y = ny;
+          continue;
+        }
         if (f & (FLAG.COLOR_CHANGE | FLAG.TRIM | FLAG.STOP | FLAG.END)) {
           if (!uncut?.[i]) pen = false;
           continue;
