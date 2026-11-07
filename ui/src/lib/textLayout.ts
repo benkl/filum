@@ -8,11 +8,17 @@
 //   place glyph (moved so min_x → 0 and baseline → 0) at x
 //   x += horiz_adv_x[char] − glyph.min_x
 // Spaces advance by horiz_adv_x_space (+ word spacing); lines by the font's
-// leading. Then, like Font.render_text: Block alignment spreads each line to
-// the widest one, and back-and-forth lines are stitched in alternate
-// directions with the font's reversed variant.
+// leading; letter and word spacing are added at the font's size, so they
+// scale with the text. Then, like Font.render_text: lines are aligned by
+// their letters' bounding box, Block alignment spreads each line to the
+// widest one, back-and-forth lines are stitched in alternate directions with
+// the font's reversed variant, the font's auto-satin routes the satins,
+// trims follow letters / words / lines and sortable fonts sort their colours
+// by colour sort index. Along a path every letter is placed whole and turned
+// (TextAlongPath).
 
-import { defaultFill, defaultRunning, defaultSatin, fillMethodDefaults, uid } from "./geometry";
+import { defaultFill, defaultRunning, defaultSatin, fillMethodDefaults, flatten, transformFlow, uid, type Mat as Affine } from "./geometry";
+import { autoSatin } from "./autoSatin";
 import type { EmbroideryFont, LoadedFont, OutlineFont } from "./fonts";
 import type { TextSpec } from "./text";
 import type { DesignObject, FillParams, PathNode, StitchParams, SubPath, Vec2 } from "../types";
@@ -79,27 +85,108 @@ function mapNodes(paths: SubPath[], f: Mat): SubPath[] {
 
 const shiftX = (paths: SubPath[], dx: number) => (dx ? mapNodes(paths, ([x, y]) => [x + dx, y]) : paths);
 
-/** Per-object sewing settings a font's glyph object carries (Ink/Stitch
- *  commands and params: ties, force lock, min stitch / jump, stop, start
- *  and end point). */
-type GlyphCommands = Partial<Pick<DesignObject, "ties" | "forceLock" | "minStitch" | "minJump" | "stopAfter" | "start" | "end">>;
-
-/** A glyph object's own commands, its start / end point mapped like its paths (only the set ones). */
-function glyphCommands(o: DesignObject, f: Mat): GlyphCommands {
-  const c: GlyphCommands = {};
-  if (o.ties && o.ties !== "both") c.ties = o.ties;
-  if (o.forceLock) c.forceLock = true;
-  if (o.minStitch != null) c.minStitch = o.minStitch;
-  if (o.minJump != null) c.minJump = o.minJump;
-  if (o.stopAfter) c.stopAfter = true;
-  if (o.start) c.start = f(o.start);
-  if (o.end) c.end = f(o.end);
-  return c;
+/** The local affine approximation of a map at `c` (exact for affine maps). */
+function localAffine(f: Mat, c: Vec2): Affine {
+  const h = 0.01;
+  const o = f(c);
+  const ex = f([c[0] + h, c[1]]);
+  const ey = f([c[0], c[1] + h]);
+  const a = (ex[0] - o[0]) / h;
+  const b = (ex[1] - o[1]) / h;
+  const cc = (ey[0] - o[0]) / h;
+  const d = (ey[1] - o[1]) / h;
+  return [a, b, cc, d, o[0] - a * c[0] - cc * c[1], o[1] - b * c[0] - d * c[1]];
 }
 
-/** The commands with the start / end point mapped by `f`. */
-function mapCommands(c: GlyphCommands, f: Mat): GlyphCommands {
-  return { ...c, ...(c.start ? { start: f(c.start) } : {}), ...(c.end ? { end: f(c.end) } : {}) };
+/** A fill angle turned by `deg` (as transformObject turns them), in (−90, 90]. */
+function turnAngle(angle: number, deg: number): number {
+  let v = (angle - deg) % 180;
+  if (v > 90) v -= 180;
+  if (v <= -90) v += 180;
+  return Math.abs(v) < 1e-9 ? 0 : v;
+}
+
+/** The lines of an object that aren't sewn but shape it: guide lines (guided
+ *  fill, ripples) and pattern lines (Ink/Stitch markers). */
+export function markerPaths(o: DesignObject): SubPath[] {
+  const st = o.stitch;
+  return [
+    ...(o.patterns ?? []).flatMap((p) => p.paths),
+    ...(st.type === "fill" && st.guide ? [st.guide] : []),
+    ...(st.type === "running" && st.ripple?.guide ? st.ripple.guide : []),
+  ];
+}
+
+/**
+ * An object mapped by `f` (a glyph's place in a lettering): its paths and
+ * every point that belongs to them — start and end points, guide, anchor
+ * and pattern lines, ripple targets, satin direction lines, gradient and
+ * density-ramp points, flow fields. Fill angles turn with the map (`turn`:
+ * by this many degrees instead; null: not at all) and centre-line satins
+ * scale with it, as transformObject does.
+ */
+export function mapGeometry(o: DesignObject, f: Mat, turn?: number | null): DesignObject {
+  // the map's rotation and scale where the object is
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const sp of o.paths)
+    for (const n of sp.nodes) {
+      x0 = Math.min(x0, n.p[0]);
+      y0 = Math.min(y0, n.p[1]);
+      x1 = Math.max(x1, n.p[0]);
+      y1 = Math.max(y1, n.p[1]);
+    }
+  const m = localAffine(f, isFinite(x0) ? [(x0 + x1) / 2, (y0 + y1) / 2] : [0, 0]);
+  const deg = turn === undefined ? (Math.atan2(m[1], m[0]) * 180) / Math.PI : (turn ?? 0);
+  const scale = Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2]));
+  const pt = (p: Vec2): Vec2 => f(p);
+  let st = o.stitch;
+  if (st.type === "fill") {
+    const g = st.gradient;
+    st = {
+      ...st,
+      angle: Math.abs(deg) > 1e-9 ? turnAngle(st.angle, deg) : st.angle,
+      ...(st.guide ? { guide: mapNodes([st.guide], f)[0] } : {}),
+      ...(st.flow ? { flow: transformFlow(st.flow, m) } : {}),
+      ...(st.ramp ? { ramp: { ...st.ramp, from: pt(st.ramp.from), to: pt(st.ramp.to) } } : {}),
+      ...(g
+        ? {
+            gradient: {
+              ...g,
+              from: pt(g.from),
+              to: pt(g.to),
+              ...(g.mesh ? { mesh: { ...g.mesh, nodes: g.mesh.nodes.map((n) => ({ ...n, p: pt(n.p) })) } } : {}),
+              ...(g.points ? { points: g.points.map((q) => ({ ...q, p: pt(q.p), spread: Math.max(0.5, q.spread * scale) })) } : {}),
+            },
+          }
+        : {}),
+    };
+  } else if (st.type === "running" && st.ripple) {
+    const r = st.ripple;
+    st = {
+      ...st,
+      ripple: {
+        ...r,
+        ...(r.target ? { target: pt(r.target) } : {}),
+        ...(r.guide ? { guide: mapNodes(r.guide, f) } : {}),
+        ...(r.anchor ? { anchor: [pt(r.anchor[0]), pt(r.anchor[1])] as [Vec2, Vec2] } : {}),
+      },
+    };
+  } else if (st.type === "satin") {
+    st = {
+      ...st,
+      ...(st.guides ? { guides: st.guides.map(([a, b]) => [pt(a), pt(b)] as [Vec2, Vec2]) } : {}),
+      // a centre-line column's width is drawn, not sewn: it scales
+      ...((o.paths.length === 1 || st.multi) && Math.abs(scale - 1) > 1e-6 ? { width: Math.max(0.3, +(st.width * scale).toFixed(2)) } : {}),
+    };
+  }
+  const out: DesignObject = { ...o, paths: mapNodes(o.paths, f), stitch: st };
+  if (o.patterns?.length) out.patterns = o.patterns.map((p) => ({ ...p, paths: mapNodes(p.paths, f) }));
+  if (o.start) out.start = pt(o.start);
+  if (o.end) out.end = pt(o.end);
+  return out;
 }
 
 /** Which letter, word and line (all counted through the whole text) a piece belongs to. */
@@ -110,24 +197,25 @@ export interface Unit {
 }
 
 interface Piece {
-  paths: SubPath[];
-  stitch: StitchParams;
+  /** The object as laid out: geometry, stitch and (embroidery fonts) the
+   *  glyph object's own settings — Ink/Stitch commands and params (ties,
+   *  lock stitches, min stitch / jump, trim, stop, start / end point),
+   *  colour sort index, pattern lines. */
+  obj: DesignObject;
   role: TextSpec["role"];
   name: string;
   thread: string;
   colorIndex?: number;
   unit?: Unit;
-  /** The glyph's own trim (from the font). */
-  trimAfter?: boolean;
-  /** The glyph object's own commands (from the font), in the same space as `paths`. */
-  cmd?: GlyphCommands;
 }
 
-/** One laid-out line: its pieces, advance width and ink width (mm). */
+/** One laid-out line: its pieces, advance width, ink width (the letters'
+ *  bounding box, Ink/Stitch's line width) and baseline (mm). */
 interface Line<T> {
   items: T[];
   width: number;
   ink: number;
+  y: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -172,8 +260,8 @@ export function blockOffsets(units: number[], distance: number): Map<number, num
 
 const firstSeen = (ids: number[]) => [...new Set(ids)];
 
-/** Spread the lines of a Block-aligned text to the widest one (in place). */
-function justify<T extends { paths: SubPath[]; unit?: Unit; cmd?: GlyphCommands }>(lines: Line<T>[], letters: boolean) {
+/** Spread the lines of a Block-aligned text to the widest one (in place); `shift` moves an item. */
+function justify<T extends { unit?: Unit }>(lines: Line<T>[], letters: boolean, shift: (it: T, dx: number) => void) {
   const widest = Math.max(0, ...lines.map((l) => l.ink));
   for (const line of lines) {
     const withUnit = line.items.filter((it) => it.unit);
@@ -188,9 +276,7 @@ function justify<T extends { paths: SubPath[]; unit?: Unit; cmd?: GlyphCommands 
     if (!off.size) continue;
     for (const it of line.items) {
       const dx = it.unit ? (off.get(it.unit[by]) ?? 0) : 0;
-      if (!dx) continue;
-      it.paths = shiftX(it.paths, dx);
-      if (it.cmd) it.cmd = mapCommands(it.cmd, ([x, y]) => [x + dx, y]);
+      if (dx) shift(it, dx);
     }
     line.width += distance;
     line.ink = widest;
@@ -302,8 +388,11 @@ async function layoutEmbroidery(spec: TextSpec, font: EmbroideryFont): Promise<{
   const scale = spec.size / font.size;
   const rtl = font.direction === "rtl";
   const rows = spec.content.split("\n").map((l) => l.trim());
-  const ls = spec.letterSpacing / scale; // applied before scaling, like Ink/Stitch
-  const ws = (spec.wordSpacing ?? 0) / scale;
+  // letter and word spacing are added in the font's own size and scale with
+  // the letters, as in Ink/Stitch (mm at 100 %)
+  const ls = spec.letterSpacing;
+  const ws = spec.wordSpacing ?? 0;
+  const crossScale = spec.crossScale ?? !!font.scaleCrossStitch;
   const variant = textVariant(spec, font);
   const bf = !!spec.backAndForth && font.reversible;
   const lines: Line<Piece>[] = [];
@@ -315,7 +404,9 @@ async function layoutEmbroidery(spec: TextSpec, font: EmbroideryFont): Promise<{
     const names = font.namesOf(v);
     const y = li * font.leading * spec.lineSpacing;
     let x = 0;
-    let inkR = 0;
+    // the letters' bounding box (Ink/Stitch's line width)
+    let inkL = Infinity;
+    let inkR = -Infinity;
     const line: Piece[] = [];
     // right-to-left fonts: glyphs are placed left to right in visual order
     const words = (rtl ? cps(rows[li]).reverse().join("") : rows[li]).split(" ");
@@ -338,17 +429,18 @@ async function layoutEmbroidery(spec: TextSpec, font: EmbroideryFont): Promise<{
         }
         const dx = x;
         letterNo++;
-        if (g.objects.length) inkR = Math.max(inkR, dx + g.width);
+        if (g.objects.length) {
+          inkL = Math.min(inkL, dx);
+          inkR = Math.max(inkR, dx + g.width);
+        }
         const at: Mat = ([px, py]) => [(px + dx) * scale, (py + y) * scale];
         g.objects.forEach((o, oi) => {
           const ci = g.colors[oi] ?? 0;
           if (o.stitch.type === "fill") fills.set(o.stitch.method, (fills.get(o.stitch.method) ?? 0) + 1);
+          const obj = mapGeometry(o, at, null);
           line.push({
-            paths: mapNodes(o.paths, at),
-            stitch: letterFill(o.stitch, spec, scale),
+            obj: { ...obj, stitch: letterFill(obj.stitch, spec, scale, crossScale) },
             unit: { letter: letterNo, word: wordNo, line: li },
-            trimAfter: o.trimAfter,
-            cmd: glyphCommands(o, at),
             role: "glyph",
             name,
             thread: spec.palette?.[ci] ?? spec.thread,
@@ -359,9 +451,9 @@ async function layoutEmbroidery(spec: TextSpec, font: EmbroideryFont): Promise<{
         last = name;
       }
     }
-    lines.push({ items: line, width: x * scale, ink: inkR * scale });
+    lines.push({ items: line, width: x * scale, ink: inkR > inkL ? (inkR - inkL) * scale : 0, y: y * scale });
   }
-  if (isBlock(spec.align)) justify(lines, spec.align === "blockLetters");
+  if (isBlock(spec.align)) justify(lines, spec.align === "blockLetters", (it, dx) => (it.obj = mapGeometry(it.obj, ([px, py]) => [px + dx, py], null)));
   // stitch order: right-to-left variants and every second back-and-forth line run backwards
   lines.forEach((l, li) => {
     if (reverseLine(variant, bf, li)) l.items = reverseLetters(l.items);
@@ -373,11 +465,14 @@ async function layoutEmbroidery(spec: TextSpec, font: EmbroideryFont): Promise<{
 
 /** A letter's stitch with the lettering's fill choice: the font's own, or
  *  another fill method (keeping the font's angle); cross stitch keeps its
- *  grid on the letter (as the font's own cross-stitch fills do). */
-export function letterFill(st: StitchParams, spec: TextSpec, scale: number): StitchParams {
+ *  grid on the letter (as the font's own cross-stitch fills do). The font's
+ *  crosses grow with the letters when `crossScale` (the lettering's choice,
+ *  by default the font's: Ink/Stitch scale_cross_stitch_pattern). */
+export function letterFill(st: StitchParams, spec: TextSpec, scale: number, crossScale = !!spec.crossScale): StitchParams {
   if (st.type !== "fill") return st;
   if (!spec.fill || spec.fill === "font") {
-    if (st.method === "cross" && spec.crossScale) return { ...st, crossSize: (st.crossSize ?? 2.5) * scale };
+    if (st.method === "cross" && crossScale && Math.abs(scale - 1) > 1e-9)
+      return { ...st, crossSize: (st.crossSize ?? 3) * scale, ...(st.crossSizeY ? { crossSizeY: st.crossSizeY * scale } : {}) };
     return st;
   }
   if (spec.fill === st.method) return st;
@@ -654,9 +749,260 @@ function layoutOutline(spec: TextSpec, font: OutlineFont): Line<{ paths: SubPath
       items.push({ paths: subs, unit: { letter: letterNo, word: wordNo, line: li } });
     }
     const gaps = Math.max(0, line.trim().split(/ +/).length - 1);
-    out.push({ items, width: placed.width + gaps * ws, ink: inkR });
+    out.push({ items, width: placed.width + gaps * ws, ink: inkR, y: li * lineH });
   });
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Auto-satin, trims and colour sort (Ink/Stitch Font.render_text)
+
+const SOURCE = Symbol("piece");
+type Tagged = DesignObject & { [SOURCE]?: number };
+
+/** A running line auto-satin may travel along: one open path, plain running stitch. */
+function travelLine(o: DesignObject): boolean {
+  const st = o.stitch;
+  if (st.type !== "running" || o.paths.length !== 1 || o.paths[0].closed) return false;
+  return !st.ripple && !st.stem && !st.motif && !st.zigzag && !st.cutworkNeedle && !st.beanRepeats && !st.beanPattern?.length && !st.lengthPattern?.length;
+}
+
+/**
+ * Ink/Stitch's auto-satin over a lettering (fonts with auto_satin,
+ * Font._apply_auto_satin): the satins and running lines of the whole text
+ * routed in their order, without trims. The routed pieces stay with their
+ * letter, where its last routed object was (Ink/Stitch puts them back into
+ * the glyph's group); fills and other stitches stay as they are. Nothing
+ * changes without a satin.
+ */
+export function routeLetters<T extends { obj: DesignObject; unit?: Unit }>(pieces: T[]): T[] {
+  const routable = (p: T) => p.obj.stitch.type === "satin" || travelLine(p.obj);
+  const idx = pieces.flatMap((p, i) => (routable(p) ? [i] : []));
+  if (!idx.some((i) => pieces[i].obj.stitch.type === "satin")) return pieces;
+  let routed: DesignObject[] | null = null;
+  try {
+    routed = autoSatin(
+      idx.map((i): Tagged => ({ ...pieces[i].obj, [SOURCE]: i })),
+      { preserveOrder: true, trim: false },
+    );
+  } catch {
+    // degenerate geometry (e.g. a zero size): the letters as the font has them
+  }
+  if (!routed) return pieces;
+  const byLetter = new Map<number | undefined, T[]>();
+  for (const r of routed as Tagged[]) {
+    const src = pieces[r[SOURCE] ?? idx[0]];
+    const obj: Tagged = { ...r };
+    delete obj[SOURCE];
+    const k = src.unit?.letter;
+    if (!byLetter.has(k)) byLetter.set(k, []);
+    byLetter.get(k)!.push({ ...src, obj });
+  }
+  const lastRouted = new Map<number | undefined, number>();
+  for (const i of idx) lastRouted.set(pieces[i].unit?.letter, i);
+  const out: T[] = [];
+  pieces.forEach((p, i) => {
+    if (!routable(p)) out.push(p);
+    if (lastRouted.get(p.unit?.letter) === i) out.push(...(byLetter.get(p.unit?.letter) ?? []));
+  });
+  return out;
+}
+
+/** An object's colour sort index (Ink/Stitch color_sort_index; none: 404, last). */
+const sortIndex = (o: DesignObject) => o.colorSortIndex ?? 404;
+
+/**
+ * Ink/Stitch's lettering trims (Font._add_trims) on pieces in stitch order:
+ * after every letter, or after the letter that ends a word or a line (not
+ * the text's last word or line). The trim goes on the letter's last object;
+ * when its colours are sorted, on its last object of every colour sort
+ * index (each colour of the letter ends with a trim). The font's own trims
+ * stay.
+ */
+export function letterTrims<T extends { obj: DesignObject; unit?: Unit }>(pieces: T[], trims: TextSpec["trims"], sorted: boolean) {
+  const level = trims && trims !== "never" ? trims : null;
+  if (!level) return;
+  for (let i = 0; i < pieces.length; ) {
+    const u = pieces[i].unit;
+    let j = i + 1;
+    while (j < pieces.length && u && pieces[j].unit?.letter === u.letter) j++;
+    const next = pieces[j]?.unit;
+    if (u && (level === "letter" || (!!next && next[level] !== u[level]))) {
+      const letter = pieces.slice(i, j);
+      if (sorted) {
+        const last = new Map<number, T>();
+        for (const p of letter) last.set(sortIndex(p.obj), p);
+        for (const p of last.values()) p.obj = { ...p.obj, trimAfter: true };
+      } else {
+        const p = letter[letter.length - 1];
+        p.obj = { ...p.obj, trimAfter: true };
+      }
+    }
+    i = j;
+  }
+}
+
+/**
+ * Ink/Stitch's colour sort (Font.do_color_sort, sortable fonts): within the
+ * whole text, each line or each word, the objects sewn by their colour sort
+ * index (404 — none — last), otherwise in order. The objects of the font's
+ * `combine` indices become one per index (their paths joined).
+ */
+export function colorSort(objs: DesignObject[], units: (Unit | undefined)[], scope: "all" | "line" | "word", combine: number[] = []): DesignObject[] {
+  // scopes in stitch order (a turned back-and-forth line keeps its words together)
+  let g = -1;
+  let prev: number | undefined = NaN;
+  const keys = objs.map((o, i) => {
+    const k = scope === "all" ? 0 : units[i]?.[scope];
+    if (k !== prev) {
+      g++;
+      prev = k;
+    }
+    return [g, sortIndex(o)];
+  });
+  const order = objs.map((_, i) => i).sort((a, b) => keys[a][0] - keys[b][0] || keys[a][1] - keys[b][1] || a - b);
+  const joined = new Set(combine);
+  const firstOf = new Map<string, DesignObject>();
+  const out: DesignObject[] = [];
+  for (const i of order) {
+    const [sg, idx] = keys[i];
+    if (!joined.has(idx)) {
+      out.push(objs[i]);
+      continue;
+    }
+    const k = `${sg}:${idx}`;
+    const first = firstOf.get(k);
+    if (first) {
+      first.paths.push(...objs[i].paths);
+      continue;
+    }
+    const copy = { ...objs[i], paths: [...objs[i].paths] };
+    firstOf.set(k, copy);
+    out.push(copy);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Text along a path (Ink/Stitch's Lettering along path)
+
+/** A letter's left and right edge on its line (mm). */
+export interface LetterBox {
+  letter: number;
+  word: number;
+  l: number;
+  r: number;
+}
+
+/** The letters of a line with their extent, left to right. */
+function letterBoxes<T extends { unit?: Unit }>(items: T[], pathsOf: (t: T) => SubPath[]): LetterBox[] {
+  const m = new Map<number, LetterBox>();
+  for (const it of items) {
+    if (!it.unit) continue;
+    let b = m.get(it.unit.letter);
+    for (const sp of pathsOf(it))
+      for (const [x] of flatten(sp, 8)) {
+        if (!b) m.set(it.unit.letter, (b = { letter: it.unit.letter, word: it.unit.word, l: x, r: x }));
+        b.l = Math.min(b.l, x);
+        b.r = Math.max(b.r, x);
+      }
+  }
+  return [...m.values()].sort((a, b) => a.l - b.l);
+}
+
+/** A polyline offset by `d` to the right of its direction (below, for a line running left to right). */
+export function offsetLine(pts: Vec2[], d: number): Vec2[] {
+  if (!d || pts.length < 2) return pts;
+  const normal = (a: Vec2, b: Vec2): Vec2 => {
+    const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1e-9;
+    return [-(b[1] - a[1]) / l, (b[0] - a[0]) / l];
+  };
+  return pts.map((p, i) => {
+    const a = i > 0 ? normal(pts[i - 1], p) : normal(p, pts[i + 1]);
+    const b = i < pts.length - 1 ? normal(p, pts[i + 1]) : a;
+    const s = Math.hypot(a[0] + b[0], a[1] + b[1]);
+    const m: Vec2 = s < 1e-9 ? a : [(a[0] + b[0]) / s, (a[1] + b[1]) / s];
+    // mitred corners, limited
+    const k = d / Math.max(0.25, m[0] * a[0] + m[1] * a[1]);
+    return [p[0] + m[0] * k, p[1] + m[1] * k];
+  });
+}
+
+/**
+ * Where every letter goes on a path (Ink/Stitch TextAlongPath): placed
+ * whole and turned along the path — the line from where it starts to where
+ * it ends on the path — its left edge at its distance along the path, its
+ * baseline on the path. Later lines follow the path offset by their
+ * baseline. Start / centre / end place a line's letters (their bounding box,
+ * Ink/Stitch's text width) on the path; stretch keeps the letters' size and
+ * spreads them over the whole path, every gap between letters widened the
+ * same and the gaps between words twice that.
+ */
+export function placeAlong(path: Vec2[], lines: { boxes: LetterBox[]; y: number }[], align: TextSpec["pathAlign"] = "center"): Map<number, { f: Mat; deg: number }> {
+  const out = new Map<number, { f: Mat; deg: number }>();
+  const clean = path.filter((p, i) => i === 0 || Math.hypot(p[0] - path[i - 1][0], p[1] - path[i - 1][1]) > 1e-9);
+  if (clean.length < 2) return out;
+  for (const line of lines) {
+    const boxes = line.boxes;
+    if (!boxes.length) continue;
+    const along = pathMap(offsetLine(clean, line.y));
+    const width = Math.max(...boxes.map((b) => b.r)) - Math.min(...boxes.map((b) => b.l));
+    const words = new Set(boxes.map((b) => b.word)).size;
+    const gaps = boxes.length - 1 + words - 1;
+    const stretch = align === "stretch" && gaps > 0 ? (along.total - width) / gaps : 0;
+    let dist = align === "center" ? (along.total - width) / 2 : align === "end" ? along.total - width : 0;
+    let prev: LetterBox | null = null;
+    for (const b of boxes) {
+      if (prev) dist += b.l - prev.r + stretch + (b.word !== prev.word ? stretch : 0);
+      const first = along.at(dist);
+      const last = along.at(dist + (b.r - b.l)).p;
+      const dx = last[0] - first.p[0];
+      const dy = last[1] - first.p[1];
+      const ang = Math.hypot(dx, dy) > 1e-9 ? Math.atan2(dy, dx) : Math.atan2(first.t[1], first.t[0]);
+      const c = Math.cos(ang);
+      const s = Math.sin(ang);
+      const [px, py] = first.p;
+      const ox = b.l;
+      const oy = line.y;
+      out.set(b.letter, {
+        f: ([x, y]) => {
+          const u = x - ox;
+          const v = y - oy;
+          return [px + u * c - v * s, py + u * s + v * c];
+        },
+        deg: (ang * 180) / Math.PI,
+      });
+      dist += b.r - b.l;
+      prev = b;
+    }
+  }
+  return out;
+}
+
+/** The sizes an embroidery font is made for (mm; its size × min / max scale), or null. */
+export function fontSizeRange(font: LoadedFont | null | undefined): [number, number] | null {
+  if (!font || font.kind !== "embroidery" || !(font.size > 0)) return null;
+  const a = font.size * (font.minScale || 1);
+  const b = font.size * (font.maxScale || 1);
+  return [Math.min(a, b), Math.max(a, b)];
+}
+
+/** A size kept in an embroidery font's range (Ink/Stitch's scale range), to 0.1 mm. */
+export function clampToFont(size: number, font: LoadedFont | null | undefined): number {
+  const r = fontSizeRange(font);
+  const v = r ? Math.min(r[1], Math.max(r[0], size)) : size;
+  return Math.round(v * 10) / 10;
+}
+
+/**
+ * The size after switching a lettering from font `from` to font `to`: like
+ * Ink/Stitch, the scale (size over the font's own size) stays, within the
+ * new font's scale range; from an outline font the size in mm stays (kept
+ * in the range).
+ */
+export function sizeForFont(size: number, from: LoadedFont | null | undefined, to: LoadedFont): number {
+  const scaled = from?.kind === "embroidery" && from.size > 0 && to.kind === "embroidery" ? (size / from.size) * to.size : size;
+  return clampToFont(scaled, to);
 }
 
 /** Lay out a lettering with its (loaded) font. */
@@ -664,99 +1010,93 @@ export async function layoutText(spec: TextSpec, font: LoadedFont): Promise<Desi
   let lines: Line<Piece>[];
   let fontFill: FillParams["method"] | undefined;
   const label = spec.content.split("\n")[0].slice(0, 18) || "Text";
+  const emb = font.kind === "embroidery" ? font : null;
+  const pathPts = spec.path && spec.path.length >= 2 ? (spec.pathFlip ? [...spec.path].reverse() : spec.path) : null;
+  // on a path: every letter placed whole
+  let placed: Map<number, { f: Mat; deg: number }> | null = null;
   if (font.kind === "embroidery") {
     const l = await layoutEmbroidery(spec, font);
     lines = l.lines;
     fontFill = l.fontFill;
+    // the font's auto-satin, over the whole text (Ink/Stitch: before trims and colour sort)
+    if (font.autoSatin) {
+      const routed = routeLetters(lines.flatMap((ln) => ln.items));
+      lines.forEach((ln, li) => (ln.items = routed.filter((p) => p.unit?.line === li)));
+    }
+    if (pathPts) placed = placeAlong(pathPts, lines.map((ln) => ({ boxes: letterBoxes(ln.items, (p) => [...p.obj.paths, ...markerPaths(p.obj)]), y: ln.y })), spec.pathAlign);
   } else {
     const glyphLines = layoutOutline(spec, font);
-    if (isBlock(spec.align)) justify(glyphLines, spec.align === "blockLetters");
+    if (isBlock(spec.align)) justify(glyphLines, spec.align === "blockLetters", (it, dx) => (it.paths = shiftX(it.paths, dx)));
+    if (pathPts) {
+      // the letters are merged per line below: placed on the path first
+      const at = placeAlong(pathPts, glyphLines.map((gl) => ({ boxes: letterBoxes(gl.items, (it) => it.paths), y: gl.y })), spec.pathAlign);
+      for (const gl of glyphLines)
+        for (const it of gl.items) {
+          const t = at.get(it.unit.letter);
+          if (t) it.paths = mapNodes(it.paths, t.f);
+        }
+      placed = new Map();
+    }
+    const obj = (paths: SubPath[], stitch: StitchParams, thread: string): DesignObject => ({ id: "", name: "", thread, visible: true, locked: false, paths, stitch, trimAfter: false, stopAfter: false });
     lines = glyphLines.map((gl) => {
       const ps: Piece[] = [];
       const paths = gl.items.flatMap((it) => it.paths);
       if (paths.length) {
         if (spec.style === "fill" || spec.style === "fillBorder")
-          ps.push({ paths, stitch: { type: "fill", ...defaultFill(), angle: spec.fillAngle, underlayInset: 0.2 }, role: "fill", name: "fill", thread: spec.thread });
-        if (spec.style === "border" || spec.style === "fillBorder")
-          ps.push({
-            paths,
-            stitch: { type: "satin", ...defaultSatin(), width: spec.borderWidth, multi: true, centerWalk: true, shortStitchInset: 0.25 },
-            role: "border",
-            name: "border",
-            thread: spec.style === "fillBorder" ? spec.borderThread : spec.thread,
-          });
-        if (spec.style === "outline")
-          ps.push({ paths, stitch: { type: "running", ...defaultRunning(), length: 1.6, beanRepeats: 2 }, role: "outline", name: "outline", thread: spec.thread });
+          ps.push({ obj: obj(paths, { type: "fill", ...defaultFill(), angle: spec.fillAngle, underlayInset: 0.2 }, spec.thread), role: "fill", name: "fill", thread: spec.thread });
+        if (spec.style === "border" || spec.style === "fillBorder") {
+          const t = spec.style === "fillBorder" ? spec.borderThread : spec.thread;
+          ps.push({ obj: obj(paths, { type: "satin", ...defaultSatin(), width: spec.borderWidth, multi: true, centerWalk: true, shortStitchInset: 0.25 }, t), role: "border", name: "border", thread: t });
+        }
+        if (spec.style === "outline") ps.push({ obj: obj(paths, { type: "running", ...defaultRunning(), length: 1.6, beanRepeats: 2 }, spec.thread), role: "outline", name: "outline", thread: spec.thread });
       }
-      return { items: ps, width: gl.width, ink: gl.ink };
+      return { items: ps, width: gl.width, ink: gl.ink, y: gl.y };
     });
   }
-  const widths = lines.map((l) => l.width);
-  // alignment: x = 0 is the alignment point of every line (Block: like left)
+  // Ink/Stitch's colour sort: sortable fonts only, by the objects' colour sort index
+  const sorting = !!emb?.sortable && !!spec.colorSort && spec.colorSort !== "off";
+  // trims: after every letter / word / line (Ink/Stitch _add_trims); the font's own stay
+  if (emb) letterTrims(lines.flatMap((l) => l.items), spec.trims, sorting);
+  // alignment: embroidery fonts by the letters' bounding box (Ink/Stitch's
+  // line width), outline fonts by the advance; x = 0 is the alignment point
+  // of every line (Block: like left)
+  const widths = lines.map((l) => (emb ? l.ink : l.width));
   const blockW = Math.max(0, ...widths);
   const shiftFor = (w: number) => (spec.align === "center" ? -w / 2 : spec.align === "right" ? -w : 0);
   // arc: bend around the centre of the widest line
   const arcShift = spec.align === "center" ? 0 : spec.align === "right" ? blockW / 2 : -blockW / 2;
   // how far the letters reach towards the arc's centre: above the baseline for a dip, below it for an arch
   let reach = 0;
-  if (Math.abs(spec.arc) >= 0.5)
+  if (Math.abs(spec.arc) >= 0.5 && !pathPts)
     for (const l of lines)
       for (const it of l.items)
-        for (const sp of it.paths) for (const n of sp.nodes) reach = Math.max(reach, spec.arc > 0 ? n.p[1] : -n.p[1]);
-  const bend = arcMap(spec.arc, blockW, reach);
+        for (const sp of it.obj.paths) for (const n of sp.nodes) reach = Math.max(reach, spec.arc > 0 ? n.p[1] : -n.p[1]);
+  const bend = pathPts ? null : arcMap(spec.arc, blockW, reach);
   const rad = (spec.rotation * Math.PI) / 180;
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
   const [ax, ay] = spec.anchor;
   const out: DesignObject[] = [];
-  const sortKeys: [number, number][] = [];
-  // trims: after the last piece of every letter / word / line (and the font's own)
-  if (font.kind === "embroidery") {
-    const all = lines.flatMap((l) => l.items);
-    const level = spec.trims && spec.trims !== "never" ? spec.trims : null;
-    all.forEach((pc, i) => {
-      const next = all[i + 1];
-      const ends = !!level && !!next && !!pc.unit && !!next.unit && pc.unit[level] !== next.unit[level];
-      pc.trimAfter = !!pc.trimAfter || ends;
-    });
-  }
-  const along = spec.path && spec.path.length >= 2 ? pathMap(spec.pathFlip ? [...spec.path].reverse() : spec.path) : null;
-  const objectOf = (piece: Piece, f: Mat, stitch: StitchParams): DesignObject => ({
-    id: uid(),
-    name: font.kind === "embroidery" ? `${label} · ${piece.name}` : `${label} (${piece.name})`,
-    thread: piece.thread,
-    visible: true,
-    locked: false,
-    paths: mapNodes(piece.paths, f),
-    stitch,
-    trimAfter: !!piece.trimAfter,
-    stopAfter: false,
-    // the glyph's own commands (Ink/Stitch font), its start / end point placed like its paths
-    ...(piece.cmd ? mapCommands(piece.cmd, f) : {}),
-    text: { ...spec, role: piece.role, ...(piece.colorIndex !== undefined ? { colorIndex: piece.colorIndex } : {}), ...(fontFill ? { fontFill } : {}) },
-  });
-  const sortKey = (piece: Piece): [number, number] =>
-    piece.unit ? [spec.colorSort === "line" ? piece.unit.line : spec.colorSort === "word" ? piece.unit.word : 0, piece.colorIndex ?? 0] : [0, 0];
+  const units: (Unit | undefined)[] = [];
+  const objectOf = (piece: Piece, f: Mat, turn?: number | null): DesignObject => {
+    const o: DesignObject = {
+      ...mapGeometry(piece.obj, f, turn),
+      id: uid(),
+      name: emb ? `${label} · ${piece.name}` : `${label} (${piece.name})`,
+      thread: piece.thread,
+      visible: true,
+      locked: false,
+      trimAfter: !!piece.obj.trimAfter,
+      stopAfter: !!piece.obj.stopAfter,
+      text: { ...spec, role: piece.role, ...(piece.colorIndex !== undefined ? { colorIndex: piece.colorIndex } : {}), ...(fontFill ? { fontFill } : {}) },
+    };
+    delete o.group;
+    delete o.clone;
+    return o;
+  };
+  const identity: Mat = (p) => p;
   lines.forEach((line, li) => {
     const sx = shiftFor(widths[li]);
-    // on a path: x runs along it, y off it (each line its own offset)
-    if (along) {
-      const w = widths[li];
-      const align = spec.pathAlign ?? "center";
-      const k = align === "stretch" && w > 0 ? along.total / w : 1;
-      const x0 = align === "start" ? 0 : align === "end" ? along.total - w : align === "stretch" ? 0 : (along.total - w) / 2;
-      const fp: Mat = ([x, y]) => {
-        // every line runs from x = 0 to its width
-        const { p, t } = along.at(x0 + x * k);
-        // normal: to the right of the direction is "down" (y grows downwards)
-        return [p[0] - t[1] * y, p[1] + t[0] * y];
-      };
-      for (const piece of line.items) {
-        sortKeys.push(sortKey(piece));
-        out.push(objectOf(piece, fp, piece.stitch));
-      }
-      return;
-    }
     const f: Mat = ([x, y]) => {
       let p: Vec2 = [x + sx, y];
       if (bend) {
@@ -765,21 +1105,17 @@ export async function layoutText(spec: TextSpec, font: LoadedFont): Promise<Desi
       }
       return [ax + p[0] * cos - p[1] * sin, ay + p[0] * sin + p[1] * cos];
     };
-    // fill/border/outline pieces of one line are merged across lines below
     for (const piece of line.items) {
-      sortKeys.push(sortKey(piece));
-      let stitch = piece.stitch;
-      if (stitch.type === "fill" && spec.rotation) stitch = { ...stitch, angle: stitch.angle - spec.rotation };
-      out.push(objectOf(piece, f, stitch));
+      units.push(piece.unit);
+      if (placed) {
+        // on a path: an embroidery letter turns as a whole, its fills with it;
+        // outline letters are placed already
+        const t = emb && piece.unit ? placed.get(piece.unit.letter) : undefined;
+        out.push(objectOf(piece, t?.f ?? identity, t ? t.deg : null));
+      } else out.push(objectOf(piece, f, emb ? undefined : spec.rotation));
     }
   });
-  // colour sort (embroidery fonts): stable, by scope then colour
-  if (font.kind === "embroidery" && spec.colorSort && spec.colorSort !== "off") {
-    const order = out.map((_, i) => i).sort((a, b) => sortKeys[a][0] - sortKeys[b][0] || sortKeys[a][1] - sortKeys[b][1] || a - b);
-    const sorted = order.map((i) => out[i]);
-    out.length = 0;
-    out.push(...sorted);
-  }
+  if (emb && sorting) return colorSort(out, units, spec.colorSort as "all" | "line" | "word", emb.combineAtSortIndices);
   if (font.kind === "outline") {
     // one object per role for the whole lettering (lines merged)
     const byRole = new Map<string, DesignObject>();

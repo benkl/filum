@@ -7,8 +7,9 @@
 //! * **Guided** (`guided_fill.py`, "copy" strategy) — the rows are copies of
 //!   a guide line. Implemented by warping the shape so the guide becomes a
 //!   straight line, filling it with tatami rows and warping the stitches back.
-//! * **Circular** (`circular_fill.py`) — an Archimedean spiral around a centre
-//!   point, clipped to the shape; pieces are joined by travel inside it.
+//! * **Circular** (`circular_fill.py`) — a double spiral around a centre
+//!   point, clipped to the shape; the pieces are sewn along the tatami's
+//!   stitch path (travel under pieces sewn later).
 
 use std::collections::{HashSet, VecDeque};
 use std::f64::consts::TAU;
@@ -640,43 +641,182 @@ pub fn default_guide(b: Rect) -> SubPath {
 }
 
 // ---------------------------------------------------------------------------
-// Circular fill
+// Circular fill (Ink/Stitch `circular_fill.py`)
 
+/// The pieces of a polyline inside the shape, in order (a grid of the
+/// outline's edges keeps long spirals quick).
+fn clip_to_shape(path: &[Point], rings: &[Ring]) -> Vec<Vec<Point>> {
+    if path.len() < 2 || rings.is_empty() {
+        return vec![];
+    }
+    let b = rings_bounds(rings);
+    let cell = (b.width().max(b.height()) / 64.0).max(0.5);
+    let key = |p: Point| ((p.x / cell).floor() as i64, (p.y / cell).floor() as i64);
+    let mut grid: CellMap<Vec<(Point, Point)>> = CellMap::default();
+    for ring in rings {
+        let n = ring.len();
+        for k in 0..n {
+            let (a, c) = (ring[k], ring[(k + 1) % n]);
+            let (k0, k1) = (key(a), key(c));
+            let (ka, kb) = ((k0.0.min(k1.0), k0.1.min(k1.1)), (k0.0.max(k1.0), k0.1.max(k1.1)));
+            for x in ka.0..=kb.0 {
+                for y in ka.1..=kb.1 {
+                    grid.entry((x, y)).or_default().push((a, c));
+                }
+            }
+        }
+    }
+    let mut out: Vec<Vec<Point>> = Vec::new();
+    let mut cur: Vec<Point> = Vec::new();
+    let mut inside = point_in_rings(path[0], rings);
+    if inside {
+        cur.push(path[0]);
+    }
+    for w in path.windows(2) {
+        let (a, c) = (w[0], w[1]);
+        let (k0, k1) = (key(a), key(c));
+        let mut ts: Vec<f64> = Vec::new();
+        for x in k0.0.min(k1.0)..=k0.0.max(k1.0) {
+            for y in k0.1.min(k1.1)..=k0.1.max(k1.1) {
+                if let Some(v) = grid.get(&(x, y)) {
+                    for &(p, q) in v {
+                        if let Some((t, _)) = segment_intersection(a, c, p, q) {
+                            ts.push(t.clamp(0.0, 1.0));
+                        }
+                    }
+                }
+            }
+        }
+        if ts.is_empty() {
+            if inside {
+                cur.push(c);
+            }
+            continue;
+        }
+        ts.push(0.0);
+        ts.push(1.0);
+        ts.sort_by(|x, y| x.partial_cmp(y).unwrap());
+        ts.dedup_by(|x, y| (*x - *y).abs() < 1e-12);
+        for tw in ts.windows(2) {
+            let (p0, p1) = (a.lerp(c, tw[0]), a.lerp(c, tw[1]));
+            let now = point_in_rings(a.lerp(c, 0.5 * (tw[0] + tw[1])), rings);
+            if now {
+                if !inside || cur.is_empty() {
+                    if cur.len() > 1 {
+                        out.push(std::mem::take(&mut cur));
+                    }
+                    cur.clear();
+                    cur.push(p0);
+                }
+                cur.push(p1);
+            } else if inside && cur.len() > 1 {
+                out.push(std::mem::take(&mut cur));
+            } else {
+                cur.clear();
+            }
+            inside = now;
+        }
+    }
+    if cur.len() > 1 {
+        out.push(cur);
+    }
+    for p in out.iter_mut() {
+        dedup(p, 1e-9);
+    }
+    out.retain(|p| p.len() > 1 && polyline_length(p) > 1e-6);
+    out
+}
+
+/// Circular fill (Ink/Stitch `circular_fill`): circles round a centre (the
+/// shape's box at `center_rel`), `spacing` apart (growing to `end_spacing`
+/// outwards if set), joined into a double spiral in and back out (Ink/Stitch
+/// `_make_fermat_spiral`, so it never gets stuck in the middle), clipped to
+/// the shape. The pieces are sewn along the tatami's stitch path: travel
+/// between them goes under pieces sewn later (`underpath`) or along the
+/// outline, never round and round it. `angle`: the travel grid's angle
+/// (radians).
 #[allow(clippy::too_many_arguments)]
-pub fn circular(rings: &[Ring], center_rel: [f64; 2], spacing: f64, stitch_len: f64, travel_len: f64, reverse: bool, f: u8) -> Vec<Run> {
+pub fn circular(
+    rings: &[Ring],
+    center_rel: [f64; 2],
+    spacing: f64,
+    end_spacing: f64,
+    stitch_len: f64,
+    travel_len: f64,
+    underpath: bool,
+    angle: f64,
+    start: Option<Point>,
+    end: Option<Point>,
+    f: u8,
+) -> Vec<Run> {
+    use super::fill::{make_fermat_spiral, sew_travel, FILL_TOLERANCE};
+    use super::travel::{find_stitch_path, PathStep, PathTravel};
     if rings.is_empty() {
         return vec![];
     }
     let b = rings_bounds(rings);
     let c = pt(b.min_x + b.width() * center_rel[0], b.min_y + b.height() * center_rel[1]);
-    let rmax = [pt(b.min_x, b.min_y), pt(b.max_x, b.min_y), pt(b.max_x, b.max_y), pt(b.min_x, b.max_y)].iter().map(|q| q.dist(c)).fold(0.0, f64::max);
-    let sp = spacing.max(0.2);
-    // Archimedean spiral r = sp · θ / 2π, points ~0.3 mm apart
-    let mut pieces: Vec<Vec<Point>> = Vec::new();
-    let mut cur: Vec<Point> = Vec::new();
-    let mut theta: f64 = 0.0;
-    while sp * theta / TAU <= rmax {
-        let r = sp * theta / TAU;
-        let p = pt(c.x + r * theta.cos(), c.y + r * theta.sin());
-        if point_in_rings(p, rings) {
-            cur.push(p);
-        } else if cur.len() > 1 {
-            pieces.push(std::mem::take(&mut cur));
-        } else {
-            cur.clear();
+    let distance = rings.iter().flatten().map(|q| q.dist(c)).fold(0.0, f64::max);
+    let sp = spacing.max(0.1);
+    let circle = |r: f64| -> Vec<Point> {
+        // segments within 0.01 mm of the circle
+        let n = ((TAU / (2.0 * (1.0 - 0.01 / r.max(0.02)).clamp(-1.0, 1.0).acos())).ceil() as usize).clamp(16, 4096);
+        (0..=n).map(|k| {
+            let t = TAU * k as f64 / n as f64;
+            pt(c.x + r * t.cos(), c.y + r * t.sin())
+        }).collect()
+    };
+    let sew = |pts: &[Point]| -> Run { super::running::sew_line(pts, stitch_len, FILL_TOLERANCE).into_iter().map(|q| (q, f)).collect() };
+    if sp > distance {
+        // smaller than the row spacing: one circle
+        let run = sew(&circle(sp));
+        return if run.len() > 1 { vec![run] } else { vec![] };
+    }
+    // the circles, from the outside in, and a tiny one so the spiral ends at the centre
+    let mut radii = vec![0.1];
+    let mut r = sp;
+    let stop = distance + if end_spacing > 0.0 { end_spacing } else { sp } * 2.0;
+    while r < stop && radii.len() < 100_000 {
+        radii.push(r);
+        r += if end_spacing > 0.0 { sp + (end_spacing - sp) * (r / distance.max(1e-9)) } else { sp };
+    }
+    radii.reverse();
+    let circles: Vec<Vec<Point>> = radii.iter().map(|&r| circle(r)).collect();
+    let spiral = make_fermat_spiral(&circles, stitch_len, circles[0][0]);
+    let pieces: Vec<Vec<Point>> = clip_to_shape(&spiral, rings).iter().map(|p| super::running::sew_line(p, stitch_len, FILL_TOLERANCE)).filter(|p| p.len() > 1).collect();
+    if pieces.len() == 1 {
+        return vec![pieces[0].iter().map(|&q| (q, f)).collect()];
+    }
+    let ends: Vec<(Point, Point)> = pieces.iter().map(|p| (p[0], p[p.len() - 1])).collect();
+    let path = find_stitch_path(rings, &ends, start, end, 0);
+    let mut travel = PathTravel::new(rings, angle, &path);
+    if !underpath {
+        travel.graph.forbid(&|_| false);
+    }
+    let mut runs: Vec<Run> = Vec::new();
+    let mut run: Run = Vec::new();
+    for step in &path.steps {
+        match *step {
+            PathStep::Segment { seg: Some(i), from, .. } => {
+                let piece = &pieces[i];
+                let fwd = piece[0].dist(from) <= piece[piece.len() - 1].dist(from);
+                let pts: Vec<Point> = if fwd { piece.clone() } else { piece.iter().rev().copied().collect() };
+                for &q in &pts {
+                    push(&mut run, q, f);
+                }
+                travel.graph.sewn(&pts, false);
+            }
+            PathStep::Segment { seg: None, .. } => {}
+            PathStep::Travel { .. } => {
+                sew_travel(&mut runs, &mut run, &travel, step, travel_len, false, f);
+            }
         }
-        theta += (0.3 / r.max(0.3)).min(0.5);
     }
-    if cur.len() > 1 {
-        pieces.push(cur);
+    if !run.is_empty() {
+        runs.push(run);
     }
-    if reverse {
-        pieces.reverse();
-        for p in &mut pieces {
-            p.reverse();
-        }
-    }
-    join_pieces(rings, pieces, stitch_len, travel_len, f)
+    runs.retain(|r| r.len() > 1);
+    runs
 }
 
 // ---------------------------------------------------------------------------
@@ -1488,11 +1628,11 @@ mod tests {
     #[test]
     fn circular_spirals_inside() {
         let rings = vec![square(20.0)];
-        let runs = circular(&rings, [0.5, 0.5], 0.5, 2.5, 2.5, false, 0);
+        let runs = circular(&rings, [0.5, 0.5], 0.5, 0.0, 2.5, 2.5, true, 0.0, None, None, 0);
         assert!(!runs.is_empty());
         assert!(inside_ratio(&runs, &rings) > 0.99);
-        let first = runs[0][0].0;
-        assert!(first.dist(pt(10.0, 10.0)) < 1.0, "starts at the centre: {first:?}");
+        // one run: the pieces of the double spiral are joined inside the square
+        assert_eq!(runs.len(), 1);
     }
 }
 

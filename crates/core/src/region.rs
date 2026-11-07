@@ -131,6 +131,9 @@ fn covers_region(covers: &[Cover]) -> clip::Region {
 /// Visible parts narrower than twice this (mm) are slivers of the clipping
 /// (two outlines drawn along the same edge), not something to sew.
 const SLIVER: f64 = 0.15;
+/// Gaps between two covers narrower than twice this (mm) are where they
+/// meet (outlines drawn along each other, flattened apart), not a gap.
+const HAIRLINE: f64 = 0.05;
 
 /// `area` minus the covers, reaching `margin` mm under the upper objects
 /// next to what stays visible (no gaps when the fabric moves). Only next to
@@ -159,7 +162,20 @@ pub fn subtract_min(area: &[Ring], covers: &[Cover], margin: f64, min_fragment: 
         // what shows, without slivers, grown back by the margin under the covers
         let visible = clip::difference(&a, &covered);
         let opened = clip::offset(&clip::offset(&visible, -SLIVER), SLIVER);
-        clip::intersect(&a, &clip::offset(&opened, margin))
+        // a sliver along the fill's own outline is the clipping's (an upper
+        // object drawn along the same edge), but one between two covers is a
+        // gap in them where this fill shows: it stays, with its margin
+        let slivers = clip::difference(&visible, &opened);
+        let kept = if clip::area(&slivers) > 1e-6 {
+            let edge = clip::difference(&a, &clip::offset(&a, -(2.0 * SLIVER + 0.05)));
+            let between = clip::difference(&slivers, &edge);
+            // hairlines of two outlines meeting (rounding) are no gap
+            let between = clip::offset(&clip::offset(&between, -HAIRLINE), HAIRLINE);
+            if clip::area(&between) > 1e-6 { clip::union(&opened, &between) } else { opened }
+        } else {
+            opened
+        };
+        clip::intersect(&a, &clip::offset(&kept, margin))
     } else {
         clip::difference(&a, &covered)
     };
@@ -175,6 +191,15 @@ pub fn subtract_min(area: &[Ring], covers: &[Cover], margin: f64, min_fragment: 
         }
     }
     Some(rings)
+}
+
+/// Do two sets of covers overlap (by more than a hair: objects that only
+/// meet along an edge don't)?
+pub fn covers_overlap(a: &[Cover], b: &[Cover]) -> bool {
+    if a.is_empty() || b.is_empty() || !covers_bounds(a).intersects(&covers_bounds(b)) {
+        return false;
+    }
+    clip::area(&clip::intersect(&covers_region(a), &covers_region(b))) > 0.01
 }
 
 /// Does any part of the covers reach this wide (mm)? An outline or a thin

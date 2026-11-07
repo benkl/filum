@@ -3,12 +3,13 @@
 //! * **Tatami** — follows Ink/Stitch's fill (`lib/stitches/fill.py`,
 //!   `tatami_fill.py`, GPL-3.0-or-later): the region is intersected with a
 //!   grating of parallel rows, rows are stitched with staggered needle
-//!   positions (`adjust_stagger`), and connected rows are grouped into
-//!   sections. Sections are visited greedily and joined with running-stitch
-//!   travel that goes *under* the fill (straight, if it stays inside the
-//!   shape) or along the boundary — so normally no jumps are needed.
-//! * **Contour** / **Spiral** — concentric inset rings; spiral blends ring k
-//!   into ring k+1 for a single continuous path.
+//!   positions (`adjust_stagger`), and the rows are sewn along Ink/Stitch's
+//!   stitch path (`auto_fill.py`, see [`super::travel::find_stitch_path`]):
+//!   travel goes *under* rows sewn later or along the outline, so a
+//!   connected shape needs no jump. A shape of several islands is sewn
+//!   island by island, underlay then top (`FillStitch.to_stitch_groups`).
+//! * **Contour** / **Spiral** — Ink/Stitch's contour fill (`contour_fill.py`):
+//!   a tree of inset rings sewn inner to outer, or as a single or double spiral.
 //! * **Radial** (new) — sunburst rays from a centre with bit-reversed ray
 //!   start radii so density stays constant from the centre to the edge.
 //! * **Hilbert** (new) — space-filling-curve texture clipped to the shape.
@@ -423,6 +424,21 @@ pub fn tatami_ramp(
     let own_rows = rows_mix.map(|g| row_colours(g, &grating, a));
     let owns_row = |rn: i64| own_rows.as_ref().is_none_or(|m| m.get(&rn).copied() == Some(rows_mix.map_or(0, |g| g.layer.min(255) as u8)));
     let max_len = fill_stitch_len(max_len);
+    let no_underpath = rows_mix.is_some() || NO_UNDERPATH.with(|c| c.get());
+    if mask.is_none() && rows_mix.is_none() && middle.is_none() {
+        // Ink/Stitch's stitch path through all rows
+        // pull compensation: rows end on the outline grown by it (Ink/Stitch
+        // grows the shape itself, `adjust_shape_for_pull_compensation`)
+        let grown = if pull > 1e-6 { offset_rings(&rr, pull, 0.0) } else { Vec::new() };
+        let shape = if grown.is_empty() { &rr } else { &grown };
+        let mut runs = tatami_path(shape, &grating, spacing, max_len, staggers, travel_len, start.map(|p| p.rotate(a)), end.map(|p| p.rotate(a)), frame, no_underpath, f);
+        for r in runs.iter_mut() {
+            for (p, _) in r.iter_mut() {
+                *p = p.rotate(-a);
+            }
+        }
+        return runs;
+    }
     let mut remaining: Vec<usize> = (0..grating.sections.len()).filter(|i| !grating.sections[*i].rows.is_empty()).collect();
     let mut runs: Vec<Run> = Vec::new();
     let mut run: Run = Vec::new();
@@ -431,7 +447,6 @@ pub fn tatami_ramp(
     // in this frame); sewn rows close the edges across them. Built when a
     // travel first needs it (a fill of one section never does), with the
     // rows sewn until then
-    let no_underpath = rows_mix.is_some() || NO_UNDERPATH.with(|c| c.get());
     let mut graph: Option<super::travel::TravelGraph> = None;
     let mut sewn_before: Vec<(Point, Point)> = Vec::new();
     let travel_graph = |graph: &mut Option<super::travel::TravelGraph>, sewn_before: &mut Vec<(Point, Point)>| {
@@ -652,130 +667,523 @@ pub fn tatami_ramp(
     runs
 }
 
-// ---------------------------------------------------------------------------
-// Contour & spiral
-// ---------------------------------------------------------------------------
+/// Running stitch tolerance of fills (Ink/Stitch `running_stitch_tolerance_mm`, default 0.2).
+pub(crate) const FILL_TOLERANCE: f64 = 0.2;
 
-fn inset_levels(rings: &[Ring], spacing: f64) -> Vec<Vec<Ring>> {
-    let res = offset_resolution(rings).min(spacing * 0.3);
-    let mut levels = Vec::new();
-    let spacing = spacing.max(0.2);
-    let Some(field) = DistanceField::new(rings, res, 0.0) else { return levels };
-    for k in 0..400 {
-        let d = spacing * 0.5 + k as f64 * spacing;
-        let lv = field.contours(d);
-        if lv.is_empty() {
-            break;
+/// Sew a travel step of a [`super::travel::StitchPath`] onto `run` (Ink/Stitch
+/// `travel`): along its route in running stitches, without its first point
+/// (the end of what was sewn before) unless `keep_first`. Between neighbouring
+/// row ends it is part of the rows (`f`), else travel. Where no route is left
+/// the run ends (a jump). Returns false then.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn sew_travel(runs: &mut Vec<Run>, run: &mut Run, travel: &super::travel::PathTravel, step: &super::travel::PathStep, len: f64, keep_first: bool, f: u8) -> bool {
+    let super::travel::PathStep::Travel { from, to, from_node, to_node, adjacent } = *step else { return true };
+    match travel.route(from, from_node, to, to_node) {
+        Some((path, inside)) => {
+            let flag = if adjacent { f } else { f | flags::TRAVEL };
+            // Ink/Stitch `even_running_stitch` (the lattice turns by 45° or
+            // more: its corners are kept); along the outline closer to it
+            // than Ink/Stitch's tolerance, so no stitch cuts across a hole
+            // (from one row to the next close by: one stitch, as Ink/Stitch's
+            // tolerance makes it)
+            let pts = if adjacent && !inside && from.dist(to) <= 1.0 { vec![from, to] } else { running_stitch(&path, len, if inside { FILL_TOLERANCE } else { 0.05 }) };
+            if run.is_empty() {
+                push(run, from, flag);
+            }
+            for q in pts.into_iter().skip(if keep_first && !adjacent { 0 } else { 1 }) {
+                push(run, q, flag);
+            }
+            true
         }
-        levels.push(lv);
+        None => {
+            if !run.is_empty() {
+                runs.push(std::mem::take(run));
+            }
+            false
+        }
     }
-    levels
 }
 
-fn rotate_ring_to(ring: &[Point], p: Point) -> Vec<Point> {
-    let mut best = (0usize, f64::INFINITY);
-    for (i, q) in ring.iter().enumerate() {
-        let d = q.dist(p);
-        if d < best.1 {
-            best = (i, d);
+/// Tatami rows sewn along Ink/Stitch's stitch path (`auto_fill`): travel goes
+/// where rows are sewn later, the outline keeps every pocket reachable, and
+/// the fill ends where it started (or at `end`). `rr`: the rings with the
+/// rows horizontal.
+#[allow(clippy::too_many_arguments)]
+fn tatami_path(rr: &[Ring], grating: &Grating, spacing: f64, max_len: f64, staggers: u32, travel_len: f64, start: Option<Point>, end: Option<Point>, frame: Option<RampFrame>, no_underpath: bool, f: u8) -> Vec<Run> {
+    use super::travel::{find_stitch_path, PathStep, PathTravel};
+    let rows: Vec<(f64, f64, f64, i64)> = grating.sections.iter().flat_map(|s| s.rows.iter().copied()).filter(|r| r.2 - r.1 > 1e-9).collect();
+    if rows.is_empty() {
+        return vec![];
+    }
+    let ends: Vec<(Point, Point)> = rows.iter().map(|r| (pt(r.1, r.0), pt(r.2, r.0))).collect();
+    let path = find_stitch_path(rr, &ends, start, end, GAP_ROWS.with(|c| c.get()));
+    let mut travel = PathTravel::new(rr, 0.0, &path);
+    if no_underpath {
+        travel.graph.forbid(&|_| false);
+    }
+    // a density ramp's open end: travel keeps to the edge there
+    if let Some(rf) = frame {
+        travel.graph.open(&|q: Point| rf.spacing(q.y) / spacing.max(0.05));
+    }
+    let skip_last = SKIP_LAST.with(|c| c.get());
+    let mut runs: Vec<Run> = Vec::new();
+    let mut run: Run = Vec::new();
+    for step in &path.steps {
+        match *step {
+            PathStep::Segment { seg: Some(i), from, to } => {
+                let (y, x0, x1, rn) = rows[i];
+                stitch_row(&mut run, y, x0, x1, rn, max_len, staggers, from.x <= to.x, f);
+                travel.graph.sewn(&[pt(x0, y), pt(x1, y)], false);
+            }
+            // gap filling: an extra row, or the step to it
+            PathStep::Segment { seg: None, from, to } => {
+                if (from.y - to.y).abs() < 1e-9 && (from.x - to.x).abs() > 1e-9 {
+                    let rn = (from.y / spacing.max(0.05)).round() as i64;
+                    stitch_row(&mut run, from.y, from.x.min(to.x), from.x.max(to.x), rn, max_len, staggers, from.x < to.x, f);
+                } else {
+                    push(&mut run, from, f);
+                    push(&mut run, to, f);
+                }
+            }
+            PathStep::Travel { .. } => {
+                sew_travel(&mut runs, &mut run, &travel, step, travel_len, skip_last, f);
+            }
         }
     }
-    let mut out: Vec<Point> = ring[best.0..].iter().chain(ring[..best.0].iter()).copied().collect();
-    if let Some(f) = out.first().copied() {
-        out.push(f);
+    if !run.is_empty() {
+        runs.push(run);
+    }
+    runs.retain(|r| !r.is_empty());
+    runs
+}
+
+// ---------------------------------------------------------------------------
+// Contour fill: Ink/Stitch's `contour_fill.py` (GPL-3.0-or-later). The shape's
+// outline is offset inwards again and again (holes outwards) into a tree of
+// isocontours, the parent containing the child; it is sewn inner to outer (a
+// path from ring to ring that dives into every child and comes back out,
+// ending on the outline next to its start), as a single spiral (interpolating
+// from ring to ring) or as a double spiral (in on every other ring, back out
+// on the rest).
+
+/// Polygons of even-odd rings: each outer ring with its holes (a ring's
+/// depth is how many other rings contain it: even an outer, odd a hole of
+/// the smallest ring around it).
+pub(crate) fn polygons_of(rings: &[Ring]) -> Vec<(Ring, Vec<Ring>)> {
+    let n = rings.len();
+    let probe = |r: &Ring| -> Point {
+        // the middle of the longest edge: off the other rings' vertices
+        let k = (0..r.len()).max_by(|&a, &b| r[a].dist(r[(a + 1) % r.len()]).partial_cmp(&r[b].dist(r[(b + 1) % r.len()])).unwrap()).unwrap_or(0);
+        r[k].lerp(r[(k + 1) % r.len()], 0.5)
+    };
+    let area: Vec<f64> = rings.iter().map(|r| signed_area(r).abs()).collect();
+    let inside: Vec<Vec<usize>> = (0..n)
+        .map(|i| {
+            let p = probe(&rings[i]);
+            (0..n).filter(|&j| j != i && area[j] > area[i] && point_in_rings(p, std::slice::from_ref(&rings[j]))).collect()
+        })
+        .collect();
+    let mut out: Vec<(Ring, Vec<Ring>)> = Vec::new();
+    let mut slot: Vec<Option<usize>> = vec![None; n];
+    for i in 0..n {
+        if inside[i].len() % 2 == 0 {
+            slot[i] = Some(out.len());
+            out.push((rings[i].clone(), Vec::new()));
+        }
+    }
+    for i in 0..n {
+        if inside[i].len() % 2 == 1 {
+            let parent = inside[i].iter().copied().filter(|&j| inside[j].len() + 1 == inside[i].len()).min_by(|&a, &b| area[a].partial_cmp(&area[b]).unwrap());
+            if let Some(k) = parent.and_then(|j| slot[j]) {
+                out[k].1.push(rings[i].clone());
+            }
+        }
     }
     out
 }
 
-fn orient_ccw(ring: &mut Ring) {
-    if signed_area(ring) < 0.0 {
-        ring.reverse();
+/// The islands of a shape (each outer ring followed by its holes).
+pub(crate) fn islands(rings: &[Ring]) -> Vec<Vec<Ring>> {
+    let polys = polygons_of(rings);
+    if polys.len() <= 1 || polys.iter().map(|p| 1 + p.1.len()).sum::<usize>() != rings.len() {
+        return vec![rings.to_vec()];
     }
+    polys.into_iter().map(|(o, hs)| std::iter::once(o).chain(hs).collect()).collect()
+}
+
+/// An isocontour: a closed ring (last point = first).
+struct Iso {
+    ring: Vec<Point>,
+    parent: Option<usize>,
+    children: Vec<usize>,
+}
+
+fn closed(r: &[Point]) -> Vec<Point> {
+    let mut v = r.to_vec();
+    if let Some(&f) = r.first() {
+        v.push(f);
+    }
+    v
+}
+
+/// Ink/Stitch `offset_polygon`: the tree of isocontours (node 0 the outline).
+fn offset_tree(outer: &Ring, holes: &[Ring], offset: f64, clockwise: bool) -> Vec<Iso> {
+    use crate::clip;
+    let mut t: Vec<Iso> = vec![Iso { ring: closed(outer), parent: None, children: vec![] }];
+    let mut root_holes = Vec::new();
+    for h in holes {
+        t.push(Iso { ring: closed(h), parent: None, children: vec![] });
+        root_holes.push(t.len() - 1);
+    }
+    let open = |r: &[Point]| r[..r.len() - 1].to_vec();
+    let mut active: Vec<(usize, Vec<usize>)> = vec![(0, root_holes)];
+    let mut guard = 0;
+    while let Some((poly, holes)) = active.pop() {
+        guard += 1;
+        if guard > 100_000 {
+            break;
+        }
+        let outer = clip::offset(&clip::region(&[open(&t[poly].ring)]), -offset);
+        let mut inner: clip::Region = Vec::new();
+        for &h in &holes {
+            inner = clip::union(&inner, &clip::offset(&clip::region(&[open(&t[h].ring)]), offset));
+        }
+        let next = clip::difference(&outer, &inner);
+        // simplified like Ink/Stitch's offset rings (0.01 mm): no micro-corners
+        let next: Vec<Ring> = clip::rings(&next).iter().map(|r| simplify_ring(r, 0.01)).filter(|r| r.len() >= 3).collect();
+        for (ext, hs) in polygons_of(&next) {
+            let area = signed_area(&ext).abs() - hs.iter().map(|h| signed_area(h).abs()).sum::<f64>();
+            if area < 0.1 || ext.len() < 3 {
+                continue;
+            }
+            t.push(Iso { ring: closed(&ext), parent: Some(poly), children: vec![] });
+            let node = t.len() - 1;
+            t[poly].children.push(node);
+            let mut new_holes = Vec::new();
+            for h in hs {
+                t.push(Iso { ring: closed(&h), parent: None, children: vec![] });
+                let hn = t.len() - 1;
+                for &ph in &holes {
+                    if t[ph].parent.is_none() && point_in_rings(t[ph].ring[0], std::slice::from_ref(&h)) {
+                        t[ph].parent = Some(hn);
+                        t[hn].children.push(ph);
+                    }
+                }
+                new_holes.push(hn);
+            }
+            active.push((node, new_holes));
+        }
+        // holes merged with the outer polygon: children of this ring
+        for &ph in &holes {
+            if t[ph].parent.is_none() {
+                t[ph].parent = Some(poly);
+                t[poly].children.push(ph);
+            }
+        }
+    }
+    // every ring the same way round (a positive signed area, y down, is
+    // clockwise on screen; Ink/Stitch `_orient_tree`)
+    for iso in t.iter_mut() {
+        let mut r = open(&iso.ring);
+        if (signed_area(&r) > 0.0) != clockwise {
+            r.reverse();
+        }
+        iso.ring = closed(&r);
+    }
+    t
+}
+
+/// Ink/Stitch `cut`: a line in two at a distance along it.
+fn cut_line(line: &[Point], d: f64) -> (Option<Vec<Point>>, Option<Vec<Point>>) {
+    let cum = cumulative_lengths(line);
+    let total = *cum.last().unwrap_or(&0.0);
+    if d <= 0.0 {
+        return (None, Some(line.to_vec()));
+    }
+    if d >= total {
+        return (Some(line.to_vec()), None);
+    }
+    (Some(substring(line, &cum, 0.0, d)), Some(substring(line, &cum, d, total)))
+}
+
+/// Ink/Stitch `roll_linear_ring`: the closed ring starting at its point nearest `p`.
+fn roll_ring(ring: &[Point], p: Point) -> Vec<Point> {
+    let cum = cumulative_lengths(ring);
+    let (s, _) = project(ring, &cum, p);
+    match cut_line(ring, s) {
+        (Some(a), Some(b)) => b.into_iter().chain(a.into_iter().skip(1)).collect(),
+        _ => ring.to_vec(),
+    }
+}
+
+/// Segments of a polyline by grid cell, for "within `reach` of the line" queries.
+struct LineGrid {
+    cell: f64,
+    map: CellMap<Vec<(Point, Point)>>,
+}
+
+impl LineGrid {
+    fn new(line: &[Point], reach: f64) -> LineGrid {
+        let cell = reach.max(0.05);
+        let mut map: CellMap<Vec<(Point, Point)>> = CellMap::default();
+        for w in line.windows(2) {
+            let (x0, x1) = ((w[0].x.min(w[1].x) / cell).floor() as i64, (w[0].x.max(w[1].x) / cell).floor() as i64);
+            let (y0, y1) = ((w[0].y.min(w[1].y) / cell).floor() as i64, (w[0].y.max(w[1].y) / cell).floor() as i64);
+            for x in x0..=x1 {
+                for y in y0..=y1 {
+                    map.entry((x, y)).or_default().push((w[0], w[1]));
+                }
+            }
+        }
+        LineGrid { cell, map }
+    }
+    /// Distance to the line if within one cell, else infinity.
+    fn dist(&self, p: Point) -> f64 {
+        let (kx, ky) = ((p.x / self.cell).floor() as i64, (p.y / self.cell).floor() as i64);
+        let mut best = f64::INFINITY;
+        for x in kx - 1..=kx + 1 {
+            for y in ky - 1..=ky + 1 {
+                if let Some(v) = self.map.get(&(x, y)) {
+                    for &(a, b) in v {
+                        let e = b - a;
+                        let l2 = e.length_sq();
+                        let t = if l2 > 1e-18 { ((p - a).dot(e) / l2).clamp(0.0, 1.0) } else { 0.0 };
+                        best = best.min((a + e * t).dist(p));
+                    }
+                }
+            }
+        }
+        best
+    }
+}
+
+/// Ink/Stitch `_get_nearest_points_closer_than_thresh`: the first point
+/// along `line` within `thr` of `other`, and the point of `other` nearest it.
+fn first_close_point(line: &[Point], other: &[Point], thr: f64) -> Option<(Point, Point)> {
+    let grid = LineGrid::new(other, thr);
+    let step = (thr / 4.0).max(0.01);
+    let mut found = None;
+    'outer: for w in line.windows(2) {
+        let (a, b) = (w[0], w[1]);
+        let l = a.dist(b);
+        let n = (l / step).ceil().max(1.0) as usize;
+        let mut prev_t = 0.0;
+        for k in 0..=n {
+            let t = k as f64 / n as f64;
+            if grid.dist(a.lerp(b, t)) <= thr {
+                // refine between the last point outside and this one
+                let (mut lo, mut hi) = (prev_t, t);
+                if k > 0 {
+                    for _ in 0..20 {
+                        let m = 0.5 * (lo + hi);
+                        if grid.dist(a.lerp(b, m)) <= thr {
+                            hi = m;
+                        } else {
+                            lo = m;
+                        }
+                    }
+                }
+                found = Some(a.lerp(b, hi));
+                break 'outer;
+            }
+            prev_t = t;
+        }
+    }
+    let p = found?;
+    let mut best = (f64::INFINITY, p);
+    for w in other.windows(2) {
+        let e = w[1] - w[0];
+        let l2 = e.length_sq();
+        let t = if l2 > 1e-18 { ((p - w[0]).dot(e) / l2).clamp(0.0, 1.0) } else { 0.0 };
+        let q = w[0] + e * t;
+        if q.dist(p) < best.0 {
+            best = (q.dist(p), q);
+        }
+    }
+    Some((p, best.1))
+}
+
+/// Ink/Stitch `_find_path_inner_to_outer` (without avoiding self-crossing),
+/// iterative: sew along each ring, pausing where a child comes near to sew
+/// it (and its children) first, then go on a little further along.
+fn inner_to_outer_path(t: &[Iso], offset: f64, start: Point) -> Vec<Point> {
+    struct Frame {
+        cur: Option<Vec<Point>>,
+        conns: Vec<(f64, Point, usize)>,
+        i: usize,
+        dist: f64,
+        /// the rest of the ring while a child is being sewn
+        pending: Option<Option<Vec<Point>>>,
+    }
+    fn tail(out: &mut Vec<Point>, r: Vec<Point>, offset: f64) {
+        // a little short of the end, so it does not end where it started
+        let len = polyline_length(&r);
+        let r = if len > offset { cut_line(&r, len - offset).0.unwrap_or(r) } else { r };
+        out.extend(r);
+    }
+    fn enter(t: &[Iso], node: usize, start: Point, offset: f64, out: &mut Vec<Point>, stack: &mut Vec<Frame>) {
+        let ring = roll_ring(&t[node].ring, start);
+        let cum = cumulative_lengths(&ring);
+        let mut conns: Vec<(f64, Point, usize)> = t[node]
+            .children
+            .iter()
+            .filter_map(|&c| {
+                let (p, q) = first_close_point(&ring, &t[c].ring, 1.5 * offset).or_else(|| first_close_point(&ring, &t[c].ring, 2.05 * offset))?;
+                Some((project(&ring, &cum, p).0, q, c))
+            })
+            .collect();
+        conns.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        if conns.is_empty() {
+            // the centre of a spiral: the innermost ring reversed looks nicer
+            let mut r = ring;
+            r.reverse();
+            tail(out, r, offset);
+        } else {
+            out.push(ring[0]);
+            stack.push(Frame { cur: Some(ring), conns, i: 0, dist: 0.0, pending: None });
+        }
+    }
+    let mut out: Vec<Point> = Vec::new();
+    let mut stack: Vec<Frame> = Vec::new();
+    enter(t, 0, start, offset, &mut out, &mut stack);
+    while let Some(fr) = stack.last_mut() {
+        if let Some(after) = fr.pending.take() {
+            // back from a child: skip a little before going on (a spiral out)
+            fr.cur = after.and_then(|a| cut_line(&a, offset).1);
+            fr.dist += offset;
+        }
+        if fr.i < fr.conns.len() {
+            let (proj, child_pt, child) = fr.conns[fr.i];
+            fr.i += 1;
+            let (before, after) = match &fr.cur {
+                Some(c) => cut_line(c, proj - fr.dist),
+                None => (None, None),
+            };
+            fr.dist = proj;
+            if let Some(b) = before {
+                out.extend(b);
+            }
+            fr.pending = Some(after);
+            enter(t, child, child_pt, offset, &mut out, &mut stack);
+        } else {
+            let fr = stack.pop().unwrap();
+            if let Some(c) = fr.cur {
+                tail(&mut out, c, offset);
+            }
+        }
+    }
+    dedup(&mut out, 1e-9);
+    out
+}
+
+/// Ink/Stitch `_get_spiral_rings`: from the outline inwards, one ring per level.
+fn spiral_rings(t: &[Iso]) -> Vec<Vec<Point>> {
+    let centroid = |r: &[Point]| {
+        let (mut c, mut l) = (Point::ZERO, 0.0);
+        for w in r.windows(2) {
+            let d = w[0].dist(w[1]);
+            c = c + (w[0] + w[1]) * (0.5 * d);
+            l += d;
+        }
+        if l > 0.0 { c / l } else { r[0] }
+    };
+    let mut out = Vec::new();
+    let mut node = 0;
+    loop {
+        out.push(t[node].ring.clone());
+        match t[node].children.len() {
+            0 => break,
+            1 => node = t[node].children[0],
+            _ => {
+                let c = centroid(&t[node].ring);
+                node = *t[node].children.iter().min_by(|&&a, &&b| centroid(&t[a].ring).dist(c).partial_cmp(&centroid(&t[b].ring).dist(c)).unwrap()).unwrap();
+            }
+        }
+        if out.len() > 100_000 {
+            break;
+        }
+    }
+    out
+}
+
+/// `count` points evenly along a polyline, both ends included (trimesh `resample_path`).
+fn resample_count(line: &[Point], count: usize) -> Vec<Point> {
+    let cum = cumulative_lengths(line);
+    let total = *cum.last().unwrap_or(&0.0);
+    (0..count).map(|k| point_at(line, &cum, total * k as f64 / (count.max(2) - 1) as f64)).collect()
+}
+
+/// Ink/Stitch `_interpolate_linear_rings`: from `r1` (at the point nearest
+/// `start`) round to `r2`, moving across gradually.
+fn interpolate_rings(r1: &[Point], r2: &[Point], stitch_len: f64, start: Point) -> Vec<Point> {
+    let count = ((20.0 * polyline_length(r1) / stitch_len.max(0.1)) as usize).max(3);
+    let roll = |v: Vec<Point>| {
+        let k = (0..v.len()).min_by(|&a, &b| v[a].dist(start).partial_cmp(&v[b].dist(start)).unwrap()).unwrap_or(0);
+        v[k..].iter().chain(v[..k].iter()).copied().collect::<Vec<Point>>()
+    };
+    let a = roll(resample_count(r1, count));
+    let b = roll(resample_count(r2, count));
+    let pts: Vec<Point> = (0..count).map(|k| a[k].lerp(b[k], k as f64 / (count - 1) as f64)).collect();
+    simplify(&pts, 0.1)
+}
+
+/// Ink/Stitch `_make_spiral`.
+fn make_spiral(rings: &[Vec<Point>], stitch_len: f64, start: Point) -> Vec<Point> {
+    let mut path: Vec<Point> = Vec::new();
+    let mut last = None;
+    for w in rings.windows(2) {
+        let part = interpolate_rings(&w[0], &w[1], stitch_len, start);
+        path.extend(&part[..part.len() - 1]);
+        last = part.last().copied();
+    }
+    if let Some(l) = last {
+        path.push(l);
+    }
+    path
+}
+
+/// Ink/Stitch `_make_fermat_spiral`: in along every other ring, out along the rest.
+pub(crate) fn make_fermat_spiral(rings: &[Vec<Point>], stitch_len: f64, start: Point) -> Vec<Point> {
+    let fwd: Vec<Vec<Point>> = rings.iter().step_by(2).cloned().collect();
+    let back: Vec<Vec<Point>> = rings.iter().skip(1).step_by(2).cloned().collect();
+    let mut path = make_spiral(&fwd, stitch_len, start);
+    let mut b = make_spiral(&back, stitch_len, start);
+    b.reverse();
+    path.extend(b);
+    path
 }
 
 pub fn contour(rings: &[Ring], spacing: f64, length: f64, spiral: bool, start: Option<Point>, f: u8) -> Vec<Run> {
     contour_ex(rings, spacing, length, spiral, false, true, start, f)
 }
 
-/// Contour fill with Ink/Stitch's strategies: a double spiral goes in on
-/// every other ring and back out on the rest (ending next to its start);
-/// `clockwise`: round clockwise on screen (Ink/Stitch
-/// `contour_fill._orient_linear_ring`), else counter-clockwise.
+/// Contour fill (Ink/Stitch `contour_fill`): inner to outer, or a single
+/// (`spiral`) or double (`spiral` + `double`) spiral; `clockwise`: round
+/// clockwise on screen (Ink/Stitch `clockwise`), else counter-clockwise.
+/// Each island of the shape is one run.
 #[allow(clippy::too_many_arguments)]
 pub fn contour_ex(rings: &[Ring], spacing: f64, length: f64, spiral: bool, double: bool, clockwise: bool, start: Option<Point>, f: u8) -> Vec<Run> {
-    let all = inset_levels(rings, spacing);
-    let levels: Vec<Vec<Ring>> = if double && spiral {
-        let inward = all.iter().step_by(2).cloned();
-        let outward: Vec<Vec<Ring>> = all.iter().skip(1).step_by(2).cloned().collect();
-        inward.chain(outward.into_iter().rev()).collect()
-    } else {
-        all
-    };
-    // a positive signed area (y down) goes round clockwise on screen
-    let orient = |r: &mut Ring| {
-        orient_ccw(r);
-        if !clockwise {
-            r.reverse();
-        }
-    };
+    let offset = spacing.max(0.05);
     let mut runs = Vec::new();
-    let mut run: Run = Vec::new();
-    let mut pos: Option<Point> = start;
-    let mut k = 0;
-    while k < levels.len() {
-        let mut lv = levels[k].clone();
-        for r in lv.iter_mut() {
-            orient(r);
+    let mut polys = polygons_of(rings);
+    // Ink/Stitch: (0, 0) without a start
+    let mut pos = start.unwrap_or(Point::ZERO);
+    while !polys.is_empty() {
+        let k = (0..polys.len()).min_by(|&a, &b| dist_to_boundary(std::slice::from_ref(&polys[a].0), pos).partial_cmp(&dist_to_boundary(std::slice::from_ref(&polys[b].0), pos)).unwrap()).unwrap();
+        let (outer, holes) = polys.swap_remove(k);
+        let tree = offset_tree(&outer, &holes, offset, clockwise);
+        let path = if spiral {
+            let rings = spiral_rings(&tree);
+            let p = if double { make_fermat_spiral(&rings, length, pos) } else { make_spiral(&rings, length, pos) };
+            if p.len() < 2 { tree[0].ring.clone() } else { p }
+        } else {
+            inner_to_outer_path(&tree, offset, pos)
+        };
+        let run: Run = super::running::sew_line(&path, length, FILL_TOLERANCE).into_iter().map(|q| (q, f)).collect();
+        if let Some(&(l, _)) = run.last() {
+            pos = l;
+            runs.push(run);
         }
-        // order rings at this level by proximity
-        let mut rem: Vec<Ring> = lv;
-        while !rem.is_empty() {
-            let i = match pos {
-                Some(p) => (0..rem.len())
-                    .min_by(|a, b| {
-                        let da = rem[*a].iter().map(|q| q.dist(p)).fold(f64::INFINITY, f64::min);
-                        let db = rem[*b].iter().map(|q| q.dist(p)).fold(f64::INFINITY, f64::min);
-                        da.partial_cmp(&db).unwrap()
-                    })
-                    .unwrap(),
-                None => 0,
-            };
-            let ring = rem.remove(i);
-            let start = pos.unwrap_or(ring[0]);
-            let mut path = rotate_ring_to(&ring, start);
-            // spiral blending into the single ring of the next level
-            if spiral && rem.is_empty() && k + 1 < levels.len() && levels[k + 1].len() == 1 && levels[k].len() == 1 {
-                let mut next = levels[k + 1][0].clone();
-                orient(&mut next);
-                let mut closed = next.clone();
-                closed.push(next[0]);
-                let cum = cumulative_lengths(&closed);
-                let total = polyline_length(&path).max(1e-9);
-                let pc = cumulative_lengths(&path);
-                path = path
-                    .iter()
-                    .zip(pc.iter())
-                    .map(|(q, d)| {
-                        let t = d / total;
-                        let (s, _) = project(&closed, &cum, *q);
-                        q.lerp(point_at(&closed, &cum, s), t)
-                    })
-                    .collect();
-                path.pop();
-            }
-            let gap = pos.map_or(0.0, |p| p.dist(path[0]));
-            if gap > spacing * 2.5 && !run.is_empty() {
-                runs.push(std::mem::take(&mut run));
-            }
-            for q in super::running::sew_line(&path, length, 0.1) {
-                push(&mut run, q, f);
-            }
-            pos = run.last().map(|x| x.0);
-        }
-        k += 1;
-    }
-    if !run.is_empty() {
-        runs.push(run);
     }
     runs
 }
@@ -1319,7 +1727,6 @@ fn edge_run(rings: &[Ring], stitch_len: f64, start: Option<Point>, f: u8) -> Vec
 /// A fill with its underlay on a fabric (the fabric's compensation, density
 /// and auto underlay rules).
 pub fn fill_on(paths: &[SubPath], p: &FillParams, fabric: &crate::model::FabricProfile, start: Option<Point>, end: Option<Point>) -> Vec<Run> {
-    let (extra_pull, density, underlay_density) = (fabric.pull_comp, fabric.density_scale, fabric.underlay_density);
     let mut rings = fill_rings(paths);
     let original = rings.clone();
     // Ink/Stitch "expand": the shape grows (or shrinks) before it is filled
@@ -1332,14 +1739,82 @@ pub fn fill_on(paths: &[SubPath], p: &FillParams, fabric: &crate::model::FabricP
     if rings.is_empty() {
         return vec![];
     }
+    // Ink/Stitch sews a shape island by island (an outline with its holes):
+    // underlay, then top, of the island nearest the start first, each
+    // ending where the next island comes nearest (`FillStitch.to_stitch_groups`)
+    let per_island = matches!(p.method, FillMethod::Tatami | FillMethod::Contour | FillMethod::Spiral | FillMethod::Circular | FillMethod::Guided)
+        && p.gradient.is_none()
+        && p.ramp.is_none()
+        && p.tartan.is_none();
+    let mut parts = if per_island { islands(&rings) } else { vec![] };
+    if parts.len() <= 1 {
+        return fill_part(&rings, &rings, &original, p, fabric, start, end);
+    }
+    let key = |part: &Vec<Ring>| match start {
+        Some(s) if point_in_rings(s, part) => 0.0,
+        Some(s) => dist_to_boundary(part, s),
+        None => rings_bounds(part).min_x,
+    };
+    parts.sort_by(|a, b| key(a).partial_cmp(&key(b)).unwrap_or(std::cmp::Ordering::Equal));
+    let mut runs: Vec<Run> = Vec::new();
+    let mut pos = start;
+    for i in 0..parts.len() {
+        let part_end = if i + 1 < parts.len() { Some(nearest_point_to(&parts[i], &parts[i + 1])) } else { end };
+        let r = fill_part(&parts[i], &rings, &original, p, fabric, pos, part_end);
+        if let Some(&(l, _)) = r.last().and_then(|r| r.last()) {
+            pos = Some(l);
+        }
+        runs.extend(r);
+    }
+    runs
+}
+
+/// The point of `a`'s outline nearest `b` (shapely `nearest_points(a, b)[0]`).
+fn nearest_point_to(a: &[Ring], b: &[Ring]) -> Point {
+    let near = |p: Point, rings: &[Ring]| -> (f64, Point) {
+        let mut best = (f64::INFINITY, p);
+        for r in rings {
+            for k in 0..r.len() {
+                let (u, v) = (r[k], r[(k + 1) % r.len()]);
+                let e = v - u;
+                let l2 = e.length_sq();
+                let t = if l2 > 1e-18 { ((p - u).dot(e) / l2).clamp(0.0, 1.0) } else { 0.0 };
+                let q = u + e * t;
+                if q.dist(p) < best.0 {
+                    best = (q.dist(p), q);
+                }
+            }
+        }
+        best
+    };
+    let mut best = (f64::INFINITY, a.first().and_then(|r| r.first()).copied().unwrap_or(Point::ZERO));
+    for p in a.iter().flatten() {
+        let (d, _) = near(*p, b);
+        if d < best.0 {
+            best = (d, *p);
+        }
+    }
+    for q in b.iter().flatten() {
+        let (d, on_a) = near(*q, a);
+        if d < best.0 {
+            best = (d, on_a);
+        }
+    }
+    best.1
+}
+
+/// One island of a fill (or the whole shape): its underlay, then its top.
+/// `whole`: the whole shape (the underlay is chosen by its size).
+fn fill_part(rings: &[Ring], whole: &[Ring], original: &[Ring], p: &FillParams, fabric: &crate::model::FabricProfile, start: Option<Point>, end: Option<Point>) -> Vec<Run> {
+    let (extra_pull, density, underlay_density) = (fabric.pull_comp, fabric.density_scale, fabric.underlay_density);
     let mut runs: Vec<Run> = Vec::new();
     let spacing = (p.row_spacing * density).max(0.1);
     // a gradient's underlay is sewn once, by its first layer
-    let plan = super::underlay::fill_underlay(&rings, p, fabric);
+    let plan = super::underlay::fill_underlay(whole, p, fabric);
     let underlay_on = !plan.is_empty() && p.gradient.as_ref().map_or(true, |g| g.layer == 0) && p.tartan.as_ref().map_or(true, |t| t.layer == 0);
     if underlay_on && matches!(p.method, FillMethod::Tatami | FillMethod::Radial | FillMethod::Contour | FillMethod::Spiral | FillMethod::Meander | FillMethod::Guided | FillMethod::Circular | FillMethod::Flow | FillMethod::Curved | FillMethod::Tartan) {
         let res = offset_resolution(&rings);
-        let inset = if p.underlay_inset > 0.0 { offset_rings(&rings, -p.underlay_inset, res) } else { rings.clone() };
+        let inset = if p.underlay_inset > 0.0 { offset_rings(rings, -p.underlay_inset, res) } else { rings.to_vec() };
         if !inset.is_empty() {
             // edge run first (an edge run under tatami), then the tatami passes
             SKIP_LAST.with(|c| c.set(p.underlay_skip_last));
@@ -1467,7 +1942,7 @@ pub fn fill_on(paths: &[SubPath], p: &FillParams, fabric: &crate::model::FabricP
             &super::inkfills::MeanderOpts {
                 aspect: p.meander_aspect,
                 zigzag: (p.meander_zigzag > 0.0).then_some((p.meander_zigzag, p.meander_zigzag_width)),
-                clip: p.meander_clip.then_some(original.as_slice()),
+                clip: p.meander_clip.then_some(original),
             },
             0,
         ),
@@ -1500,7 +1975,19 @@ pub fn fill_on(paths: &[SubPath], p: &FillParams, fabric: &crate::model::FabricP
         FillMethod::Curved => streamlines(&rings, &curved_field(&rings, p, p.curve), p, spacing, density, top_start),
         // after an underlay (which ends at the outline) the spiral runs outside-in,
         // so no travel line crosses the open spiral rows
-        FillMethod::Circular => super::inkfills::circular(&rings, p.center, spacing, p.max_stitch_length, p.travel_length, underlay_on, 0),
+        FillMethod::Circular => super::inkfills::circular(
+            &rings,
+            p.center,
+            spacing,
+            if p.end_row_spacing > 0.0 { p.end_row_spacing * density } else { 0.0 },
+            p.max_stitch_length,
+            p.travel_length,
+            p.underpath,
+            p.angle.to_radians(),
+            top_start,
+            end,
+            0,
+        ),
         FillMethod::Tartan => super::tartan::tartan(&rings, p, &p.tartan.clone().unwrap_or_default(), spacing, top_start, 0),
     });
     CENTER_OUT.with(|c| c.set(false));
@@ -2070,7 +2557,8 @@ mod ink_param_tests {
             let p = FillParams { method, row_spacing: 1.0, underlay: false, max_stitch_length: 4.0, ..Default::default() };
             let runs = fill(&sq(20.0), &p, 0.0, 1.0, false, 1.0, None, None);
             let longest = runs.iter().flat_map(|r| r.windows(2).map(|w| w[0].0.dist(w[1].0))).fold(0.0, f64::max);
-            assert!(longest > 3.5 && longest < 4.0 + 1e-6, "{method:?}: {longest}");
+            // (Ink/Stitch's stitch length carries a 1e-6 mm rounding correction)
+            assert!(longest > 3.5 && longest < 4.0 + 1e-5, "{method:?}: {longest}");
         }
     }
 
@@ -2164,10 +2652,13 @@ mod gap_fill_tests {
         let plain = n(&base);
         let gaps = n(&FillParams { gap_fill_rows: 3, ..base.clone() });
         assert!(gaps > plain, "extra rows: {plain} → {gaps}");
-        // not on a single section
+        // Ink/Stitch fills a gap wherever its stitch path travels on after
+        // more than three rows, which its walk also does inside a square
+        // (Ink/Stitch 3.1: 372 → 407 stitches on this one with 4 rows)
         let sq = vec![SubPath::polyline(&[pt(0.0, 0.0), pt(20.0, 0.0), pt(20.0, 20.0), pt(0.0, 20.0)], true)];
         let m = |p: &FillParams| fill(&sq, p, 0.0, 1.0, false, 1.0, None, None).iter().map(|r| r.len()).sum::<usize>();
-        assert_eq!(m(&base), m(&FillParams { gap_fill_rows: 4, ..base.clone() }), "one section: nothing to fill");
+        let (a, b) = (m(&base), m(&FillParams { gap_fill_rows: 4, ..base.clone() }));
+        assert!(b > a && b < a + a / 5, "square: {a} → {b}");
     }
 }
 

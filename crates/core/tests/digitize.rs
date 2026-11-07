@@ -1,7 +1,7 @@
 #![cfg(feature = "digitize")]
 
 use filum_core::digitize::{digitize_rgba, DigitizeOptions, DigitizeResult};
-use filum_core::geom::{signed_area, Point};
+use filum_core::geom::{pt, signed_area, Point};
 use filum_core::{Object, StitchParams};
 
 struct Img {
@@ -741,16 +741,25 @@ fn background_removal_is_per_region_and_editable() {
     let base = DigitizeOptions { width_mm: 60.0, ..Default::default() };
 
     // outside only (default): the surrounding white is not stitched, nor the ring's
-    // centre (a plain hole: the fabric shows); the highlight is
+    // centre (a plain hole: the fabric shows), nor the highlight: an area with one
+    // shape all around it is a hole whatever its size (this one is 2 mm)
     let p = preview(&base);
     assert_eq!(reason_at(&p, 0.5, 0.5), reason::BACKGROUND, "the ring's hole");
-    assert_eq!(reason_at(&p, 46.0 / 300.0, 34.0 / 300.0), reason::STITCHED, "the highlight");
+    assert_eq!(reason_at(&p, 46.0 / 300.0, 34.0 / 300.0), reason::BACKGROUND, "the highlight");
     assert_eq!(reason_at(&p, 0.02, 0.02), reason::BACKGROUND);
     assert_eq!(reason_at(&p, 0.5, 0.25), reason::STITCHED, "the ring");
     let r = img.run(&base);
-    assert_eq!(r.threads.len(), 2, "black and the white highlight");
+    assert_eq!(r.threads.len(), 1, "black only");
     let white = r.colors.iter().find(|c| c.rgb[0] > 200).unwrap();
-    assert!(white.background && white.removed > 0.5 && white.removed < white.coverage);
+    assert!(white.background && white.removed > 0.5);
+    // a slit too narrow to stay open (0.4 × 5 mm: pull closes it, though it is no
+    // speck) is sewn over by the shape around it
+    let mut slit = Img { w: img.w, h: img.h, px: img.px.clone() };
+    slit.paint([20, 20, 20], |x, y| (x - 46.0).powi(2) + (y - 34.0).powi(2) <= 5.0 * 5.0);
+    slit.paint([255, 255, 255], |x, y| (28.0..53.0).contains(&x) && (44.0..46.0).contains(&y));
+    let ps = digitize_preview_rgba(&slit.px, 300, 300, &base);
+    assert_eq!(reason_at(&ps, 40.0 / 300.0, 45.0 / 300.0), reason::STITCHED, "the slit");
+    assert_eq!(ps.region_label[ps.regions[45 * 300 + 40] as usize], ps.region_label[ps.regions[30 * 300 + 30] as usize], "sewn in the disc's colour");
 
     // everywhere: the highlight is a hole too
     let all = DigitizeOptions { background_scope: BackgroundScope::Everywhere, ..base.clone() };
@@ -1182,3 +1191,221 @@ fn outlines_at_a_set_width_sew_as_one_network() {
     let unrouted = routed.stitches.iter().filter(|s| s.flags & filum_core::plan::flags::TRIM != 0).count();
     assert!(trims < unrouted && trims <= 1, "routed {trims} trims, unrouted {unrouted}");
 }
+
+/// Is `p` inside the area of a fill (even-odd over its rings)?
+fn in_fill(o: &Object, p: Point) -> bool {
+    o.paths.iter().filter(|sp| filum_core::geom::point_in_ring(p, &sp.flatten(0.05))).count() % 2 == 1
+}
+
+#[test]
+fn knocked_out_letters_keep_their_width() {
+    // a red banner with white 1 mm bars knocked out of it (white text on a banner),
+    // on a white background: the banner never grows into its holes
+    let mut img = Img::new(400, 200, [255, 255, 255]);
+    img.paint([200, 20, 40], |x, y| (40.0..360.0).contains(&x) && (60.0..140.0).contains(&y));
+    let s = 100.0 / 400.0;
+    let bars: Vec<f64> = (0..6).map(|k| 100.0 + 40.0 * k as f64).collect();
+    for &bx in &bars {
+        img.paint([255, 255, 255], |x, y| (bx - 2.0..bx + 2.0).contains(&x) && (80.0..120.0).contains(&y));
+    }
+    let r = img.run(&DigitizeOptions { width_mm: 100.0, ..Default::default() });
+    let red = r.objects.iter().find(|o| rgb(o, &r)[0] > 150 && matches!(o.stitch, StitchParams::Fill(_))).expect("red fill");
+    assert!(r.threads.iter().all(|t| t.rgb()[1] < 200), "the letters are fabric, not white thread");
+    for &bx in &bars {
+        // the bar is 1 mm wide: its middle and points 0.35 mm off it stay fabric
+        for dx in [-0.35, 0.0, 0.35] {
+            let p = pt(bx * s + dx, 100.0 * s);
+            assert!(!in_fill(red, p), "bar at {:.1} mm is sewn over at {:+} mm", bx * s, dx);
+        }
+    }
+    // the banner still reaches its outer edge (it is not shrunk either)
+    assert!(in_fill(red, pt(41.0 * s, 100.0 * s)));
+}
+
+#[test]
+fn only_the_object_sewn_first_grows_under_a_seam() {
+    // two rectangles side by side: the larger (sewn first) grows under the smaller one,
+    // the smaller one keeps its edge; neither grows into the background
+    let mut img = Img::new(400, 200, [255, 255, 255]);
+    img.paint([30, 60, 200], |x, y| (40.0..240.0).contains(&x) && (40.0..160.0).contains(&y));
+    img.paint([220, 30, 30], |x, y| (240.0..340.0).contains(&x) && (40.0..160.0).contains(&y));
+    let opts = DigitizeOptions { width_mm: 100.0, overlap_mm: 0.4, ..Default::default() };
+    let r = img.run(&opts);
+    let blue = r.objects.iter().find(|o| rgb(o, &r)[2] > 150).unwrap();
+    let red = r.objects.iter().find(|o| rgb(o, &r)[0] > 150).unwrap();
+    let pos = |o: &Object| r.objects.iter().position(|x| x.id == o.id).unwrap();
+    assert!(pos(blue) < pos(red), "the larger rectangle is sewn first");
+    let xs = |o: &Object| points(o).iter().fold((f64::MAX, f64::MIN), |(a, b), p| (a.min(p.x), b.max(p.x)));
+    let (b0, b1) = xs(blue);
+    let (r0, r1) = xs(red);
+    // seam at 60 mm: blue reaches under red, red stays at the seam
+    assert!((b1 - 60.4).abs() < 0.15, "blue grows 0.4 mm under red: {b1}");
+    assert!((r0 - 60.0).abs() < 0.15, "red keeps its edge: {r0}");
+    // edges against the background stay where they are
+    assert!((b0 - 10.0).abs() < 0.15 && (r1 - 85.0).abs() < 0.15, "outer edges {b0} {r1}");
+}
+
+#[test]
+fn a_light_colour_is_not_lost_to_the_background() {
+    // a cream face inside a navy ring on white, with three more colours: the background
+    // takes a colour slot, the cream must not merge into it
+    let mut img = Img::new(400, 400, [255, 255, 255]);
+    let d = |x: f64, y: f64| ((x - 200.0).powi(2) + (y - 200.0).powi(2)).sqrt();
+    img.paint([32, 43, 87], |x, y| (150.0..180.0).contains(&d(x, y)));
+    img.paint([243, 238, 224], |x, y| d(x, y) < 150.0);
+    img.paint([48, 107, 80], |x, y| y > 200.0 && y < 260.0 && (x - 200.0).abs() < (y - 200.0) * 1.5);
+    img.paint([200, 18, 47], |x, y| (90.0..310.0).contains(&x) && (265.0..290.0).contains(&y));
+    img.paint([242, 182, 51], |x, y| (x - 250.0).powi(2) + (y - 130.0).powi(2) < 25.0 * 25.0);
+    let r = img.run(&DigitizeOptions { width_mm: 80.0, colors: 5, ..Default::default() });
+    let cream = r.objects.iter().find(|o| {
+        let c = rgb(o, &r);
+        c[0] > 225 && c[2] < 235 && (c[0] as i32 - c[2] as i32) > 10
+    });
+    let cream = cream.unwrap_or_else(|| panic!("no cream thread: {:?}", r.threads.iter().map(|t| &t.color).collect::<Vec<_>>()));
+    assert!(area(cream) > 0.5 * std::f64::consts::PI * 30.0 * 30.0, "the face is stitched");
+    assert!(r.threads.iter().all(|t| t.rgb() != [255, 255, 255]), "white stays the background");
+}
+
+#[test]
+fn letter_counters_are_not_stitched() {
+    // small dark 'o's and 'e'-like rings (4 mm text): their counters are fabric, never
+    // a white fill under the letter
+    let mut img = Img::new(400, 200, [255, 255, 255]);
+    for k in 0..5 {
+        let cx = 80.0 + 60.0 * k as f64;
+        img.paint([30, 30, 30], |x, y| {
+            let d = ((x - cx).powi(2) + (y - 100.0).powi(2)).sqrt();
+            (4.0..7.5).contains(&d) || (k % 2 == 1 && (y - 100.0).abs() < 1.2 && (x - cx).abs() < 7.0)
+        });
+    }
+    let r = img.run(&DigitizeOptions { width_mm: 100.0, ..Default::default() });
+    assert!(r.threads.iter().all(|t| t.rgb()[0] < 200), "no white thread: {:?}", r.threads.iter().map(|t| &t.color).collect::<Vec<_>>());
+    let s = 100.0 / 400.0;
+    for k in [0, 2, 4] {
+        let c = pt((80.0 + 60.0 * k as f64) * s, 100.0 * s);
+        for o in &r.objects {
+            if matches!(o.stitch, StitchParams::Fill(_)) {
+                assert!(!in_fill(o, c), "{} covers the counter of letter {k}", o.name);
+            }
+        }
+    }
+}
+
+#[test]
+fn pixel_art_keeps_its_corners() {
+    // a 16 × 16 sprite: 4 × 2 feet under a body (5 mm pixels): a foot stays a
+    // rectangle, its corners within a quarter pixel, never a triangle or a teardrop
+    let (w, h) = (16usize, 16usize);
+    let mut img = Img::new(w, h, [255, 255, 255]);
+    for y in 4..12 {
+        for x in 4..12 {
+            img.set(x, y, [240, 160, 90]);
+        }
+    }
+    for y in 12..14 {
+        for x in 3..7 {
+            img.set(x, y, [40, 70, 80]);
+        }
+        for x in 9..13 {
+            img.set(x, y, [40, 70, 80]);
+        }
+    }
+    let opts = DigitizeOptions { pixel_art: filum_core::digitize::PixelArt::On, width_mm: 80.0, overlap_mm: 0.0, ..Default::default() };
+    let r = img.run(&opts);
+    let px = 80.0 / w as f64;
+    let feet: Vec<&Object> = r.objects.iter().filter(|o| rgb(o, &r)[0] < 100).collect();
+    assert_eq!(feet.len(), 2, "two feet");
+    for f in feet {
+        let b = f.bounds();
+        assert!((b.width() - 4.0 * px).abs() < 0.25 * px && (b.height() - 2.0 * px).abs() < 0.25 * px, "foot {}×{} mm", b.width(), b.height());
+        let a = area(f);
+        assert!((a - 8.0 * px * px).abs() < 0.05 * 8.0 * px * px, "foot area {a} vs {}", 8.0 * px * px);
+        // each corner of the block is on the outline
+        let pts = points(f);
+        for (cx, cy) in [(b.min_x, b.min_y), (b.max_x, b.min_y), (b.min_x, b.max_y), (b.max_x, b.max_y)] {
+            let near = pts.iter().map(|p| p.dist(pt(cx, cy))).fold(f64::MAX, f64::min);
+            assert!(near < 0.25 * px, "corner ({cx:.1}, {cy:.1}) cut by {near:.2} mm");
+        }
+    }
+}
+
+#[test]
+fn thin_letters_keep_their_arms_and_bold_letters_stay_fills() {
+    // a 'k' of 0.8 mm strokes, 7 mm high: the arms (2.5 mm) are no spurs to prune
+    let mut img = Img::new(400, 200, [255, 255, 255]);
+    let k_strokes = [((100.0, 60.0), (100.0, 116.0)), ((100.0, 96.0), (122.0, 76.0)), ((106.0, 91.0), (124.0, 116.0))];
+    for (a, b) in k_strokes {
+        img.paint([200, 30, 50], |x, y| seg_dist(x, y, a, b) <= 3.2);
+    }
+    // a bold 'o' with thick sides (2.4 mm) and thin top and bottom (0.8 mm), 15 mm high
+    img.paint([30, 40, 90], |x, y| {
+        let (dx, dy) = ((x - 280.0) / 28.0, (y - 100.0) / 30.0);
+        let (ix, iy) = ((x - 280.0) / 18.0, (y - 100.0) / 27.0);
+        dx * dx + dy * dy <= 1.0 && ix * ix + iy * iy > 1.0
+    });
+    let s = 50.0 / 400.0;
+    let opts = DigitizeOptions { width_mm: 50.0, ..Default::default() };
+    let r = img.run(&opts);
+    let red_len: f64 = r.objects.iter().filter(|o| rgb(o, &r)[0] > 150 && !matches!(o.stitch, StitchParams::Fill(_))).map(polyline_len).sum();
+    let drawn: f64 = k_strokes.iter().map(|((x0, y0), (x1, y1))| ((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0)).sqrt() * s).sum();
+    assert!(red_len > 0.8 * drawn, "the k's strokes: {red_len:.1} of {drawn:.1} mm");
+    let navy: Vec<&Object> = r.objects.iter().filter(|o| rgb(o, &r)[2] > 60 && rgb(o, &r)[0] < 100).collect();
+    assert!(!navy.is_empty() && navy.iter().all(|o| matches!(o.stitch, StitchParams::Fill(_))), "the bold o is a fill: {:?}", navy.iter().map(|o| &o.name).collect::<Vec<_>>());
+}
+
+#[test]
+fn a_ring_cut_by_a_later_shape_is_a_fill() {
+    // a 4 mm ring cut by a banner sewn over it: square satin ends would leave fabric on
+    // one side of the cut; a fill takes the cut's shape and grows under the banner
+    let mut img = Img::new(400, 400, [255, 255, 255]);
+    let d = |x: f64, y: f64| ((x - 200.0).powi(2) + (y - 200.0).powi(2)).sqrt();
+    img.paint([32, 43, 87], |x, y| (160.0..180.0).contains(&d(x, y)));
+    img.paint([200, 18, 47], |x, y| (10.0..390.0).contains(&x) && (190.0..230.0).contains(&y));
+    let r = img.run(&DigitizeOptions { width_mm: 80.0, ..Default::default() });
+    let navy: Vec<&Object> = r.objects.iter().filter(|o| rgb(o, &r)[2] > 60 && rgb(o, &r)[0] < 100).collect();
+    assert!(!navy.is_empty());
+    assert!(navy.iter().all(|o| matches!(o.stitch, StitchParams::Fill(_))), "{:?}", navy.iter().map(|o| (&o.name, &o.stitch)).collect::<Vec<_>>());
+}
+
+#[test]
+fn noise_does_not_become_lines() {
+    // uniform random colour noise (a texture, no drawing): the app's default options
+    // must not find thousands of ink lines in it
+    let (w, h) = (97usize, 97usize);
+    let mut img = Img::new(w, h, [0, 0, 0]);
+    let mut state: u64 = 0x9E37_79B9_7F4A_7C15;
+    let mut next = || {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        (state >> 24) as u8
+    };
+    for y in 0..h {
+        for x in 0..w {
+            let c = [next(), next(), next()];
+            img.set(x, y, c);
+        }
+    }
+    let r = img.run(&DigitizeOptions::default());
+    let is_line = |o: &Object| o.name.contains(" line") || o.name.contains(" · path");
+    let lines = r.objects.iter().filter(|o| is_line(o)).count();
+    assert!(r.objects.len() < 300, "{} objects", r.objects.len());
+    assert_eq!(lines, 0, "lines found in noise");
+
+    // a clean design (a navy ring around a disc on white) under heavy grain: the specks
+    // on the paper and inside the shapes are no ink lines
+    let mut grain = Img::new(300, 300, [255, 255, 255]);
+    let d = |x: f64, y: f64| ((x - 150.0).powi(2) + (y - 150.0).powi(2)).sqrt();
+    grain.paint([32, 43, 87], |x, y| (100.0..130.0).contains(&d(x, y)));
+    grain.paint([200, 60, 40], |x, y| d(x, y) < 60.0);
+    for i in 0..300 * 300 {
+        let n = next() as i32 / 4 - 32;
+        for c in 0..3 {
+            grain.px[i * 4 + c] = (grain.px[i * 4 + c] as i32 + n).clamp(0, 255) as u8;
+        }
+    }
+    let r = grain.run(&DigitizeOptions { width_mm: 60.0, ..Default::default() });
+    let lines = r.objects.iter().filter(|o| is_line(o)).count();
+    assert!(lines <= 5 && r.objects.len() < 40, "{} objects, {lines} lines", r.objects.len());
+}
+

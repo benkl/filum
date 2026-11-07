@@ -259,35 +259,107 @@ fn stitch_distance(p0: Point, p1: Point, prev0: Point, prev1: Point) -> f64 {
     d0.dot(normal).abs().max(d1.dot(normal).abs())
 }
 
+/// Expand (+) or contract (−) a pair about its middle, each end by its own
+/// amount — Ink/Stitch `utils.geometry.offset_points`. A contraction past
+/// the middle is scaled back so the two meet there (they never cross).
+fn offset_points(a: Point, b: Point, off: [f64; 2]) -> (Point, Point) {
+    let d = a.dist(b);
+    if d < 1e-4 {
+        return (a, b);
+    }
+    let (mut oa, mut ob) = (off[0], off[1]);
+    let total = oa + ob;
+    if total < -d {
+        let s = -d / total;
+        oa *= s;
+        ob *= s;
+    }
+    let u = (a - b) / d;
+    (a + u * oa, b - u * ob)
+}
+
+/// How far each pair is grown (+) or shrunk (−) on each rail: mm plus a
+/// share of the pair's length (Ink/Stitch `offset_px` / `offset_proportional`,
+/// index 0 = first rail).
+#[derive(Debug, Clone, Copy, Default)]
+struct Offsets {
+    mm: [f64; 2],
+    prop: [f64; 2],
+}
+
+impl Offsets {
+    fn even(mm: f64, prop: f64) -> Self {
+        Offsets { mm: [mm; 2], prop: [prop; 2] }
+    }
+}
+
+/// The cover's randomness (Ink/Stitch `SatinProcessor` with `use_random`):
+/// every pair's width on each rail and every stitch's spacing.
+#[derive(Debug, Clone, Copy)]
+struct Random {
+    wider: [f64; 2],
+    narrower: [f64; 2],
+    spacing: f64,
+    seed: u32,
+}
+
+impl Random {
+    fn of(p: &SatinParams) -> Self {
+        let sr = p.second_rail.unwrap_or_default();
+        Random {
+            wider: [p.random_wider, sr.random_wider.unwrap_or(p.random_wider)],
+            narrower: [p.random_narrower, sr.random_narrower.unwrap_or(p.random_narrower)],
+            spacing: p.random_spacing.max(0.0),
+            seed: p.random_seed,
+        }
+    }
+}
+
+/// Offsets (and with `random`, varies) the plotted pairs. One counter
+/// numbers the rolls for widths and spacings, as in Ink/Stitch.
+struct Processor<'a> {
+    off: Offsets,
+    random: Option<&'a Random>,
+    cycle: u64,
+}
+
+impl Processor<'_> {
+    /// Roll number `cycle`: two uniform numbers.
+    fn roll(&mut self) -> [f64; 2] {
+        let Some(r) = self.random else { return [0.5; 2] };
+        self.cycle += 1;
+        [0, 1].map(|k| crate::prng::uniform(r.seed, 0x5a71_0000 + self.cycle, k))
+    }
+
+    fn process(&mut self, a: Point, b: Point) -> (Point, Point) {
+        let mut prop = self.off.prop;
+        if let Some(r) = self.random {
+            let roll = self.roll();
+            for k in 0..2 {
+                prop[k] = prop[k] - r.narrower[k] + roll[k] * (r.wider[k] + r.narrower[k]);
+            }
+        }
+        let w = a.dist(b);
+        offset_points(a, b, [self.off.mm[0] + w * prop[0], self.off.mm[1] + w * prop[1]])
+    }
+
+    fn spacing_multiple(&mut self) -> f64 {
+        match self.random {
+            Some(r) => (1.0 + (self.roll()[0] - 0.5) * 2.0 * r.spacing).max(0.01),
+            None => 1.0,
+        }
+    }
+}
+
 /// Port of Ink/Stitch `plot_points_on_rails`. `offset` grows (+) or shrinks (−)
 /// each pair: absolute mm per side plus a proportion of the local width.
 pub fn plot_points_on_rails(geo: &SatinGeometry, spacing: f64, offset_mm: f64, offset_prop: f64) -> Vec<(Point, Point)> {
-    plot_points_on_rails_ex(geo, spacing, offset_mm, offset_prop, None)
+    plot_pairs(geo, spacing, Offsets::even(offset_mm, offset_prop), None)
 }
 
-/// With `random` = (share, seed): every stitch's spacing varies by up to
-/// that share (Ink/Stitch `SatinProcessor.get_stitch_spacing_multiple`).
-pub fn plot_points_on_rails_ex(geo: &SatinGeometry, spacing: f64, offset_mm: f64, offset_prop: f64, random: Option<(f64, u32)>) -> Vec<(Point, Point)> {
+fn plot_pairs(geo: &SatinGeometry, spacing: f64, off: Offsets, random: Option<&Random>) -> Vec<(Point, Point)> {
     let spacing = spacing.max(0.05);
-    let mut rng = random.map(|(_, seed)| crate::prng::Stream::new(seed, 0x5a71));
-    let mut multiple = move || match (&mut rng, random) {
-        (Some(r), Some((share, _))) => (1.0 + (r.next() - 0.5) * 2.0 * share).max(0.01),
-        _ => 1.0,
-    };
-    let process = |a: Point, b: Point| -> (Point, Point) {
-        let d = b - a;
-        let w = d.length();
-        if w < 1e-9 {
-            return (a, b);
-        }
-        let u = d / w;
-        let mut off = offset_mm + offset_prop * w;
-        // never let an inset collapse/invert the pair
-        if off < 0.0 && -2.0 * off > w * 0.9 {
-            off = -w * 0.45;
-        }
-        (a - u * off, b + u * off)
-    };
+    let mut proc = Processor { off, random, cycle: 0 };
     let mut pairs = Vec::new();
     let (mut old0, mut old1) = (Point::ZERO, Point::ZERO);
     for (i, (s0, s1)) in geo.sections.iter().enumerate() {
@@ -297,13 +369,13 @@ pub fn plot_points_on_rails_ex(geo: &SatinGeometry, spacing: f64, offset_mm: f64
         if i == 0 || pairs.is_empty() {
             old0 = s0[0];
             old1 = s1[0];
-            pairs.push(process(old0, old1));
+            pairs.push(proc.process(old0, old1));
         }
         let (c0, c1) = (cumulative_lengths(s0), cumulative_lengths(s1));
         let (l0, l1) = (*c0.last().unwrap(), *c1.last().unwrap());
         let num_points = l0.max(l1).max(0.01) / spacing;
         let step = 1.0 / num_points;
-        let mut m = multiple();
+        let mut m = proc.spacing_multiple();
         let mut current = spacing * m;
         let dist = stitch_distance(s0[0], s1[0], old0, old1);
         let mut to_travel = (1.0 - (dist / spacing).min(1.0)) * step * m;
@@ -327,45 +399,47 @@ pub fn plot_points_on_rails_ex(geo: &SatinGeometry, spacing: f64, offset_mm: f64
                 }
             }
             cursor += to_travel;
-            m = multiple();
+            m = proc.spacing_multiple();
             to_travel = step * m;
             current = spacing * m;
             old0 = p0;
             old1 = p1;
-            pairs.push(process(p0, p1));
+            pairs.push(proc.process(p0, p1));
             iterations = 0;
         }
     }
     if let Some((s0, s1)) = geo.sections.last() {
         if let (Some(e0), Some(e1)) = (s0.last(), s1.last()) {
             if stitch_distance(*e0, *e1, old0, old1) > 0.1 {
-                pairs.push(process(*e0, *e1));
+                pairs.push(proc.process(*e0, *e1));
             }
         }
     }
     pairs
 }
 
-/// Shorten every other stitch where the rail is tightly curved (avoids
-/// thread build-up on the inside of curves).
-fn inset_short_stitches(pairs: &[(Point, Point)], inset: f64, min_dist: f64) -> Vec<(Point, Point)> {
-    if inset <= 0.0 {
+/// Shorten every other stitch where it lies close to the one before
+/// (inside tight curves), so the thread does not build up there — Ink/Stitch
+/// `inset_short_stitches_sawtooth`: at most half the stitch per end, and
+/// with the default split no more than a third of the max stitch length,
+/// so an inset end never passes a split point.
+fn inset_short_stitches(pairs: &[(Point, Point)], p: &SatinParams, split: &Splitter) -> Vec<(Point, Point)> {
+    let min_dist = p.short_stitch_distance;
+    let inset = p.short_stitch_inset.min(0.5);
+    // off at 0 (and NaN)
+    if min_dist.partial_cmp(&0.0) != Some(std::cmp::Ordering::Greater) || inset.partial_cmp(&0.0) != Some(std::cmp::Ordering::Greater) {
         return pairs.to_vec();
     }
     let mut out = pairs.to_vec();
-    for i in 1..pairs.len() {
-        if i % 2 == 0 {
-            continue;
-        }
+    for i in (1..pairs.len()).step_by(2) {
         let (a, b) = pairs[i];
         let (pa, pb) = pairs[i - 1];
-        let w = b - a;
-        if a.dist(pa) < min_dist {
-            out[i].0 = a + w * inset;
+        let mut inset_mm = inset * a.dist(b);
+        if split.staggers == 0 && split.max_len > 0.0 && !split.random_phase {
+            inset_mm = inset_mm.min(split.max_len / 3.0);
         }
-        if b.dist(pb) < min_dist {
-            out[i].1 = b - w * inset;
-        }
+        let off = [if a.dist(pa) < min_dist { -inset_mm } else { 0.0 }, if b.dist(pb) < min_dist { -inset_mm } else { 0.0 }];
+        out[i] = offset_points(a, b, off);
     }
     out
 }
@@ -374,39 +448,47 @@ fn inset_short_stitches(pairs: &[(Point, Point)], inset: f64, min_dist: f64) -> 
 /// into millions of points (a hang); Ink/Stitch-sized values are unchanged.
 const MIN_SPLIT: f64 = 0.05;
 
-/// A split length brought into range (0 or less = no splitting).
+/// A split length brought into range (0 = no splitting).
 fn split_len(v: f64) -> f64 {
-    if v > 0.0 { v.max(MIN_SPLIT) } else { v }
+    if v > 0.0 { v.max(MIN_SPLIT) } else { 0.0 }
 }
 
-fn split_points(a: Point, b: Point, max_len: f64) -> Vec<Point> {
-    split_points_staggered(a, b, max_len, 0, 0)
-}
-
-/// Split points of a long stitch: evenly, or staggered — shifted by a share
-/// of a section from stitch to stitch (repeating every `staggers` stitches)
-/// so the split points do not line up into a visible line.
-fn split_points_staggered(a: Point, b: Point, max_len: f64, row: usize, staggers: u32) -> Vec<Point> {
-    let max_len = split_len(max_len);
-    if max_len.is_nan() || max_len <= 0.0 {
+/// Ink/Stitch `split_segment_even_n`: `n` equal parts, each split point
+/// moved by up to `jitter` of a part.
+fn split_even_n(a: Point, b: Point, n: usize, jitter: f64, seed: u32, row: usize) -> Vec<Point> {
+    if n <= 1 {
         return vec![];
     }
+    let mut ts: Vec<f64> = (1..n)
+        .map(|k| {
+            let j = if jitter > 0.0 { crate::prng::uniform(seed, 0x5011_7001 + row as u64, k as u64) * 2.0 - 1.0 } else { 0.0 };
+            (k as f64 + j * jitter) / n as f64
+        })
+        .collect();
+    ts.sort_by(|x, y| x.total_cmp(y));
+    ts.into_iter().map(|t| a.lerp(b, t.clamp(0.0, 1.0))).collect()
+}
+
+/// Ink/Stitch `split_segment_stagger_phase`: a point every `len`, starting
+/// `(row / staggers) % 1` of a length from `a`, keeping those strictly
+/// between `min` and `max` (distances from `a`).
+fn split_stagger_phase(a: Point, b: Point, len: f64, staggers: f64, row: usize, min: f64, max: f64) -> Vec<Point> {
     let d = a.dist(b);
-    if d <= max_len {
-        return vec![];
+    let phase = (row as f64 / staggers).rem_euclid(1.0);
+    let mut progress = phase * len;
+    let mut out = Vec::new();
+    while progress < d {
+        if progress > min && progress < max {
+            out.push(a.lerp(b, progress / d));
+        }
+        progress += len;
     }
-    let n = (d / max_len).ceil() as usize;
-    if staggers < 2 {
-        return (1..n).map(|k| a.lerp(b, k as f64 / n as f64)).collect();
-    }
-    // an extra section, the points moved along it row by row
-    let n = n + 1;
-    let shift = (row % staggers as usize) as f64 / staggers as f64;
-    (0..n - 1).map(|k| (k as f64 + 0.5 + shift * 0.5) / n as f64).filter(|t| *t > 0.02 && *t < 0.98).map(|t| a.lerp(b, t)).collect()
+    out
 }
 
-/// How long satin stitches are split (Ink/Stitch `split_method` default
-/// with random jitter / random phase, or staggered).
+/// How long satin stitches are split (Ink/Stitch `split_method`): the
+/// default (even parts, with random jitter or a random phase), or
+/// staggered — `staggers` 1 is Ink/Stitch's "simple".
 #[derive(Debug, Clone, Copy)]
 struct Splitter {
     max_len: f64,
@@ -430,23 +512,47 @@ impl Splitter {
         }
     }
 
-    /// Split points of stitch `row` from a to b.
-    fn points(&self, a: Point, b: Point, row: usize) -> Vec<Point> {
-        if self.max_len <= 0.0 || self.staggers >= 2 || (self.jitter <= 0.0 && !self.random_phase) {
-            return split_points_staggered(a, b, self.max_len, row, self.staggers);
+    /// The same split without randomness (Ink/Stitch's `get_split_points`
+    /// with its default arguments).
+    fn plain(&self) -> Self {
+        Splitter { jitter: 0.0, random_phase: false, min_len: self.max_len, ..*self }
+    }
+
+    /// Split points of the stitch from `a` to `b` (sewn from `a_short` to
+    /// `b_short`), stitch number `row`, sewn backwards with `from_end`;
+    /// `count`: that many parts (the default split's way back matches the
+    /// stitch before it). Also returns the parts made — Ink/Stitch
+    /// `get_split_points`.
+    #[allow(clippy::too_many_arguments)]
+    fn split(&self, a: Point, b: Point, a_short: Point, b_short: Point, count: Option<usize>, row: usize, from_end: bool) -> (Vec<Point>, Option<usize>) {
+        if self.max_len <= 0.0 {
+            return (vec![], None);
         }
         let d = a.dist(b);
-        if self.random_phase {
-            if d <= self.min_len {
-                return vec![];
+        if self.staggers >= 1 {
+            if d <= self.max_len {
+                return (vec![], None);
             }
+            let (a, b, a_short, b_short) = if from_end { (b, a, b_short, a_short) } else { (a, b, a_short, b_short) };
+            let proj = |q: Point| ((q - a).dot(b - a) / d).clamp(0.0, d);
+            let mut pts = split_stagger_phase(a, b, self.max_len, self.staggers as f64, row, proj(a_short), proj(b_short));
+            if from_end {
+                pts.reverse();
+            }
+            return (pts, None);
+        }
+        if d <= self.min_len {
+            return (vec![], Some(1));
+        }
+        if self.random_phase {
             // Ink/Stitch split_segment_random_phase: a random start, then
             // lengths varied by the jitter; none right next to the ends
+            let len = a_short.dist(b_short);
             let mut rng = crate::prng::Stream::new(self.seed, 0x5011_7000 + row as u64);
             let mut t = self.max_len * rng.next();
             let mut out = Vec::new();
-            while t < d {
-                out.push(a.lerp(b, t / d));
+            while t < len {
+                out.push(a_short.lerp(b_short, t / len));
                 // never a zero step (jitter 1 can draw one)
                 t += (self.max_len * (1.0 + self.jitter * (rng.next() - 0.5) * 2.0)).max(self.max_len * 0.05);
             }
@@ -457,34 +563,14 @@ impl Splitter {
             if out.len() > 1 && out.last().unwrap().dist(b) <= min_stitch {
                 out.pop();
             }
-            return out;
+            return (out, None);
         }
-        if d <= self.max_len {
-            return vec![];
-        }
-        // even parts, each split point moved by up to the jitter (Ink/Stitch split_segment_even_n)
-        let n = (d / self.max_len).ceil() as usize;
-        let mut ts: Vec<f64> = (1..n)
-            .map(|k| {
-                let j = crate::prng::uniform(self.seed, 0x5011_7001 + row as u64, k as u64) * 2.0 - 1.0;
-                (k as f64 + j * self.jitter) / n as f64
-            })
-            .collect();
-        ts.sort_by(|x, y| x.total_cmp(y));
-        ts.into_iter().map(|t| a.lerp(b, t.clamp(0.0, 1.0))).collect()
+        let n = count.unwrap_or_else(|| (d / self.max_len).ceil() as usize);
+        (split_even_n(a, b, n, self.jitter, self.seed, row), Some(n))
     }
 }
 
-/// A small deterministic random number (0..1) for stitch `i`.
-fn jitter(seed: u32, i: usize) -> f64 {
-    let mut x = (i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ (seed as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F);
-    x ^= x >> 31;
-    x = x.wrapping_mul(0xBF58_476D_1CE4_E5B9);
-    x ^= x >> 29;
-    (x >> 11) as f64 / (1u64 << 53) as f64
-}
-
-/// Push compensation (column ends pulled in) and random width texture.
+/// Push compensation: the column's ends pulled in.
 fn shape_pairs(pairs: Vec<(Point, Point)>, p: &SatinParams) -> Vec<(Point, Point)> {
     let mut pairs = pairs;
     if p.push_comp > 0.0 && pairs.len() > 2 {
@@ -498,19 +584,6 @@ fn shape_pairs(pairs: Vec<(Point, Point)>, p: &SatinParams) -> Vec<(Point, Point
         if total > 3.0 * p.push_comp {
             pairs = pairs.into_iter().zip(s).filter(|(_, d)| *d >= p.push_comp && *d <= total - p.push_comp).map(|(x, _)| x).collect();
         }
-    }
-    if p.random_wider > 0.0 || p.random_narrower > 0.0 {
-        pairs = pairs
-            .into_iter()
-            .enumerate()
-            .map(|(i, (a, b))| {
-                let r = jitter(p.random_seed, i);
-                // one side at a time, so the edges get the texture
-                let f = -p.random_narrower + r * (p.random_wider + p.random_narrower);
-                let d = (b - a) * f;
-                if i % 2 == 0 { (a - d, b) } else { (a, b + d) }
-            })
-            .collect();
     }
     pairs
 }
@@ -527,6 +600,7 @@ fn push(run: &mut Run, p: Point, f: u8) {
 fn underlay(geo: &SatinGeometry, p: &SatinParams, which: super::underlay::SatinUnderlay, run: &mut Run, density: f64) {
     let u = flags::UNDERLAY;
     let len = p.underlay_stitch_length.clamp(0.5, 8.0);
+    let sr = p.second_rail.unwrap_or_default();
     if which.center {
         let pairs = plot_points_on_rails(geo, 0.5, 0.0, 0.0);
         let pos = p.center_walk_position.clamp(0.0, 1.0);
@@ -544,7 +618,11 @@ fn underlay(geo: &SatinGeometry, p: &SatinParams, which: super::underlay::SatinU
         }
     }
     if which.contour {
-        let pairs = plot_points_on_rails(geo, 0.5, -p.contour_inset, -p.contour_inset_pct);
+        let off = Offsets {
+            mm: [-p.contour_inset, -sr.contour_inset.unwrap_or(p.contour_inset)],
+            prop: [-p.contour_inset_pct, -sr.contour_inset_pct.unwrap_or(p.contour_inset_pct)],
+        };
+        let pairs = plot_pairs(geo, 0.5, off, None);
         let left: Vec<Point> = pairs.iter().map(|x| x.0).collect();
         let right: Vec<Point> = pairs.iter().rev().map(|x| x.1).collect();
         for q in running_stitch(&left, len, 0.1) {
@@ -559,7 +637,11 @@ fn underlay(geo: &SatinGeometry, p: &SatinParams, which: super::underlay::SatinU
     }
     if which.zigzag {
         let sp = (p.zigzag_underlay_spacing * density).max(0.5);
-        let pairs = plot_points_on_rails(geo, sp / 2.0, -p.zigzag_underlay_inset, -p.zigzag_inset_pct);
+        let off = Offsets {
+            mm: [-p.zigzag_underlay_inset, -sr.zigzag_underlay_inset.unwrap_or(p.zigzag_underlay_inset)],
+            prop: [-p.zigzag_inset_pct, -sr.zigzag_inset_pct.unwrap_or(p.zigzag_inset_pct)],
+        };
+        let pairs = plot_pairs(geo, sp / 2.0, off, None);
         // forward: alternate sides; back: the other alternation (ends at start)
         let fwd: Vec<Point> = pairs.iter().enumerate().map(|(i, (a, b))| if i % 2 == 0 { *a } else { *b }).collect();
         let back: Vec<Point> = pairs.iter().enumerate().rev().map(|(i, (a, b))| if i % 2 == 0 { *b } else { *a }).collect();
@@ -605,67 +687,106 @@ pub fn satin_on(paths: &[SubPath], p: &SatinParams, fabric: &crate::model::Fabri
     } else {
         underlay(&geo, p, which, &mut run, density);
     }
-    let geo = if back {
-        SatinGeometry { sections: geo.sections.into_iter().rev().map(|(mut a, mut b)| { a.reverse(); b.reverse(); (a, b) }).collect() }
-    } else {
-        geo
-    };
+    let mut top = top_layer(&geo, p, extra_pull, density);
+    // Ink/Stitch plots the cover from the start and sews it backwards
+    if back {
+        top.reverse();
+    }
+    for q in top {
+        push(&mut run, q, 0);
+    }
+    vec![run]
+}
 
-    let pc = (p.pull_comp + extra_pull) * 0.5;
-    let pct = p.pull_comp_pct / 100.0 * 0.5;
+/// The cover stitches (Ink/Stitch `do_satin`, `do_e_stitch`, `do_s_stitch`,
+/// `do_zigzag`): pairs plotted with pull compensation and the random
+/// texture, short stitches inset, long stitches split.
+fn top_layer(geo: &SatinGeometry, p: &SatinParams, extra_pull: f64, density: f64) -> Vec<Point> {
+    let sr = p.second_rail.unwrap_or_default();
+    // ours are the total width, Ink/Stitch's (and these) each side
+    let off = Offsets {
+        mm: [(p.pull_comp + extra_pull) * 0.5, (sr.pull_comp.unwrap_or(p.pull_comp) + extra_pull) * 0.5],
+        prop: [p.pull_comp_pct / 100.0 * 0.5, sr.pull_comp_pct.unwrap_or(p.pull_comp_pct) / 100.0 * 0.5],
+    };
     let spacing = (p.spacing * density).max(0.1);
-    let max_len = p.max_stitch_length;
-    let random = (p.random_spacing > 0.0).then_some((p.random_spacing.clamp(0.0, 1.0), p.random_seed));
+    let random = Random::of(p);
+    let split = Splitter::new(p);
+    let mut out: Vec<Point> = Vec::new();
+    let mut add = |q: Point| {
+        if out.last().is_none_or(|l| l.dist(q) >= 1e-6) {
+            out.push(q);
+        }
+    };
     match p.method {
         SatinMethod::Satin => {
-            let pairs = shape_pairs(plot_points_on_rails_ex(&geo, spacing, pc, pct, random), p);
-            let pairs = inset_short_stitches(&pairs, p.short_stitch_inset, p.short_stitch_distance.max(0.0));
-            let split = Splitter::new(p);
-            let mut last_b: Option<Point> = None;
-            for (row, (a, b)) in pairs.into_iter().enumerate() {
-                if let Some(lb) = last_b {
-                    for q in split.points(lb, a, row * 2 + 1) {
-                        push(&mut run, q, 0);
-                    }
+            let pairs = shape_pairs(plot_pairs(geo, spacing, off, Some(&random)), p);
+            let short = inset_short_stitches(&pairs, p, &split);
+            let mut last: Option<(Point, Point)> = None;
+            let mut last_count = None;
+            for (i, (&(a, b), &(a_s, b_s))) in pairs.iter().zip(&short).enumerate() {
+                if let Some((lb, lb_s)) = last {
+                    split.split(lb, a, lb_s, a_s, last_count, 2 * i, true).0.into_iter().for_each(&mut add);
                 }
-                push(&mut run, a, 0);
-                for q in split.points(a, b, row * 2) {
-                    push(&mut run, q, 0);
-                }
-                push(&mut run, b, 0);
-                last_b = Some(b);
-            }
-        }
-        SatinMethod::Zigzag => {
-            let pairs = shape_pairs(plot_points_on_rails_ex(&geo, spacing / 2.0, pc, pct, random), p);
-            for (i, (a, b)) in pairs.iter().enumerate() {
-                push(&mut run, if i % 2 == 0 { *a } else { *b }, 0);
+                add(a_s);
+                let (pts, count) = split.split(a, b, a_s, b_s, None, 2 * i + 1, false);
+                pts.into_iter().for_each(&mut add);
+                last_count = count;
+                add(b_s);
+                last = Some((b, b_s));
             }
         }
         SatinMethod::EStitch => {
-            let pairs = plot_points_on_rails(&geo, spacing, pc, pct);
-            for (a, b) in pairs {
-                push(&mut run, a, 0);
-                push(&mut run, b, 0);
-                push(&mut run, a, 0);
+            let pairs = shape_pairs(plot_pairs(geo, spacing, off, Some(&random)), p);
+            let short = inset_short_stitches(&pairs, p, &split);
+            let mut last: Option<Point> = None;
+            for (i, (&(a, b), &(a_s, b_s))) in pairs.iter().zip(&short).enumerate() {
+                let (pts, _) = split.split(a, b, a_s, b_s, None, 2 * i + 1, false);
+                // spacing wider than the max stitch length: the step along the rail is split too
+                if let Some(l) = last {
+                    if split.max_len > 0.0 && spacing > split.max_len {
+                        split.plain().split(l, a, l, a, None, 0, false).0.into_iter().for_each(&mut add);
+                    }
+                }
+                add(a_s);
+                pts.iter().copied().for_each(&mut add);
+                add(b_s);
+                pts.iter().rev().copied().for_each(&mut add);
+                add(a_s);
+                last = Some(a_s);
             }
         }
         SatinMethod::SStitch => {
-            let pairs = plot_points_on_rails(&geo, spacing, pc, pct);
-            for (i, (a, b)) in pairs.iter().enumerate() {
-                let mut pts = vec![*a];
-                pts.extend(split_points(*a, *b, max_len));
-                pts.push(*b);
+            let pairs = shape_pairs(plot_pairs(geo, spacing, off, Some(&random)), p);
+            let short = inset_short_stitches(&pairs, p, &split);
+            for (i, (&(a, b), &(a_s, b_s))) in pairs.iter().zip(&short).enumerate() {
+                let mut pts = vec![a_s];
+                pts.extend(split.split(a, b, a_s, b_s, None, i, false).0);
+                pts.push(b_s);
                 if i % 2 == 0 {
                     pts.reverse();
                 }
-                for q in pts {
-                    push(&mut run, q, 0);
+                pts.into_iter().for_each(&mut add);
+            }
+        }
+        SatinMethod::Zigzag => {
+            // pairs at double density, one point of each in turn, paired up again
+            let pairs = shape_pairs(plot_pairs(geo, spacing / 2.0, off, Some(&random)), p);
+            let points: Vec<Point> = pairs.iter().enumerate().map(|(i, (a, b))| if i % 2 == 0 { *a } else { *b }).collect();
+            let pairs: Vec<(Point, Point)> = points.as_chunks::<2>().0.iter().map(|c| (c[0], c[1])).collect();
+            let short = inset_short_stitches(&pairs, p, &split);
+            let mut last: Option<(Point, Point)> = None;
+            for (i, (&(a, b), &(a_s, b_s))) in pairs.iter().zip(&short).enumerate() {
+                if let Some((lb, lb_s)) = last {
+                    split.split(lb, a, lb_s, a_s, None, 2 * i, true).0.into_iter().for_each(&mut add);
                 }
+                add(a_s);
+                split.split(a, b, a_s, b_s, None, 2 * i + 1, false).0.into_iter().for_each(&mut add);
+                add(b_s);
+                last = Some((b, b_s));
             }
         }
     }
-    vec![run]
+    out
 }
 
 #[cfg(test)]
@@ -878,5 +999,198 @@ mod random_split_tests {
         let slant = |v: &[Point]| v.windows(2).map(|w| (w[1].x - w[0].x).abs()).fold(0.0, f64::max);
         assert!(slant(&first) > slant(&auto) + 10.0);
         assert_eq!(sewn(&SatinParams { reverse_rails: RailReverse::None, ..base() }), auto, "parallel rails need no reversing");
+    }
+}
+
+/// Regressions against Ink/Stitch 3.1 (`satin_column.py`): splitting,
+/// short-stitch inset and random texture for every satin method, the
+/// staggered split, and the second rail's own values.
+#[cfg(test)]
+mod ink_parity_tests {
+    use super::*;
+    use crate::geom::pt;
+    use crate::model::SecondRail;
+
+    /// Two straight rails `w` apart, 60 mm long.
+    fn rails(w: f64) -> Vec<SubPath> {
+        vec![SubPath::polyline(&[pt(20.0, 0.0), pt(80.0, 0.0)], false), SubPath::polyline(&[pt(20.0, w), pt(80.0, w)], false)]
+    }
+    /// A tight arc: the inner rail (radius 2) much shorter than the outer (8).
+    fn tight() -> Vec<SubPath> {
+        let arc = |r: f64| -> SubPath {
+            let pts: Vec<Point> = (0..=48)
+                .map(|i| {
+                    let a = std::f64::consts::PI * (1.0 - i as f64 / 48.0);
+                    pt(48.0 + r * a.cos(), 50.0 - r * a.sin())
+                })
+                .collect();
+            SubPath::polyline(&pts, false)
+        };
+        vec![arc(8.0), arc(2.0)]
+    }
+    fn base() -> SatinParams {
+        SatinParams { center_walk: false, contour_underlay: false, zigzag_underlay: false, underlay_auto: false, pull_comp: 0.0, ..Default::default() }
+    }
+    fn top(paths: &[SubPath], p: &SatinParams) -> Vec<Point> {
+        satin(paths, p, 0.0, 1.0).into_iter().flatten().filter(|x| x.1 & flags::UNDERLAY == 0).map(|x| x.0).collect()
+    }
+    fn under(paths: &[SubPath], p: &SatinParams) -> Vec<Point> {
+        satin(paths, p, 0.0, 1.0).into_iter().flatten().filter(|x| x.1 & flags::UNDERLAY != 0).map(|x| x.0).collect()
+    }
+    fn longest(v: &[Point]) -> f64 {
+        v.windows(2).map(|w| w[0].dist(w[1])).fold(0.0, f64::max)
+    }
+    fn y_range(v: &[Point]) -> (f64, f64) {
+        (v.iter().map(|q| q.y).fold(f64::MAX, f64::min), v.iter().map(|q| q.y).fold(f64::MIN, f64::max))
+    }
+
+    #[test]
+    fn every_method_keeps_the_max_stitch_length() {
+        // a 14 mm column split at 4 mm: Ink/Stitch's longest stitch is 3.5 mm
+        for method in [SatinMethod::Satin, SatinMethod::EStitch, SatinMethod::SStitch, SatinMethod::Zigzag] {
+            let p = SatinParams { method, max_stitch_length: 4.0, ..base() };
+            let v = top(&rails(14.0), &p);
+            assert!(longest(&v) < 3.51, "{method:?}: {}", longest(&v));
+            assert!(longest(&top(&rails(14.0), &SatinParams { max_stitch_length: 0.0, ..p.clone() })) > 13.9, "{method:?} unsplit");
+        }
+        // E-stitch spaced wider than the max length: the step along the rail is split too
+        let p = SatinParams { method: SatinMethod::EStitch, spacing: 5.0, max_stitch_length: 2.0, ..base() };
+        let v = top(&rails(1.5), &p);
+        assert!(longest(&v) <= 2.0 + 1e-9, "{}", longest(&v));
+    }
+
+    #[test]
+    fn short_stitch_inset_works_for_every_method() {
+        for method in [SatinMethod::EStitch, SatinMethod::SStitch, SatinMethod::Zigzag] {
+            let on = SatinParams { method, short_stitch_inset: 0.3, short_stitch_distance: 0.5, ..base() };
+            let off = SatinParams { short_stitch_inset: 0.0, ..on.clone() };
+            // inset stitches stop short of the inner rail (radius 2)
+            let inside = |v: Vec<Point>| v.iter().filter(|q| q.dist(pt(48.0, 50.0)) > 2.5 && q.dist(pt(48.0, 50.0)) < 7.5).count();
+            assert_eq!(inside(top(&tight(), &off)), 0, "{method:?}");
+            assert!(inside(top(&tight(), &on)) > 10, "{method:?}");
+        }
+    }
+
+    #[test]
+    fn short_stitch_inset_is_capped() {
+        // Ink/Stitch: at most 50 % per end (80 % would cross the ends over)
+        let p = SatinParams { short_stitch_inset: 0.8, short_stitch_distance: 0.6, ..base() };
+        let geo = satin_geometry(&tight(), &p).unwrap();
+        let pairs = plot_points_on_rails(&geo, 0.4, 0.0, 0.0);
+        let short = inset_short_stitches(&pairs, &p, &Splitter::new(&p));
+        let mut collapsed = 0;
+        for ((a, b), (sa, sb)) in pairs.iter().zip(&short) {
+            assert!((*sb - *sa).dot(*b - *a) >= -1e-9, "ends crossed: {sa:?} {sb:?}");
+            assert!(sa.dist(*a) <= 0.5 * a.dist(*b) + 1e-9 && sb.dist(*b) <= 0.5 * a.dist(*b) + 1e-9);
+            collapsed += (sa.dist(*sb) < 1e-6) as usize;
+        }
+        assert!(collapsed > 0, "both ends inset by half meet in the middle");
+        // with the default split: no more than a third of the max length
+        let p = SatinParams { short_stitch_inset: 0.5, max_stitch_length: 1.5, ..p };
+        let short = inset_short_stitches(&pairs, &p, &Splitter::new(&p));
+        for ((a, b), (sa, sb)) in pairs.iter().zip(&short) {
+            assert!(sa.dist(*a) <= 0.5 + 1e-9 && sb.dist(*b) <= 0.5 + 1e-9);
+        }
+    }
+
+    #[test]
+    fn random_width_and_spacing_for_every_method() {
+        for method in [SatinMethod::EStitch, SatinMethod::SStitch, SatinMethod::Zigzag] {
+            let plain = SatinParams { method, ..base() };
+            let rnd = SatinParams { random_wider: 0.2, random_narrower: 0.2, random_seed: 3, ..plain.clone() };
+            let spread = |v: Vec<Point>| {
+                let (lo, hi) = y_range(&v);
+                hi - lo
+            };
+            assert!((spread(top(&rails(10.0), &plain)) - 10.0).abs() < 1e-6, "{method:?}");
+            assert!(spread(top(&rails(10.0), &rnd)) > 11.0, "{method:?}");
+            let gaps = |v: Vec<Point>| -> Vec<f64> {
+                let xs: Vec<f64> = v.iter().filter(|q| q.y.abs() < 1e-6).map(|q| q.x).collect();
+                xs.windows(2).map(|w| w[1] - w[0]).filter(|d| *d > 0.01).collect()
+            };
+            let even = gaps(top(&rails(10.0), &plain));
+            let g = gaps(top(&rails(10.0), &SatinParams { random_spacing: 0.5, ..plain.clone() }));
+            let spread_of = |g: &[f64]| g.iter().cloned().fold(f64::MIN, f64::max) - g.iter().cloned().fold(f64::MAX, f64::min);
+            assert!(spread_of(&g) > spread_of(&even) + 0.2, "{method:?}: random spacing {}", spread_of(&g));
+        }
+    }
+
+    #[test]
+    fn staggered_split_keeps_the_length_and_steps_the_phase() {
+        // Ink/Stitch split_segment_stagger_phase: points every 3 mm, starting
+        // (row / staggers) % 1 of 3 mm along
+        let p = SatinParams { max_stitch_length: 3.0, split_staggers: 3, ..base() };
+        let v = top(&rails(14.0), &p);
+        assert!(longest(&v) <= 3.0 + 1e-6, "{}", longest(&v));
+        // the stitches from the first rail across (rows 1, 3, 5, ...): their
+        // first split point 1, 3, 2 mm from the first rail, over and over
+        let mut firsts = Vec::new();
+        for w in v.windows(2) {
+            if firsts.len() < 6 && w[0].y.abs() < 1e-9 && w[1].y > 1e-9 && w[1].y < 14.0 - 1e-9 {
+                firsts.push((w[1].y * 1000.0).round() / 1000.0);
+            }
+        }
+        assert_eq!(firsts, vec![1.0, 3.0, 2.0, 1.0, 3.0, 2.0]);
+        // "simple" (one stagger): every 3 mm from the first rail (both ways
+        // across, Ink/Stitch measures the stitch back from its end), not centred
+        let simple = SatinParams { split_staggers: 1, ..p.clone() };
+        let v = top(&rails(14.0), &simple);
+        let mut ys: Vec<i64> = v.iter().filter(|q| q.y > 1e-6 && q.y < 14.0 - 1e-6).map(|q| (q.y * 10.0).round() as i64).collect();
+        ys.sort();
+        ys.dedup();
+        assert_eq!(ys, vec![30, 60, 90, 120]);
+    }
+
+    #[test]
+    fn default_split_returns_in_as_many_parts() {
+        // Ink/Stitch do_satin: the stitch back (along the rail and across) is
+        // split into as many parts as the one before it
+        let p = SatinParams { max_stitch_length: 3.0, ..base() };
+        let v = top(&rails(14.0), &p);
+        let on_rail: Vec<usize> = v.iter().enumerate().filter(|(_, q)| q.y.abs() < 1e-9 || (q.y - 14.0).abs() < 1e-9).map(|(i, _)| i).collect();
+        for w in on_rail.windows(2) {
+            assert!(w[1] - w[0] == 5, "{} parts", w[1] - w[0]);
+        }
+    }
+
+    #[test]
+    fn second_rail_values() {
+        // pull compensation "0.2 0.5" (ours: totals 0.4 and 1.0)
+        let sr = SecondRail { pull_comp: Some(1.0), ..Default::default() };
+        let (lo, hi) = y_range(&top(&rails(4.0), &SatinParams { pull_comp: 0.4, second_rail: Some(sr), ..base() }));
+        assert!((lo + 0.2).abs() < 1e-6 && (hi - 4.5).abs() < 1e-6, "{lo} {hi}");
+        // as a share of the width, "10 30" (ours: totals 20 and 60)
+        let sr = SecondRail { pull_comp_pct: Some(60.0), ..Default::default() };
+        let (lo, hi) = y_range(&top(&rails(4.0), &SatinParams { pull_comp_pct: 20.0, second_rail: Some(sr), ..base() }));
+        assert!((lo + 0.4).abs() < 1e-6 && (hi - 5.2).abs() < 1e-6, "{lo} {hi}");
+        // contour and zig-zag underlay insets per rail
+        let sr = SecondRail { contour_inset: Some(1.0), contour_inset_pct: Some(0.1), ..Default::default() };
+        let (lo, hi) = y_range(&under(&rails(4.0), &SatinParams { contour_underlay: true, contour_inset: 0.2, contour_inset_pct: 0.0, second_rail: Some(sr), ..base() }));
+        assert!((lo - 0.2).abs() < 1e-6 && (hi - 2.6).abs() < 1e-6, "{lo} {hi}");
+        let sr = SecondRail { zigzag_underlay_inset: Some(1.5), ..Default::default() };
+        let (lo, hi) = y_range(&under(&rails(4.0), &SatinParams { zigzag_underlay: true, zigzag_underlay_inset: 0.5, second_rail: Some(sr), ..base() }));
+        assert!((lo - 0.5).abs() < 1e-6 && (hi - 2.5).abs() < 1e-6, "{lo} {hi}");
+        let sr = SecondRail { zigzag_inset_pct: Some(0.25), ..Default::default() };
+        let (lo, hi) = y_range(&under(&rails(4.0), &SatinParams { zigzag_underlay: true, zigzag_underlay_inset: 0.0, zigzag_inset_pct: 0.0, second_rail: Some(sr), ..base() }));
+        assert!(lo.abs() < 1e-6 && (hi - 3.0).abs() < 1e-6, "{lo} {hi}");
+        // random width on the second rail only
+        let sr = SecondRail { random_wider: Some(0.2), random_narrower: Some(0.0), ..Default::default() };
+        let (lo, hi) = y_range(&top(&rails(10.0), &SatinParams { second_rail: Some(sr), ..base() }));
+        assert!(lo.abs() < 1e-9 && hi > 11.0, "{lo} {hi}");
+        // none set: the same as the first rail
+        let same = SatinParams { pull_comp: 0.4, ..base() };
+        assert_eq!(top(&rails(4.0), &same), top(&rails(4.0), &SatinParams { second_rail: Some(SecondRail::default()), ..same.clone() }));
+    }
+
+    #[test]
+    fn insets_past_the_middle_meet_there() {
+        // Ink/Stitch offset_points: a 3 mm inset on a 4 mm column puts both
+        // ends of the contour underlay in the middle, they never cross
+        let v = under(&rails(4.0), &SatinParams { contour_underlay: true, contour_inset: 3.0, ..base() });
+        assert!(v.iter().all(|q| (q.y - 2.0).abs() < 1e-6), "{:?}", &v[..4]);
+        let (a, b) = offset_points(pt(0.0, 0.0), pt(0.0, 4.0), [-3.0, -3.0]);
+        assert!(a.dist(pt(0.0, 2.0)) < 1e-9 && b.dist(pt(0.0, 2.0)) < 1e-9, "scaled to meet: {a:?} {b:?}");
+        let (a, b) = offset_points(pt(0.0, 0.0), pt(0.0, 4.0), [-6.0, -2.0]);
+        assert!(a.dist(b) < 1e-9 && a.dist(pt(0.0, 3.0)) < 1e-9, "in proportion: {a:?} {b:?}");
     }
 }

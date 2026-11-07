@@ -173,7 +173,11 @@ fn small_removed(engine: &mut Engine, doc: &Document, i: usize) -> usize {
         let mut last = first;
         let k = run.len();
         for (j, &(q, _)) in run.iter().enumerate().skip(1) {
-            if q.dist(last) < min && j + 1 < k {
+            let d = q.dist(last);
+            if d < 1e-6 {
+                continue;
+            }
+            if d < min && j + 1 < k && crate::assemble::redundant(last, q, run[j + 1].0) {
                 n += 1;
                 continue;
             }

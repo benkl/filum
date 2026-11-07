@@ -1257,12 +1257,14 @@ function StitchOptions({ o }: { o: DesignObject }) {
                   {(
                     [
                       ["even", "Even", { splitStaggers: 0, splitRandomPhase: false }],
+                      // Ink/Stitch "simple": the same split points on every stitch
+                      ["simple", "Simple", { splitStaggers: 1, splitRandomPhase: false }],
                       ["s3", "Stagger 3", { splitStaggers: 3, splitRandomPhase: false }],
                       ["s4", "Stagger 4", { splitStaggers: 4, splitRandomPhase: false }],
                       ["random", "Random", { splitStaggers: 0, splitRandomPhase: true }],
                     ] as const
                   ).map(([k, l, patch]) => {
-                    const cur = st.splitRandomPhase ? "random" : (st.splitStaggers ?? 0) >= 4 ? "s4" : (st.splitStaggers ?? 0) >= 2 ? "s3" : "even";
+                    const cur = st.splitRandomPhase ? "random" : (st.splitStaggers ?? 0) >= 4 ? "s4" : (st.splitStaggers ?? 0) >= 2 ? "s3" : st.splitStaggers === 1 ? "simple" : "even";
                     return (
                       <button key={k} className={cur === k ? "on" : ""} onClick={() => up(patch)}>
                         {l}

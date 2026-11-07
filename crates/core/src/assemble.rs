@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
 use crate::geom::{point_in_ring, pt, Point, Rect, Ring};
-use crate::model::{thread_density_scale, Basting, CoverMode, DesignOptions, Document, Fabric, FillMethod, MachineSettings, Object, StitchParams, SubPath, Thread, Ties};
+use crate::model::{thread_density_scale, Basting, CoverMode, DesignOptions, Document, Fabric, FillMethod, LockOverride, MachineSettings, Object, StitchParams, SubPath, Thread, Ties};
 use crate::plan::{flags, Stitch, StitchPlan};
 use crate::region::{object_cover, outline, subtract_min, Cover};
 use crate::stitches::applique::is_stop;
@@ -172,8 +172,15 @@ impl Engine {
         let own = layer_group(obj);
         let mut groups: Vec<&str> = Vec::new();
         let mut above: Vec<usize> = Vec::new();
+        // a line the next line (a satin column or running line in the same
+        // thread) sews over right away is its way there, under it (a routed
+        // underpath): taking it out would leave a jump and a trim in its place
+        let next = (i + 1..doc.objects.len()).find(|&j| doc.objects[j].visible);
+        let underpath = |j: usize| {
+            lines && Some(j) == next && matches!(doc.objects[j].stitch, StitchParams::Satin(_) | StitchParams::Running(_)) && doc.same_spool(&obj.thread, &doc.objects[j].thread)
+        };
         for j in i + 1..doc.objects.len() {
-            if !(scan.may_cover(doc, j) && scan.bounds(doc, j).intersects(&b)) {
+            if underpath(j) || !(scan.may_cover(doc, j) && scan.bounds(doc, j).intersects(&b)) {
                 continue;
             }
             match layer_group(&doc.objects[j]) {
@@ -267,7 +274,7 @@ impl Engine {
                 let full = Object { start: obj.start, ..doc.objects[i].clone() };
                 let (under, _) = split_underlay(self.runs_for(&full, doc));
                 let (_, top) = split_underlay(runs);
-                runs = under.into_iter().chain(top).filter(|r| !r.is_empty()).collect();
+                runs = splice_underlay(&full, under, top);
             }
             if let Some(&(q, _)) = runs.last().and_then(|r| r.last()) {
                 prev = Some(q);
@@ -347,6 +354,52 @@ fn split_underlay(runs: Vec<Run>) -> (Vec<Run>, Vec<Run>) {
         }
     }
     (under, top)
+}
+
+/// The full underlay of a fill and the top stitching of what's left of it
+/// ("keep underlay"), sewn as one: the clipped fill's own way from its
+/// (clipped) underlay to the top goes, and the needle travels from the end
+/// of the full underlay to the first top stitch inside the full shape,
+/// under the stitching to come — no tie-off, trim and jump inside the object.
+fn splice_underlay(full: &Object, mut under: Vec<Run>, mut top: Vec<Run>) -> Vec<Run> {
+    under.retain(|r| !r.is_empty());
+    if under.is_empty() {
+        return top.into_iter().filter(|r| !r.is_empty()).collect();
+    }
+    // the clipped fill's travel from its own underlay's end
+    if let Some(first) = top.first_mut() {
+        let lead = first.iter().take_while(|s| s.1 & flags::TRAVEL != 0).count();
+        if lead < first.len() {
+            first.drain(..lead);
+        }
+    }
+    top.retain(|r| !r.is_empty());
+    let (Some(last), Some(first)) = (under.last_mut(), top.first()) else { return under.into_iter().chain(top).collect() };
+    let (a, b) = (last[last.len() - 1].0, first[0].0);
+    let travel = match &full.stitch {
+        StitchParams::Fill(f) => f.travel_length,
+        _ => 3.0,
+    };
+    let rings = fill_rings(&full.paths);
+    if let Some(path) = crate::stitches::fill::travel_path(&rings, a, b) {
+        for q in running_stitch(&path, travel.max(0.5), 0.1).into_iter().skip(1) {
+            if last.last().is_some_and(|s| s.0.dist(q) < 1e-6) {
+                continue;
+            }
+            last.push((q, flags::TRAVEL));
+        }
+        let mut it = top.into_iter();
+        let first = it.next().unwrap_or_default();
+        for s in first {
+            if last.last().is_some_and(|x| x.0.dist(s.0) < 1e-6) {
+                continue;
+            }
+            last.push(s);
+        }
+        under.extend(it);
+        return under;
+    }
+    under.into_iter().chain(top).collect()
 }
 
 /// Stitch types that start where they are told (running, satins, fills).
@@ -527,6 +580,10 @@ struct Builder<'a> {
     /// Where the object being sewn is locked (its `ties`), and the one sewn before.
     ties: Ties,
     prev_ties: Ties,
+    /// The object's own lock stitches (what it leaves out: the machine's),
+    /// and those of the object sewn before (its tie-off is its own).
+    lock: LockOverride,
+    prev_lock: LockOverride,
     /// The object the last stitches belong to (its tie-off is its own).
     last_obj: u32,
     /// The current object's minimum stitch and jump (mm), and the jump
@@ -551,7 +608,9 @@ impl Builder<'_> {
         }
         let behind: Vec<Point> = self.out.iter().rev().filter(|s| s.is_stitch()).take(20).map(|s| s.pos()).collect();
         let behind = if behind.first().is_some_and(|p| p.dist(at) < 1e-6) { behind } else { std::iter::once(at).chain(behind).collect() };
-        for p in crate::locks::lock_points(self.m.lock_end, &behind, self.m.lock_scale, self.m.lock_length, true) {
+        let l = self.prev_lock;
+        let (style, scale, length) = (l.end.unwrap_or(self.m.lock_end), l.end_scale.unwrap_or(self.m.lock_scale), l.end_length.unwrap_or(self.m.lock_length));
+        for p in crate::locks::lock_points(style, &behind, scale, length, true) {
             self.out.push(Stitch::new(p, flags::TIE, o));
             // a shape lock (arrow, star…) ends away from the lock point:
             // the trim that follows is where the needle is
@@ -565,7 +624,9 @@ impl Builder<'_> {
             return;
         }
         let ahead: Vec<Point> = run.iter().take(20).map(|x| x.0).collect();
-        for p in crate::locks::lock_points(self.m.lock_start, &ahead, self.m.lock_scale, self.m.lock_length, false) {
+        let l = self.lock;
+        let (style, scale, length) = (l.start.unwrap_or(self.m.lock_start), l.start_scale.unwrap_or(self.m.lock_scale), l.start_length.unwrap_or(self.m.lock_length));
+        for p in crate::locks::lock_points(style, &ahead, scale, length, false) {
             if self.out.last().is_some_and(|s| s.pos().dist(p) < 1e-6) {
                 continue;
             }
@@ -635,11 +696,14 @@ impl Builder<'_> {
         let mut last = self.out.iter().rev().find(|s| s.is_stitch()).map(|s| s.pos()).unwrap_or(start);
         let k = run.len();
         for (j, &(q, f)) in run.iter().enumerate() {
-            // drop too-short stitches, but always land on the run's final point
-            if q.dist(last) < self.min_stitch && j + 1 < k {
+            let d = q.dist(last);
+            if d < 1e-6 {
                 continue;
             }
-            if q.dist(last) < 1e-6 {
+            // drop too-short stitches that change nothing, but always land
+            // on the run's final point and keep every turn (a fill's step to
+            // its next row)
+            if d < self.min_stitch && j + 1 < k && redundant(last, q, run[j + 1].0) {
                 continue;
             }
             self.out.push(Stitch::new(q, f, o));
@@ -650,6 +714,34 @@ impl Builder<'_> {
         self.last_min_jump = self.min_jump;
         self.last_min_jump_set = self.min_jump_set;
         self.prev_ties = self.ties;
+        self.prev_lock = self.lock;
+    }
+}
+
+/// Ink/Stitch's own minimum stitch (`filter_duplicate_stitches`): a stitch
+/// this short is a duplicate whatever the setting.
+const DUPLICATE_STITCH: f64 = 0.1;
+/// A short stitch is redundant when the needle passes within this of its
+/// end anyway (mm).
+const ON_THE_WAY: f64 = 0.05;
+
+/// May the short stitch `last → q` go, sewing `last → next` instead? When it
+/// is a duplicate (Ink/Stitch's 0.1 mm), or `q` lies on the way to `next`
+/// (a short stitch along a line or a gentle curve). A turn stays: the step
+/// from a fill row to the next (0.25 mm at a dense spacing) dropped would
+/// start every other row with a slanted stitch — a saw-tooth edge with
+/// fabric showing between the rows.
+pub(crate) fn redundant(last: Point, q: Point, next: Point) -> bool {
+    q.dist(last) <= DUPLICATE_STITCH || seg_dist(q, last, next) < ON_THE_WAY
+}
+
+/// Where an object is locked: its `ties`, but manual stitch only when it
+/// forces lock stitches (Ink/Stitch: manual stitch places every needle
+/// drop itself, locks included).
+fn object_ties(obj: &Object) -> Ties {
+    match obj.stitch {
+        StitchParams::Manual(_) if !obj.force_lock => Ties::None,
+        _ => obj.ties,
     }
 }
 
@@ -680,6 +772,8 @@ fn assemble_basted(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[Run], 
         needs_tie_in: true,
         ties: Ties::Both,
         prev_ties: Ties::Both,
+        lock: LockOverride::default(),
+        prev_lock: LockOverride::default(),
         last_obj: u32::MAX,
         min_stitch: doc.machine.min_stitch,
         min_jump: doc.machine.trim_distance,
@@ -703,9 +797,15 @@ fn assemble_basted(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[Run], 
                 cur_thread = Some(t.as_str());
             }
         }
-        for (k, run) in prefix.iter().filter(|r| !r.is_empty()).enumerate() {
+        let prefix: Vec<&Run> = prefix.iter().filter(|r| !r.is_empty()).collect();
+        for (k, run) in prefix.iter().enumerate() {
             b.run(run, u32::MAX);
             if k + 1 == basting {
+                // the basting is pulled out after sewing: tied off and cut
+                // on its own, whatever comes next (the knockdown)
+                if k + 1 < prefix.len() {
+                    b.cut(u32::MAX, false, false);
+                }
                 basting_end = Some(b.out.len());
             }
         }
@@ -731,7 +831,8 @@ fn assemble_basted(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[Run], 
             threads.push(doc.thread(&obj.thread).cloned().unwrap_or_else(|| fallback_thread(threads.len())));
             cur_thread = Some(obj.thread.as_str());
         }
-        b.ties = obj.ties;
+        b.ties = object_ties(obj);
+        b.lock = obj.lock.unwrap_or_default();
         b.min_stitch = obj.min_stitch.unwrap_or(doc.machine.min_stitch).max(0.0);
         b.min_jump = obj.min_jump.unwrap_or(doc.machine.trim_distance).max(0.0);
         b.min_jump_set = obj.min_jump.is_some();
@@ -860,7 +961,8 @@ mod tests {
         d.options.remove_overlaps = true;
         let mut eng = Engine::new();
         let clipped = lower(&eng.plan(&d));
-        assert!(clipped < full * 8 / 10, "{clipped} vs {full}");
+        // (61 % of the area: the frame's four sections turn twice as often)
+        assert!(clipped < full * 85 / 100, "{clipped} vs {full}");
         // 900 mm² minus the cover shrunk by the 0.6 mm margin (18.8² mm²)
         let shape = eng.stitched_object(&d, 0).unwrap();
         let area = crate::geom::rings_area(&fill_rings(&shape.paths));
@@ -979,11 +1081,15 @@ mod tests {
         let top = StitchParams::Fill(FillParams { underlay: false, ..Default::default() });
         let mut d = doc(vec![obj("under", square(0.0, 0.0, 30.0), under_fill), obj("top", square(0.0, 0.0, 25.0), top)]);
         d.options.remove_overlaps = true;
-        let ul = |d: &Document| Engine::new().plan(d).stitches.iter().filter(|s| s.object == 0 && s.is_stitch() && s.flags & flags::UNDERLAY != 0).count();
+        // underlay stitches well under the 25 mm cover
+        let ul = |d: &Document| {
+            let under = |s: &&Stitch| s.x > 3.0 && s.x < 22.0 && s.y > 3.0 && s.y < 22.0;
+            Engine::new().plan(d).stitches.iter().filter(|s| s.object == 0 && s.is_stitch() && s.flags & flags::UNDERLAY != 0).filter(under).count()
+        };
         let cut = ul(&d);
         d.options.keep_underlay = true;
         let kept = ul(&d);
-        assert!(kept > cut * 2, "the underlay under the cover stays: {kept} vs {cut}");
+        assert!(cut == 0 && kept > 50, "the underlay under the cover stays: {kept} vs {cut}");
     }
 
     #[test]

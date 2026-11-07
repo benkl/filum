@@ -1,10 +1,12 @@
 //! Global stitch-order optimisation (not available in Ink/Stitch).
 //!
 //! Builds a precedence DAG — object *A* must stay before *B* when they overlap
-//! and use different spools (so stacking is preserved) — then performs a
-//! topological sort that greedily keeps the current spool (minimising colour
-//! changes) and, within a spool, picks the nearest available object
-//! (minimising jumps/trims). Same-spool objects may be freely reordered.
+//! and use different spools (so stacking is preserved), or the same spool
+//! where the order shows (a detail, border or appliqué on top of a fill,
+//! see [`order_shows`]) — then performs a topological sort that greedily
+//! keeps the current spool (minimising colour changes) and, within a spool,
+//! picks the nearest available object (minimising jumps/trims). Other
+//! same-spool objects may be freely reordered.
 //! A spool is a thread colour + brand + code: threads fitted or merged onto
 //! the same spool count as one colour.
 
@@ -12,7 +14,8 @@ use serde::Serialize;
 
 use crate::assemble::Engine;
 use crate::geom::{Point, Rect};
-use crate::model::Document;
+use crate::model::{Document, Object, StitchParams};
+use crate::region::{covers_overlap, object_cover, Cover};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -41,6 +44,18 @@ fn travel(ends: &[(Point, Point)], order: &[usize]) -> f64 {
     order.windows(2).map(|w| ends[w[0]].1.dist(ends[w[1]].0)).sum()
 }
 
+/// Does it show which of two overlapping objects in the same thread is sewn
+/// first (`lower` before `upper` as drawn)? When they are stitched
+/// differently, or the upper one is a line or detail sewn on top (running,
+/// satin, manual, appliqué), or either stops the machine: a border sewn
+/// before the fill under it disappears under the fill.
+fn order_shows(lower: &Object, upper: &Object) -> bool {
+    std::mem::discriminant(&lower.stitch) != std::mem::discriminant(&upper.stitch)
+        || matches!(upper.stitch, StitchParams::Running(_) | StitchParams::Satin(_) | StitchParams::Manual(_) | StitchParams::Applique(_))
+        || lower.stop_after
+        || upper.stop_after
+}
+
 /// Compute an optimised order. Hidden objects keep their relative position at the end.
 pub fn optimize_order(doc: &Document, engine: &mut Engine) -> OptimizeReport {
     let n = doc.objects.len();
@@ -64,9 +79,21 @@ pub fn optimize_order(doc: &Document, engine: &mut Engine) -> OptimizeReport {
     // precedence: preds[j] = number of unresolved predecessors
     let mut succ: Vec<Vec<usize>> = vec![vec![]; n];
     let mut preds = vec![0usize; n];
+    let mut covers: Vec<Option<Vec<Cover>>> = vec![None; n];
     for (a, &i) in visible.iter().enumerate() {
         for &j in visible.iter().skip(a + 1) {
-            if spool[i] != spool[j] && bounds[i].intersects(&bounds[j]) {
+            if !bounds[i].intersects(&bounds[j]) {
+                continue;
+            }
+            let keep = spool[i] != spool[j] || {
+                order_shows(&doc.objects[i], &doc.objects[j]) && {
+                    for k in [i, j] {
+                        covers[k].get_or_insert_with(|| object_cover(&doc.objects[k]));
+                    }
+                    covers_overlap(covers[i].as_deref().unwrap_or_default(), covers[j].as_deref().unwrap_or_default())
+                }
+            };
+            if keep {
                 succ[i].push(j);
                 preds[j] += 1;
             }

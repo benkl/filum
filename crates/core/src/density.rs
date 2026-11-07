@@ -530,6 +530,11 @@ mod tests {
     fn at(f: &DensityField, x: f64, y: f64) -> usize {
         ((y - f.y0) / f.cell) as usize * f.cols + ((x - f.x0) / f.cell) as usize
     }
+    /// A cell of the 20 mm squares away from the travel a fill sews under its
+    /// rows (from its start back to it, as Ink/Stitch does: it adds a layer
+    /// along that line).
+    const PX: f64 = 15.0;
+    const PY: f64 = 5.0;
 
     #[test]
     fn threads_are_sized_by_weight() {
@@ -544,28 +549,29 @@ mod tests {
         let fill = |s: f64| StitchParams::Fill(FillParams { underlay: false, row_spacing: s, ..Default::default() });
         let one = field(&doc(vec![obj("a", square(0.0, 0.0, 20.0), fill(0.25))]));
         let two = field(&doc(vec![obj("a", square(0.0, 0.0, 20.0), fill(0.125))]));
-        let (l1, l2) = (one.layers[at(&one, 10.0, 10.0)], two.layers[at(&two, 10.0, 10.0)]);
+        let (l1, l2) = (one.layers[at(&one, PX, PY)], two.layers[at(&two, PX, PY)]);
         assert!((l1 - 1.0).abs() < 0.2, "0.25 mm rows: {l1} layers");
         assert!((l2 - 2.0).abs() < 0.35, "0.125 mm rows: {l2} layers");
-        assert_eq!(one.class[at(&one, 10.0, 10.0)], DensityClass::Ok as u8);
+        assert_eq!(one.class[at(&one, PX, PY)], DensityClass::Ok as u8);
     }
 
     #[test]
     fn overlaps_are_risk_and_sparse_covering_fills_are_thin() {
         let fill = |s: f64| StitchParams::Fill(FillParams { underlay: false, row_spacing: s, ..Default::default() });
         let stacked = field(&doc(vec![obj("a", square(0.0, 0.0, 20.0), fill(0.18)), obj("b", square(5.0, 5.0, 10.0), fill(0.18)), obj("c", square(7.0, 7.0, 6.0), fill(0.18))]));
-        assert_eq!(stacked.class[at(&stacked, 10.0, 10.0)], DensityClass::Risk as u8, "three dense fills on top of each other");
+        assert_eq!(stacked.class[at(&stacked, 12.0, 8.0)], DensityClass::Risk as u8, "three dense fills on top of each other");
         // two default fills with their underlay: heavy, not a risk
         let dflt = || StitchParams::Fill(FillParams::default());
         let two = field(&doc(vec![obj("a", square(0.0, 0.0, 20.0), dflt()), obj("b", square(5.0, 5.0, 10.0), dflt())]));
-        let i = at(&two, 10.0, 10.0);
+        let i = at(&two, 12.0, 8.0);
         assert_eq!(two.class[i], DensityClass::Heavy as u8, "a fill over a fill: {} layers", two.layers[i]);
         let one = field(&doc(vec![obj("a", square(0.0, 0.0, 20.0), dflt())]));
-        let l1 = one.layers[at(&one, 10.0, 10.0)];
-        assert!(l1 > 1.1 && l1 < 1.7 && one.class[at(&one, 10.0, 10.0)] == DensityClass::Ok as u8, "a default fill with underlay: {l1} layers");
+        let l1 = one.layers[at(&one, PX, PY)];
+        // (the underlay and its travel under the rows: up to about 1.75)
+        assert!(l1 > 1.1 && l1 < 1.8 && one.class[at(&one, PX, PY)] == DensityClass::Ok as u8, "a default fill with underlay: {l1} layers");
         assert!(!stacked.hotspots.is_empty() && stacked.hotspots[0].objects.len() >= 3);
         let sparse = field(&doc(vec![obj("a", square(0.0, 0.0, 20.0), fill(0.9))]));
-        assert_eq!(sparse.class[at(&sparse, 10.0, 10.0)], DensityClass::Thin as u8, "0.9 mm rows let the fabric show");
+        assert_eq!(sparse.class[at(&sparse, PX, PY)], DensityClass::Thin as u8, "0.9 mm rows let the fabric show");
         assert!(sparse.stats.thin > 100.0);
     }
 
@@ -587,11 +593,11 @@ mod tests {
     fn a_threads_own_weight_sets_its_spacing_and_width() {
         let fill = StitchParams::Fill(FillParams { underlay: false, row_spacing: 0.4, ..Default::default() });
         let mut d = doc(vec![obj("a", square(0.0, 0.0, 20.0), fill)]);
-        let base = field(&d).layers[at(&field(&d), 10.0, 10.0)];
+        let base = field(&d).layers[at(&field(&d), PX, PY)];
         d.threads[0].weight = Some(12);
         // a 12 wt thread is sewn at twice the spacing by the engine and covers each row twice as wide
         let f = field(&d);
-        let heavy = f.layers[at(&f, 10.0, 10.0)];
+        let heavy = f.layers[at(&f, PX, PY)];
         assert!((base - 0.625).abs() < 0.12 && (heavy - base).abs() < 0.12, "{base} → {heavy}");
     }
 }

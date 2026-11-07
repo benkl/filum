@@ -14,6 +14,7 @@ import { buildFont, fontMetrics, variantId, VARIANTS, type PackedFont } from "./
 import { engine } from "../engine/client";
 import { installedItems, onDownloadsChange, storedFont } from "./downloadStore";
 import { flatten, unionBoxes } from "./geometry";
+import { mapGeometry, markerPaths } from "./textLayout";
 import { fontNameFromFiles, letterOfFile, withDefaultVariant, wrapGlyphLayer } from "./letteringTools";
 import type { DesignObject, StitchDocument, Vec2 } from "../types";
 
@@ -476,6 +477,14 @@ export interface EmbroideryFont {
   variants: string[];
   /** Ink/Stitch "reversible": lines may be stitched back and forth. */
   reversible: boolean;
+  /** Ink/Stitch "sortable": the font's colours may be sorted (by each object's colour sort index). */
+  sortable?: boolean;
+  /** Ink/Stitch "combine_at_sort_indices": when sorted, the objects of these indices become one each. */
+  combineAtSortIndices?: number[];
+  /** Ink/Stitch "auto_satin": the lettering's satins are routed (default true). */
+  autoSatin?: boolean;
+  /** Ink/Stitch "scale_cross_stitch_pattern": the crosses scale with the lettering. */
+  scaleCrossStitch?: boolean;
   /** Glyph names of a variant (the default variant's when it is missing). */
   namesOf(variant?: string): Set<string>;
   /** A glyph of the default variant, or of `variant` (falling back to the default, like Ink/Stitch). */
@@ -527,16 +536,18 @@ type FontFile = PackedFont;
 
 // no size / viewBox: one user unit is one px, exactly as Ink/Stitch treats glyphs
 const SVG_HEAD =
-  '<svg xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:inkstitch="http://inkstitch.org/namespace" xmlns:filum="https://github.com/benkl/filum#namespace">';
+  '<svg xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:inkstitch="http://inkstitch.org/namespace" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:filum="https://github.com/benkl/filum#namespace">';
 
-/** Bounds of the raw path geometry (like Ink/Stitch's glyph bbox), mm. */
-function pathBounds(objs: DesignObject[]) {
+/** Bounds of the raw path geometry, mm; `markers`: with the guide and
+ *  pattern lines too (Ink/Stitch's glyph bbox counts every path but the
+ *  command connectors). */
+function pathBounds(objs: DesignObject[], markers = false) {
   let x0 = Infinity;
   let y0 = Infinity;
   let x1 = -Infinity;
   let y1 = -Infinity;
   for (const o of objs)
-    for (const sp of o.paths)
+    for (const sp of markers ? [...o.paths, ...markerPaths(o)] : o.paths)
       for (const [x, y] of flatten(sp, 12)) {
         x0 = Math.min(x0, x);
         y0 = Math.min(y0, y);
@@ -634,19 +645,11 @@ async function loadEmbroidery(key: string): Promise<EmbroideryFont> {
         return i;
       });
       // glyph origin: left edge and baseline, like Ink/Stitch's Glyph._move_to_origin
-      const b = pathBounds(objs) ?? { x: 0, y: 0, w: 0, h: 0 };
+      const b = pathBounds(objs, true) ?? { x: 0, y: 0, w: 0, h: 0 };
       const dx = -b.x;
       const dy = -(await baselineOf(ci)) * PX;
-      const mv = (q: Vec2): Vec2 => [q[0] + dx, q[1] + dy];
-      const moved = objs.map((o) => ({
-        ...o,
-        paths: o.paths.map((sp) => ({
-          closed: sp.closed,
-          nodes: sp.nodes.map((n) => ({ p: mv(n.p), ...(n.i ? { i: mv(n.i) } : {}), ...(n.o ? { o: mv(n.o) } : {}) })),
-        })),
-        start: o.start ? mv(o.start) : undefined,
-        end: o.end ? mv(o.end) : undefined,
-      }));
+      // everything moves: paths, start / end points, guide and pattern lines, ripple targets …
+      const moved = objs.map((o) => mapGeometry(o, (q: Vec2): Vec2 => [q[0] + dx, q[1] + dy]));
       return { name, objects: moved, colors: colorIdx, width: b.w, minX: b.x };
     })();
     p.catch(() => cache.delete(ck));
@@ -675,6 +678,11 @@ async function loadEmbroidery(key: string): Promise<EmbroideryFont> {
     variant: defaultVariant,
     variants: [defaultVariant, ...[...where.keys()].filter((v) => v !== defaultVariant)],
     reversible: meta.reversible !== false,
+    sortable: meta.sortable === true,
+    combineAtSortIndices: Array.isArray(meta.combine_at_sort_indices) ? meta.combine_at_sort_indices : [],
+    // Ink/Stitch's default: on (fonts packed before the flag was kept: on too)
+    autoSatin: meta.auto_satin !== false,
+    scaleCrossStitch: meta.scale_cross_stitch_pattern === true,
     namesOf: (v) => nameSets.get(variantOf(v)) ?? new Set(),
     glyph,
   };

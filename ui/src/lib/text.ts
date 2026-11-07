@@ -3,8 +3,9 @@
 // editable (content, font, size, spacing, arc, style) after it is placed.
 // The layout itself (Ink/Stitch's rules) is in textLayout.ts.
 
-import { loadFont } from "./fonts";
-import { layoutText } from "./textLayout";
+import { loadFont, type LoadedFont } from "./fonts";
+import { clampToFont, layoutText } from "./textLayout";
+export { clampToFont, fontSizeRange, sizeForFont } from "./textLayout";
 import type { DesignObject, FillParams, Vec2 } from "../types";
 
 export type TextStyle = "fill" | "border" | "fillBorder" | "outline";
@@ -15,9 +16,10 @@ export interface TextSpec {
   font: string;
   /** Cap height in mm. */
   size: number;
-  /** Extra space between letters, mm. */
+  /** Extra space between letters, mm. Embroidery fonts: at the font's own
+   *  size, scaling with the letters (Ink/Stitch letter spacing). */
   letterSpacing: number;
-  /** Extra space between words, mm (Ink/Stitch word spacing). */
+  /** Extra space between words, mm (Ink/Stitch word spacing; scales like the letter spacing). */
   wordSpacing?: number;
   /** Multiplier of the font's line height. */
   lineSpacing: number;
@@ -46,15 +48,17 @@ export interface TextSpec {
    *  the font is digitized, the default) or a fill method instead. */
   fill?: "font" | FillParams["method"];
   /** Cross-stitch fonts: crosses grow with the letters (the designed pattern
-   *  at every size) instead of keeping the font's cross size. */
+   *  at every size) instead of keeping the font's cross size; unset: as the
+   *  font says (Ink/Stitch scale_cross_stitch_pattern). */
   crossScale?: boolean;
   /** The fill the font is digitized with (set when generated, for the panel). */
   fontFill?: FillParams["method"];
   /** Embroidery fonts: trim after every letter, word or line (Ink/Stitch's
    *  lettering trims); the font's own trims are always kept. */
   trims?: "never" | "letter" | "word" | "line";
-  /** Multicolour fonts: sew each colour in one go within the whole text, each
-   *  line or each word (Ink/Stitch colour sort) — fewer colour changes. */
+  /** Fonts that allow it (Ink/Stitch "sortable"): sew the font's colours in
+   *  the order of their colour sort index within the whole text, each line or
+   *  each word (Ink/Stitch colour sort) — fewer colour changes. */
   colorSort?: "off" | "all" | "line" | "word";
   /** Lettering along a path (Ink/Stitch "Lettering along path"): the path in
    *  design mm; it replaces the anchor, rotation and arc. */
@@ -75,7 +79,8 @@ export interface TextSpec {
 
 export const DEFAULT_TEXT: Omit<TextSpec, "group" | "anchor" | "thread" | "borderThread" | "font"> = {
   content: "Text",
-  size: 10,
+  // the default font's own size (Amitaclo, 23 mm): new lettering starts at the size it is digitized for
+  size: 23,
   letterSpacing: 0,
   lineSpacing: 1,
   align: "center",
@@ -85,6 +90,11 @@ export const DEFAULT_TEXT: Omit<TextSpec, "group" | "anchor" | "thread" | "borde
   borderWidth: 1.2,
   fillAngle: 45,
 };
+
+/** The size a new lettering in `font` starts at: the font's own size (in its range). */
+export function startSize(font: LoadedFont | null | undefined, fallback = DEFAULT_TEXT.size): number {
+  return font?.kind === "embroidery" && font.size > 0 ? clampToFont(font.size, font) : fallback;
+}
 
 /** Generate the objects of a lettering for its spec. */
 export async function generateText(spec: TextSpec): Promise<DesignObject[]> {

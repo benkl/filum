@@ -39,9 +39,8 @@ fn centroid(ring: &[Point]) -> Point {
     pt(cx / (3.0 * a), cy / (3.0 * a))
 }
 
-/// Centroid of an open line (shapely's `LineString.centroid`, what Ink/Stitch
-/// fans an open ripple towards): segment midpoints weighted by length. The
-/// area centroid of an open S-curve can land far outside it.
+/// Centroid of a line (shapely's `LineString.centroid`): segment midpoints
+/// weighted by length. Ink/Stitch moves guided copies about it.
 fn line_centroid(line: &[Point]) -> Point {
     let (mut len, mut cx, mut cy) = (0.0, 0.0, 0.0);
     for w in line.windows(2) {
@@ -54,6 +53,43 @@ fn line_centroid(line: &[Point]) -> Point {
         return line.first().copied().unwrap_or(pt(0.0, 0.0));
     }
     pt(cx / len, cy / len)
+}
+
+/// Centroid of the convex hull of all the points (shapely's
+/// `convex_hull.centroid`): Ink/Stitch's default ripple target, for open and
+/// closed outlines alike (`Stroke.get_ripple_target`: the element's
+/// line strings' convex hull). A hull that is a line gives its middle.
+fn hull_centroid(points: &[Point]) -> Point {
+    let mut v: Vec<Point> = points.iter().copied().filter(|q| q.x.is_finite() && q.y.is_finite()).collect();
+    v.sort_by(|a, b| a.x.total_cmp(&b.x).then(a.y.total_cmp(&b.y)));
+    v.dedup_by(|a, b| a.dist(*b) < 1e-12);
+    match v.len() {
+        0 => return pt(0.0, 0.0),
+        1 => return v[0],
+        _ => {}
+    }
+    // Andrew's monotone chain
+    let cross = |o: Point, a: Point, b: Point| (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    let mut hull: Vec<Point> = Vec::with_capacity(v.len() * 2);
+    for pass in 0..2 {
+        let start = hull.len();
+        let iter: Box<dyn Iterator<Item = &Point>> = if pass == 0 { Box::new(v.iter()) } else { Box::new(v.iter().rev()) };
+        for &q in iter {
+            while hull.len() >= start + 2 && cross(hull[hull.len() - 2], hull[hull.len() - 1], q) <= 0.0 {
+                hull.pop();
+            }
+            hull.push(q);
+        }
+        hull.pop();
+    }
+    let area: f64 = (0..hull.len()).map(|i| cross(pt(0.0, 0.0), hull[i], hull[(i + 1) % hull.len()])).sum::<f64>() * 0.5;
+    let (lo, hi) = (v[0], v[v.len() - 1]);
+    let extent = lo.dist(hi).max(1e-9);
+    if hull.len() < 3 || area.abs() < 1e-9 * extent * extent {
+        // collinear: the hull is the segment between the extremes
+        return lo.lerp(hi, 0.5);
+    }
+    centroid(&hull)
 }
 
 /// Ink/Stitch `_get_steps`: `n` values from `start` to `end`, raised to
@@ -234,7 +270,8 @@ fn satin_guide_helper(c: &Ctx, outline: &[Point], guide: &[SubPath]) -> Vec<Vec<
         let Some(&(a0, a1)) = pairs.first() else { return vec![] };
         let start_rot = angle_of(a0, a1);
         let start_scale = a0.dist(a1).max(1e-9);
-        let oc = centroid(outline);
+        // Ink/Stitch: `outline.centroid` of the (open) outline line
+        let oc = line_centroid(outline);
         let copies: Vec<Vec<Point>> = pairs
             .iter()
             .map(|&(q0, q1)| {
@@ -341,7 +378,8 @@ fn target_helper(c: &Ctx, outline: &[Point], target: Point, end: f64, twist: f64
 }
 
 /// Helper lines of one sub-path, and whether its ripples are linear.
-fn single_helper(c: &Ctx, sp: &SubPath, spacing: f64) -> Option<(bool, Vec<Vec<Point>>)> {
+/// `default_target`: where ripples go without a target set (the hull centroid).
+fn single_helper(c: &Ctx, sp: &SubPath, spacing: f64, default_target: Point) -> Option<(bool, Vec<Vec<Point>>)> {
     let p = c.p;
     let outline: Vec<Point> = if p.manual {
         let mut v: Vec<Point> = sp.nodes.iter().map(|n| n.point()).collect();
@@ -363,8 +401,7 @@ fn single_helper(c: &Ctx, sp: &SubPath, spacing: f64) -> Option<(bool, Vec<Vec<P
     let twist = p.rotation.to_radians();
     if sp.closed {
         // circular ripples: towards the target, blended into a spiral
-        let ring = &outline[..outline.len() - 1];
-        let target = p.target.map(Point::from_arr).unwrap_or_else(|| centroid(ring));
+        let target = p.target.map(Point::from_arr).unwrap_or(default_target);
         let end = 1.0 - p.min_scale.clamp(0.0, 0.98);
         let h = target_helper(c, &outline, target, end, twist);
         return Some((false, converge(h, false, true)));
@@ -382,7 +419,7 @@ fn single_helper(c: &Ctx, sp: &SubPath, spacing: f64) -> Option<(bool, Vec<Vec<P
         guided_helper(c, &outline, &pts, Some(&rungs), twist)
     } else if p.fan {
         // Ink/Stitch without a guide: fanned towards the target
-        let target = p.target.map(Point::from_arr).unwrap_or_else(|| line_centroid(&outline));
+        let target = p.target.map(Point::from_arr).unwrap_or(default_target);
         target_helper(c, &outline, target, 1.0, twist)
     } else {
         // Filum's default: parallel copies `spacing` apart, towards the target side
@@ -583,12 +620,14 @@ pub fn ripple_stitches(paths: &[SubPath], p: &RippleParams, run: &RunningParams)
         let g = if p.grid_size > 0.0 { satin_helper(&c, &owned, p.grid_size).unwrap_or_else(|| h.clone()) } else { h.clone() };
         vec![(true, h, g)]
     } else {
+        let all: Vec<Point> = usable.iter().flat_map(|sp| sp.flatten(0.05)).collect();
+        let default_target = hull_centroid(&all);
         usable
             .iter()
             .filter_map(|sp| {
                 let c = Ctx { p, len: len.clone(), tol, closed: sp.closed };
                 let spacing = if p.grid_size > 0.0 { p.grid_size } else { len.main() };
-                single_helper(&c, sp, spacing).map(|(linear, h)| (linear, h.clone(), h))
+                single_helper(&c, sp, spacing, default_target).map(|(linear, h)| (linear, h.clone(), h))
             })
             .collect()
     };
@@ -649,6 +688,24 @@ mod tests {
 
     fn run() -> RunningParams {
         RunningParams::default()
+    }
+
+    #[test]
+    fn the_default_target_is_the_convex_hull_centroid() {
+        // Ink/Stitch `shape.convex_hull.centroid`: a "C" ends in the middle of
+        // its hull (50, 50), not at its area centroid (further left)
+        let c = SubPath::polyline(&[pt(30.0, 30.0), pt(70.0, 30.0), pt(70.0, 40.0), pt(40.0, 40.0), pt(40.0, 60.0), pt(70.0, 60.0), pt(70.0, 70.0), pt(30.0, 70.0)], true);
+        let s = &ripple_stitches(&[c], &RippleParams { lines: 6, ..Default::default() }, &run())[0];
+        assert!(s.last().unwrap().dist(pt(50.0, 50.0)) < 0.3, "{:?}", s.last());
+        // an open "^": fanned towards its hull's centroid (10, 10/3), not the
+        // line's centroid (10, 5)
+        let hat = SubPath::polyline(&[pt(0.0, 0.0), pt(10.0, 10.0), pt(20.0, 0.0)], false);
+        let s = &ripple_stitches(&[hat], &RippleParams { lines: 4, fan: true, ..Default::default() }, &run())[0];
+        assert!(s.iter().any(|q| q.dist(pt(10.0, 10.0 / 3.0)) < 1e-6), "the last ripple at the target");
+        assert!(s.iter().all(|q| q.dist(pt(10.0, 5.0)) > 0.5));
+        // a straight line's hull is the line: its middle
+        assert!(hull_centroid(&[pt(0.0, 0.0), pt(4.0, 0.0), pt(10.0, 0.0)]).dist(pt(5.0, 0.0)) < 1e-9);
+        assert!(hull_centroid(&[pt(2.0, 3.0)]).dist(pt(2.0, 3.0)) < 1e-9);
     }
 
     #[test]

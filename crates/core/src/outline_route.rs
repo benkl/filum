@@ -11,7 +11,7 @@
 //! Every edge is covered once and no travel shows.
 
 use crate::geom::{polyline_length, Point};
-use crate::model::{Object, RunningParams, SatinParams, StitchParams, SubPath};
+use crate::model::{HiddenRule, Object, RunningParams, SatinParams, StitchParams, SubPath};
 
 /// A line to route: its centre line and how it is sewn.
 #[derive(Clone)]
@@ -207,7 +207,11 @@ pub fn route_lines(objects: Vec<Object>, cursor: Point) -> Vec<Object> {
                 "path" => format!("{} · path {k}", template.name.split(" line").next().unwrap_or("Line")),
                 _ => format!("{} line {k}", template.name.split(" line").next().unwrap_or("Line")),
             };
-            Object { id: format!("{}r{k}", template.id), name, paths: vec![SubPath::polyline(&pts, closed)], stitch, ..template.clone() }
+            // a path runs under the line sewn back over it: it stays when
+            // running stitches under covers are removed (a gap there would
+            // bring the trims back)
+            let hidden = if step == "path" { Some(HiddenRule { keep: true, ..template.hidden.unwrap_or_default() }) } else { template.hidden };
+            Object { id: format!("{}r{k}", template.id), name, paths: vec![SubPath::polyline(&pts, closed)], stitch, hidden, ..template.clone() }
         };
         let steps = walk(&edges, tol, &mut pos);
         for st in steps {

@@ -250,7 +250,9 @@ pub fn strokes(skel: &[bool], w: usize, h: usize, radius: &dyn Fn(usize) -> f64,
     let degree = |g: &Graph, nd: usize| g.edges.iter().filter(|e| e.alive && (e.a == nd || e.b == nd)).map(|e| if e.a == e.b { 2 } else { 1 }).sum::<usize>();
     let node_r = |g: &Graph, nd: usize| g.nodes[nd].1.iter().map(|&i| radius(i)).fold(0.0f64, f64::max).max(1.0);
 
-    // 2. spurs: a free end hanging off a junction, shorter than the line is wide (or the minimum)
+    // 2. spurs: a free end hanging off a junction, shorter than about one and a half
+    // line widths (thinning artefacts of corners and blobs reach about one width; an
+    // arm or a serif of a letter is longer), or the minimum
     let prune = |g: &mut Graph| {
     for _ in 0..3 {
         let mut changed = false;
@@ -263,7 +265,7 @@ pub fn strokes(skel: &[bool], w: usize, h: usize, radius: &dyn Fn(usize) -> f64,
             let (free, junction) = if da == 1 && db >= 3 { (e.a, e.b) } else if db == 1 && da >= 3 { (e.b, e.a) } else { continue };
             let _ = free;
             let len = e.pix.len() as f64 + 1.0;
-            if len < (2.5 * node_r(g, junction)).max(o.min_len) {
+            if len < (3.0 * node_r(g, junction)).max(o.min_len) {
                 g.edges[k].alive = false;
                 changed = true;
             }

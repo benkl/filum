@@ -125,7 +125,9 @@ pub fn plan_to_document(plan: &StitchPlan, name: &str) -> Document {
             stitch: StitchParams::Manual(Default::default()),
             trim_after: false,
             stop_after: false,
-            ties: Default::default(),
+            // the file's stitches already hold its lock stitches: none on top
+            // (each round trip would add another set)
+            ties: crate::model::Ties::None,
             force_lock: false,
             min_stitch: None,
             min_jump: None,

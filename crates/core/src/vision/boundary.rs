@@ -550,6 +550,120 @@ pub fn fit_chain(c: &Chain, accuracy: f64, corner_deg: f64, scale: f64) -> Vec<S
     out
 }
 
+/// Fit one chain of upscaled pixel art (`up` grid units per source pixel). Pixel art
+/// is drawn on purpose pixel by pixel: every 90° corner stays, except the steps of a
+/// staircase (a run of one source pixel between two turns the opposite way, or the
+/// one-unit steps of a diagonal the upscaler joined), which become a smooth diagonal
+/// or curve. Curves stay within a quarter of a source pixel of the pixels.
+pub fn fit_chain_pixel(c: &Chain, up: f64) -> Vec<Seg> {
+    let pts = &c.pts;
+    let n = pts.len();
+    if n < 2 {
+        return vec![];
+    }
+    // runs of equal unit steps: (first vertex, last vertex, direction, steps)
+    let step = |i: usize| {
+        let d = pts[(i + 1) % n] - pts[i];
+        ((d.x.round() as i64).signum(), (d.y.round() as i64).signum())
+    };
+    let steps = if c.closed { n } else { n - 1 };
+    let mut runs: Vec<(usize, usize, (i64, i64), usize)> = Vec::new();
+    for i in 0..steps {
+        let d = step(i);
+        match runs.last_mut() {
+            Some(r) if r.2 == d => {
+                r.1 = (i + 1) % n;
+                r.3 += 1;
+            }
+            _ => runs.push((i, (i + 1) % n, d, 1)),
+        }
+    }
+    if c.closed && runs.len() > 1 && runs[0].2 == runs.last().unwrap().2 {
+        let last = runs.pop().unwrap();
+        runs[0].0 = last.0;
+        runs[0].3 += last.3;
+    }
+    let m = runs.len();
+    if m < 2 {
+        return vec![Seg::Line(pts[0], pts[if c.closed { 0 } else { n - 1 }])];
+    }
+    let run_len = |k: usize| runs[k].3 as f64;
+    // turn at the vertex between run k and run k+1: +1 / -1 (sense), 0 = no turn there
+    let sense = |k: usize| -> i64 {
+        if !c.closed && k + 1 >= m {
+            return 0;
+        }
+        let (a, b) = (runs[k % m].2, runs[(k + 1) % m].2);
+        (a.0 * b.1 - a.1 * b.0).signum()
+    };
+    let short = up + 0.5;
+    // the vertex after run k is a corner unless one of its runs is a staircase step
+    let corner_after = |k: usize| -> bool {
+        let t = sense(k);
+        if t == 0 {
+            return false;
+        }
+        let before = if c.closed { (k + m - 1) % m } else if k == 0 { usize::MAX } else { k - 1 };
+        let step_before = before != usize::MAX && run_len(k) <= short && sense(before) == -t;
+        let step_after = run_len((k + 1) % m) <= short && (c.closed || k + 2 < m) && sense((k + 1) % m) == -t;
+        !(step_before || step_after)
+    };
+    let mut cuts: Vec<usize> = (0..if c.closed { m } else { m - 1 }).filter(|&k| corner_after(k)).map(|k| runs[k].1).collect();
+    cuts.sort_unstable();
+    let acc = 0.25 * up;
+    let fit_piece = |piece: &[Point], closed: bool| -> Vec<Seg> {
+        if piece.len() < 2 {
+            return vec![];
+        }
+        if !closed && (piece.len() <= 3 || max_dev_from_chord(piece) <= 0.5) {
+            return vec![Seg::Line(piece[0], *piece.last().unwrap())];
+        }
+        let mut smooth = destair(piece, closed, up);
+        if closed {
+            keep_area(&mut smooth, piece);
+        }
+        if !closed && max_dev_from_chord(&smooth) <= acc {
+            return vec![Seg::Line(piece[0], *piece.last().unwrap())];
+        }
+        let segs = fit_smooth(&smooth, closed, acc);
+        if !segs.is_empty() && segs.iter().all(|sg| seg_near(sg, &smooth, 2.0 * acc)) {
+            return segs;
+        }
+        let mut line = smooth.clone();
+        if closed {
+            line.push(smooth[0]);
+        }
+        crate::geom::simplify(&line, acc).windows(2).map(|w| Seg::Line(w[0], w[1])).collect()
+    };
+    let mut out = Vec::new();
+    if c.closed {
+        if cuts.is_empty() {
+            return fit_piece(pts, true);
+        }
+        for k in 0..cuts.len() {
+            let (a, b) = (cuts[k], cuts[(k + 1) % cuts.len()]);
+            let mut piece = vec![pts[a]];
+            let mut i = a;
+            loop {
+                i = (i + 1) % n;
+                piece.push(pts[i]);
+                if i == b || piece.len() > n + 1 {
+                    break;
+                }
+            }
+            out.extend(fit_piece(&piece, false));
+        }
+    } else {
+        let mut bounds = vec![0];
+        bounds.extend(cuts.into_iter().filter(|&i| i > 0 && i < n - 1));
+        bounds.push(n - 1);
+        for w in bounds.windows(2) {
+            out.extend(fit_piece(&pts[w[0]..=w[1]], false));
+        }
+    }
+    out
+}
+
 // ---------------------------------------------------------------------------
 // Rings per region
 

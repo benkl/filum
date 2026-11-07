@@ -21,7 +21,7 @@ import {
 import { objectBoundsCached, unionBoxes } from "../lib/geometry";
 import { openFile, openFolder } from "../lib/platform";
 import { MACHINE_EXT } from "../lib/actions";
-import { members, type TextSpec, type TextStyle } from "../lib/text";
+import { members, sizeForFont, startSize, type TextSpec, type TextStyle } from "../lib/text";
 import { lockedToast, selectedTextGroup, textLocked, updateText } from "../lib/textOps";
 import { onDownloadsChange } from "../lib/downloadStore";
 import { useStore } from "../store";
@@ -86,10 +86,12 @@ const FILL_NAMES: Partial<Record<FillParams["method"], string>> = {
 const LETTER_FILLS: FillParams["method"][] = ["tatami", "cross", "contour", "meander", "curved"];
 
 /** Embroidery fonts: the letters' fill — the font's own by default. */
-function LetterFill({ group, spec, fontFill }: { group: string; spec: TextSpec; fontFill?: FillParams["method"] }) {
+function LetterFill({ group, spec, fontFill, fontScales }: { group: string; spec: TextSpec; fontFill?: FillParams["method"]; fontScales?: boolean }) {
   if (!fontFill) return null;
   const cur = spec.fill ?? "font";
   const crosses = (cur === "font" && fontFill === "cross") || cur === "cross";
+  // unset: as the font says (Ink/Stitch scale_cross_stitch_pattern)
+  const grow = spec.crossScale ?? !!fontScales;
   return (
     <>
       <Row label="Fill" title="The fill of the letters' filled areas: as the font is digitized, or another fill">
@@ -103,12 +105,15 @@ function LetterFill({ group, spec, fontFill }: { group: string; spec: TextSpec; 
         </select>
       </Row>
       {crosses && cur === "font" && (
-        <Row label="Crosses" title="Keep the font's cross size (more crosses on bigger letters, as Ink/Stitch) or grow the crosses with the letters (the designed pattern at every size)">
+        <Row
+          label="Crosses"
+          title={`Keep the font's cross size (more crosses on bigger letters) or grow the crosses with the letters (the designed pattern at every size). This font: ${fontScales ? "grow with the letters" : "keep their size"} (Ink/Stitch's scale cross stitch pattern).`}
+        >
           <div className="seg">
-            <button className={!spec.crossScale ? "on" : ""} onClick={() => updateText(group, { crossScale: false })}>
+            <button className={!grow ? "on" : ""} onClick={() => updateText(group, { crossScale: false })}>
               Font size
             </button>
-            <button className={spec.crossScale ? "on" : ""} onClick={() => updateText(group, { crossScale: true })}>
+            <button className={grow ? "on" : ""} onClick={() => updateText(group, { crossScale: true })}>
               Grow with letters
             </button>
           </div>
@@ -352,7 +357,7 @@ export function TextProperties({ group }: { group: string }) {
           </>
         ) : (
           <>
-          <LetterFill group={group} spec={spec} fontFill={fontFill} />
+          <LetterFill group={group} spec={spec} fontFill={fontFill} fontScales={emb?.scaleCrossStitch} />
           {emb && emb.variants.length > 1 && (
             <Row label="Direction" title="The direction the letters are stitched in: the font comes digitized in several (Ink/Stitch font variants)">
               <div className="seg">
@@ -410,8 +415,8 @@ export function TextProperties({ group }: { group: string }) {
           </p>
           </>
         )}
-        {palette && palette.length > 1 && (
-          <Row label="Colour order" title="Sew each colour in one go within the whole text, each line or each word — fewer colour changes (Ink/Stitch colour sort)">
+        {!outline && emb?.sortable && (
+          <Row label="Colour order" title="Sew the font's colours in turn (its colour sort order) within the whole text, each line or each word — fewer colour changes (Ink/Stitch colour sort; the font allows it)">
             <div className="seg">
               {(
                 [
@@ -624,10 +629,20 @@ export function FontPickerDialog({ onClose }: { onClose: () => void }) {
     }
     if (group) {
       useStore.getState().toast(`Loading ${fontLabel(key)}…`);
-      await updateText(group, { font: key });
+      // Ink/Stitch keeps the scale, within the new font's range
+      const [to, from] = await Promise.all([loadFont(key).catch(() => null), spec ? loadFont(spec.font).catch(() => null) : null]);
+      const size = to && spec ? sizeForFont(spec.size, from, to) : undefined;
+      await updateText(group, { font: key, ...(size !== undefined && size !== spec?.size ? { size } : {}) });
     } else {
-      const d = JSON.parse(localStorage.getItem("filum.textDefaults") ?? "{}");
-      safeSetItem("filum.textDefaults", JSON.stringify({ ...d, font: key }));
+      // new text starts at the font's own size
+      let d: Record<string, unknown> = {};
+      try {
+        d = JSON.parse(localStorage.getItem("filum.textDefaults") ?? "{}");
+      } catch {
+        /* unreadable: start afresh */
+      }
+      const to = await loadFont(key).catch(() => null);
+      safeSetItem("filum.textDefaults", JSON.stringify({ ...d, font: key, ...(to?.kind === "embroidery" ? { size: startSize(to) } : {}) }));
       useStore.getState().toast(`${fontLabel(key)} will be used for new text`);
     }
     onClose();

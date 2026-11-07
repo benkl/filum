@@ -10,9 +10,10 @@
 //!   interior edge its length divided by its distance from the outline
 //!   (+ 0.1 px), so travel keeps to the middle of the shape, where the rows
 //!   sewn later cover it.
-//! * Hard rule: once a row (or a streamline) is sewn, every travel edge that
-//!   crosses it is removed — a later travel never lies on it. With no route
-//!   left the caller jumps.
+//! * Hard rule: once a row (or a streamline) is sewn, every interior travel
+//!   edge that crosses it is removed — a later travel never lies on it. The
+//!   outline stays (as in Ink/Stitch), so every part of the shape stays
+//!   reachable; with no route left the caller jumps.
 //! * Open rows (a weak blended colour, the sparse end of a density ramp):
 //!   travel inside shows through them, so interior edges cost more with the
 //!   square of the local row distance, and above about 2.5 × the normal
@@ -78,6 +79,13 @@ impl TravelGraph {
     /// The travel graph of a shape whose rows run at `angle` (radians, the
     /// rotation that lays the rows horizontal: frame = p.rotate(angle)).
     pub fn new(rings: &[Ring], angle: f64) -> TravelGraph {
+        Self::with_outline_nodes(rings, angle, &[]).0
+    }
+
+    /// [`TravelGraph::new`] with extra nodes on the outline (row ends: Ink/Stitch
+    /// puts the fill graph's nodes in its travel graph), chained into it in
+    /// order; returns their node ids.
+    pub fn with_outline_nodes(rings: &[Ring], angle: f64, extra: &[OutlinePos]) -> (TravelGraph, Vec<u32>) {
         crate::prof!("travel: TravelGraph::new");
         let rr = rotate_rings(rings, angle);
         let b = rings_bounds(&rr);
@@ -109,8 +117,20 @@ impl TravelGraph {
                 }
             }
         }
+        let mut on_ring: Vec<Vec<(usize, f64, u32)>> = vec![Vec::new(); rings.len()];
+        let extra_ids: Vec<u32> = extra
+            .iter()
+            .map(|e| {
+                let id = g.add_node(e.at);
+                if let Some(r) = on_ring.get_mut(e.ring) {
+                    r.push((e.edge, e.u, id));
+                }
+                id
+            })
+            .collect();
         if !(b.width() > 0.0 && b.height() > 0.0) {
-            return g;
+            g.chain_outline(on_ring);
+            return (g, extra_ids);
         }
         let back = |q: Point| q.rotate(-angle);
         // lattice nodes (i·s, j·s) with i + j even: the ±45° diagonals and the
@@ -131,7 +151,6 @@ impl TravelGraph {
         }
         // where the lattice leaves the shape: a node on the outline
         // (ring index, edge index, t) for chaining the outline
-        let mut on_ring: Vec<Vec<(usize, f64, u32)>> = vec![Vec::new(); rings.len()];
         let mut keys: Vec<(i64, i64)> = node_at.keys().copied().collect();
         keys.sort_unstable();
         for (i, j) in keys {
@@ -178,7 +197,14 @@ impl TravelGraph {
                 }
             }
         }
-        // the outline: ring vertices and the lattice's outline nodes in order
+        g.chain_outline(on_ring);
+        (g, extra_ids)
+    }
+
+    /// The outline: ring vertices and the nodes on it (lattice ends, row
+    /// ends) in order, each joined to the next (Ink/Stitch: 3 × the length).
+    fn chain_outline(&mut self, on_ring: Vec<Vec<(usize, f64, u32)>>) {
+        let rings = self.rings.clone();
         for (ri, ring) in rings.iter().enumerate() {
             let n = ring.len();
             if n < 2 {
@@ -186,19 +212,20 @@ impl TravelGraph {
             }
             let mut chain: Vec<(usize, f64, u32)> = (0..n).map(|k| (k, 0.0, u32::MAX)).collect();
             chain.extend(on_ring[ri].iter().copied());
-            chain.sort_by(|x, y| (x.0, x.1).partial_cmp(&(y.0, y.1)).unwrap());
-            let ids: Vec<u32> = chain.iter().map(|&(k, _, id)| if id == u32::MAX { g.add_node(ring[k]) } else { id }).collect();
+            chain.sort_by(|x, y| (x.0, x.1, x.2 != u32::MAX).partial_cmp(&(y.0, y.1, y.2 != u32::MAX)).unwrap());
+            let ids: Vec<u32> = chain.iter().map(|&(k, _, id)| if id == u32::MAX { self.add_node(ring[k]) } else { id }).collect();
             for w in 0..ids.len() {
                 let (a, c) = (ids[w], ids[(w + 1) % ids.len()]);
-                let l = g.pts[a as usize].dist(g.pts[c as usize]);
-                if l > 1e-9 {
-                    g.add_edge(a, c, 3.0 * l * PX);
-                    let last = g.edges.len() - 1;
-                    g.edges[last].outline = true;
+                if a == c {
+                    continue;
                 }
+                // nodes at the same place (row ends meeting) stay joined
+                let l = self.pts[a as usize].dist(self.pts[c as usize]);
+                self.add_edge(a, c, 3.0 * l * PX);
+                let last = self.edges.len() - 1;
+                self.edges[last].outline = true;
             }
         }
-        g
     }
 
     fn key(&self, p: Point) -> (i64, i64) {
@@ -318,7 +345,9 @@ impl TravelGraph {
                 if let Some(ids) = self.egrid.get(&c) {
                     for &id in ids {
                         let e = self.edges[id as usize];
-                        if e.alive && segments_intersect(a, b, self.pts[e.a as usize], self.pts[e.b as usize]) {
+                        // the outline stays open (Ink/Stitch removes only the
+                        // interior travel edges a row crosses)
+                        if e.alive && !e.outline && segments_intersect(a, b, self.pts[e.a as usize], self.pts[e.b as usize]) {
                             self.edges[id as usize].alive = false;
                         }
                     }
@@ -522,6 +551,526 @@ impl TravelGraph {
     pub fn route(&self, from: Point, to: Point) -> Option<Vec<Point>> {
         self.routes(from, &[to]).pop().flatten()
     }
+
+    /// The cheapest route between two nodes of the graph (Ink/Stitch
+    /// `networkx.shortest_path` on its travel graph), and whether it goes
+    /// inside the shape (else it follows the outline).
+    pub fn route_nodes(&self, a: u32, b: u32) -> Option<(Vec<Point>, bool)> {
+        let n = self.pts.len() as u32;
+        if a >= n || b >= n {
+            return None;
+        }
+        if a == b {
+            return Some((vec![self.pts[a as usize]], false));
+        }
+        let key = |d: f64| (d * 1e4) as u64;
+        let mut dist: HashMap<u32, f64> = HashMap::new();
+        let mut prev: HashMap<u32, (u32, u32)> = HashMap::new();
+        let mut heap = BinaryHeap::new();
+        dist.insert(a, 0.0);
+        heap.push(Reverse((0u64, a)));
+        let mut found = false;
+        while let Some(Reverse((dk, u))) = heap.pop() {
+            let du = dist[&u];
+            if dk > key(du) {
+                continue;
+            }
+            if u == b {
+                found = true;
+                break;
+            }
+            for &(v, e) in &self.adj[u as usize] {
+                let edge = self.edges[e as usize];
+                if !edge.alive {
+                    continue;
+                }
+                let nd = du + edge.w;
+                if dist.get(&v).is_none_or(|d| nd < *d) {
+                    dist.insert(v, nd);
+                    prev.insert(v, (u, e));
+                    heap.push(Reverse((key(nd), v)));
+                }
+            }
+        }
+        if !found {
+            return None;
+        }
+        let mut path = vec![self.pts[b as usize]];
+        let mut inside = false;
+        let mut u = b;
+        while let Some(&(p, e)) = prev.get(&u) {
+            inside |= !self.edges[e as usize].outline;
+            path.push(self.pts[p as usize]);
+            u = p;
+            if u == a {
+                break;
+            }
+        }
+        path.reverse();
+        dedup(&mut path, 1e-9);
+        Some((path, inside))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The stitch path of a fill (Ink/Stitch `auto_fill.py`: `build_fill_stitch_graph`,
+// `find_stitch_path`, `fill_gaps`, `collapse_sequential_outline_edges`,
+// `path_to_stitches`)
+//
+// The rows (or any sewn pieces whose ends lie on the outline) are the edges of
+// a graph whose nodes are their ends; the outline between neighbouring ends is
+// an edge too, every other one doubled, so every node has an even degree and
+// an Eulerian circuit exists. Hierholzer's algorithm, always taking a row when
+// one is left, walks it like mowing a lawn; read backwards, the circuit travels
+// to a place *before* the rows there are sewn, so travel hides under them, and
+// every pocket stays reachable along the outline. The fill ends where it
+// started unless it has an end point.
+
+/// Where a point lies on the outline: ring, edge, parameter on the edge,
+/// distance along the ring from its first vertex, and the point on it.
+#[derive(Clone, Copy, Debug)]
+pub struct OutlinePos {
+    pub ring: usize,
+    pub edge: usize,
+    pub u: f64,
+    pub s: f64,
+    pub at: Point,
+}
+
+/// The nearest place on the outline (Ink/Stitch `which_outline` + `project`).
+pub fn outline_pos(rings: &[Ring], p: Point) -> Option<OutlinePos> {
+    let mut best: Option<(f64, OutlinePos)> = None;
+    for (ri, ring) in rings.iter().enumerate() {
+        let n = ring.len();
+        let mut s = 0.0;
+        for k in 0..n {
+            let (a, b) = (ring[k], ring[(k + 1) % n]);
+            let e = b - a;
+            let l2 = e.length_sq();
+            let l = l2.sqrt();
+            let u = if l2 > 1e-18 { ((p - a).dot(e) / l2).clamp(0.0, 1.0) } else { 0.0 };
+            let q = a + e * u;
+            let d = q.dist(p);
+            if best.is_none_or(|(bd, _)| d < bd) {
+                best = Some((d, OutlinePos { ring: ri, edge: k, u, s: s + l * u, at: q }));
+            }
+            s += l;
+        }
+    }
+    best.map(|b| b.1)
+}
+
+fn dist_to_seg(p: Point, a: Point, b: Point) -> f64 {
+    let e = b - a;
+    let l2 = e.length_sq();
+    let t = if l2 > 1e-18 { ((p - a).dot(e) / l2).clamp(0.0, 1.0) } else { 0.0 };
+    (a + e * t).dist(p)
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Kind {
+    Segment,
+    Outline,
+    Extra,
+    /// added to make the graph Eulerian (not a neighbour along the outline)
+    Euler,
+}
+
+/// A step of a fill's stitch path.
+#[derive(Clone, Copy, Debug)]
+pub enum PathStep {
+    /// Sew from `from` to `to`: piece `seg` of the fill (None: an extra row
+    /// of gap filling, Ink/Stitch `fill_gap`).
+    Segment { seg: Option<usize>, from: Point, to: Point },
+    /// Travel between two points; `from_node` / `to_node` index
+    /// [`StitchPath::nodes`] (None: not a node). `adjacent`: neighbours along
+    /// the outline (one row to the next; Ink/Stitch's "outline" edge).
+    Travel { from: Point, to: Point, from_node: Option<usize>, to_node: Option<usize>, adjacent: bool },
+}
+
+/// A fill's stitch path: rows to sew and travel between them.
+#[derive(Clone, Debug, Default)]
+pub struct StitchPath {
+    pub steps: Vec<PathStep>,
+    /// The graph's nodes: the pieces' ends, the start and end points.
+    pub nodes: Vec<Point>,
+    /// Where the nodes lie on the outline (None: the start, off it).
+    pub pos: Vec<Option<OutlinePos>>,
+}
+
+/// One edge of the path before travel runs are collapsed.
+#[derive(Clone, Copy, Debug)]
+struct RawEdge {
+    a: Point,
+    b: Point,
+    na: Option<usize>,
+    nb: Option<usize>,
+    seg: Option<usize>,
+    segment: bool,
+}
+
+type GEdge = (usize, usize, Kind, usize);
+
+/// Ink/Stitch `insert_node`: a start or end point as a new node splitting
+/// the outline edge it lies on.
+fn insert_node(rings: &[Ring], perim: &[f64], p: Point, nodes: &mut Vec<Point>, pos: &mut Vec<OutlinePos>, edges: &mut Vec<GEdge>, alive: &mut Vec<bool>) -> Option<usize> {
+    let op = outline_pos(rings, p)?;
+    let id = nodes.len();
+    nodes.push(op.at);
+    pos.push(op);
+    let len = perim[op.ring].max(1e-9);
+    let split = (0..edges.len()).find(|&e| {
+        let (x, y, k, _) = edges[e];
+        if !alive[e] || k != Kind::Outline || pos[x].ring != op.ring || pos[y].ring != op.ring {
+            return false;
+        }
+        let span = (pos[y].s - pos[x].s).rem_euclid(len);
+        let at = (op.s - pos[x].s).rem_euclid(len);
+        at <= span + 1e-9 || span < 1e-12
+    });
+    let (x, y, kind) = match split {
+        Some(e) => {
+            alive[e] = false;
+            (edges[e].0, edges[e].1, Kind::Outline)
+        }
+        // no row ends on this outline: joined to the ends of the nearest outline edge
+        None => {
+            let near = (0..edges.len()).filter(|&e| alive[e] && edges[e].2 == Kind::Outline).min_by(|&e, &f| {
+                let d = |e: usize| dist_to_seg(op.at, nodes[edges[e].0], nodes[edges[e].1]);
+                d(e).partial_cmp(&d(f)).unwrap()
+            });
+            let e = near.or_else(|| (0..edges.len()).find(|&e| alive[e]))?;
+            (edges[e].0, edges[e].1, Kind::Euler)
+        }
+    };
+    edges.push((x, id, kind, op.ring));
+    alive.push(true);
+    edges.push((id, y, kind, op.ring));
+    alive.push(true);
+    Some(id)
+}
+
+/// The stitch path through pieces whose ends lie on the outline of `rings`
+/// (Ink/Stitch `build_fill_stitch_graph` + `graph_make_valid` +
+/// `find_stitch_path` + `fill_gaps` + `collapse_sequential_outline_edges`).
+/// `ends`: each piece's first and last point. `gap_rows`: Ink/Stitch
+/// `gap_fill_rows` (rounded up to even; straight rows only).
+pub fn find_stitch_path(rings: &[Ring], ends: &[(Point, Point)], start: Option<Point>, end: Option<Point>, gap_rows: u32) -> StitchPath {
+    let mut out = StitchPath::default();
+    if ends.is_empty() || rings.is_empty() {
+        return out;
+    }
+    // nodes: the pieces' ends (one node per place)
+    let mut nodes: Vec<Point> = Vec::new();
+    let mut index: HashMap<(u64, u64), usize> = HashMap::new();
+    let mut edges: Vec<GEdge> = Vec::new();
+    for (i, &(a, b)) in ends.iter().enumerate() {
+        let mut node_of = |p: Point| {
+            *index.entry((p.x.to_bits(), p.y.to_bits())).or_insert_with(|| {
+                nodes.push(p);
+                nodes.len() - 1
+            })
+        };
+        let na = node_of(a);
+        let nb = node_of(b);
+        edges.push((na, nb, Kind::Segment, i));
+    }
+    let Some(mut pos) = nodes.iter().map(|p| outline_pos(rings, *p)).collect::<Option<Vec<_>>>() else { return out };
+    let perim: Vec<f64> = rings.iter().map(|r| (0..r.len()).map(|k| r[k].dist(r[(k + 1) % r.len()])).sum()).collect();
+    // the outline between neighbouring nodes, every other edge doubled
+    let mut order: Vec<usize> = (0..nodes.len()).collect();
+    order.sort_by(|&x, &y| (pos[x].ring, pos[x].s).partial_cmp(&(pos[y].ring, pos[y].s)).unwrap());
+    let mut i0 = 0;
+    while i0 < order.len() {
+        let ring = pos[order[i0]].ring;
+        let mut i1 = i0;
+        while i1 < order.len() && pos[order[i1]].ring == ring {
+            i1 += 1;
+        }
+        let group = &order[i0..i1];
+        let k = group.len();
+        if k >= 2 {
+            for i in 0..k {
+                let (x, y) = (group[i], group[(i + 1) % k]);
+                edges.push((x, y, Kind::Outline, ring));
+                if i % 2 == 0 {
+                    edges.push((x, y, Kind::Extra, ring));
+                }
+            }
+        }
+        i0 = i1;
+    }
+    let mut alive = vec![true; edges.len()];
+    if let Some(p) = start {
+        insert_node(rings, &perim, p, &mut nodes, &mut pos, &mut edges, &mut alive);
+    }
+    if let Some(p) = end {
+        insert_node(rings, &perim, p, &mut nodes, &mut pos, &mut edges, &mut alive);
+    }
+    let n = nodes.len();
+    let degree = |edges: &[GEdge], alive: &[bool]| {
+        let mut d = vec![0usize; n];
+        for (e, &(a, b, _, _)) in edges.iter().enumerate() {
+            if alive[e] {
+                d[a] += 1;
+                d[b] += 1;
+            }
+        }
+        d
+    };
+    // Eulerian: pair the odd nodes (networkx `eulerize`)
+    let deg = degree(&edges, &alive);
+    let mut odd: Vec<usize> = (0..n).filter(|&v| deg[v] % 2 == 1).collect();
+    while let Some(v) = odd.pop() {
+        let Some(k) = (0..odd.len()).min_by(|&x, &y| nodes[odd[x]].dist(nodes[v]).partial_cmp(&nodes[odd[y]].dist(nodes[v])).unwrap()) else { break };
+        let w = odd.swap_remove(k);
+        edges.push((v, w, Kind::Euler, 0));
+        alive.push(true);
+    }
+    // adjacency as networkx keeps it: by neighbour in the order first met,
+    // then by edge in insertion order
+    let mut adj: Vec<Vec<usize>> = vec![Vec::new(); n];
+    for (e, &(a, b, _, _)) in edges.iter().enumerate() {
+        if alive[e] {
+            adj[a].push(e);
+            if b != a {
+                adj[b].push(e);
+            }
+        }
+    }
+    for (v, list) in adj.iter_mut().enumerate() {
+        let other = |e: usize| if edges[e].0 == v { edges[e].1 } else { edges[e].0 };
+        let mut first: Vec<usize> = Vec::new();
+        for &e in list.iter() {
+            if !first.contains(&other(e)) {
+                first.push(other(e));
+            }
+        }
+        list.sort_by_key(|&e| first.iter().position(|&o| o == other(e)).unwrap_or(0));
+    }
+    let neighbours: std::collections::HashSet<(usize, usize)> =
+        edges.iter().enumerate().filter(|(e, x)| alive[*e] && matches!(x.2, Kind::Outline | Kind::Extra)).map(|(_, x)| (x.0.min(x.1), x.0.max(x.1))).collect();
+    let nearest = |p: Point| (0..n).min_by(|&x, &y| nodes[x].dist(p).partial_cmp(&nodes[y].dist(p)).unwrap()).unwrap();
+    let starting = nearest(start.unwrap_or(nodes[0]));
+    let ending = end.map_or(starting, nearest);
+    // Hierholzer (networkx `eulerian_circuit`), taking a row when there is one
+    let mut deg = degree(&edges, &alive);
+    let mut used: Vec<bool> = alive.iter().map(|a| !a).collect();
+    let circuit = |from: usize, deg: &mut Vec<usize>, used: &mut Vec<bool>, raw: &mut Vec<RawEdge>| {
+        let mut stack: Vec<(usize, Option<usize>)> = vec![(from, None)];
+        let mut last: Option<(usize, Option<usize>)> = None;
+        while let Some(&(v, k)) = stack.last() {
+            if deg[v] == 0 {
+                if let Some((lv, lk)) = last {
+                    let seg = lk.filter(|&e| edges[e].2 == Kind::Segment).map(|e| edges[e].3);
+                    raw.push(RawEdge { a: nodes[lv], b: nodes[v], na: Some(lv), nb: Some(v), seg, segment: seg.is_some() });
+                }
+                last = Some((v, k));
+                stack.pop();
+            } else {
+                let mut pick = None;
+                for &e in &adj[v] {
+                    if used[e] {
+                        continue;
+                    }
+                    if pick.is_none() {
+                        pick = Some(e);
+                    }
+                    if edges[e].2 == Kind::Segment {
+                        pick = Some(e);
+                        break;
+                    }
+                }
+                let Some(e) = pick else {
+                    deg[v] = 0;
+                    continue;
+                };
+                used[e] = true;
+                let (a, b) = (edges[e].0, edges[e].1);
+                deg[a] -= 1;
+                deg[b] -= 1;
+                stack.push((if a == v { b } else { a }, Some(e)));
+            }
+        }
+    };
+    let mut raw: Vec<RawEdge> = Vec::new();
+    circuit(ending, &mut deg, &mut used, &mut raw);
+    // pieces the circuit could not reach (a graph in parts): their own
+    // circuits, from the nearest node, after the rest
+    loop {
+        let left: Vec<usize> = (0..edges.len()).filter(|&e| !used[e] && edges[e].2 == Kind::Segment).collect();
+        if left.is_empty() {
+            break;
+        }
+        let here = raw.last().map_or(nodes[ending], |r| r.b);
+        let v = left.iter().flat_map(|&e| [edges[e].0, edges[e].1]).min_by(|&x, &y| nodes[x].dist(here).partial_cmp(&nodes[y].dist(here)).unwrap()).unwrap();
+        let mut more = Vec::new();
+        circuit(v, &mut deg, &mut used, &mut more);
+        if more.is_empty() {
+            break;
+        }
+        if let Some(r) = raw.last().copied() {
+            raw.push(RawEdge { a: r.b, b: nodes[v], na: r.nb, nb: Some(v), seg: None, segment: false });
+        }
+        raw.extend(more);
+    }
+    if starting != ending {
+        raw.insert(0, RawEdge { a: nodes[starting], b: nodes[ending], na: Some(starting), nb: Some(ending), seg: None, segment: false });
+    }
+    // a start inside the shape: travel from there (Ink/Stitch starts at the
+    // travel graph's node nearest the start, which may be inside)
+    let mut pos: Vec<Option<OutlinePos>> = pos.into_iter().map(Some).collect();
+    if let Some(p) = start.filter(|p| point_in_rings(*p, rings) && p.dist(nodes[starting]) > 1e-6) {
+        nodes.push(p);
+        pos.push(None);
+        raw.insert(0, RawEdge { a: p, b: nodes[starting], na: Some(nodes.len() - 1), nb: Some(starting), seg: None, segment: false });
+    }
+    if gap_rows > 0 {
+        raw = fill_gaps(raw, gap_rows.div_ceil(2) * 2);
+    }
+    // runs of travel collapse into one travel each
+    let travel = |from: (Point, Option<usize>), to: (Point, Option<usize>)| {
+        let adjacent = matches!((from.1, to.1), (Some(x), Some(y)) if neighbours.contains(&(x.min(y), x.max(y))));
+        PathStep::Travel { from: from.0, to: to.0, from_node: from.1, to_node: to.1, adjacent }
+    };
+    let mut run: Option<(Point, Option<usize>)> = None;
+    for e in &raw {
+        if e.segment {
+            if let Some(r) = run.take() {
+                if r.0.dist(e.a) > 1e-9 {
+                    out.steps.push(travel(r, (e.a, e.na)));
+                }
+            }
+            out.steps.push(PathStep::Segment { seg: e.seg, from: e.a, to: e.b });
+        } else if run.is_none() {
+            run = Some((e.a, e.na));
+        }
+    }
+    if let (Some(r), Some(e)) = (run, raw.last()) {
+        if r.0.dist(e.b) > 1e-9 {
+            out.steps.push(travel(r, (e.b, e.nb)));
+        }
+    }
+    out.nodes = nodes;
+    out.pos = pos;
+    out
+}
+
+/// Ink/Stitch `fill_gaps`: where back-and-forth rows end and the path
+/// travels on, the last row is repeated `rows` times beyond it (into the gap
+/// fabric distortion opens there) and the path comes back.
+fn fill_gaps(path: Vec<RawEdge>, rows: u32) -> Vec<RawEdge> {
+    let path = remove_loops(path);
+    if path.len() < 3 {
+        return path;
+    }
+    let mut out: Vec<RawEdge> = Vec::new();
+    let mut last: Option<RawEdge> = None;
+    let mut in_section = 0;
+    for e in path {
+        if let Some(l) = last {
+            if e.segment && !l.segment {
+                in_section += 1;
+            }
+            if !e.segment && !l.segment {
+                if in_section > 3 && out.len() >= 4 {
+                    let next = out.pop().unwrap();
+                    fill_gap(&mut out, rows);
+                    out.push(next);
+                }
+                in_section = 0;
+            }
+        }
+        last = Some(e);
+        out.push(e);
+    }
+    out
+}
+
+fn remove_loops(path: Vec<RawEdge>) -> Vec<RawEdge> {
+    if path.len() < 2 {
+        return path;
+    }
+    let mut out: Vec<RawEdge> = Vec::new();
+    let mut seen: HashMap<(u64, u64), usize> = HashMap::new();
+    for e in path {
+        if e.segment {
+            out.push(e);
+            seen.clear();
+            continue;
+        }
+        let k = (e.b.x.to_bits(), e.b.y.to_bits());
+        if let Some(&i) = seen.get(&k) {
+            out.truncate(i);
+            seen.clear();
+            continue;
+        }
+        out.push(e);
+        seen.insert(k, out.len());
+    }
+    out
+}
+
+/// Ink/Stitch `fill_gap`: the last row repeated, offset by the row spacing.
+fn fill_gap(path: &mut Vec<RawEdge>, rows: u32) {
+    let n = path.len();
+    let original_end = path[n - 1].b;
+    let mut last = (path[n - 1].a, path[n - 1].b);
+    let penultimate = (path[n - 3].a, path[n - 3].b);
+    let mut off = (last.1 - last.0).unit().perp();
+    if (last.1 - penultimate.0).dot(off) < 0.0 {
+        off = off * -1.0;
+    }
+    let off = off * (last.1 - penultimate.0).dot(off);
+    let seg = |a: Point, b: Point| RawEdge { a, b, na: None, nb: None, seg: None, segment: true };
+    for _ in 0..rows {
+        let (end, start) = last;
+        let (start, end) = (start + off, end + off);
+        path.push(seg(last.1, start));
+        path.push(seg(start, end));
+        last = (start, end);
+    }
+    path.push(seg(last.1, original_end));
+}
+
+/// Sewing a [`StitchPath`]: its travel graph, with the path's nodes on the
+/// outline (Ink/Stitch `build_travel_graph`).
+pub struct PathTravel {
+    pub graph: TravelGraph,
+    ids: Vec<Option<u32>>,
+}
+
+impl PathTravel {
+    /// `angle`: the rows' rotation (see [`TravelGraph::new`]).
+    pub fn new(rings: &[Ring], angle: f64, path: &StitchPath) -> PathTravel {
+        let on: Vec<(usize, OutlinePos)> = path.pos.iter().enumerate().filter_map(|(i, p)| p.map(|p| (i, p))).collect();
+        let extra: Vec<OutlinePos> = on.iter().map(|x| x.1).collect();
+        let (graph, gids) = TravelGraph::with_outline_nodes(rings, angle, &extra);
+        let mut ids = vec![None; path.nodes.len()];
+        for ((i, _), g) in on.iter().zip(gids) {
+            ids[*i] = Some(g);
+        }
+        PathTravel { graph, ids }
+    }
+
+    /// The way of a travel step from `from` to `to` (the step's own points
+    /// at its ends), and whether it goes inside the shape (else along the
+    /// outline); None where no route is left (Ink/Stitch then jumps).
+    pub fn route(&self, from: Point, from_node: Option<usize>, to: Point, to_node: Option<usize>) -> Option<(Vec<Point>, bool)> {
+        let id = |n: Option<usize>| n.and_then(|i| self.ids.get(i).copied().flatten());
+        let (mut path, inside) = match (id(from_node), id(to_node)) {
+            (Some(a), Some(b)) => self.graph.route_nodes(a, b)?,
+            _ => (self.graph.route(from, to)?, true),
+        };
+        if path.len() < 2 {
+            return Some((vec![from, to], false));
+        }
+        path[0] = from;
+        let last = path.len() - 1;
+        path[last] = to;
+        dedup(&mut path, 1e-9);
+        Some((path, inside))
+    }
 }
 
 #[cfg(test)]
@@ -546,13 +1095,21 @@ mod tests {
         g.sewn(&row, false);
         let r = g.route(a, b).expect("still a route, below");
         assert!(r.windows(2).all(|w| !segments_intersect(w[0], w[1], row[0], row[1])));
-        // a full wall of rows: no route
+        // a full wall of rows: no way through the inside; the outline stays
+        // open (Ink/Stitch never takes its outline edges out of the travel
+        // graph), so a route may only cross the wall on the outline
+        let wall = [pt(19.5, 0.0), pt(19.5, 40.0)];
         for y in [12.0, 20.0, 28.0] {
-            g.sewn(&[pt(19.5, 0.0), pt(19.5, 40.0)], false);
+            g.sewn(&wall, false);
             g.sewn(&[pt(0.0, y), pt(40.0, y)], false);
         }
-        let blocked = g.route(pt(5.0, 18.0), pt(35.0, 18.0));
-        assert!(blocked.is_none_or(|r| r.windows(2).all(|w| !segments_intersect(w[0], w[1], pt(19.5, 0.0), pt(19.5, 40.0)))));
+        if let Some(r) = g.route(pt(5.0, 18.0), pt(35.0, 18.0)) {
+            for w in r.windows(2) {
+                if let Some((_, q)) = segment_intersection(w[0], w[1], wall[0], wall[1]) {
+                    assert!(dist_to_boundary(&rings, q) < 0.05, "crosses the wall inside at {q:?}");
+                }
+            }
+        }
     }
 
     #[test]

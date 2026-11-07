@@ -72,7 +72,12 @@ fn composed_tf(n: roxmltree::Node) -> Affine {
 /// Object commands by target id (Ink/Stitch `lib/commands.py`): a connector
 /// links a command symbol to its object; the command's point is the symbol's
 /// position.
-fn object_commands(xml: &roxmltree::Document, root_tf: Affine) -> HashMap<String, Vec<(String, [f64; 2])>> {
+///
+/// Files older than Ink/Stitch's SVG version 3 (`legacy`: the file's
+/// version) are updated the way Ink/Stitch does (`update_legacy_commands`):
+/// the old command names are renamed and starting / ending positions move to
+/// where their connector meets the object.
+fn object_commands(xml: &roxmltree::Document, root_tf: Affine, legacy: Option<u32>) -> HashMap<String, Vec<(String, [f64; 2])>> {
     let by_id: HashMap<&str, roxmltree::Node> = xml.descendants().filter(|n| n.is_element()).filter_map(|n| Some((n.attribute("id")?, n))).collect();
     let mut out: HashMap<String, Vec<(String, [f64; 2])>> = HashMap::new();
     for c in xml.descendants().filter(|n| n.is_element()) {
@@ -86,10 +91,27 @@ fn object_commands(xml: &roxmltree::Document, root_tf: Affine) -> HashMap<String
             continue;
         };
         let num = |k: &str| sym.attribute(k).and_then(|v| v.trim().parse::<f64>().ok()).unwrap_or(0.0);
-        let p = root_tf.mul(composed_tf(sym)).apply(pt(num("x"), num("y")));
-        if let (Some(cmd), Some(id)) = (command_of(sym), target.attribute("id")) {
-            out.entry(id.to_string()).or_default().push((cmd.to_string(), [p.x, p.y]));
+        let mut p = root_tf.mul(composed_tf(sym)).apply(pt(num("x"), num("y")));
+        let (Some(mut cmd), Some(id)) = (command_of(sym), target.attribute("id")) else { continue };
+        if legacy.is_some_and(|v| v < 3) {
+            cmd = match cmd {
+                "fill_start" => "starting_point",
+                "fill_end" => "ending_point",
+                "satin_start" | "run_start" => "autoroute_start",
+                "satin_end" | "run_end" => "autoroute_end",
+                "ripple_target" => "target_point",
+                c => c,
+            };
+            if matches!(cmd, "starting_point" | "ending_point") {
+                // the connector's end at the object
+                let path = path_to_subpaths(c.attribute("d").unwrap_or(""), root_tf.mul(composed_tf(c)));
+                let at = path.first().and_then(|sp| if command_of(a).is_some() { sp.nodes.last() } else { sp.nodes.first() });
+                if let Some(n) = at {
+                    p = pt(n.p[0], n.p[1]);
+                }
+            }
         }
+        out.entry(id.to_string()).or_default().push((cmd.to_string(), [p.x, p.y]));
     }
     out
 }
@@ -671,23 +693,151 @@ fn shape_subpaths(node: roxmltree::Node, tf: Affine) -> Vec<SubPath> {
 }
 
 struct Ink<'a> {
-    attrs: HashMap<&'a str, &'a str>,
+    /// Values as written, or as set by the legacy file update.
+    attrs: HashMap<&'a str, std::borrow::Cow<'a, str>>,
 }
 
 impl<'a> Ink<'a> {
     fn new(node: roxmltree::Node<'a, 'a>) -> Ink<'a> {
-        let attrs = node.attributes().filter(|a| a.namespace() == Some(INKSTITCH_NS)).map(|a| (a.name(), a.value())).collect();
+        let attrs = node.attributes().filter(|a| a.namespace() == Some(INKSTITCH_NS)).map(|a| (a.name(), a.value().into())).collect();
         Ink { attrs }
     }
     fn has_any(&self) -> bool {
         !self.attrs.is_empty()
     }
     fn get(&self, k: &str) -> Option<&str> {
-        self.attrs.get(k).copied().filter(|v| !v.trim().is_empty())
+        self.attrs.get(k).map(|v| v.as_ref()).filter(|v| !v.trim().is_empty())
+    }
+    fn set(&mut self, k: &'a str, v: impl Into<String>) {
+        self.attrs.insert(k, std::borrow::Cow::Owned(v.into()));
     }
     fn f(&self, k: &str, d: f64) -> f64 {
         // nan / inf / 1e400 parse as floats but can't go through JSON
         self.get(k).and_then(|v| v.trim().split_whitespace().next()?.parse().ok()).filter(|v: &f64| v.is_finite()).unwrap_or(d)
+    }
+    /// A number the way Ink/Stitch's `get_float_param` reads it: the whole
+    /// value, or nothing.
+    fn float(&self, k: &str) -> Option<f64> {
+        self.get(k)?.trim().parse::<f64>().ok().filter(|v| v.is_finite())
+    }
+    /// An integer the way Ink/Stitch's `get_int_param` reads it.
+    fn int(&self, k: &str) -> Option<i64> {
+        self.get(k)?.trim().parse().ok()
+    }
+    /// Two values for the two satin rails (`get_split_float_param`): one
+    /// value is both, none (or a bad one) the default.
+    fn pair(&self, k: &str, d: (f64, f64)) -> (f64, f64) {
+        let parts: Vec<&str> = self.get(k).map(|v| v.split_whitespace().collect()).unwrap_or_default();
+        let num = |s: &str| s.parse::<f64>().ok().filter(|v| v.is_finite());
+        match parts.as_slice() {
+            [] => d,
+            [a] => num(a).map_or(d, |a| (a, a)),
+            [a, b, ..] => match (num(a), num(b)) {
+                (Some(a), Some(b)) => (a, b),
+                _ => d,
+            },
+        }
+    }
+
+    /// Ink/Stitch's update of files saved by older versions (`lib/update.py`,
+    /// `_update_to_one` … `_update_to_four`), from the file's
+    /// `inkstitch_svg_version` on; only the rules that change stitching.
+    /// The commands' part (renamed symbols, repositioned start and end) is in
+    /// [`object_commands`].
+    fn update_legacy(&mut self, from: u32, node: roxmltree::Node<'a, 'a>, tag: &str, st: &Style) {
+        let fill = st.fill_url.is_some() || st.fill.unwrap_or(Some([0, 0, 0])).is_some();
+        let stroke = st.stroke.flatten().is_some();
+        // Ink/Stitch caches each parameter read of an element (`@cache` on
+        // `get_param`): version 3 sees the stroke method version 1 read
+        let mut cached_stroke_method: Option<Option<String>> = None;
+        if from < 1 {
+            // `embroider_*` attributes become namespaced ones
+            let mut legacy_attribs = false;
+            for a in node.attributes().filter(|a| a.namespace().is_none()) {
+                if let Some(k) = a.name().strip_prefix("embroider_") {
+                    self.set(k, a.value().trim());
+                    legacy_attribs = true;
+                }
+            }
+            match self.get("ties").map(|v| v.trim().to_string()).as_deref() {
+                Some("True") => self.set("ties", "0"),
+                Some("False") => self.set("ties", "3"),
+                _ => {}
+            }
+            match self.int("fill_method") {
+                Some(0) => self.set("fill_method", "auto_fill"),
+                Some(1) => self.set("fill_method", "contour_fill"),
+                Some(2) => self.set("fill_method", "guided_fill"),
+                Some(3) => self.set("fill_method", "legacy_fill"),
+                _ => {}
+            }
+            if let Some(a) = self.get("fill_underlay_angle").filter(|a| a.contains(',')).map(|a| a.replace(',', " ")) {
+                self.set("fill_underlay_angle", a);
+            }
+            if self.b("e_stitch", false) {
+                self.attrs.remove("e_stitch");
+                self.set("satin_method", "e_stitch");
+            }
+            // old satins are never reversed automatically
+            if self.b("satin_column", false) || self.int("stroke_method") == Some(1) {
+                self.set("reverse_rails", "none");
+            }
+            if legacy_attribs && self.get("fill_underlay").is_none() {
+                self.set("fill_underlay", "False");
+            }
+            // the running stitch length default changed (fills and strokes, not satins)
+            if !self.b("satin_column", false) && self.float("running_stitch_length_mm").is_none() {
+                self.set("running_stitch_length_mm", "1.5");
+            }
+            if stroke {
+                if self.b("manual_stitch", false) {
+                    self.attrs.remove("manual_stitch");
+                    self.set("stroke_method", "manual_stitch");
+                }
+                let method = self.get("stroke_method").map(str::to_string);
+                cached_stroke_method = Some(method.clone());
+                match method.as_deref().and_then(|m| m.trim().parse::<i64>().ok()) {
+                    Some(0) => self.set("stroke_method", "running_stitch"),
+                    Some(1) => self.set("stroke_method", "ripple_stitch"),
+                    _ => {}
+                }
+                // plain strokes used to be zig-zags, dashed ones running stitches
+                let dashed = node.attribute("style").map(css_decls).unwrap_or_default().iter().any(|(k, v, _)| k == "stroke-dasharray" && !matches!(v.trim(), "" | "none"));
+                if method.is_none() && self.get("satin_column").is_none() && !dashed {
+                    self.set("stroke_method", "zigzag_stitch");
+                }
+                // grid_size was in pixels
+                if let Some(g) = self.float("grid_size").filter(|g| *g != 0.0) {
+                    self.set("grid_size_mm", format!("{:.2}", g / (96.0 / 25.4)));
+                    self.attrs.remove("grid_size");
+                }
+            }
+        }
+        if from < 2 && tag == "polyline" && stroke {
+            self.set("stroke_method", "manual_stitch");
+        }
+        if from < 3 {
+            let method = cached_stroke_method.unwrap_or_else(|| self.get("stroke_method").map(str::to_string));
+            if method.as_deref() == Some("zigzag_stitch") {
+                // zig-zag pull compensation got its own attribute, per side
+                if let Some(pc) = self.get("pull_compensation_mm").map(str::trim).filter(|v| *v != "0").and_then(|v| v.parse::<f64>().ok()) {
+                    self.set("stroke_pull_compensation_mm", fmt(pc / 2.0));
+                }
+            }
+        }
+        if from < 4 && fill {
+            // the default fill stitch length changed from 3 to 4
+            if self.float("max_stitch_length_mm").is_none_or(|v| v == 0.0) {
+                self.set("max_stitch_length_mm", "3");
+            }
+            if !self.b("auto_fill", true) {
+                self.set("fill_method", "legacy_fill");
+                self.attrs.remove("auto_fill");
+            }
+            if self.get("fill_method") == Some("auto_fill") {
+                self.set("fill_method", "tatami_fill");
+            }
+        }
     }
     /// A boolean the Ink/Stitch way (`get_boolean_param`): yes / y / true / t / 1.
     fn b(&self, k: &str, d: bool) -> bool {
@@ -869,6 +1019,29 @@ fn ink_fill(ink: &Ink) -> FillParams {
 }
 
 fn ink_satin(ink: &Ink) -> SatinParams {
+    // Ink/Stitch gives these per rail ("0.2 0.5"): the first rail's value
+    // goes in the setting, the second rail's in `second_rail` where it differs
+    let pull = ink.pair("pull_compensation_mm", (0.0, 0.0));
+    let pull_pct = ink.pair("pull_compensation_percent", (0.0, 0.0));
+    let contour = ink.pair("contour_underlay_inset_mm", (0.4, 0.4));
+    let contour_pct = ink.pair("contour_underlay_inset_percent", (0.0, 0.0));
+    // Ink/Stitch: half the contour underlay inset when not set
+    let zigzag = ink.pair("zigzag_underlay_inset_mm", (contour.0 * 0.5, contour.1 * 0.5));
+    let zigzag_pct = ink.pair("zigzag_underlay_inset_percent", (contour_pct.0 * 0.5, contour_pct.1 * 0.5));
+    let wider = ink.pair("random_width_increase_percent", (0.0, 0.0));
+    let narrower = ink.pair("random_width_decrease_percent", (0.0, 0.0));
+    let second = |(a, b): (f64, f64), scale: f64| ((a - b).abs() > 1e-9).then_some(b * scale);
+    let rail = SecondRail {
+        // Ink/Stitch adds pull compensation to each side, ours is the total
+        pull_comp: second(pull, 2.0),
+        pull_comp_pct: second(pull_pct, 2.0),
+        contour_inset: second(contour, 1.0),
+        contour_inset_pct: second(contour_pct, 0.01),
+        zigzag_underlay_inset: second(zigzag, 1.0),
+        zigzag_inset_pct: second(zigzag_pct, 0.01),
+        random_wider: second(wider, 0.01),
+        random_narrower: second(narrower, 0.01),
+    };
     SatinParams {
         method: match ink.get("satin_method").unwrap_or("satin_column") {
             "e_stitch" => SatinMethod::EStitch,
@@ -879,28 +1052,27 @@ fn ink_satin(ink: &Ink) -> SatinParams {
         spacing: ink.f("zigzag_spacing_mm", 0.4),
         width: 3.0,
         // Ink/Stitch adds these to each side, ours are the total
-        pull_comp: ink.f("pull_compensation_mm", 0.0) * 2.0,
-        pull_comp_pct: ink.f("pull_compensation_percent", 0.0) * 2.0,
+        pull_comp: pull.0 * 2.0,
+        pull_comp_pct: pull_pct.0 * 2.0,
         max_stitch_length: ink.f("max_stitch_length_mm", 0.0),
         short_stitch_inset: ink.f("short_stitch_inset", 15.0) / 100.0,
         center_walk: ink.b("center_walk_underlay", false),
         contour_underlay: ink.b("contour_underlay", false),
-        contour_inset: ink.f("contour_underlay_inset_mm", 0.4),
+        contour_inset: contour.0,
         zigzag_underlay: ink.b("zigzag_underlay", false),
         zigzag_underlay_spacing: ink.f("zigzag_underlay_spacing_mm", 3.0),
-        // Ink/Stitch: half the contour underlay inset when not set
-        zigzag_underlay_inset: ink.f("zigzag_underlay_inset_mm", ink.f("contour_underlay_inset_mm", 0.4) * 0.5),
+        zigzag_underlay_inset: zigzag.0,
         underlay_auto: false,
         center_walk_repeats: ink.u("center_walk_underlay_repeats", 2).max(1),
         center_walk_position: ink.f("center_walk_underlay_position", 50.0) / 100.0,
         underlay_stitch_length: ink.f("contour_underlay_stitch_length_mm", ink.f("center_walk_underlay_stitch_length_mm", 3.0)),
-        contour_inset_pct: ink.f("contour_underlay_inset_percent", 0.0) / 100.0,
-        zigzag_inset_pct: ink.f("zigzag_underlay_inset_percent", 0.0) / 100.0,
+        contour_inset_pct: contour_pct.0 / 100.0,
+        zigzag_inset_pct: zigzag_pct.0 / 100.0,
         zigzag_underlay_max_stitch: ink.f("zigzag_underlay_max_stitch_length_mm", 0.0),
         short_stitch_distance: ink.f("short_stitch_distance_mm", 0.25),
         push_comp: ink.f("push_compensation_mm", 0.0),
-        random_wider: ink.f("random_width_increase_percent", 0.0) / 100.0,
-        random_narrower: ink.f("random_width_decrease_percent", 0.0) / 100.0,
+        random_wider: wider.0 / 100.0,
+        random_narrower: narrower.0 / 100.0,
         random_seed: ink.u("random_seed", 1),
         random_spacing: (ink.f("random_zigzag_spacing_percent", 0.0) / 100.0).max(0.0),
         split_jitter: (ink.f("random_split_jitter_percent", 0.0) / 100.0).clamp(0.0, 1.0),
@@ -913,11 +1085,16 @@ fn ink_satin(ink: &Ink) -> SatinParams {
             "both" => RailReverse::Both,
             _ => RailReverse::Automatic,
         },
-        split_staggers: if ink.get("split_method") == Some("staggered") { ink.u("split_staggers", 4) } else { 0 },
+        // Ink/Stitch split methods: default (0), simple (one stagger), staggered
+        split_staggers: match ink.get("split_method") {
+            Some("staggered") => ink.u("split_staggers", 4).max(1),
+            Some("simple") => 1,
+            _ => 0,
+        },
         guides: Vec::new(),
         swap_rails: ink.b("swap_satin_rails", false),
         reverse: false,
-        second_rail: None,
+        second_rail: (rail != SecondRail::default()).then_some(rail),
         multi: false,
     }
 }
@@ -1008,6 +1185,10 @@ struct Ctx<'a> {
     /// Ink/Stitch's `min_satin_stroke_width_mm` (document metadata, default 1):
     /// single-line satins no wider are running stitches.
     satin_threshold: f64,
+    /// The file's Ink/Stitch SVG version when Ink/Stitch would update it on
+    /// opening (`update_inkstitch_document`): older than the current one and
+    /// with Ink/Stitch settings in it.
+    legacy: Option<u32>,
     _p: std::marker::PhantomData<&'a ()>,
 }
 
@@ -1086,8 +1267,8 @@ impl<'a> Ctx<'a> {
             patterns: vec![],
             start: None,
             end: None,
-            lock: None,
-            color_sort_index: None,
+            lock: ink_lock(ink, &mut self.warnings),
+            color_sort_index: ink.get("color_sort_index").and_then(|v| v.trim().parse::<f64>().ok()).filter(|v| v.is_finite() && *v >= 0.0).map(|v| v as u32),
         };
         self.doc.objects.push(obj);
     }
@@ -1438,7 +1619,10 @@ impl<'a> Ctx<'a> {
         if paths.is_empty() {
             return;
         }
-        let ink = Ink::new(node);
+        let mut ink = Ink::new(node);
+        if let Some(v) = self.legacy {
+            ink.update_legacy(v, node, tag, st);
+        }
         let label = node
             .attributes()
             .find(|a| a.name() == "label")
@@ -1561,6 +1745,41 @@ impl<'a> Ctx<'a> {
     }
 }
 
+/// An Ink/Stitch document setting (`<metadata><inkstitch:name>`, JSON: a
+/// number or a quoted one).
+fn metadata_f64(xml: &roxmltree::Document, name: &str) -> Option<f64> {
+    xml.descendants()
+        .find(|n| n.is_element() && n.tag_name().namespace() == Some(INKSTITCH_NS) && n.tag_name().name() == name)
+        .and_then(|n| n.text()?.trim().trim_matches('"').trim().parse::<f64>().ok())
+        .filter(|v| v.is_finite())
+}
+
+/// Ink/Stitch's current SVG version (`lib/update.py`).
+const INKSTITCH_SVG_VERSION: u32 = 4;
+
+/// The file's Ink/Stitch SVG version if Ink/Stitch would update it on opening
+/// (`update_inkstitch_document`): older than the current version (none is 0)
+/// and with Ink/Stitch settings in it (else it is a new document). SVG made
+/// by Filum (it declares our namespace: exports, lettering glyphs taken from
+/// current Ink/Stitch fonts) is current.
+fn legacy_version(xml: &roxmltree::Document) -> Option<u32> {
+    if xml.root_element().namespaces().any(|ns| ns.uri() == FILUM_NS) {
+        return None;
+    }
+    let version = xml
+        .descendants()
+        .find(|n| n.is_element() && n.tag_name().name() == "inkstitch_svg_version")
+        .and_then(|n| n.descendants().filter(|d| d.is_text()).filter_map(|d| d.text()).collect::<String>().trim().parse::<u32>().ok())
+        .unwrap_or(0);
+    if version >= INKSTITCH_SVG_VERSION {
+        return None;
+    }
+    let inkstitch = xml.descendants().filter(|n| n.is_element()).any(|n| {
+        n.tag_name().namespace() == Some(INKSTITCH_NS) || n.attributes().any(|a| a.namespace() == Some(INKSTITCH_NS) || (a.namespace().is_none() && a.name().starts_with("embroider_")))
+    });
+    inkstitch.then_some(version)
+}
+
 /// Import SVG text. Coordinates are converted to millimetres.
 pub fn import_svg(text: &str) -> Result<SvgImport, String> {
     let opt = roxmltree::ParsingOptions { allow_dtd: true, ..Default::default() };
@@ -1584,7 +1803,8 @@ pub fn import_svg(text: &str) -> Result<SvgImport, String> {
         (Some(v), _, _) if v.len() == 4 => Affine([px, 0.0, 0.0, px, -v[0] * px, -v[1] * px]),
         _ => Affine([px, 0.0, 0.0, px, 0.0, 0.0]),
     };
-    let commands = object_commands(&xml, root_tf);
+    let legacy = legacy_version(&xml);
+    let commands = object_commands(&xml, root_tf, legacy);
     let by_id: HashMap<&str, roxmltree::Node> = xml.descendants().filter(|n| n.is_element()).filter_map(|n| Some((n.attribute("id")?, n))).collect();
     let mut ctx = Ctx {
         doc: Document::default(),
@@ -1603,14 +1823,19 @@ pub fn import_svg(text: &str) -> Result<SvgImport, String> {
         clip: None,
         texts: Vec::new(),
         sheet: Sheet::new(&xml),
-        satin_threshold: xml
-            .descendants()
-            .find(|n| n.is_element() && n.tag_name().namespace() == Some(INKSTITCH_NS) && n.tag_name().name() == "min_satin_stroke_width_mm")
-            .and_then(|n| n.text()?.trim().trim_matches('"').parse::<f64>().ok())
-            .filter(|v| v.is_finite())
-            .unwrap_or(1.0),
+        satin_threshold: metadata_f64(&xml, "min_satin_stroke_width_mm").unwrap_or(1.0),
+        legacy,
         _p: Default::default(),
     };
+    // Ink/Stitch document settings (`lib/extensions/output.py`): stitches
+    // shorter than `min_stitch_len_mm` are dropped, jumps longer than
+    // `collapse_len_mm` get lock stitches (our trim distance)
+    if let Some(v) = metadata_f64(&xml, "min_stitch_len_mm").filter(|v| *v >= 0.0) {
+        ctx.doc.machine.min_stitch = v;
+    }
+    if let Some(v) = metadata_f64(&xml, "collapse_len_mm").filter(|v| *v >= 0.0) {
+        ctx.doc.machine.trim_distance = v;
+    }
     if let Some(w) = w_mm {
         ctx.doc.hoop.width = w.max(10.0);
     }
@@ -1736,7 +1961,13 @@ xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"{}mm\" height=\"{}mm\" view
         fmt(h)
     ));
     // Ink/Stitch's current SVG version (`lib/update.py`): no legacy updates on opening
-    s.push_str("  <metadata><inkstitch:inkstitch_svg_version>4</inkstitch:inkstitch_svg_version></metadata>\n");
+    // and the document settings that change stitching (`lib/extensions/output.py`)
+    s.push_str(&format!(
+        "  <metadata><inkstitch:inkstitch_svg_version>{INKSTITCH_SVG_VERSION}</inkstitch:inkstitch_svg_version>\
+<inkstitch:min_stitch_len_mm>{}</inkstitch:min_stitch_len_mm><inkstitch:collapse_len_mm>{}</inkstitch:collapse_len_mm></metadata>\n",
+        fmt(doc.machine.min_stitch.max(0.0)),
+        fmt(doc.machine.trim_distance.max(0.0))
+    ));
     let mut body = String::new();
     let mut symbols: Vec<&str> = Vec::new();
     let mut markers: Vec<&str> = Vec::new();
@@ -1925,28 +2156,36 @@ xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"{}mm\" height=\"{}mm\" view
                     .into(),
                 ));
                 attrs.push(("zigzag_spacing_mm".into(), fmt(p.spacing)));
+                // per-rail values: "first second" where the second rail has its own
+                let r = p.second_rail.unwrap_or_default();
+                let two = |a: f64, b: Option<f64>, scale: f64| match b {
+                    Some(b) if (b - a).abs() > 1e-9 => format!("{} {}", fmt(a * scale), fmt(b * scale)),
+                    _ => fmt(a * scale),
+                };
                 // Ink/Stitch adds them to each side
-                attrs.push(("pull_compensation_mm".into(), fmt(p.pull_comp / 2.0)));
-                attrs.push(("pull_compensation_percent".into(), fmt(p.pull_comp_pct / 2.0)));
+                attrs.push(("pull_compensation_mm".into(), two(p.pull_comp, r.pull_comp, 0.5)));
+                attrs.push(("pull_compensation_percent".into(), two(p.pull_comp_pct, r.pull_comp_pct, 0.5)));
                 if p.max_stitch_length > 0.0 {
                     attrs.push(("max_stitch_length_mm".into(), fmt(p.max_stitch_length)));
                 }
                 attrs.push(("short_stitch_inset".into(), fmt(p.short_stitch_inset * 100.0)));
                 attrs.push(("center_walk_underlay".into(), b(p.center_walk).into()));
                 attrs.push(("contour_underlay".into(), b(p.contour_underlay).into()));
-                attrs.push(("contour_underlay_inset_mm".into(), fmt(p.contour_inset)));
+                attrs.push(("contour_underlay_inset_mm".into(), two(p.contour_inset, r.contour_inset, 1.0)));
                 attrs.push(("zigzag_underlay".into(), b(p.zigzag_underlay).into()));
                 attrs.push(("zigzag_underlay_spacing_mm".into(), fmt(p.zigzag_underlay_spacing)));
-                attrs.push(("zigzag_underlay_inset_mm".into(), fmt(p.zigzag_underlay_inset)));
+                attrs.push(("zigzag_underlay_inset_mm".into(), two(p.zigzag_underlay_inset, r.zigzag_underlay_inset, 1.0)));
                 attrs.push(("center_walk_underlay_repeats".into(), p.center_walk_repeats.to_string()));
                 attrs.push(("center_walk_underlay_position".into(), fmt(p.center_walk_position * 100.0)));
                 attrs.push(("contour_underlay_stitch_length_mm".into(), fmt(p.underlay_stitch_length)));
                 attrs.push(("center_walk_underlay_stitch_length_mm".into(), fmt(p.underlay_stitch_length)));
-                if p.contour_inset_pct > 0.0 {
-                    attrs.push(("contour_underlay_inset_percent".into(), fmt(p.contour_inset_pct * 100.0)));
+                let contour_pct = p.contour_inset_pct > 0.0 || r.contour_inset_pct.is_some_and(|v| v > 0.0);
+                if contour_pct {
+                    attrs.push(("contour_underlay_inset_percent".into(), two(p.contour_inset_pct, r.contour_inset_pct, 100.0)));
                 }
-                if p.zigzag_inset_pct > 0.0 {
-                    attrs.push(("zigzag_underlay_inset_percent".into(), fmt(p.zigzag_inset_pct * 100.0)));
+                // written with a contour percentage too: Ink/Stitch's default is half of it
+                if contour_pct || p.zigzag_inset_pct > 0.0 || r.zigzag_inset_pct.is_some_and(|v| v > 0.0) {
+                    attrs.push(("zigzag_underlay_inset_percent".into(), two(p.zigzag_inset_pct, r.zigzag_inset_pct, 100.0)));
                 }
                 if p.short_stitch_distance != 0.25 {
                     attrs.push(("short_stitch_distance_mm".into(), fmt(p.short_stitch_distance)));
@@ -1954,12 +2193,15 @@ xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"{}mm\" height=\"{}mm\" view
                 if p.push_comp > 0.0 {
                     attrs.push(("push_compensation_mm".into(), fmt(p.push_comp)));
                 }
-                if p.random_wider > 0.0 || p.random_narrower > 0.0 {
-                    attrs.push(("random_width_increase_percent".into(), fmt(p.random_wider * 100.0)));
-                    attrs.push(("random_width_decrease_percent".into(), fmt(p.random_narrower * 100.0)));
+                let random_width = p.random_wider > 0.0 || p.random_narrower > 0.0 || r.random_wider.is_some_and(|v| v > 0.0) || r.random_narrower.is_some_and(|v| v > 0.0);
+                if random_width {
+                    attrs.push(("random_width_increase_percent".into(), two(p.random_wider, r.random_wider, 100.0)));
+                    attrs.push(("random_width_decrease_percent".into(), two(p.random_narrower, r.random_narrower, 100.0)));
                     attrs.push(("random_seed".into(), p.random_seed.to_string()));
                 }
-                if p.split_staggers > 1 {
+                if p.split_staggers == 1 {
+                    attrs.push(("split_method".into(), "simple".into()));
+                } else if p.split_staggers > 1 {
                     attrs.push(("split_method".into(), "staggered".into()));
                     attrs.push(("split_staggers".into(), p.split_staggers.to_string()));
                 }
@@ -1984,7 +2226,7 @@ xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"{}mm\" height=\"{}mm\" view
                     };
                     attrs.push(("reverse_rails".into(), v.into()));
                 }
-                if p.random_spacing > 0.0 || p.split_jitter > 0.0 || p.split_random_phase || p.random_wider > 0.0 || p.random_narrower > 0.0 {
+                if p.random_spacing > 0.0 || p.split_jitter > 0.0 || p.split_random_phase || random_width {
                     attrs.push(("random_seed".into(), p.random_seed.to_string()));
                 }
                 if p.zigzag_underlay_max_stitch > 0.0 {
@@ -2093,6 +2335,28 @@ xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"{}mm\" height=\"{}mm\" view
         }
         if let Some(v) = o.min_jump {
             attrs.push(("min_jump_stitch_length_mm".into(), fmt(v)));
+        }
+        // its own lock stitches (Ink/Stitch `lock_start` / `lock_end` and their scales)
+        if let Some(l) = &o.lock {
+            if let Some(v) = l.start {
+                attrs.push(("lock_start".into(), lock_id(v).into()));
+            }
+            if let Some(v) = l.end {
+                attrs.push(("lock_end".into(), lock_id(v).into()));
+            }
+            for (k, v) in [
+                ("lock_start_scale_percent", l.start_scale),
+                ("lock_end_scale_percent", l.end_scale),
+                ("lock_start_scale_mm", l.start_length),
+                ("lock_end_scale_mm", l.end_length),
+            ] {
+                if let Some(v) = v {
+                    attrs.push((k.into(), fmt(v)));
+                }
+            }
+        }
+        if let Some(v) = o.color_sort_index {
+            attrs.push(("color_sort_index".into(), v.to_string()));
         }
         // one value per attribute (several settings share e.g. the random seed)
         let mut seen = std::collections::HashSet::new();
@@ -2244,6 +2508,57 @@ fn ink_tartan(ink: &Ink) -> TartanParams {
     }
 }
 
+/// Ink/Stitch lock stitch ids (`lib/stitch_plan/lock_stitch.py`).
+fn lock_id(s: LockStyle) -> &'static str {
+    match s {
+        LockStyle::HalfStitch => "half_stitch",
+        LockStyle::Arrow => "arrow",
+        LockStyle::BackForth => "back_forth",
+        LockStyle::Bowtie => "bowtie",
+        LockStyle::Cross => "cross",
+        LockStyle::Star => "star",
+        LockStyle::Simple => "simple",
+        LockStyle::Triangle => "triangle",
+        LockStyle::Zigzag => "zigzag",
+    }
+}
+
+/// An object's own lock stitches (Ink/Stitch `lock_start`, `lock_end` and
+/// their scales); `None` when it has none of them.
+fn ink_lock(ink: &Ink, warnings: &mut Vec<String>) -> Option<LockOverride> {
+    let mut style = |k: &str| {
+        let id = ink.get(k)?.trim();
+        const ALL: [LockStyle; 9] = [
+            LockStyle::HalfStitch,
+            LockStyle::Arrow,
+            LockStyle::BackForth,
+            LockStyle::Bowtie,
+            LockStyle::Cross,
+            LockStyle::Star,
+            LockStyle::Simple,
+            LockStyle::Triangle,
+            LockStyle::Zigzag,
+        ];
+        Some(ALL.into_iter().find(|s| lock_id(*s) == id).unwrap_or_else(|| {
+            // a custom lock with its own path: not supported (an unknown id,
+            // or a custom one without a path, is a half stitch in Ink/Stitch)
+            if id == "custom" && ink.get(if k == "lock_start" { "lock_custom_start" } else { "lock_custom_end" }).is_some() {
+                warnings.push("Custom lock stitches are not supported: half stitches are used".into());
+            }
+            LockStyle::HalfStitch
+        }))
+    };
+    let lock = LockOverride {
+        start: style("lock_start"),
+        end: style("lock_end"),
+        start_scale: ink.float("lock_start_scale_percent"),
+        end_scale: ink.float("lock_end_scale_percent"),
+        start_length: ink.float("lock_start_scale_mm"),
+        end_length: ink.float("lock_end_scale_mm"),
+    };
+    (lock != LockOverride::default()).then_some(lock)
+}
+
 /// Manual stitch bean repeats as a pattern (one value is a pattern of one).
 fn manual_beans(ink: &Ink) -> Vec<u32> {
     match ink.beans() {
@@ -2258,7 +2573,7 @@ mod tests {
     use super::*;
 
     const INK: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkstitch="http://inkstitch.org/namespace"
-        width="100mm" height="50mm" viewBox="0 0 200 100">
+        width="100mm" height="50mm" viewBox="0 0 200 100"><metadata><inkstitch:inkstitch_svg_version>4</inkstitch:inkstitch_svg_version></metadata>
       <g transform="translate(10,0)">
         <path d="M 0 0 L 40 0 L 40 40 L 0 40 Z" style="fill:#ff0000;stroke:none"
               inkstitch:angle="45" inkstitch:row_spacing_mm="0.3" inkstitch:fill_underlay="False"/>
@@ -2272,8 +2587,18 @@ mod tests {
     </svg>"##;
 
     #[test]
+    fn split_methods_map_both_ways() {
+        let svg = |m: &str| format!(r#"<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkstitch="http://inkstitch.org/namespace" width="100mm" height="100mm" viewBox="0 0 100 100"><metadata><inkstitch:inkstitch_svg_version>4</inkstitch:inkstitch_svg_version></metadata><path d="M20 40 L80 40 M20 60 L80 60" style="fill:none;stroke:#000;stroke-width:0.5" inkstitch:satin_column="True" inkstitch:split_method="{m}" inkstitch:split_staggers="3"/></svg>"#);
+        let staggers = |m: &str| match &import_svg(&svg(m)).unwrap().document.objects[0].stitch {
+            StitchParams::Satin(p) => p.split_staggers,
+            other => panic!("{other:?}"),
+        };
+        assert_eq!((staggers("default"), staggers("simple"), staggers("staggered")), (0, 1, 3));
+    }
+
+    #[test]
     fn converts_inkstitch_units() {
-        let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkstitch="http://inkstitch.org/namespace" width="100mm" height="100mm" viewBox="0 0 100 100">
+        let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkstitch="http://inkstitch.org/namespace" width="100mm" height="100mm" viewBox="0 0 100 100"><metadata><inkstitch:inkstitch_svg_version>4</inkstitch:inkstitch_svg_version></metadata>
           <path d="M 10 10 L 60 10 M 10 20 L 60 20" style="fill:none;stroke:#000" inkstitch:satin_column="True" inkstitch:pull_compensation_mm="0.3" inkstitch:contour_underlay_inset_mm="0.6"/>
           <path d="M 10 40 L 60 40" style="fill:none;stroke:#000" inkstitch:stroke_method="running_stitch" inkstitch:bean_stitch_repeats="1"/>
           <path d="M 10 50 L 60 50" style="fill:none;stroke:#000;stroke-width:3" inkstitch:stroke_method="zigzag_stitch" inkstitch:stroke_pull_compensation_mm="0.2"/>
@@ -2345,7 +2670,7 @@ mod tests {
     /// commands and meander / circular parameters, as Ink/Stitch writes them.
     const INK_COMMANDS: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkstitch="http://inkstitch.org/namespace"
         xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:xlink="http://www.w3.org/1999/xlink"
-        width="100mm" height="100mm" viewBox="0 0 100 100">
+        width="100mm" height="100mm" viewBox="0 0 100 100"><metadata><inkstitch:inkstitch_svg_version>4</inkstitch:inkstitch_svg_version></metadata>
       <defs><symbol id="inkstitch_starting_point"><path d="M 0 0 L 1 1"/></symbol></defs>
       <g inkscape:groupmode="layer">
         <path id="fill1" d="M 0 0 L 40 0 L 40 40 L 0 40 Z" style="fill:#ff0000" inkstitch:fill_method="meander_fill"
@@ -2479,7 +2804,7 @@ mod tests {
 
     #[test]
     fn reads_and_writes_stitch_patterns_random_lengths_zigzag_and_manual() {
-        let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkstitch="http://inkstitch.org/namespace" viewBox="0 0 100 100" width="100mm" height="100mm">
+        let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkstitch="http://inkstitch.org/namespace" viewBox="0 0 100 100" width="100mm" height="100mm"><metadata><inkstitch:inkstitch_svg_version>4</inkstitch:inkstitch_svg_version></metadata>
           <path id="a" d="M 10 10 L 60 10" style="fill:none;stroke:#000;stroke-width:0.3" inkstitch:stroke_method="running_stitch" inkstitch:running_stitch_length_mm="2 1" inkstitch:bean_stitch_repeats="0 1" inkstitch:enable_random_stitch_length="True" inkstitch:random_stitch_length_jitter_percent="15" inkstitch:random_seed="4" inkstitch:min_stitch_length_mm="0.5" inkstitch:min_jump_stitch_length_mm="6"/>
           <path id="b" d="M 10 30 L 60 30" style="fill:none;stroke:#000;stroke-width:3" inkstitch:stroke_method="zigzag_stitch" inkstitch:zigzag_spacing_mm="0.8" inkstitch:zigzag_angle="30" inkstitch:stroke_pull_compensation_mm="0.2"/>
           <path id="c" d="M 10 50 L 60 50" style="fill:none;stroke:#000;stroke-width:0.3" inkstitch:stroke_method="manual_stitch" inkstitch:max_stitch_length_mm="4" inkstitch:bean_stitch_repeats="1"/>
@@ -2516,7 +2841,7 @@ mod tests {
 
     #[test]
     fn reads_and_writes_guided_ripples() {
-        let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkstitch="http://inkstitch.org/namespace" viewBox="0 0 100 100" width="100mm" height="100mm">
+        let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkstitch="http://inkstitch.org/namespace" viewBox="0 0 100 100" width="100mm" height="100mm"><metadata><inkstitch:inkstitch_svg_version>4</inkstitch:inkstitch_svg_version></metadata>
           <g>
             <path d="M 10 10 L 20 10" style="fill:none;stroke:#000;stroke-width:0.3" inkstitch:stroke_method="ripple_stitch" inkstitch:line_count="7" inkstitch:skip_start="1" inkstitch:staggers="3" inkstitch:join_style="1" inkstitch:scale_axis="2" inkstitch:satin_guide_pattern_position="adaptive"/>
             <path d="M 10 30 L 90 30 M 10 40 L 90 40" style="fill:none;stroke:#f00;marker-start:url(#inkstitch-guide-line-marker)" inkstitch:satin_column="True"/>
@@ -2541,7 +2866,7 @@ mod tests {
 
     #[test]
     fn imports_clones_clip_paths_gradients_and_text() {
-        let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:inkstitch="http://inkstitch.org/namespace" viewBox="0 0 100 100" width="100mm" height="100mm">
+        let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:inkstitch="http://inkstitch.org/namespace" viewBox="0 0 100 100" width="100mm" height="100mm"><metadata><inkstitch:inkstitch_svg_version>4</inkstitch:inkstitch_svg_version></metadata>
           <defs>
             <clipPath id="cp"><rect x="0" y="0" width="50" height="100"/></clipPath>
             <symbol id="sym"><rect x="0" y="0" width="5" height="5" style="fill:#00f"/></symbol>
@@ -2591,7 +2916,7 @@ mod tests {
 
     #[test]
     fn imports_and_exports_tartan_fills() {
-        let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkstitch="http://inkstitch.org/namespace" viewBox="0 0 100 100" width="100mm" height="100mm">
+        let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkstitch="http://inkstitch.org/namespace" viewBox="0 0 100 100" width="100mm" height="100mm"><metadata><inkstitch:inkstitch_svg_version>4</inkstitch:inkstitch_svg_version></metadata>
           <rect x="10" y="10" width="40" height="40" style="fill:#000" inkstitch:fill_method="tartan_fill" inkstitch:rows_per_thread="3" inkstitch:tartan_angle="45" inkstitch:tartan="{&quot;palette&quot;: &quot;(#0000FF)/4 (#FFFFFF)0.5 (#FF0000)/4&quot;, &quot;rotate&quot;: 10, &quot;offset_x&quot;: 0, &quot;offset_y&quot;: 0, &quot;symmetry&quot;: true, &quot;scale&quot;: 100, &quot;min_stripe_width&quot;: 1.0}"/>
         </svg>"##;
         let doc = import_svg(svg).unwrap().document;
@@ -2612,7 +2937,7 @@ mod tests {
 
     // ---- Ink/Stitch interop ----
 
-    const HEAD: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkstitch="http://inkstitch.org/namespace" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="100mm" height="100mm" viewBox="0 0 100 100">"##;
+    const HEAD: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkstitch="http://inkstitch.org/namespace" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="100mm" height="100mm" viewBox="0 0 100 100"><metadata><inkstitch:inkstitch_svg_version>4</inkstitch:inkstitch_svg_version></metadata>"##;
 
     fn imp(body: &str) -> Document {
         import_svg(&format!("{HEAD}{body}</svg>")).unwrap().document
@@ -2889,6 +3214,213 @@ mod tests {
         let full = import_svg(&svg).unwrap().document;
         for (a, b) in d.objects.iter().zip(&full.objects) {
             assert_eq!(a.stitch, b.stitch);
+        }
+    }
+
+    /// An Ink/Stitch file of an SVG version (`None`: no version metadata).
+    fn versioned(version: Option<u32>, body: &str) -> SvgImport {
+        let meta = version.map(|v| format!("<metadata><inkstitch:inkstitch_svg_version>{v}</inkstitch:inkstitch_svg_version></metadata>")).unwrap_or_default();
+        let head = HEAD.replace("<metadata><inkstitch:inkstitch_svg_version>4</inkstitch:inkstitch_svg_version></metadata>", "");
+        import_svg(&format!("{head}{meta}{body}</svg>")).unwrap()
+    }
+
+    fn running_of(o: &Object) -> &RunningParams {
+        match &o.stitch {
+            StitchParams::Running(r) => r,
+            s => panic!("not a running stitch: {s:?}"),
+        }
+    }
+
+    fn satin_of(o: &Object) -> &SatinParams {
+        match &o.stitch {
+            StitchParams::Satin(s) => s,
+            s => panic!("not a satin: {s:?}"),
+        }
+    }
+
+    const LEGACY_BODY: &str = r##"<path d="M 10 10 L 50 10 L 50 50 L 10 50 Z" style="fill:#f00" inkstitch:angle="10"/>
+        <path d="M 10 10 L 50 10 L 50 50 L 10 50 Z" style="fill:#0f0" inkstitch:max_stitch_length_mm="0"/>
+        <path d="M 10 10 L 50 10 L 50 50 L 10 50 Z" style="fill:#00f" inkstitch:fill_method="1"/>
+        <path d="M 10 60 L 90 60" style="fill:none;stroke:#000;stroke-width:0.5"/>
+        <path d="M 10 65 L 90 65" style="fill:none;stroke:#000;stroke-width:0.5;stroke-dasharray:1,1"/>
+        <path d="M 10 70 L 90 70 M 10 74 L 90 74" style="fill:none;stroke:#000" inkstitch:satin_column="True"/>
+        <polyline points="10,80 50,85 90,80" style="fill:none;stroke:#000" inkstitch:stroke_method="running_stitch"/>
+        <path d="M 10 90 L 90 90" style="fill:none;stroke:#000" inkstitch:stroke_method="zigzag_stitch" inkstitch:pull_compensation_mm="0.6"/>
+        <path d="M 10 95 L 90 95" style="fill:none;stroke:#000;stroke-width:0.5" embroider_running_stitch_length_mm="2"/>"##;
+
+    #[test]
+    fn updates_legacy_files_like_inkstitch() {
+        // no version: Ink/Stitch's updates from version 1 on
+        let d = versioned(None, LEGACY_BODY).document;
+        let o = &d.objects;
+        assert_eq!(o.len(), 9);
+        // version 4: the fill stitch length default changed from 3 to 4 (also for "0")
+        assert_eq!(fill_of(&o[0]).max_stitch_length, 3.0);
+        assert_eq!(fill_of(&o[1]).max_stitch_length, 3.0);
+        // version 1: numbered fill methods; running stitch length 1.5 for fills and strokes
+        assert_eq!(fill_of(&o[2]).method, FillMethod::Contour);
+        assert_eq!(fill_of(&o[0]).travel_length, 1.5);
+        // plain strokes were zig-zags, dashed ones running stitches
+        let z = running_of(&o[3]);
+        assert!(z.zigzag.is_some() && z.length == 1.5, "{z:?}");
+        let r = running_of(&o[4]);
+        assert!(r.zigzag.is_none() && r.length == 1.5, "{r:?}");
+        // old satins are never reversed automatically
+        assert_eq!(satin_of(&o[5]).reverse_rails, RailReverse::None);
+        // version 2: stroked polylines are manual stitches
+        assert!(matches!(o[6].stitch, StitchParams::Manual(_)), "{:?}", o[6].stitch);
+        // version 3: zig-zag pull compensation became per side
+        assert!((running_of(&o[7]).zigzag.as_ref().unwrap().pull_comp - 0.3).abs() < 1e-9);
+        // `embroider_*` attributes
+        assert_eq!(running_of(&o[8]).length, 2.0);
+
+        // version 3: only version 4's update
+        let d = versioned(Some(3), LEGACY_BODY).document;
+        let o = &d.objects;
+        assert_eq!(fill_of(&o[0]).max_stitch_length, 3.0);
+        assert_eq!(fill_of(&o[0]).travel_length, 2.5);
+        assert_eq!(fill_of(&o[2]).method, FillMethod::Tatami);
+        assert!(running_of(&o[3]).zigzag.is_none());
+        assert_eq!(satin_of(&o[5]).reverse_rails, RailReverse::Automatic);
+        assert!(matches!(o[6].stitch, StitchParams::Running(_)));
+        assert_eq!(running_of(&o[7]).zigzag.as_ref().unwrap().pull_comp, 0.0);
+
+        // current files and files Filum made are left as they are
+        for d in [versioned(Some(4), LEGACY_BODY).document, import_svg(&format!("{}{LEGACY_BODY}</svg>", HEAD.replace("<svg ", &format!("<svg xmlns:filum=\"{FILUM_NS}\" ")))).unwrap().document] {
+            let o = &d.objects;
+            assert_eq!(fill_of(&o[0]).max_stitch_length, 4.0);
+            assert_eq!(fill_of(&o[1]).max_stitch_length, 0.0);
+            assert!(running_of(&o[3]).zigzag.is_none() && running_of(&o[3]).length == 2.5);
+            assert_eq!(satin_of(&o[5]).reverse_rails, RailReverse::Automatic);
+        }
+        // without Ink/Stitch settings a file is new: not updated
+        let d = versioned(None, r##"<path d="M 10 60 L 90 60" style="fill:none;stroke:#000;stroke-width:0.5"/>"##).document;
+        assert!(running_of(&d.objects[0]).zigzag.is_none());
+    }
+
+    #[test]
+    fn legacy_stroke_method_is_read_once_like_inkstitch() {
+        // Ink/Stitch caches parameter reads per element: a stroke that became a
+        // zig-zag in the version 1 update keeps its (fill) pull compensation
+        let d = versioned(None, r##"<path d="M 10 60 L 90 60" style="fill:none;stroke:#000;stroke-width:2" inkstitch:pull_compensation_mm="0.6"/>"##).document;
+        let z = running_of(&d.objects[0]).zigzag.clone().unwrap();
+        assert_eq!(z.pull_comp, 0.0);
+        // a version 2 zig-zag gets it halved
+        let d = versioned(Some(2), r##"<path d="M 10 60 L 90 60" style="fill:none;stroke:#000;stroke-width:2" inkstitch:stroke_method="zigzag_stitch" inkstitch:pull_compensation_mm="0.6"/>"##).document;
+        assert!((running_of(&d.objects[0]).zigzag.as_ref().unwrap().pull_comp - 0.3).abs() < 1e-9);
+    }
+
+    #[test]
+    fn updates_legacy_commands() {
+        let body = |sym: &str| {
+            format!(
+                r##"<defs><symbol id="inkstitch_{sym}"><path d="M 0 0 L 1 1"/></symbol></defs>
+                <path id="fill1" d="M 0 0 L 40 0 L 40 40 L 0 40 Z" style="fill:#ff0000" inkstitch:fill_method="tatami_fill"/>
+                <g transform="translate(2,3)">
+                  <path d="M 30,30 20,20" inkscape:connection-start="#use1" inkscape:connection-end="#fill1"/>
+                  <use id="use1" xlink:href="#inkstitch_{sym}" x="30" y="30"/>
+                </g>
+                <g><path d="M 1,2 50,50" inkscape:connection-start="#fill1" inkscape:connection-end="#use2"/>
+                  <use id="use2" xlink:href="#inkstitch_fill_end" x="50" y="50"/></g>"##
+            )
+        };
+        // version 2: renamed and moved to where the connector meets the object
+        let d = versioned(Some(2), &body("fill_start")).document;
+        assert_eq!(d.objects[0].start, Some([22.0, 23.0]));
+        assert_eq!(d.objects[0].end, Some([1.0, 2.0]));
+        let d = versioned(Some(2), &body("starting_point")).document;
+        assert_eq!(d.objects[0].start, Some([22.0, 23.0]));
+        // current files: the symbol's position, old names unknown
+        let d = versioned(Some(4), &body("starting_point")).document;
+        assert_eq!(d.objects[0].start, Some([32.0, 33.0]));
+        assert_eq!(d.objects[0].end, None);
+    }
+
+    #[test]
+    fn satin_values_per_rail() {
+        let d = imp(r##"<path d="M 10 10 L 90 10 M 10 14 L 90 14" style="fill:none;stroke:#000" inkstitch:satin_column="True"
+                inkstitch:pull_compensation_mm="0.2 0.5" inkstitch:pull_compensation_percent="10" inkstitch:contour_underlay_inset_mm="0.3 0.6"
+                inkstitch:contour_underlay_inset_percent="4 8" inkstitch:random_width_increase_percent="10 20" inkstitch:random_width_decrease_percent="5 5"/>
+            <path d="M 10 20 L 90 20 M 10 24 L 90 24" style="fill:none;stroke:#000" inkstitch:satin_column="True" inkstitch:pull_compensation_mm="0.2"/>"##);
+        let s = satin_of(&d.objects[0]);
+        assert!((s.pull_comp - 0.4).abs() < 1e-9 && (s.pull_comp_pct - 20.0).abs() < 1e-9);
+        assert_eq!(s.contour_inset, 0.3);
+        // the zig-zag underlay inset defaults to half the contour inset, per rail
+        assert_eq!((s.zigzag_underlay_inset, s.zigzag_inset_pct), (0.15, 0.02));
+        assert_eq!((s.random_wider, s.random_narrower), (0.1, 0.05));
+        let r = s.second_rail.unwrap();
+        assert_eq!(r.pull_comp, Some(1.0));
+        assert_eq!(r.pull_comp_pct, None);
+        assert_eq!(r.contour_inset, Some(0.6));
+        assert_eq!(r.contour_inset_pct, Some(0.08));
+        assert_eq!(r.zigzag_underlay_inset, Some(0.3));
+        assert_eq!(r.zigzag_inset_pct, Some(0.04));
+        assert_eq!((r.random_wider, r.random_narrower), (Some(0.2), None));
+        assert_eq!(satin_of(&d.objects[1]).second_rail, None);
+        // written back as two values
+        let svg = export_svg(&d);
+        assert!(svg.contains(r#"inkstitch:pull_compensation_mm="0.2 0.5""#), "{svg}");
+        assert!(svg.contains(r#"inkstitch:contour_underlay_inset_mm="0.3 0.6""#) && svg.contains(r#"inkstitch:random_width_increase_percent="10 20""#));
+        assert!(svg.contains(r#"inkstitch:pull_compensation_mm="0.2""#));
+        let back = import_svg(&without_filum_params(&svg)).unwrap().document;
+        for (a, b) in d.objects.iter().zip(&back.objects) {
+            let (x, y) = (satin_of(a), satin_of(b));
+            assert_eq!((x.pull_comp, x.contour_inset, x.zigzag_underlay_inset, x.second_rail), (y.pull_comp, y.contour_inset, y.zigzag_underlay_inset, y.second_rail));
+            assert!((x.zigzag_inset_pct - y.zigzag_inset_pct).abs() < 1e-9 && (x.random_wider - y.random_wider).abs() < 1e-9);
+        }
+    }
+
+    #[test]
+    fn object_lock_stitches_and_color_sort_index() {
+        let d = imp(&format!(
+            r##"<path {SQ} style="fill:#f00" inkstitch:lock_start="arrow" inkstitch:lock_end="back_forth" inkstitch:lock_start_scale_percent="150" inkstitch:lock_end_scale_mm="1.2" inkstitch:color_sort_index="3"/>
+            <path {SQ} style="fill:#0f0" inkstitch:lock_end="nonsense"/>
+            <path {SQ} style="fill:#00f"/>"##
+        ));
+        let l = d.objects[0].lock.unwrap();
+        assert_eq!(l, LockOverride { start: Some(LockStyle::Arrow), end: Some(LockStyle::BackForth), start_scale: Some(150.0), end_length: Some(1.2), ..Default::default() });
+        assert_eq!(d.objects[0].color_sort_index, Some(3));
+        // an unknown lock: Ink/Stitch's half stitch
+        assert_eq!(d.objects[1].lock, Some(LockOverride { end: Some(LockStyle::HalfStitch), ..Default::default() }));
+        assert_eq!((d.objects[2].lock, d.objects[2].color_sort_index), (None, None));
+        let svg = export_svg(&d);
+        assert!(svg.contains(r#"inkstitch:lock_start="arrow""#) && svg.contains(r#"inkstitch:lock_end="back_forth""#) && svg.contains(r#"inkstitch:lock_end_scale_mm="1.2""#));
+        assert!(svg.contains(r#"inkstitch:color_sort_index="3""#));
+        let back = import_svg(&without_filum_params(&svg)).unwrap().document;
+        for (a, b) in d.objects.iter().zip(&back.objects) {
+            assert_eq!((a.lock, a.color_sort_index), (b.lock, b.color_sort_index));
+        }
+    }
+
+    #[test]
+    fn document_stitch_settings_from_metadata() {
+        let d = imp(&format!(
+            r##"<metadata><inkstitch:inkstitch_svg_version>4</inkstitch:inkstitch_svg_version><inkstitch:min_stitch_len_mm>0.5</inkstitch:min_stitch_len_mm><inkstitch:collapse_len_mm>"2.5"</inkstitch:collapse_len_mm></metadata>
+            <path {SQ} style="fill:#f00"/>"##
+        ));
+        assert_eq!((d.machine.min_stitch, d.machine.trim_distance), (0.5, 2.5));
+        // left as they are without
+        let plain = imp(&format!(r##"<path {SQ} style="fill:#f00"/>"##));
+        assert_eq!(plain.machine, MachineSettings::default());
+        let svg = export_svg(&d);
+        assert!(svg.contains("<inkstitch:min_stitch_len_mm>0.5</inkstitch:min_stitch_len_mm>") && svg.contains("<inkstitch:collapse_len_mm>2.5</inkstitch:collapse_len_mm>"), "{svg}");
+        let back = import_svg(&svg).unwrap().document;
+        assert_eq!((back.machine.min_stitch, back.machine.trim_distance), (0.5, 2.5));
+    }
+
+    #[test]
+    fn roundtrip_of_the_new_settings() {
+        let mut d = imp(r##"<path d="M 10 10 L 90 10 M 10 14 L 90 14" style="fill:none;stroke:#000" inkstitch:satin_column="True" inkstitch:pull_compensation_mm="0.1 0.3" inkstitch:lock_start="star" inkstitch:color_sort_index="1"/>"##);
+        d.machine.min_stitch = 0.2;
+        d.machine.trim_distance = 4.0;
+        let svg = export_svg(&d);
+        roxmltree::Document::parse(&svg).unwrap();
+        for back in [import_svg(&svg).unwrap().document, import_svg(&without_filum_params(&svg)).unwrap().document] {
+            let (a, b) = (&d.objects[0], &back.objects[0]);
+            assert_eq!((a.lock, a.color_sort_index), (b.lock, b.color_sort_index));
+            assert_eq!(satin_of(a).second_rail, satin_of(b).second_rail);
+            assert_eq!(satin_of(b).second_rail.unwrap().pull_comp, Some(0.6));
+            assert_eq!((back.machine.min_stitch, back.machine.trim_distance), (0.2, 4.0));
         }
     }
 }

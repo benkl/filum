@@ -99,6 +99,7 @@ import { flatten as flattenSub, normAngle } from "../lib/geometry";
 import { pruneGroups } from "../lib/layerRows";
 import { freshCopies } from "../lib/copies";
 import { transformable } from "../lib/textSettle";
+import { loadFont } from "../lib/fonts";
 
 const hitCtx = (() => {
   const c = document.createElement("canvas");
@@ -139,7 +140,7 @@ type Drag =
   | { kind: "freehand" }
   | { kind: "ruler"; a: Vec2 }
   | { kind: "handle"; h: Handle; orig: DesignObject; moved: boolean }
-  | { kind: "texthandle"; h: Handle; group: string; spec: TextSpec; start: Vec2; moved: boolean }
+  | { kind: "texthandle"; h: Handle; group: string; spec: TextSpec; start: Vec2; moved: boolean; spacingScale?: number }
   | { kind: "pen-new"; idx: number; moved: boolean; last: Vec2 }
   | { kind: "bend"; o: DesignObject; sp: number; seg: number; t: number; start: Vec2; moved: boolean }
   | { kind: "pen-close"; moved: boolean }
@@ -1346,7 +1347,12 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
             return;
           }
           s.checkpoint();
-          dragRef.current = { kind: "texthandle", h: hh, group: hh.group, spec, start: p, moved: false };
+          const drag = { kind: "texthandle" as const, h: hh, group: hh.group, spec, start: p, moved: false, spacingScale: 1 };
+          dragRef.current = drag;
+          // embroidery fonts: spacing is at the font's own size, so the handle follows the pointer at the text's scale
+          void loadFont(spec.font).then((f) => {
+            if (f.kind === "embroidery" && f.size > 0) drag.spacingScale = spec.size / f.size;
+          });
           iRef.current.activeHandle = hh;
           return;
         }
@@ -2208,8 +2214,9 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
           const lines = d.spec.content.split("\n").map((l) => Array.from(l).length);
           const gaps = Math.max(1, Math.max(...lines) - 1);
           const k = d.spec.align === "center" ? 2 : 1;
-          let ls = d.spec.letterSpacing + (v * k) / gaps;
-          ls = Math.max(-d.spec.size * 0.5, Math.min(d.spec.size * 3, e.shiftKey ? Math.round(ls * 2) / 2 : Math.round(ls * 20) / 20));
+          const sc = d.spacingScale || 1;
+          let ls = d.spec.letterSpacing + (v * k) / gaps / sc;
+          ls = Math.max((-d.spec.size * 0.5) / sc, Math.min((d.spec.size * 3) / sc, e.shiftKey ? Math.round(ls * 2) / 2 : Math.round(ls * 20) / 20));
           updateText(d.group, { letterSpacing: ls }, true);
           label = `Letter spacing ${ls.toFixed(2)} mm`;
         }

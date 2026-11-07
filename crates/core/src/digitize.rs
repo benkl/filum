@@ -20,7 +20,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::clip;
-use crate::geom::{offset_rings, polyline_length, pt, signed_area, simplify, trace_contours, Point, Ring};
+use crate::geom::{polyline_length, pt, signed_area, simplify, trace_contours, Point, Ring};
 use crate::model::{
     hex_color, DitherMethod, FillMethod, FillParams, FlowField, GradientKind, GradientParams, GradientStop, Node, Object, RunningParams, SatinParams, StitchParams, SubPath, Thread,
 };
@@ -33,7 +33,8 @@ use crate::vision::{self, depixel, strokes};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct DigitizeOptions {
-    /// Number of thread colours (2..=24), background included.
+    /// Number of thread colours (2..=24), background included (enclosed areas of the
+    /// background's cluster that differ from the border colour get a colour of their own).
     pub colors: usize,
     /// Output width of the image in mm.
     pub width_mm: f64,
@@ -45,7 +46,8 @@ pub struct DigitizeOptions {
     pub smoothing: u32,
     /// Contour simplification tolerance (mm).
     pub simplify_mm: f64,
-    /// Outset of every fill region to hide gaps from pull (mm).
+    /// Overlap between neighbouring regions against gaps from pull (mm): the region
+    /// sewn first grows this far under the one sewn after it (0.3–0.5 mm is common in commercial digitizing).
     pub overlap_mm: f64,
     /// Narrow elongated regions up to this width become satin (mm).
     pub satin_max_width_mm: f64,
@@ -122,7 +124,8 @@ pub struct DigitizeOptions {
     pub line_continuity: f64,
     /// Satin lines follow the width of the line in the picture.
     pub line_taper: bool,
-    /// Thin lines as triple (bean) stitch instead of a single running stitch.
+    /// Thin lines (0.5 mm up to the running width) as triple (bean) stitch instead of a
+    /// single running stitch; hairlines under 0.5 mm stay single.
     pub thin_triple: bool,
     /// Outline width (mm): dark lines of the picture (outlines, ink) are sewn
     /// as satin of exactly this width, whatever their width in the picture
@@ -175,7 +178,8 @@ pub struct DigitizeOptions {
 pub enum BackgroundScope {
     /// Background-coloured regions connected to the image border, and plain
     /// holes (one shape around them, nothing inside: a donut's hole, a letter's
-    /// counter) larger than 6 mm². Small enclosed areas (highlights) and ones
+    /// counter, an eye's highlight), whatever their size. Holes too narrow to stay
+    /// open (under 0.8 mm) are sewn over by the shape around them; enclosed areas
     /// that are part of the picture (a badge face with shapes on it) are stitched.
     #[default]
     Outside,
@@ -299,7 +303,7 @@ impl Default for DigitizeOptions {
             min_region_mm2: 1.5,
             smoothing: 2,
             simplify_mm: 0.12,
-            overlap_mm: 0.2,
+            overlap_mm: 0.35,
             satin_max_width_mm: 6.0,
             running_max_width_mm: 0.9,
             palette: Vec::new(),
@@ -337,7 +341,7 @@ impl Default for DigitizeOptions {
             line_min_mm: 2.0,
             line_continuity: 35.0,
             line_taper: true,
-            thin_triple: false,
+            thin_triple: true,
             outline_line_mm: 0.0,
             route_lines: true,
             line_subpixel: true,
@@ -461,6 +465,9 @@ struct Prepared {
     up: usize,
     /// Regions before upscaling: (width, height, id per pixel, label and reason per region).
     regions: (usize, usize, Vec<u32>, Vec<u8>, Vec<u8>),
+    /// Pixels removed as the background (before pixel-art upscaling): a dark line
+    /// drawn on it may have been quantised into it and is still found as ink.
+    paper: Vec<bool>,
 }
 
 fn decode_mask(m: &SegMask, w: usize, h: usize) -> Vec<bool> {
@@ -635,6 +642,12 @@ fn prepare(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOptions) -> Opti
     if opts.fixed_colors.is_empty() && !pixel {
         merge_close_colors(&mut q, opts.merge_delta_e);
     }
+    // the removed background never swallows a light colour of the design (a cream sun,
+    // a cream badge face on a white background): enclosed areas of its cluster that
+    // differ from the border's colour become a colour of their own
+    if opts.remove_background && opts.fixed_colors.is_empty() {
+        split_background(&mut q, &lab, w, h, s, opts);
+    }
     let transparent = q.colors.len();
     let mut labels = q.labels;
     let mut grads_l: Vec<(u8, GradientRegion)> = Vec::new();
@@ -729,30 +742,44 @@ fn prepare(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOptions) -> Opti
         }
     }
     // an enclosed area of the background colour that is a plain hole (one shape around
-    // it, nothing inside: a donut's hole, a letter's counter, the inside of an outline)
-    // shows the fabric; small ones (highlights, eye glints) and ones that are part of a
-    // picture (several shapes around or inside them: a badge face) are stitched
-    let hole_px = (6.0 / (s * s)).ceil() as usize;
-    let is_hole = |k: usize| -> bool {
+    // it, nothing inside: a donut's hole, a letter's counter, the inside of an outline,
+    // an eye's highlight) shows the fabric, whatever its size; ones that are part of a
+    // picture (several shapes around or inside them: a badge face) are stitched. A hole
+    // too narrow to stay open (pull closes knock-outs under ~1 mm) is sewn over by the
+    // shape around it.
+    // the labels around a region, by contact count (most first)
+    let around_labels = |k: usize| -> Vec<(u8, usize)> {
         let c = &cc.comps[k];
-        if c.len <= hole_px {
-            return false;
-        }
-        let mut around: Option<u32> = None;
+        let mut n: Vec<(u8, usize)> = Vec::new();
         for &i in &cc.order[c.start..c.start + c.len] {
             let (x, y) = (i as usize % w, i as usize / w);
             for (nx, ny) in [(x.wrapping_sub(1), y), (x + 1, y), (x, y.wrapping_sub(1)), (x, y + 1)] {
-                if nx >= w || ny >= h {
+                if nx >= w || ny >= h || region_id[ny * w + nx] as usize == k {
                     continue;
                 }
-                let r = region_id[ny * w + nx];
-                if r as usize != k && around.replace(r).is_some_and(|a| a != r) {
-                    return false;
+                let l = labels[ny * w + nx];
+                match n.iter_mut().find(|e| e.0 == l) {
+                    Some(e) => e.1 += 1,
+                    None => n.push((l, 1)),
                 }
             }
         }
-        true
+        n.sort_by_key(|e| std::cmp::Reverse(e.1));
+        n
     };
+    let narrow = |k: usize| -> bool {
+        let c = &cc.comps[k];
+        let (cw, ch) = (c.x1 - c.x0 + 3, c.y1 - c.y0 + 3);
+        let mut m = vec![false; cw * ch];
+        for &i in &cc.order[c.start..c.start + c.len] {
+            let (x, y) = (i as usize % w, i as usize / w);
+            m[(y - c.y0 + 1) * cw + (x - c.x0 + 1)] = true;
+        }
+        let dmax = edt_sq(&m, cw, ch).into_iter().fold(0f64, f64::max).sqrt();
+        (2.0 * dmax - 0.5).max(0.5) * s < 0.8
+    };
+    // holes sewn over: the label of the shape around them
+    let mut sewn_over: Vec<(usize, u8)> = Vec::new();
     for (k, c) in cc.comps.iter().enumerate() {
         let l = c.label as usize;
         let on_border = c.x0 == 0 || c.y0 == 0 || c.x1 + 1 >= w || c.y1 + 1 >= h;
@@ -760,13 +787,41 @@ fn prepare(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOptions) -> Opti
             reason::TRANSPARENT
         } else if skipped[l] {
             reason::COLOUR
-        } else if bg_colour == Some(l) && (on_border || opts.background_scope == BackgroundScope::Everywhere || (opts.background_scope == BackgroundScope::Outside && is_hole(k))) {
+        } else if bg_colour == Some(l) && (on_border || opts.background_scope == BackgroundScope::Everywhere) {
             reason::BACKGROUND
+        } else if bg_colour == Some(l) && opts.background_scope == BackgroundScope::Outside {
+            // a hole: one colour all around (a letter's counters are the same colour)
+            let around = around_labels(k);
+            let sewable = |al: usize| al != transparent && Some(al) != bg_colour && !skipped[al];
+            match around.first() {
+                Some(&(al, _)) if around.len() == 1 => {
+                    if sewable(al as usize) && narrow(k) {
+                        sewn_over.push((k, al));
+                        reason::STITCHED
+                    } else {
+                        reason::BACKGROUND
+                    }
+                }
+                // part of the picture; a sliver of it (an anti-aliased or JPEG seam
+                // between two colours) goes to its main neighbour instead
+                Some(&(al, _)) if sewable(al as usize) && narrow(k) => {
+                    sewn_over.push((k, al));
+                    reason::STITCHED
+                }
+                _ => reason::STITCHED,
+            }
         } else {
             reason::STITCHED
         };
         region_label.push(c.label);
         region_reason.push(why);
+    }
+    for &(k, al) in &sewn_over {
+        let c = &cc.comps[k];
+        for &i in &cc.order[c.start..c.start + c.len] {
+            labels[i as usize] = al;
+        }
+        region_label[k] = al;
     }
     for e in &opts.region_edits {
         let x = ((e.x * w as f64) as isize).clamp(0, w as isize - 1) as usize;
@@ -804,6 +859,7 @@ fn prepare(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOptions) -> Opti
             }
         })
         .collect();
+    let paper: Vec<bool> = region_id.iter().map(|&r| region_reason[r as usize] == reason::BACKGROUND).collect();
     let regions = (w, h, region_id, region_label, region_reason);
 
     // pixel art: upscale the label image so diagonals connect smoothly
@@ -818,7 +874,7 @@ fn prepare(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOptions) -> Opti
         s /= k as f64;
         up = k;
     }
-    Some(Prepared { w, h, s, labels, colors: q.colors, palette_idx: q.palette_idx, background, nlab, info, lab, grads: grads_l, zone, up, regions })
+    Some(Prepared { w, h, s, labels, colors: q.colors, palette_idx: q.palette_idx, background, nlab, info, lab, grads: grads_l, zone, up, regions, paper })
 }
 
 /// The colour of a gradient region at pixel `(x, y)` (its own pixel grid).
@@ -890,22 +946,89 @@ fn segs_to_subpath(segs: &[Seg], s: f64, closed: bool) -> SubPath {
     SubPath { nodes, closed }
 }
 
-/// Grow fill shapes by the overlap (exact offset, curves re-fitted).
-fn grow_paths(paths: &[SubPath], d: f64) -> Option<Vec<SubPath>> {
-    let rings: Vec<Ring> = paths
-        .iter()
-        .map(|sp| {
-            let mut r = sp.flatten(0.02);
-            if r.len() > 2 && r[0].dist(*r.last().unwrap()) < 1e-6 {
-                r.pop();
+/// A closed sub-path as a ring (mm) without a repeated end point.
+fn flat_ring(sp: &SubPath) -> Ring {
+    let mut r = sp.flatten(0.02);
+    if r.len() > 2 && r[0].dist(*r.last().unwrap()) < 1e-6 {
+        r.pop();
+    }
+    r
+}
+
+/// The overlap between neighbouring regions: every fill grows by `overlap_mm`, but
+/// only into the regions next to it that are sewn after it, and into satin and
+/// running regions (whose stitches cannot grow): the object sewn first lies under
+/// the seam, the later one covers it. Edges against holes, the background or an
+/// earlier fill keep their place.
+#[allow(clippy::too_many_arguments)]
+fn grow_under_neighbours(regions: &mut [Region], region_comp: &[usize], ordered: &[usize], cid: &[u32], w: usize, h: usize, s: f64, opts: &DigitizeOptions) {
+    let d = opts.overlap_mm;
+    let mut of_comp: std::collections::HashMap<u32, usize> = std::collections::HashMap::new();
+    for (ri, &k) in region_comp.iter().enumerate() {
+        of_comp.insert(k as u32, ri);
+    }
+    let mut pos = vec![usize::MAX; regions.len()];
+    for (p, &ri) in ordered.iter().enumerate() {
+        pos[ri] = p;
+    }
+    // regions that touch (4-neighbours)
+    let mut next: Vec<Vec<usize>> = vec![Vec::new(); regions.len()];
+    let mut link = |a: u32, b: u32| {
+        if let (Some(&ra), Some(&rb)) = (of_comp.get(&a), of_comp.get(&b)) {
+            if !next[ra].contains(&rb) {
+                next[ra].push(rb);
+                next[rb].push(ra);
             }
-            r
+        }
+    };
+    for y in 0..h {
+        for x in 0..w {
+            let i = y * w + x;
+            if x + 1 < w && cid[i] != cid[i + 1] {
+                link(cid[i], cid[i + 1]);
+            }
+            if y + 1 < h && cid[i] != cid[i + w] {
+                link(cid[i], cid[i + w]);
+            }
+        }
+    }
+    let grown: Vec<Option<Vec<SubPath>>> = (0..regions.len())
+        .map(|ri| {
+            let r = &regions[ri];
+            if r.rank != 0 || r.paths.is_empty() || !matches!(r.stitch, StitchParams::Fill(_)) {
+                return None;
+            }
+            let under: Vec<clip::Region> = next[ri]
+                .iter()
+                .filter(|&&rj| pos[rj] > pos[ri] || regions[rj].rank != 0)
+                .map(|&rj| clip::region(&regions[rj].outline))
+                .filter(|g| !g.is_empty())
+                .collect();
+            // (every fill's outline goes through the polygon clipper, grown or not: its
+            // rings come out normalised — outers and holes wound apart, no touching
+            // vertices — which the fill's travel routing needs to stay inside the shape)
+            let mut later = clip::union_all(&under);
+            if !opts.seamless {
+                // traced outlines of neighbours do not share their edges exactly
+                later = clip::offset(&later, (0.75 * s).min(0.3));
+            }
+            let own_rings: Vec<Ring> = r.paths.iter().map(flat_ring).filter(|r| r.len() >= 3).collect();
+            let own = clip::region(&own_rings);
+            let band = if later.is_empty() || d <= 1e-6 { Vec::new() } else { clip::intersect(&clip::offset(&own, d), &later) };
+            let rings = clip::rings(&if clip::area(&band) < 1e-4 { own } else { clip::union(&own, &band) });
+            let paths: Vec<SubPath> = if opts.seamless {
+                rings.iter().map(|r| clip::fit_ring(r, 0.02, 35.0)).filter(|sp| sp.nodes.len() >= 3).collect()
+            } else {
+                rings.iter().map(|r| SubPath::polyline(&round_pts(&simplify_closed(r, 0.02)), true)).filter(|sp| sp.nodes.len() >= 3).collect()
+            };
+            (!paths.is_empty()).then_some(paths)
         })
-        .filter(|r| r.len() >= 3)
         .collect();
-    let grown = clip::rings(&clip::offset(&clip::region(&rings), d));
-    let out: Vec<SubPath> = grown.iter().map(|r| clip::fit_ring(r, 0.02, 35.0)).filter(|sp| sp.nodes.len() >= 3).collect();
-    (!out.is_empty()).then_some(out)
+    for (r, g) in regions.iter_mut().zip(grown) {
+        if let Some(p) = g {
+            r.paths = p;
+        }
+    }
 }
 
 /// Fill angle convention: rows along (cos(-a), sin(-a)) in y-down coordinates.
@@ -975,14 +1098,14 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
     if opts.photo_zigzag && prep.up == 1 {
         return photo_zigzag(&prep, opts);
     }
-    let Prepared { w, h, s, mut labels, colors, palette_idx, background, nlab, mut info, lab, grads, zone, up, .. } = prep;
+    let Prepared { w, h, s, mut labels, colors, palette_idx, background, nlab, mut info, lab, grads, zone, up, paper, .. } = prep;
     let pixel = up > 1;
     let q = Quant { labels: Vec::new(), colors, palette_idx };
     let mut cc = components_zoned(&labels, &zone, w, h);
     // lines of the picture become strokes; the fills around them grow under them
     let mut line_strokes: Vec<LineStroke> = Vec::new();
     if opts.line_networks && !pixel && lab.w == w && lab.h == h {
-        if let Some((line_px, strip_px, found)) = find_lines(&lab, &labels, &cc, &background, &grads, &q.colors, w, h, s, opts) {
+        if let Some((line_px, strip_px, found)) = find_lines(&lab, &labels, &paper, &cc, &background, &grads, &q.colors, w, h, s, opts) {
             let total = (w * h) as f64;
             for (i, &on) in line_px.iter().enumerate() {
                 let l = labels[i] as usize;
@@ -990,6 +1113,9 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
                     info[l].lines += 1.0 / total;
                 }
             }
+            // (a letter's counter is fabric, removed before this: it never grows under
+            // the letter; an enclosed area of the background colour that is stitched is
+            // a thread colour like any other and runs under its outline)
             grow_under_lines(&mut labels, &line_px, &strip_px, w, h, (0.8 / s).ceil() as u32, q.colors.len() as u8);
             cc = components_zoned(&labels, &zone, w, h);
             line_strokes = found;
@@ -1004,9 +1130,9 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
     // shared boundaries, fitted once
     let (chains, fitted): (Vec<Chain>, Vec<Vec<Seg>>) = if opts.seamless {
         let ch = boundary::chains(&cid, w, h);
-        let accuracy = if pixel { 0.35 * up as f64 } else { 0.35 };
-        let corner = if pixel { opts.corner_angle.max(60.0) } else { opts.corner_angle };
-        let f = ch.iter().map(|c| boundary::fit_chain(c, accuracy, corner, up as f64)).collect();
+        // pixel art: its own fitting (every 90° corner of two pixels or more stays,
+        // within a quarter of a source pixel)
+        let f = ch.iter().map(|c| if pixel { boundary::fit_chain_pixel(c, up as f64) } else { boundary::fit_chain(c, 0.35, opts.corner_angle, 1.0) }).collect();
         (ch, f)
     } else {
         (Vec::new(), Vec::new())
@@ -1022,8 +1148,23 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
     let flow_etf = (want_flow && (flow_fill || gradient_flow) && flow_smoothing != 2).then(|| filters::edge_tangent_flow(&filters::luminance(&lab), 4, flow_smoothing));
 
     // 6./7. vectorise + stitch type
-    let ctx = Ctx { s, tol: opts.simplify_mm.max(0.0).max(s * 0.5), opts, fill_only: colour_roles(&q.colors, opts).1 };
+    // pixels next to another stitched region (a seam): where a region's end lies along
+    // one, the region is cut by another object there
+    let stitched_label = |l: u8| (l as usize) < nlab && !background[l as usize];
+    let seam: Vec<bool> = (0..w * h)
+        .map(|i| {
+            let (x, y) = (i % w, i / w);
+            stitched_label(labels[i])
+                && [(x > 0).then(|| i - 1), (x + 1 < w).then(|| i + 1), (y > 0).then(|| i - w), (y + 1 < h).then(|| i + w)]
+                    .into_iter()
+                    .flatten()
+                    .any(|j| cid[j] != cid[i] && stitched_label(labels[j]))
+        })
+        .collect();
+    let ctx = Ctx { s, tol: opts.simplify_mm.max(0.0).max(s * 0.5), opts, fill_only: colour_roles(&q.colors, opts).1, seam: &seam };
     let mut regions: Vec<Region> = Vec::new();
+    // the component each region was made of
+    let mut region_comp: Vec<usize> = Vec::new();
     // pixels that became fills: the outline wraps these, not thin strokes
     let mut fill_mask = vec![false; w * h];
     for (k, c) in cc.comps.iter().enumerate() {
@@ -1049,27 +1190,28 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
                 area: pix.len(),
                 paths: Vec::new(),
                 stitch: StitchParams::Fill(FillParams { method: FillMethod::Tatami, row_spacing: opts.row_spacing.max(0.1), underlay: opts.underlay, ..Default::default() }),
+                outline: Vec::new(),
             })
         } else {
             process_region(&ctx, c, pix, w)
         };
         let Some(mut r) = region else { continue };
+        // seamless outlines: the shared, fitted boundaries
+        let seam: Vec<SubPath> = if opts.seamless {
+            let rings = boundary::region_rings_of(&chains, &fitted, k as u32, by_region.get(&(k as u32)).cloned().unwrap_or_default());
+            rings.iter().map(|ring| segs_to_subpath(ring, s, true)).filter(|sp| sp.nodes.len() >= 2).collect()
+        } else {
+            Vec::new()
+        };
+        if !seam.is_empty() {
+            r.outline = seam.iter().map(flat_ring).filter(|r| r.len() >= 3).collect();
+        }
         if r.rank == 0 {
             for &p in pix {
                 fill_mask[p as usize] = true;
             }
-            // seamless outlines: the shared, fitted boundaries
-            if opts.seamless {
-                let rings = boundary::region_rings_of(&chains, &fitted, k as u32, by_region.get(&(k as u32)).cloned().unwrap_or_default());
-                let mut paths: Vec<SubPath> = rings.iter().map(|ring| segs_to_subpath(ring, s, true)).filter(|sp| sp.nodes.len() >= 2).collect();
-                if opts.overlap_mm > 1e-6 && !paths.is_empty() {
-                    if let Some(g) = grow_paths(&paths, opts.overlap_mm) {
-                        paths = g;
-                    }
-                }
-                if !paths.is_empty() {
-                    r.paths = paths;
-                }
+            if !seam.is_empty() {
+                r.paths = seam;
             }
             if r.paths.is_empty() {
                 continue;
@@ -1115,6 +1257,7 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
                 }
             }
         }
+        region_comp.push(k);
         regions.push(r);
     }
 
@@ -1148,6 +1291,11 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
             }
         }
     }
+
+    // overlap: a fill grows under the neighbours sewn after it (only the object sewn
+    // first grows, so a seam is never sewn twice) and under satins and running
+    // regions (which cannot grow), never into holes or the background
+    grow_under_neighbours(&mut regions, &region_comp, &ordered, &cid, w, h, s, opts);
 
     // 9. threads in first-use order, objects
     let mut threads: Vec<Thread> = Vec::new();
@@ -1236,8 +1384,11 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
             };
             // lines in their own colour share a thread with one alike (blurred,
             // compressed pictures give every small stroke a slightly different shade)
+            // (dark ones, ink, within a wider margin: the measured darkness of thin ink
+            // drifts with blur and compression)
+            let dark = |c: [u8; 3]| rgb_to_lab(c)[0] < 40.0;
             let rgb = match ls.label {
-                None => keyed.iter().map(|(c, _)| *c).find(|c| crate::threads::delta_e(*c, rgb) < 12.0).unwrap_or(rgb),
+                None => keyed.iter().map(|(c, _)| *c).find(|c| crate::threads::delta_e(*c, rgb) < if dark(*c) && dark(rgb) { 20.0 } else { 12.0 }).unwrap_or(rgb),
                 Some(_) => rgb,
             };
             keyed.push((rgb, ls));
@@ -1281,10 +1432,9 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
                     .unwrap();
                 let ls = left.remove(bi);
                 let st = &ls.stroke;
-                // crumbs of the stroke network (a few pixels at a junction) and loose
-                // dashes shorter than a line cost a trim each and sew nothing visible
-                let len_mm = polyline_length(&st.pts) * s;
-                if len_mm < 0.5 || (st.closed && len_mm < opts.line_min_mm) || (!st.closed && st.free[0] && st.free[1] && len_mm < opts.line_min_mm) {
+                // (crumbs and loose dashes were dropped with the lines; a stroke of a
+                // glyph-like cluster stays however short)
+                if polyline_length(&st.pts) * s < 0.5 {
                     continue;
                 }
                 let fixed = (ls.ink && opts.outline_line_mm > 0.0).then_some(opts.outline_line_mm);
@@ -1331,7 +1481,8 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
     let make_outline = |paths: Vec<SubPath>, name: String, thread: String, kind: OutlineKind, objects: &mut Vec<Object>| {
         let width = opts.outline_width_mm.clamp(0.4, 8.0);
         let stitch = match kind {
-            OutlineKind::Satin => StitchParams::Satin(SatinParams { width, center_walk: true, contour_underlay: width > 2.5, ..Default::default() }),
+            // (the width as set: an outline narrower than 1 mm is the user's choice)
+            OutlineKind::Satin => StitchParams::Satin(SatinParams { width, ..satin_params(width) }),
             _ => StitchParams::Running(RunningParams { length: 2.0, bean_repeats: 2, ..Default::default() }),
         };
         objects.push(Object {
@@ -2047,6 +2198,7 @@ struct LineStroke {
 fn find_lines(
     lab: &Img,
     labels: &[u8],
+    paper: &[bool],
     cc: &Components,
     background: &[bool],
     grads: &[(u8, GradientRegion)],
@@ -2058,6 +2210,23 @@ fn find_lines(
 ) -> Option<(Vec<bool>, Vec<bool>, Vec<LineStroke>)> {
     let ncolors = colors.len();
     let colors_rgb = |l: usize| colors[l];
+    // a texture (noise, grain, a photo's fine detail) is no drawing: thin dark or narrow
+    // structures are everywhere in it. Drawn art has a few per cent of its pixels on a
+    // colour boundary (the suite: at most 6 %), uniform noise two thirds
+    if w > 2 && h > 2 {
+        let mut b = 0usize;
+        for y in 1..h - 1 {
+            for x in 1..w - 1 {
+                let i = y * w + x;
+                if labels[i] != labels[i - 1] || labels[i] != labels[i + 1] || labels[i] != labels[i - w] || labels[i] != labels[i + w] {
+                    b += 1;
+                }
+            }
+        }
+        if b as f64 > TEXTURE_BOUNDARY * ((w - 2) * (h - 2)) as f64 {
+            return None;
+        }
+    }
     // the widest line a stroke can sew: satin up to the line width, else running only
     let limit_mm = if opts.allow_satin {
         opts.line_max_width_mm.min(opts.satin_max_width_mm.max(0.8))
@@ -2072,11 +2241,33 @@ fn find_lines(
     let (as_line, as_fill) = colour_roles(colors, opts);
     let fill_px = |i: usize| (labels[i] as usize) < ncolors && as_fill[labels[i] as usize];
     let stitchable = |i: usize| ((labels[i] as usize) < ncolors || is_grad(labels[i] as usize)) && !fill_px(i);
+    // ink may also lie on the removed background: a thin dark line (small text, an
+    // accent) the colour reduction merged into the paper colour — but not the
+    // anti-aliased rim of a stitched shape (paper next to it)
+    let on_paper = |i: usize| {
+        paper.get(i).copied().unwrap_or(false) && {
+            let (x, y) = ((i % w) as i64, (i / w) as i64);
+            (-1..=1i64).all(|dy| {
+                (-1..=1i64).all(|dx| {
+                    let (nx, ny) = (x + dx, y + dy);
+                    nx < 0 || ny < 0 || nx >= w as i64 || ny >= h as i64 || {
+                        let j = ny as usize * w + nx as usize;
+                        paper[j] || (labels[j] as usize) >= ncolors
+                    }
+                })
+            })
+        }
+    };
     let mut mask = vec![false; w * h];
     // pixels of colours marked as lines (their strokes are kept whatever their width)
     let mut forced = vec![false; w * h];
     // darkness above the local background (for sub-pixel centring)
     let mut ink_ridge: Option<Vec<f32>> = None;
+    // the distance to a wide body of the pixel's own colour (a bold letter's stem), and
+    // how far a line may end from one and still hang off it (px): a narrow part attached
+    // to one is part of that shape (a serif letter's hairline, a K's arm)
+    let mut body_dist: Vec<u32> = vec![u32::MAX; w * h];
+    let mut body_grow = 0.0f64;
 
     // 1. ink: thin structures darker than their surroundings
     if opts.ink_sensitivity > 0.0 {
@@ -2089,7 +2280,7 @@ fn find_lines(
         let bh: Vec<f32> = (0..w * h).map(|i| closed[i] - lum[i]).collect();
         ink_ridge = Some(bh.clone());
         // hysteresis: weak line pixels count when connected to strong ones
-        let mut stack: Vec<usize> = (0..w * h).filter(|&i| bh[i] >= hi && stitchable(i)).collect();
+        let mut stack: Vec<usize> = (0..w * h).filter(|&i| bh[i] >= hi && (stitchable(i) || on_paper(i))).collect();
         for &i in &stack {
             mask[i] = true;
         }
@@ -2101,12 +2292,13 @@ fn find_lines(
                     continue;
                 }
                 let j = ny as usize * w + nx as usize;
-                if !mask[j] && bh[j] >= lo && stitchable(j) {
+                if !mask[j] && bh[j] >= lo && (stitchable(j) || on_paper(j)) {
                     mask[j] = true;
                     stack.push(j);
                 }
             }
         }
+        keep_paper_strokes(&mut mask, paper, w, h, s);
         // ink the colour regions explain (as light as its region's colour: the darkness
         // only comes from a lighter neighbour) must also look like a line there:
         // narrow in its region (not a shape's body) and most of its region (not the
@@ -2125,7 +2317,7 @@ fn find_lines(
                 body_l[p as usize] = v;
             }
         }
-        let explained = |i: usize| (labels[i] as usize) >= ncolors || body_l[i].is_nan() || lum[i] as f64 > body_l[i] - hi as f64;
+        let explained = |i: usize| ((labels[i] as usize) >= ncolors && !on_paper(i)) || body_l[i].is_nan() || lum[i] as f64 > body_l[i] - hi as f64;
         let mut edge = vec![true; w * h];
         for y in 0..h {
             for x in 0..w {
@@ -2141,6 +2333,52 @@ fn find_lines(
         let not_core: Vec<bool> = core.iter().map(|c| !c).collect();
         let near_core = edt_sq(&not_core, w, h);
         let grow2 = (r2.sqrt() + 1.5).powi(2);
+        // (bodies: cores of some size, not the widening where two lines merge; breadth
+        // first from them, carrying their colour, over the pixels of that colour)
+        let mut seen = vec![false; w * h];
+        let mut queue: std::collections::VecDeque<usize> = std::collections::VecDeque::new();
+        let min_core = (max_w * max_w).max(16.0) as usize;
+        for start in 0..w * h {
+            if !core[start] || seen[start] || (labels[start] as usize) >= ncolors {
+                continue;
+            }
+            let l = labels[start];
+            let mut part = vec![start];
+            seen[start] = true;
+            let mut k = 0;
+            while k < part.len() {
+                let i = part[k];
+                k += 1;
+                let (x, y) = (i % w, i / w);
+                for j in [(x > 0).then(|| i - 1), (x + 1 < w).then(|| i + 1), (y > 0).then(|| i - w), (y + 1 < h).then(|| i + w)].into_iter().flatten() {
+                    if core[j] && !seen[j] && labels[j] == l {
+                        seen[j] = true;
+                        part.push(j);
+                    }
+                }
+            }
+            if part.len() >= min_core {
+                for i in part {
+                    body_dist[i] = 0;
+                    queue.push_back(i);
+                }
+            }
+        }
+        body_grow = grow2.sqrt();
+        let body_reach = 1.2 * (body_grow + max_w / 2.0 + 3.0);
+        while let Some(i) = queue.pop_front() {
+            if body_dist[i] as f64 >= body_reach {
+                continue;
+            }
+            let (x, y) = (i % w, i / w);
+            for j in [(x > 0).then(|| i - 1), (x + 1 < w).then(|| i + 1), (y > 0).then(|| i - w), (y + 1 < h).then(|| i + w)].into_iter().flatten() {
+                if body_dist[j] == u32::MAX && labels[j] == labels[i] {
+                    body_dist[j] = body_dist[i] + 1;
+                    queue.push_back(j);
+                }
+            }
+        }
+        let _ = &near_core;
         for i in 0..w * h {
             if mask[i] && (core[i] || near_core[i] <= grow2) && explained(i) {
                 mask[i] = false;
@@ -2256,7 +2494,7 @@ fn find_lines(
             w,
             h,
             &|i| dt[i].sqrt(),
-            &strokes::StrokeOpts { min_len: min_len.max(2.0), gap: opts.line_gap_mm.max(0.0) / s, continue_deg: opts.line_continuity.clamp(0.0, 90.0) },
+            &strokes::StrokeOpts { min_len: (0.25 / s).max(2.0), gap: opts.line_gap_mm.max(0.0) / s, continue_deg: opts.line_continuity.clamp(0.0, 90.0) },
         );
         let mut kept: Vec<strokes::Stroke> = traced
             .into_iter()
@@ -2264,8 +2502,10 @@ fn find_lines(
                 let mut ws = st.widths.clone();
                 ws.sort_by(|a, b| a.partial_cmp(b).unwrap());
                 let wd = ws[ws.len() / 2] - 0.5;
-                // a line is long for its width: a short, wide one is a blob (two dots the ink test joined)
-                let long = st.closed || polyline_length(&st.pts) >= 2.0 * wd;
+                // a line is long for its width: a short, wide one is a blob (two dots the ink
+                // test joined). (Its skeleton stops about half a width short of a free end.)
+                let free = usize::from(st.free[0]) + usize::from(st.free[1]);
+                let long = st.closed || polyline_length(&st.pts) + 0.5 * wd * free as f64 >= 2.0 * wd;
                 (wd <= max_w * 1.1 && long) || on_forced(st)
             })
             .collect();
@@ -2362,10 +2602,187 @@ fn find_lines(
             }
         }
     }
+    let at = |p: &Point| ((p.y - 0.5).round().max(0.0) as usize).min(h - 1) * w + ((p.x - 0.5).round().max(0.0) as usize).min(w - 1);
+    // half the line's width at the end `e` of a stroke (px)
+    let r_of = |st: &strokes::Stroke, e: usize| st.widths.get(e).copied().filter(|v| v.is_finite()).unwrap_or(2.0) / 2.0;
+    // shapes, not lines: a piece whose width varies a lot along it (a bold serif
+    // letter: thick stems, thin hairlines), or a stroke that ends at a wide body of its
+    // colour (a hairline or an arm of a letter whose stem is a fill), stays a fill: its
+    // centre line would lose the serifs and the contrast. Only fairly even strokes that
+    // stand on their own are lines.
+    {
+        let np = keep.len();
+        let piece_of = |st: &strokes::Stroke| -> Option<usize> {
+            let mut votes: Vec<(u32, usize)> = Vec::new();
+            for p in &st.pts {
+                let k = piece[at(p)];
+                if k != u32::MAX {
+                    match votes.iter_mut().find(|v| v.0 == k) {
+                        Some(v) => v.1 += 1,
+                        None => votes.push((k, 1)),
+                    }
+                }
+            }
+            votes.into_iter().max_by_key(|v| v.1).map(|v| v.0 as usize)
+        };
+        let mut widths: Vec<Vec<f64>> = vec![Vec::new(); np];
+        let mut forced_p = vec![false; np];
+        // strokes and their total length per piece
+        let mut n_st = vec![0usize; np];
+        for (st, _) in &found {
+            if let Some(k) = piece_of(st) {
+                widths[k].extend(st.widths.iter().copied().filter(|v| v.is_finite()));
+                forced_p[k] |= on_forced(st);
+                n_st[k] += 1;
+            }
+        }
+        // a mesh: one connected piece of many strokes packed close (grain or a texture
+        // inside a shape, not a drawing: a drawing's strokes run from junction to
+        // junction over some distance — a cartoon's outline network has one stroke per
+        // ~2000 of its pixels, grain one per few dozen)
+        let mut area_p = vec![0usize; np];
+        for i in 0..w * h {
+            if mask[i] && piece[i] != u32::MAX {
+                area_p[piece[i] as usize] += 1;
+            }
+        }
+        let mesh: Vec<bool> = (0..np).map(|k| !forced_p[k] && n_st[k] >= 20 && n_st[k] * 100 > area_p[k]).collect();
+        let varies: Vec<bool> = (0..np)
+            .map(|k| {
+                let ws = &mut widths[k];
+                if forced_p[k] || ws.len() < 6 {
+                    return false;
+                }
+                ws.sort_by(|a, b| a.total_cmp(b));
+                let n = ws.len();
+                let (lo, med, hi) = (ws[n * 15 / 100], ws[n / 2], ws[n * 85 / 100]);
+                // (thin lines measure a pixel or two: their width ratio is noise)
+                med >= 4.0 && hi - lo >= 3.0 && hi > 1.8 * lo.max(1.0)
+            })
+            .collect();
+        let attached = |st: &strokes::Stroke| -> bool {
+            if on_forced(st) || st.pts.len() < 2 {
+                return false;
+            }
+            let mid = st.pts[st.pts.len() / 2];
+            let own = labels[at(&mid)];
+            // (only a line in its region's own colour: a pen line merged into the region
+            // it is drawn on lies on that region's body, it does not hang off it)
+            if (own as usize) >= ncolors {
+                return false;
+            }
+            let mut ls: Vec<f32> = st.pts.iter().map(|p| lab.data[at(p) * 3]).collect();
+            ls.sort_by(|a, b| a.total_cmp(b));
+            if (ls[ls.len() / 2] as f64 - rgb_to_lab(colors_rgb(own as usize))[0]).abs() > 15.0 {
+                return false;
+            }
+            [0, st.pts.len() - 1].into_iter().any(|e| {
+                let i = at(&st.pts[e]);
+                labels[i] == own && (body_dist[i] as f64) <= 1.2 * (body_grow + r_of(st, e) + 3.0)
+            })
+        };
+        let drop: Vec<bool> = found.iter().map(|(st, _)| piece_of(st).is_some_and(|k| varies[k] || mesh[k]) || attached(st)).collect();
+        if drop.iter().any(|d| *d) {
+            // the mask pixels of the dropped strokes (those closest to one of them)
+            // return to the fills; the rest stays line
+            let mut from = vec![0u8; w * h]; // 0 = unreached, 1 = kept, 2 = dropped
+            let mut queue: std::collections::VecDeque<usize> = std::collections::VecDeque::new();
+            for (k, (st, _)) in found.iter().enumerate() {
+                for p in &st.pts {
+                    let i = at(p);
+                    if mask[i] && from[i] == 0 {
+                        from[i] = if drop[k] { 2 } else { 1 };
+                        queue.push_back(i);
+                    }
+                }
+            }
+            while let Some(i) = queue.pop_front() {
+                let (x, y) = (i % w, i / w);
+                for j in [(x > 0).then(|| i - 1), (x + 1 < w).then(|| i + 1), (y > 0).then(|| i - w), (y + 1 < h).then(|| i + w)].into_iter().flatten() {
+                    if mask[j] && from[j] == 0 && piece[j] == piece[i] {
+                        from[j] = from[i];
+                        queue.push_back(j);
+                    }
+                }
+            }
+            for i in 0..w * h {
+                if from[i] == 2 {
+                    mask[i] = false;
+                    piece[i] = u32::MAX;
+                }
+            }
+            let mut k = 0;
+            found.retain(|_| {
+                k += 1;
+                !drop[k - 1]
+            });
+        }
+    }
+    // crumbs of the network and loose dashes sew nothing visible and cost a trim
+    // each, unless they belong to a cluster of strokes (a letter's arm or accent, the
+    // strokes of small text): a real stroke lies close by
+    {
+        // (the mark's length: the skeleton stops about half a width short of a free end)
+        let len_px: Vec<f64> = found
+            .iter()
+            .map(|(st, _)| {
+                let wd = st.widths.iter().copied().filter(|v| v.is_finite()).fold(0.0, f64::max);
+                let free = if st.closed { 0 } else { usize::from(st.free[0]) + usize::from(st.free[1]) };
+                polyline_length(&st.pts) + 0.5 * wd * free as f64
+            })
+            .collect();
+        let loose = |k: usize| {
+            let st = &found[k].0;
+            len_px[k] * s < opts.line_min_mm && (st.closed || (st.free[0] && st.free[1]))
+        };
+        // (next to a real stroke — long, or part of a network — not just next to
+        // another crumb: in grain or noise every speck has a neighbour)
+        let mut owner = vec![u32::MAX; w * h];
+        for (k, (st, _)) in found.iter().enumerate() {
+            if loose(k) {
+                continue;
+            }
+            for p in &st.pts {
+                owner[at(p)] = k as u32;
+            }
+        }
+        let keep_st: Vec<bool> = (0..found.len())
+            .map(|k| {
+                let st = &found[k].0;
+                let wd = st.widths.iter().copied().filter(|v| v.is_finite()).fold(0.0, f64::max);
+                if len_px[k] * s < 0.5 || len_px[k] < 1.5 * wd.max(1.0) {
+                    return false;
+                }
+                if !loose(k) {
+                    return true;
+                }
+                let reach = (1.0 / s).max(3.0 * wd).ceil() as i64;
+                st.pts.iter().any(|p| {
+                    let (cx, cy) = ((p.x - 0.5).round() as i64, (p.y - 0.5).round() as i64);
+                    (-reach..=reach).any(|dy| {
+                        (-reach..=reach).any(|dx| {
+                            let (x, y) = (cx + dx, cy + dy);
+                            x >= 0 && y >= 0 && x < w as i64 && y < h as i64 && dx * dx + dy * dy <= reach * reach && {
+                                let o = owner[y as usize * w + x as usize];
+                                o != u32::MAX && o as usize != k
+                            }
+                        })
+                    })
+                })
+            })
+            .collect();
+        let mut k = 0;
+        found.retain(|_| {
+            k += 1;
+            keep_st[k - 1]
+        });
+    }
+    if found.is_empty() {
+        return None;
+    }
     for (st, ink) in &found {
         for p in &st.pts {
-            let (x, y) = ((p.x - 0.5).round().max(0.0) as usize, (p.y - 0.5).round().max(0.0) as usize);
-            let i = y.min(h - 1) * w + x.min(w - 1);
+            let i = at(p);
             let k = piece[i];
             if k != u32::MAX && (class[i] == 1) == *ink {
                 keep[k as usize] = true;
@@ -2377,6 +2794,31 @@ fn find_lines(
             mask[i] = false;
         }
     }
+    // the anti-aliased rim of a line in its own colour (a pixel or two the ink test
+    // left out) belongs to the line: left alone it would be a sliver region along it
+    // (sewn a second time, or joined to a shape the line touches)
+    let mut class = class;
+    for _ in 0..2 {
+        let mut add: Vec<(usize, u16)> = Vec::new();
+        for i in 0..w * h {
+            if !mask[i] {
+                continue;
+            }
+            let (x, y) = (i % w, i / w);
+            for j in [(x > 0).then(|| i - 1), (x + 1 < w).then(|| i + 1), (y > 0).then(|| i - w), (y + 1 < h).then(|| i + w)].into_iter().flatten() {
+                if !mask[j] && labels[j] == labels[i] && (labels[j] as usize) < ncolors && !fill_px(j) && body_dist[j] == u32::MAX {
+                    add.push((j, class[i]));
+                }
+            }
+        }
+        if add.is_empty() {
+            break;
+        }
+        for (j, c) in add {
+            mask[j] = true;
+            class[j] = c;
+        }
+    }
     // the colour of a stroke: the picture's colour along it (a thin line may
     // have been merged into its surroundings by the colour reduction), as an
     // existing thread colour when one is close
@@ -2384,9 +2826,25 @@ fn find_lines(
     for (st, ink) in found {
         let mut ls: Vec<f32> = Vec::new();
         let (mut sa, mut sb) = (0f64, 0f64);
+        // a thin ink line is mostly anti-aliased blend: its colour is that of its core,
+        // the darkest pixel around each point
+        let mut wd: Vec<f64> = st.widths.iter().copied().filter(|v| v.is_finite()).collect();
+        wd.sort_by(|a, b| a.total_cmp(b));
+        let thin_ink = ink && wd.get(wd.len() / 2).is_some_and(|v| *v < 4.0);
         for p in &st.pts {
             let (x, y) = ((p.x - 0.5).round().max(0.0) as usize, (p.y - 0.5).round().max(0.0) as usize);
-            let i = y.min(h - 1) * w + x.min(w - 1);
+            let mut i = y.min(h - 1) * w + x.min(w - 1);
+            if thin_ink {
+                for (dx, dy) in [(-1i64, -1i64), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)] {
+                    let (nx, ny) = (x as i64 + dx, y as i64 + dy);
+                    if nx >= 0 && ny >= 0 && (nx as usize) < w && (ny as usize) < h {
+                        let j = ny as usize * w + nx as usize;
+                        if mask[j] && lab.data[j * 3] < lab.data[i * 3] {
+                            i = j;
+                        }
+                    }
+                }
+            }
             ls.push(lab.data[i * 3]);
             sa += lab.data[i * 3 + 1] as f64;
             sb += lab.data[i * 3 + 2] as f64;
@@ -2402,9 +2860,153 @@ fn find_lines(
             .map(|(l, _)| l);
         out.push(LineStroke { stroke: st, label, rgb: lab_to_rgb(col), ink });
     }
+    // ink lines of one drawing in a design colour and a drifting shade of it (thin
+    // strokes of small text measure lighter or greyer, JPEG most of all): a dark stroke
+    // without a colour of its own joins the dark design colour other ink lines use
+    let used: Vec<usize> = {
+        let mut u: Vec<usize> = out.iter().filter(|ls| ls.ink).filter_map(|ls| ls.label).collect();
+        u.sort_unstable();
+        u.dedup();
+        u
+    };
+    for ls in out.iter_mut().filter(|ls| ls.ink && ls.label.is_none()) {
+        let lab_ls = rgb_to_lab(ls.rgb);
+        if lab_ls[0] >= 40.0 {
+            continue;
+        }
+        ls.label = used
+            .iter()
+            .map(|&l| (l, rgb_to_lab(colors_rgb(l))))
+            .filter(|(_, c)| c[0] < 40.0)
+            .map(|(l, c)| (l, vision::delta_e(lab_ls, c)))
+            .filter(|(_, d)| *d <= 20.0)
+            .min_by(|a, b| a.1.total_cmp(&b.1))
+            .map(|(l, _)| l);
+    }
     // the pixels of coloured strips (not ink): fills reach only their edges
     let strip: Vec<bool> = (0..w * h).map(|i| mask[i] && class[i] > 1).collect();
     Some((mask, strip, out))
+}
+
+/// Share of a picture's pixels on a colour boundary above which it is a texture.
+const TEXTURE_BOUNDARY: f64 = 0.3;
+
+/// Ink found on the removed background (the paper) is kept only where it forms real
+/// strokes: a piece (8-connected ink pixels touching the paper) at least 1.5 mm long
+/// and three times as long as it is wide, or a shorter mark (an accent, a stroke or a
+/// fragment of small text) within 1.5 mm of such a stroke or of ink on the design. On paper that is itself a texture (grain, noise:
+/// dense dark specks, many small pieces) none is kept, and never more than the 400
+/// longest pieces.
+fn keep_paper_strokes(mask: &mut [bool], paper: &[bool], w: usize, h: usize, s: f64) {
+    if paper.len() != w * h || !paper.iter().any(|p| *p) {
+        return;
+    }
+    // pieces of ink that touch the paper
+    let mut piece = vec![u32::MAX; w * h];
+    let mut pieces: Vec<Vec<usize>> = Vec::new();
+    for start in 0..w * h {
+        if !mask[start] || piece[start] != u32::MAX {
+            continue;
+        }
+        let id = pieces.len() as u32;
+        let mut px = vec![start];
+        piece[start] = id;
+        let mut k = 0;
+        while k < px.len() {
+            let i = px[k];
+            k += 1;
+            let (x, y) = ((i % w) as i64, (i / w) as i64);
+            for (dx, dy) in [(-1i64, 0i64), (1, 0), (0, -1), (0, 1), (-1, -1), (1, 1), (-1, 1), (1, -1)] {
+                let (nx, ny) = (x + dx, y + dy);
+                if nx < 0 || ny < 0 || nx >= w as i64 || ny >= h as i64 {
+                    continue;
+                }
+                let j = ny as usize * w + nx as usize;
+                if mask[j] && piece[j] == u32::MAX {
+                    piece[j] = id;
+                    px.push(j);
+                }
+            }
+        }
+        pieces.push(px);
+    }
+    let on_paper: Vec<bool> = pieces.iter().map(|px| px.iter().any(|&i| paper[i])).collect();
+    if !on_paper.iter().any(|v| *v) {
+        return;
+    }
+    // length and width of a piece (px): its extent along the longer bounding-box
+    // diagonal, and its area over that length
+    let size = |px: &[usize]| -> (f64, f64) {
+        let (mut x0, mut y0, mut x1, mut y1) = (usize::MAX, usize::MAX, 0, 0);
+        for &i in px {
+            let (x, y) = (i % w, i / w);
+            x0 = x0.min(x);
+            y0 = y0.min(y);
+            x1 = x1.max(x);
+            y1 = y1.max(y);
+        }
+        let len = (((x1 - x0 + 1) as f64).powi(2) + ((y1 - y0 + 1) as f64).powi(2)).sqrt();
+        (len, px.len() as f64 / len.max(1.0))
+    };
+    let dims: Vec<(f64, f64)> = pieces.iter().map(|px| size(px)).collect();
+    let paper_px = paper.iter().filter(|p| **p).count() as f64;
+    let ink_px: usize = pieces.iter().zip(&on_paper).filter(|(_, o)| **o).map(|(px, _)| px.iter().filter(|&&i| paper[i]).count()).sum();
+    let count = on_paper.iter().filter(|v| **v).count() as f64;
+    let paper_mm2 = paper_px * s * s;
+    // a texture: dark specks everywhere on the paper
+    let texture = ink_px as f64 > 0.15 * paper_px || count > paper_mm2 / 16.0;
+    let long = |k: usize| {
+        let (len, wd) = dims[k];
+        len * s >= 1.5 && len >= 3.0 * wd
+    };
+    let mut keep: Vec<bool> = (0..pieces.len()).map(|k| !on_paper[k] || (!texture && long(k))).collect();
+    if !texture {
+        // short marks next to a real stroke (or next to ink on the design itself)
+        let mut owner = vec![u32::MAX; w * h];
+        for (k, px) in pieces.iter().enumerate() {
+            if keep[k] {
+                for &i in px {
+                    owner[i] = k as u32;
+                }
+            }
+        }
+        let reach = (1.5 / s).ceil().max(2.0) as i64;
+        for k in 0..pieces.len() {
+            if keep[k] {
+                continue;
+            }
+            // (a fragment of a glyph: any size, as long as it is no round speck)
+            let (len, wd) = dims[k];
+            if len < 2.0 || len < 1.2 * wd {
+                continue;
+            }
+            let near = pieces[k].iter().step_by(3).any(|&i| {
+                let (cx, cy) = ((i % w) as i64, (i / w) as i64);
+                (-reach..=reach).any(|dy| {
+                    (-reach..=reach).any(|dx| {
+                        let (x, y) = (cx + dx, cy + dy);
+                        x >= 0 && y >= 0 && x < w as i64 && y < h as i64 && owner[y as usize * w + x as usize] != u32::MAX
+                    })
+                })
+            });
+            keep[k] = near;
+        }
+        // never more than the 400 longest
+        let mut kept: Vec<usize> = (0..pieces.len()).filter(|&k| keep[k] && on_paper[k]).collect();
+        if kept.len() > 400 {
+            kept.sort_by(|a, b| dims[*b].0.total_cmp(&dims[*a].0));
+            for &k in &kept[400..] {
+                keep[k] = false;
+            }
+        }
+    }
+    for (k, px) in pieces.iter().enumerate() {
+        if !keep[k] {
+            for &i in px {
+                mask[i] = false;
+            }
+        }
+    }
 }
 
 /// Moving average of a closed polyline.
@@ -2473,7 +3075,9 @@ fn sliding_extreme(x: &[f32], r: usize, take_max: bool) -> Vec<f32> {
 /// The fills around a line grow under it to its centre (no gap can show
 /// beside it). Under a coloured strip (`strip`, a satin of its own colour)
 /// they reach in at most `max_px` pixels: nothing is sewn twice under its
-/// middle — those pixels get `empty`, a label that is not stitched.
+/// middle — those pixels get `empty`, a label that is not stitched. Removed areas
+/// (the background, a letter's counter) are `empty` already: the line lies on the
+/// fabric there.
 fn grow_under_lines(labels: &mut [u8], line: &[bool], strip: &[bool], w: usize, h: usize, max_px: u32, empty: u8) {
     let mut done: Vec<bool> = line.iter().map(|l| !l).collect();
     let mut dist = vec![0u32; w * h];
@@ -2490,6 +3094,26 @@ fn grow_under_lines(labels: &mut [u8], line: &[bool], strip: &[bool], w: usize, 
             }
         }
     }
+}
+
+/// A digitized satin column of width `w` (mm): never narrower than 1 mm (Ink/Stitch
+/// warns below that), underlay by width — none under 1.5 mm (it would show and
+/// thicken the column), a centre walk up to 4 mm, a contour up to 5 mm, contour and
+/// zig-zag above.
+fn satin_params(w: f64) -> SatinParams {
+    let w = r3(w.max(1.0));
+    SatinParams { width: w, center_walk: (1.5..4.0).contains(&w), contour_underlay: w >= 4.0, zigzag_underlay: w >= 5.0, ..Default::default() }
+}
+
+/// A digitized line's running stitch: shorter stitches on small detail (a letter of
+/// small text sews as a polygon with 2 mm stitches), triple (bean) when `bean`.
+fn line_running(small: bool, bean: bool) -> RunningParams {
+    let length = match (small, bean) {
+        (true, false) => 1.2,
+        (true, true) => 1.5,
+        _ => 2.0,
+    };
+    RunningParams { length, tolerance: if small { 0.1 } else { 0.2 }, bean_repeats: if bean { 2 } else { 0 }, ..Default::default() }
 }
 
 /// A stroke as an embroidery object: running (or triple) stitch for thin
@@ -2532,11 +3156,16 @@ fn stroke_object(st: &strokes::Stroke, reverse: bool, s: f64, ctx: &Ctx, fixed: 
             }
         }
     }
+    // small detail (a letter of small text, a short mark): a finer centre line and
+    // shorter stitches, or its curves sew as polygons
+    let len_mm: f64 = pts.windows(2).map(|p| p[0].dist(p[1])).sum();
+    let small = len_mm < 12.0;
+    let tol = if small { ctx.tol.min(0.05) } else { ctx.tol };
     let smooth = |pts: &[Point]| -> Vec<Point> {
         if st.closed {
-            simplify_closed(&chaikin_closed(pts), ctx.tol)
+            simplify_closed(&chaikin_closed(pts), tol)
         } else {
-            simplify(&smooth_open(pts, 2), ctx.tol)
+            simplify(&smooth_open(pts, 2), tol)
         }
     };
     let thin = match fixed {
@@ -2549,10 +3178,14 @@ fn stroke_object(st: &strokes::Stroke, reverse: bool, s: f64, ctx: &Ctx, fixed: 
         if line.len() < 2 {
             return None;
         }
-        let stitch = StitchParams::Running(RunningParams { length: 2.0, bean_repeats: if opts.thin_triple || fixed.is_some() { 2 } else { 0 }, ..Default::default() });
+        // 0.5–1 mm: a bean (triple) stitch reads as a line; a hairline stays single
+        // (the measured width of a thin line runs short: a 2 px line of 0.5 mm reads
+        // 0.375 mm)
+        let bean = fixed.is_some() || (opts.thin_triple && width >= 0.35);
+        let stitch = StitchParams::Running(line_running(small, bean));
         return Some((vec![SubPath::polyline(&round_pts(&line), st.closed)], stitch));
     }
-    let satin = |w: f64| SatinParams { width: r3(w), center_walk: true, contour_underlay: w > 2.5, ..Default::default() };
+    let satin = satin_params;
     // an outline: one even width along a smooth centre line
     if let Some(fw) = fixed {
         let line = smooth(&pts);
@@ -2563,7 +3196,7 @@ fn stroke_object(st: &strokes::Stroke, reverse: bool, s: f64, ctx: &Ctx, fixed: 
     }
     // lines are at most the line width; colours marked as lines up to the satin width
     let max_w = opts.line_max_width_mm.max(opts.satin_max_width_mm).max(0.8);
-    let w_med = width.clamp(0.8, max_w);
+    let w_med = width.clamp(1.0, max_w);
     let (lo, hi) = (sorted[sorted.len() / 10], sorted[sorted.len() * 9 / 10]);
     if !opts.line_taper || hi < lo * 1.3 || pts.len() < 6 {
         let line = smooth(&pts);
@@ -2597,7 +3230,7 @@ fn stroke_object(st: &strokes::Stroke, reverse: bool, s: f64, ctx: &Ctx, fixed: 
         .map(|i| {
             let a = i.saturating_sub(win);
             let b = (i + win).min(wid.len() - 1);
-            (wid[a..=b].iter().sum::<f64>() / (b - a + 1) as f64).clamp(0.6, max_w)
+            (wid[a..=b].iter().sum::<f64>() / (b - a + 1) as f64).clamp(1.0, max_w)
         })
         .collect();
     let mut j = 0;
@@ -3126,6 +3759,148 @@ struct Quant {
     palette_idx: Vec<Option<usize>>,
 }
 
+/// The dominant label of the picture's border (transparent pixels aside).
+fn border_label(labels: &[u8], w: usize, h: usize, n: usize) -> Option<usize> {
+    let mut count = vec![0usize; n + 1];
+    for x in 0..w {
+        count[(labels[x] as usize).min(n)] += 1;
+        count[(labels[(h - 1) * w + x] as usize).min(n)] += 1;
+    }
+    for y in 0..h {
+        count[(labels[y * w] as usize).min(n)] += 1;
+        count[(labels[y * w + w - 1] as usize).min(n)] += 1;
+    }
+    (0..n).filter(|&l| count[l] > 0).max_by_key(|&l| (count[l], std::cmp::Reverse(l))).filter(|&l| count[l] >= count[n])
+}
+
+/// The background's cluster is the border colour. Enclosed parts of it whose own
+/// colour differs from the border's by more than a just noticeable difference (a cream
+/// face inside a ring, a pale sun) were only merged into it because the background
+/// took a colour slot: they get their own colour (one per distinct shade).
+fn split_background(q: &mut Quant, lab: &Img, w: usize, h: usize, s: f64, opts: &DigitizeOptions) {
+    let n = q.colors.len();
+    if n == 0 || n >= 250 || w < 3 || h < 3 {
+        return;
+    }
+    let Some(bg) = border_label(&q.labels, w, h, n) else { return };
+    let cc = components(&q.labels, w, h);
+    // a shade is judged on the inside of an area, two pixels in from its edge: the
+    // anti-aliased rim of thin white letters on red is pink, their body is not
+    let labels = &q.labels;
+    let inside = |p: usize| -> bool {
+        let (x, y) = (p % w, p / w);
+        let l = labels[p];
+        x >= 2 && y >= 2 && x + 2 < w && y + 2 < h && [p - 1, p + 1, p - w, p + w, p - 2, p + 2, p - 2 * w, p + 2 * w, p - w - 1, p - w + 1, p + w - 1, p + w + 1].iter().all(|&q| labels[q] == l)
+    };
+    let mean = |pix: &[u32]| -> Option<([f64; 3], usize)> {
+        let mut m = [0f64; 3];
+        let mut n = 0usize;
+        for &p in pix {
+            if inside(p as usize) {
+                for k in 0..3 {
+                    m[k] += lab.data[p as usize * 3 + k] as f64;
+                }
+                n += 1;
+            }
+        }
+        (n > 0).then(|| (m.map(|v| v / n as f64), n))
+    };
+    // the border's own shade: the background components that touch it
+    let (mut sum, mut cnt) = ([0f64; 3], 0usize);
+    let mut inner: Vec<usize> = Vec::new();
+    for (k, c) in cc.comps.iter().enumerate() {
+        if c.label as usize != bg {
+            continue;
+        }
+        let pix = &cc.order[c.start..c.start + c.len];
+        if c.x0 == 0 || c.y0 == 0 || c.x1 + 1 >= w || c.y1 + 1 >= h {
+            if let Some((m, n)) = mean(pix) {
+                for j in 0..3 {
+                    sum[j] += m[j] * n as f64;
+                }
+                cnt += n;
+            }
+        } else {
+            inner.push(k);
+        }
+    }
+    if cnt == 0 || inner.is_empty() {
+        return;
+    }
+    let border = sum.map(|v| v / cnt as f64);
+    let thr = opts.merge_delta_e.max(3.0);
+    // new colours: (Lab sum, pixel count) per distinct shade
+    let mut shades: Vec<([f64; 3], usize)> = Vec::new();
+    let mut assign: Vec<(usize, usize)> = Vec::new();
+    for k in inner {
+        let c = &cc.comps[k];
+        let pix = &cc.order[c.start..c.start + c.len];
+        // too small to judge a shade (anti-aliased crumbs, thin strokes, noise; a small
+        // knocked-out letter tinted by JPEG ringing): a face or a sun has an inside of
+        // some size
+        let Some((m, n)) = mean(pix) else { continue };
+        if (n as f64) < (20.0 / (s * s)).max(16.0) || vision::delta_e(m, border) <= thr {
+            continue;
+        }
+        let at = shades.iter().position(|(s, c)| vision::delta_e(s.map(|v| v / *c as f64), m) <= thr.max(5.0));
+        let si = match at {
+            Some(i) => i,
+            None => {
+                shades.push(([0.0; 3], 0));
+                shades.len() - 1
+            }
+        };
+        for j in 0..3 {
+            shades[si].0[j] += m[j] * pix.len() as f64;
+        }
+        shades[si].1 += pix.len();
+        assign.push((k, si));
+    }
+    if shades.is_empty() {
+        return;
+    }
+    // a shade close to an existing colour joins it; the others are new colours
+    let pal_lab: Vec<[f64; 3]> = opts.palette.iter().map(|e| rgb_to_lab(e.rgb)).collect();
+    let mut label_of: Vec<u8> = Vec::with_capacity(shades.len());
+    let old_t = n as u8;
+    for (sum, c) in &shades {
+        let m = sum.map(|v| v / *c as f64);
+        let near = (0..q.colors.len()).filter(|&l| l != bg).find(|&l| vision::delta_e(rgb_to_lab(q.colors[l]), m) <= thr);
+        if let Some(l) = near {
+            label_of.push(l as u8);
+            continue;
+        }
+        let (rgb, pidx) = if pal_lab.is_empty() {
+            (lab_to_rgb(m), None)
+        } else {
+            let e = (0..pal_lab.len()).min_by(|&a, &b| vision::delta_e(pal_lab[a], m).total_cmp(&vision::delta_e(pal_lab[b], m))).unwrap();
+            (opts.palette[e].rgb, Some(e))
+        };
+        // the chart maps it onto the background's own thread: nothing to split
+        if pidx.is_some() && pidx == q.palette_idx[bg] {
+            label_of.push(bg as u8);
+            continue;
+        }
+        label_of.push(q.colors.len() as u8);
+        q.colors.push(rgb);
+        q.palette_idx.push(pidx);
+    }
+    let new_t = q.colors.len() as u8;
+    if new_t != old_t {
+        for l in q.labels.iter_mut() {
+            if *l == old_t {
+                *l = new_t;
+            }
+        }
+    }
+    for (k, si) in assign {
+        let c = &cc.comps[k];
+        for &p in &cc.order[c.start..c.start + c.len] {
+            q.labels[p as usize] = label_of[si];
+        }
+    }
+}
+
 fn quantize(px: &[[u8; 4]], w: usize, h: usize, opts: &DigitizeOptions) -> Quant {
     let n = w * h;
     let lut = srgb_lut();
@@ -3526,6 +4301,8 @@ struct Ctx<'a> {
     opts: &'a DigitizeOptions,
     /// Colours the user marked as fills (never lines).
     fill_only: Vec<bool>,
+    /// Pixels next to another stitched region.
+    seam: &'a [bool],
 }
 
 struct Region {
@@ -3536,6 +4313,8 @@ struct Region {
     area: usize,
     paths: Vec<SubPath>,
     stitch: StitchParams,
+    /// The region's own area (mm), not grown: what a neighbour grows under.
+    outline: Vec<Ring>,
 }
 
 fn r3(v: f64) -> f64 {
@@ -3613,6 +4392,16 @@ fn process_region(ctx: &Ctx, c: &Comp, pix: &[u32], w: usize) -> Option<Region> 
     // ones by 0; split the difference.
     let width_mm = (2.0 * dmax - 0.5).max(0.5) * s;
     let label = c.label as usize;
+    // the region's outline (mm): the fill's shape, and what neighbours grow under
+    let min_area = 0.5 * s * s;
+    let outline: Vec<Ring> = trace_contours(&mask, cw, ch)
+        .iter()
+        .map(|r| {
+            let mm: Vec<Point> = r.iter().map(|p| to_mm(*p)).collect();
+            simplify_closed(&chaikin_closed(&mm), ctx.tol)
+        })
+        .filter(|r| r.len() >= 3 && signed_area(r).abs() > min_area)
+        .collect();
 
     // --- running stitch for hairlines
     let as_fill = ctx.fill_only.get(label).copied().unwrap_or(false);
@@ -3640,22 +4429,50 @@ fn process_region(ctx: &Ctx, c: &Comp, pix: &[u32], w: usize) -> Option<Region> 
             }
             paths.push(SubPath::polyline(&round_pts(&r), true));
         }
+        let small = paths.iter().map(|sp| polyline_length(&sp.flatten(0.05))).sum::<f64>() < 12.0;
         return Some(Region {
             label,
             rank: 1,
             centroid,
             area,
             paths,
-            stitch: StitchParams::Running(RunningParams { length: 2.0, ..Default::default() }),
+            stitch: StitchParams::Running(line_running(small, opts.thin_triple && width_mm >= 0.35)),
+            outline,
         });
     }
 
-    // --- medial-axis satin for narrow elongated strokes
-    if opts.allow_satin && width_mm <= opts.satin_max_width_mm && !as_fill {
+    // --- medial-axis satin for narrow elongated strokes. Wider than 4.5 mm a column is
+    // a fill: its ends and rails come from an averaged width and only a fill follows a
+    // wide shape's outline (a band cut by a stripe, a ring under a banner)
+    if opts.allow_satin && width_mm <= opts.satin_max_width_mm.min(4.5) && !as_fill {
         // a fill needs room for its rows: a mark narrower than 2 mm (a dash, a
         // brush tick) sews cleaner as a short column even when it is stubby
         let min_elongation = if width_mm < 2.0 { 1.0 } else { 3.0 };
-        if let Some((centre, sw)) = satin_centre_line(&mask, &dt, cw, ch, area, dmax, min_elongation) {
+        // an end cut by another object (a ring running under a banner) would be square
+        // across the column, leaving fabric on one side and spilling on the other: a fill
+        // takes the cut's own shape (and grows under the object that cuts it)
+        let cut_end = |p: Point, r: f64| -> bool {
+            let rr = (1.5 * r + 1.5).ceil() as i64;
+            let (cx, cy) = (p.x.floor() as i64, p.y.floor() as i64);
+            let mut n = 0usize;
+            for dy in -rr..=rr {
+                for dx in -rr..=rr {
+                    let (x, y) = (cx + dx, cy + dy);
+                    if x < 0 || y < 0 || x >= cw as i64 || y >= ch as i64 || dx * dx + dy * dy > rr * rr || !mask[y as usize * cw + x as usize] {
+                        continue;
+                    }
+                    // crop → image pixel
+                    let (gx, gy) = ((x - 1) as usize + c.x0, (y - 1) as usize + c.y0);
+                    if ctx.seam[gy * w + gx] {
+                        n += 1;
+                    }
+                }
+            }
+            n as f64 >= r.max(1.0)
+        };
+        let centre_line = satin_centre_line(&mask, &dt, cw, ch, area, dmax, min_elongation)
+            .filter(|(centre, sw)| width_mm <= 2.0 || !(cut_end(centre[0], sw / 2.0) || cut_end(*centre.last().unwrap(), sw / 2.0)));
+        if let Some((centre, sw)) = centre_line {
             // rails that follow the shape's width (an ellipse, a leaf, a swoosh taper),
             // like the lines' strokes; the centre line already reaches the shape's ends
             let width_at = |p: &Point| {
@@ -3669,52 +4486,29 @@ fn process_region(ctx: &Ctx, c: &Comp, pix: &[u32], w: usize) -> Option<Region> 
                 free: [false, false],
             };
             if let Some((paths, stitch @ StitchParams::Satin(_))) = stroke_object(&st, false, s, ctx, None) {
-                return Some(Region { label, rank: 1, centroid, area, paths, stitch });
+                return Some(Region { label, rank: 1, centroid, area, paths, stitch, outline });
             }
             let pts: Vec<Point> = centre.iter().map(|p| to_mm(*p)).collect();
             let pts = simplify(&pts, ctx.tol);
             if pts.len() >= 2 {
-                let width = r3((sw * s).clamp(0.8, opts.satin_max_width_mm.max(0.8)));
+                let width = (sw * s).clamp(1.0, opts.satin_max_width_mm.max(1.0));
                 return Some(Region {
                     label,
                     rank: 1,
                     centroid,
                     area,
                     paths: vec![SubPath::polyline(&round_pts(&pts), false)],
-                    stitch: StitchParams::Satin(SatinParams {
-                        width,
-                        center_walk: true,
-                        contour_underlay: width > 2.5,
-                        ..Default::default()
-                    }),
+                    stitch: StitchParams::Satin(satin_params(width)),
+                    outline,
                 });
             }
         }
     }
 
-    // --- tatami fill
-    let min_area = 0.5 * s * s;
-    let mut rings: Vec<Ring> = trace_contours(&mask, cw, ch)
-        .iter()
-        .map(|r| {
-            let mm: Vec<Point> = r.iter().map(|p| to_mm(*p)).collect();
-            simplify_closed(&chaikin_closed(&mm), ctx.tol)
-        })
-        .filter(|r| r.len() >= 3 && signed_area(r).abs() > min_area)
-        .collect();
+    // --- tatami fill (grown under its later neighbours once the sew order is known)
+    let rings = outline.clone();
     if rings.is_empty() {
         return None;
-    }
-    if opts.overlap_mm > 1e-6 {
-        let res = (s * 0.5).clamp(0.03, 0.2);
-        let out: Vec<Ring> = offset_rings(&rings, opts.overlap_mm, res)
-            .iter()
-            .map(|r| simplify_closed(r, ctx.tol * 0.5))
-            .filter(|r| r.len() >= 3 && signed_area(r).abs() > min_area)
-            .collect();
-        if !out.is_empty() {
-            rings = out;
-        }
     }
     // principal axis (PCA of pixel coordinates, y down)
     let (mut sxx, mut syy, mut sxy) = (0f64, 0f64, 0f64);
@@ -3735,6 +4529,21 @@ fn process_region(ctx: &Ctx, c: &Comp, pix: &[u32], w: usize) -> Option<Region> 
     if let Some(a) = opts.fill_angle {
         angle = a;
     }
+    let area_mm2 = area as f64 * s * s;
+    // how much of the outline lies against the fabric (not against another region)
+    let (mut rim, mut seam) = (0usize, 0usize);
+    for &p in pix {
+        let p = p as usize;
+        let (x, y) = (p % w, p / w);
+        let (mx, my) = (x - c.x0 + 1, y - c.y0 + 1);
+        if [mask[my * cw + mx - 1], mask[my * cw + mx + 1], mask[(my - 1) * cw + mx], mask[(my + 1) * cw + mx]].iter().any(|v| !v) {
+            rim += 1;
+            if ctx.seam[p] {
+                seam += 1;
+            }
+        }
+    }
+    let open_edge = seam * 2 < rim;
     Some(Region {
         label,
         rank: 0,
@@ -3745,9 +4554,18 @@ fn process_region(ctx: &Ctx, c: &Comp, pix: &[u32], w: usize) -> Option<Region> 
             method: opts.fill_method,
             angle,
             row_spacing: opts.row_spacing.max(0.1),
-            underlay: opts.underlay,
+            // a fill under ~3 mm across has no room for an inset underlay; a large one
+            // (15 mm and more) gets an edge run first: crisp, stable edges
+            underlay: opts.underlay && width_mm >= 3.0,
+            // (along its edges against the fabric: against a neighbour the overlap lies
+            // there already; not around holes, the run jumps and trims between rings)
+            underlay_edge: opts.underlay && width_mm >= 6.0 && area_mm2 >= 225.0 && rings.len() == 1 && open_edge,
+            // (pull compensation: the fabric's share is added when sewing; a base value
+            // of its own makes the tatami rows overshoot the outline and split the fill's
+            // travel into more trims, so the overlap carries the seams instead)
             ..Default::default()
         }),
+        outline,
     })
 }
 

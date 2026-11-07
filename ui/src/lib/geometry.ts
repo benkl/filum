@@ -359,12 +359,15 @@ export function transformObject(o: DesignObject, m: Mat, rotationDeg = 0): Desig
   if (o.text) {
     // keep the lettering parametric: its spec follows the transform
     const t = o.text;
+    // embroidery fonts keep their spacing at the font's own size (it scales with
+    // the letters already); outline fonts' spacing is in mm
+    const spaced = t.font.startsWith("emb:") || t.font.startsWith("inkfont:") ? 1 : scale;
     out.text = {
       ...t,
       anchor: applyMat(m, t.anchor),
       size: +(t.size * scale).toFixed(3),
-      letterSpacing: t.letterSpacing * scale,
-      ...(t.wordSpacing ? { wordSpacing: t.wordSpacing * scale } : {}),
+      letterSpacing: t.letterSpacing * spaced,
+      ...(t.wordSpacing ? { wordSpacing: t.wordSpacing * spaced } : {}),
       borderWidth: +(t.borderWidth * scale).toFixed(3),
       rotation: +(t.rotation + rotationDeg).toFixed(3),
       // text on a path: the path moves with the letters

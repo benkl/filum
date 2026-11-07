@@ -33,6 +33,12 @@ export interface FontMetrics {
   reversible?: boolean;
   /** Ink/Stitch "sortable": colour sort allowed. */
   sortable?: boolean;
+  /** Ink/Stitch "combine_at_sort_indices": colour sort indices merged into one object each. */
+  combine_at_sort_indices?: number[];
+  /** Ink/Stitch "auto_satin": the lettering's satins are routed (default true). */
+  auto_satin?: boolean;
+  /** Ink/Stitch "scale_cross_stitch_pattern": crosses scale with the lettering. */
+  scale_cross_stitch_pattern?: boolean;
 }
 
 export interface PackedFont extends FontMetrics {
@@ -44,7 +50,8 @@ export interface PackedFont extends FontMetrics {
   variants?: Record<string, PackedChunk[]>;
 }
 
-export function fontMetrics(meta: Record<string, unknown>): FontMetrics;
+/** font.json metrics with Ink/Stitch's defaults (every flag set). */
+export function fontMetrics(meta: Record<string, unknown>): FontMetrics & Required<Pick<FontMetrics, "reversible" | "sortable" | "combine_at_sort_indices" | "auto_satin" | "scale_cross_stitch_pattern">>;
 export function buildFont(
   meta: Record<string, unknown>,
   files: string[],

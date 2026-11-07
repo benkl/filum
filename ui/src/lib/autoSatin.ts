@@ -10,8 +10,8 @@
 // Shared: plain functions on objects, so lettering and the digitizer can
 // route their satins too.
 
-import type { DesignObject, SubPath, Vec2 } from "../types";
-import { flattenSubPath } from "./bezier";
+import type { DesignObject, PathNode, SubPath, Vec2 } from "../types";
+import { cubicAt, flattenSubPath, isCurved, segmentOf, splitCubic } from "./bezier";
 import { satinRailIndices, uid } from "./geometry";
 
 export interface AutoSatinOptions {
@@ -77,15 +77,142 @@ function simplify(pts: Vec2[], tol = 0.02): Vec2[] {
   return pts.filter((_, k) => keep[k]);
 }
 
+/** Where on a rail: its segment and the curve parameter there. */
+interface RailLoc {
+  seg: number;
+  t: number;
+}
+
+/** A rail, open (a closed one ends where it began), flattened. */
+interface Rail {
+  sp: SubPath;
+  pts: Vec2[];
+  cum: number[];
+  /** Segment and parameter of every flattened point. */
+  loc: RailLoc[];
+  /** Flattened index of every node. */
+  nodeIdx: number[];
+}
+
+/** A closed sub-path as an open one ending on its first node; reversed, every handle swapped. */
+function openRail(sp: SubPath, reverse: boolean): SubPath {
+  let nodes = sp.nodes.map((n) => ({ ...n }));
+  if (sp.closed && nodes.length > 1) nodes.push({ p: nodes[0].p, i: nodes[0].i });
+  if (reverse) nodes = nodes.reverse().map((n) => ({ p: n.p, i: n.o, o: n.i }));
+  nodes[0] = { p: nodes[0].p, o: nodes[0].o };
+  nodes[nodes.length - 1] = { p: nodes[nodes.length - 1].p, i: nodes[nodes.length - 1].i };
+  return { closed: false, nodes };
+}
+
+function railOf(sp: SubPath, reverse: boolean): Rail {
+  const r = openRail(sp, reverse);
+  const pts: Vec2[] = [r.nodes[0].p];
+  const loc: RailLoc[] = [{ seg: 0, t: 0 }];
+  const nodeIdx = [0];
+  for (let s = 0; s < r.nodes.length - 1; s++) {
+    const c = segmentOf(r, s);
+    // like the engine (curves flattened finely, straight segments kept whole)
+    const k = isCurved(r, s) ? Math.max(4, Math.min(400, Math.ceil((dist(c[0], c[1]) + dist(c[1], c[2]) + dist(c[2], c[3])) / 0.1))) : 1;
+    for (let j = 1; j <= k; j++) {
+      pts.push(j === k ? c[3] : cubicAt(c, j / k));
+      loc.push({ seg: s, t: j / k });
+    }
+    nodeIdx.push(pts.length - 1);
+  }
+  return { sp: r, pts, cum: cumulative(pts), loc, nodeIdx };
+}
+
+/** Segment and parameter `d` mm along a rail. */
+function locAt(r: Rail, d: number): RailLoc {
+  const total = r.cum[r.cum.length - 1];
+  d = Math.max(0, Math.min(total, d));
+  let k = 1;
+  while (k < r.cum.length - 1 && r.cum[k] < d) k++;
+  const l = r.cum[k] - r.cum[k - 1];
+  const u = l <= 1e-12 ? 1 : (d - r.cum[k - 1]) / l;
+  const { seg, t } = r.loc[k];
+  const t0 = r.loc[k - 1].seg === seg ? r.loc[k - 1].t : 0;
+  const tt = t0 + (t - t0) * u;
+  // a node: the start of the next segment
+  if (tt >= 1 - 1e-9) return seg + 1 < r.sp.nodes.length - 1 ? { seg: seg + 1, t: 0 } : { seg, t: 1 };
+  return { seg, t: Math.max(0, tt) };
+}
+
+/**
+ * The part of a rail from `d0` to `d1` mm, its own nodes and curves kept
+ * (the curves at the cuts split, de Casteljau).
+ */
+function cutRail(r: Rail, d0: number, d1: number): SubPath {
+  const a = locAt(r, d0);
+  const b = locAt(r, d1);
+  const src = r.sp.nodes;
+  const node = (i: number): PathNode => ({ ...src[i] });
+  if (a.seg === b.seg) {
+    const c = segmentOf(r.sp, a.seg);
+    const [, right] = splitCubic(c, a.t);
+    const [mid] = splitCubic(right, a.t >= 1 ? 0 : (b.t - a.t) / (1 - a.t));
+    const curved = isCurved(r.sp, a.seg);
+    return { closed: false, nodes: [{ p: mid[0], o: curved ? mid[1] : undefined }, { p: mid[3], i: curved ? mid[2] : undefined }] };
+  }
+  const nodes: PathNode[] = [];
+  // the start: inside segment a.seg (or on its first node)
+  const ca = segmentOf(r.sp, a.seg);
+  const [, ra] = splitCubic(ca, a.t);
+  const curvedA = isCurved(r.sp, a.seg);
+  nodes.push({ p: ra[0], o: curvedA ? ra[1] : undefined });
+  for (let i = a.seg + 1; i <= b.seg; i++) nodes.push(node(i));
+  if (curvedA) nodes[1] = { ...nodes[1], i: ra[2] };
+  // the end: inside segment b.seg (nothing of it when on its first node)
+  if (b.t > 1e-9) {
+    const [lb] = splitCubic(segmentOf(r.sp, b.seg), b.t);
+    const curvedB = isCurved(r.sp, b.seg);
+    if (curvedB) nodes[nodes.length - 1] = { ...nodes[nodes.length - 1], o: lb[1] };
+    else nodes[nodes.length - 1] = { ...nodes[nodes.length - 1], o: undefined };
+    nodes.push({ p: lb[3], i: curvedB ? lb[2] : undefined });
+  }
+  const first = nodes[0];
+  const last = nodes[nodes.length - 1];
+  nodes[0] = { p: first.p, o: first.o };
+  nodes[nodes.length - 1] = { p: last.p, i: last.i };
+  return { closed: false, nodes: nodes.map((n) => Object.fromEntries(Object.entries(n).filter(([, v]) => v !== undefined)) as unknown as PathNode) };
+}
+
+/** Where a rung crosses a rail (mm along it), the rung lengthened a little as the engine does. */
+function rungHit(rung: Vec2[], r: Rail): number | null {
+  for (let k = 1; k < rung.length; k++) {
+    const [p, q] = [rung[k - 1], rung[k]];
+    const l = dist(p, q) || 1e-12;
+    const u: Vec2 = [((q[0] - p[0]) / l) * 0.5, ((q[1] - p[1]) / l) * 0.5];
+    const a: Vec2 = [p[0] - u[0], p[1] - u[1]];
+    const b: Vec2 = [q[0] + u[0], q[1] + u[1]];
+    for (let i = 1; i < r.pts.length; i++) {
+      const [c, d] = [r.pts[i - 1], r.pts[i]];
+      const den = (b[0] - a[0]) * (d[1] - c[1]) - (b[1] - a[1]) * (d[0] - c[0]);
+      if (Math.abs(den) < 1e-12) continue;
+      const s = ((c[0] - a[0]) * (d[1] - c[1]) - (c[1] - a[1]) * (d[0] - c[0])) / den;
+      const t = ((c[0] - a[0]) * (b[1] - a[1]) - (c[1] - a[1]) * (b[0] - a[0])) / den;
+      if (s >= 0 && s <= 1 && t >= 0 && t <= 1) return r.cum[i - 1] + t * (r.cum[i] - r.cum[i - 1]);
+    }
+  }
+  return null;
+}
+
 /** A satin's geometry for routing: its centre line, and its rails (two-rail satins). */
 interface SatinShape {
   obj: DesignObject;
   center: Vec2[];
   cum: number[];
-  /** Two-rail satins: rails sampled at the same fractions as `center`. */
-  rails?: [Vec2[], Vec2[]];
-  /** Other sub-paths (rungs) with their centre fraction. */
-  rungs: { sp: SubPath; f: number }[];
+  /**
+   * Two-rail satins: the rails, and stitch pairs plotted along them as the
+   * engine does (equal shares of each section between rungs, or between
+   * corresponding nodes) — `center` runs through the pairs' middles.
+   */
+  rails?: [Rail, Rail];
+  pairs?: { d0: number; d1: number }[];
+  /** Rungs (other sub-paths) with the pair where they cross. */
+  rungs: { sp: SubPath; pair: number }[];
+  /** Its nodes correspond (no rungs, as many on each rail): the engine's sections. */
+  nodeRungs: boolean;
   half: number;
 }
 
@@ -95,6 +222,9 @@ function railsOf(o: DesignObject): { r: [number, number]; rest: number[] } | nul
   return { r, rest: o.paths.map((_, i) => i).filter((i) => i !== r[0] && i !== r[1]) };
 }
 
+/** Pair spacing for routing and cutting (mm). */
+const PAIR_STEP = 0.25;
+
 function shapeOf(o: DesignObject): SatinShape | null {
   if (o.stitch.type !== "satin") return null;
   const st = o.stitch;
@@ -102,41 +232,92 @@ function shapeOf(o: DesignObject): SatinShape | null {
   if (!two) {
     const c = flattenSubPath(o.paths[0], 0.2);
     if (c.length < 2) return null;
-    return { obj: o, center: c, cum: cumulative(c), rungs: [], half: st.width / 2 };
+    return { obj: o, center: c, cum: cumulative(c), rungs: [], nodeRungs: false, half: st.width / 2 };
   }
-  let r0 = flattenSubPath(o.paths[two.r[0]], 0.2);
-  let r1 = flattenSubPath(o.paths[two.r[1]], 0.2);
-  if (st.swapRails) [r0, r1] = [r1, r0];
+  let [sp0, sp1] = [o.paths[two.r[0]], o.paths[two.r[1]]];
+  if (st.swapRails) [sp0, sp1] = [sp1, sp0];
+  const r0 = railOf(sp0, false);
   // the second rail runs like the first (as the engine orients it)
-  if (dist(r0[0], r1[0]) + dist(r0[r0.length - 1], r1[r1.length - 1]) > dist(r0[0], r1[r1.length - 1]) + dist(r0[r0.length - 1], r1[0])) r1 = [...r1].reverse();
-  const n = Math.max(8, Math.ceil(Math.max(cumulative(r0).at(-1)!, cumulative(r1).at(-1)!) / 0.25));
-  const c0 = cumulative(r0);
-  const c1 = cumulative(r1);
-  const s0: Vec2[] = [];
-  const s1: Vec2[] = [];
-  for (let i = 0; i <= n; i++) {
-    s0.push(at(r0, c0, (c0.at(-1)! * i) / n));
-    s1.push(at(r1, c1, (c1.at(-1)! * i) / n));
+  const f1 = railOf(sp1, false).pts;
+  const [a0, b0, a1, b1] = [r0.pts[0], r0.pts[r0.pts.length - 1], f1[0], f1[f1.length - 1]];
+  const r1 = railOf(sp1, dist(a0, a1) + dist(b0, b1) > dist(a0, b1) + dist(b0, a1));
+  if (r0.pts.length < 2 || r1.pts.length < 2) return null;
+  const [l0, l1] = [r0.cum[r0.cum.length - 1], r1.cum[r1.cum.length - 1]];
+  // sections: between rungs, or between corresponding nodes (the engine's rules)
+  const rungCuts = two.rest
+    .map((i) => {
+      const rung = flattenSubPath(o.paths[i], 0.1);
+      const d0 = rungHit(rung, r0);
+      const d1 = rungHit(rung, r1);
+      return d0 == null || d1 == null ? null : { sp: o.paths[i], d0, d1 };
+    })
+    .filter((x): x is { sp: SubPath; d0: number; d1: number } => !!x);
+  const nodeRungs = !rungCuts.length && !(st.guides?.length) && r0.nodeIdx.length === r1.nodeIdx.length && r0.nodeIdx.length > 2;
+  const cuts = nodeRungs ? r0.nodeIdx.slice(1, -1).map((k, j) => ({ sp: null as SubPath | null, d0: r0.cum[k], d1: r1.cum[r1.nodeIdx[j + 1]] })) : rungCuts.map((c) => ({ ...c, sp: c.sp as SubPath | null }));
+  cuts.sort((x, y) => x.d0 - y.d0);
+  const pairs: { d0: number; d1: number }[] = [{ d0: 0, d1: 0 }];
+  const rungs: { sp: SubPath; pair: number }[] = [];
+  let [s0, s1] = [0, 0];
+  for (const c of [...cuts, { sp: null, d0: l0, d1: l1 }]) {
+    const e0 = c.d0;
+    const e1 = Math.max(c.d1, s1);
+    const m = Math.max(1, Math.ceil(Math.max(e0 - s0, e1 - s1) / PAIR_STEP));
+    if (e0 - s0 > 1e-9 || e1 - s1 > 1e-9) for (let j = 1; j <= m; j++) pairs.push({ d0: s0 + ((e0 - s0) * j) / m, d1: s1 + ((e1 - s1) * j) / m });
+    if (c.sp) rungs.push({ sp: c.sp, pair: pairs.length - 1 });
+    [s0, s1] = [e0, e1];
   }
-  const center = s0.map((p, i) => lerp(p, s1[i], 0.5));
-  const cum = cumulative(center);
-  const project = (q: Vec2) => {
-    let best = 0;
-    let bd = Infinity;
-    center.forEach((p, i) => {
-      const d = dist(p, q);
-      if (d < bd) [bd, best] = [d, i];
-    });
-    return cum[best] / (cum.at(-1)! || 1);
-  };
-  const rungs = two.rest.map((i) => {
-    const sp = o.paths[i];
-    const a = sp.nodes[0].p;
-    const b = sp.nodes[sp.nodes.length - 1].p;
-    return { sp, f: project(lerp(a, b, 0.5)) };
-  });
-  const half = Math.max(...s0.map((p, i) => dist(p, s1[i]))) / 2;
-  return { obj: o, center, cum, rails: [s0, s1], rungs, half };
+  const p0 = pairs.map((q) => at(r0.pts, r0.cum, q.d0));
+  const p1 = pairs.map((q) => at(r1.pts, r1.cum, q.d1));
+  const center = p0.map((p, i) => lerp(p, p1[i], 0.5));
+  const half = Math.max(...p0.map((p, i) => dist(p, p1[i]))) / 2;
+  return { obj: o, center, cum: cumulative(center), rails: [r0, r1], pairs, rungs, nodeRungs, half };
+}
+
+/** The pair at fraction `f` of a two-rail satin's centre line. */
+function pairAt(s: SatinShape, f: number): number {
+  const d = f * s.cum[s.cum.length - 1];
+  let best = 0;
+  for (let i = 1; i < s.cum.length; i++) if (Math.abs(s.cum[i] - d) < Math.abs(s.cum[best] - d)) best = i;
+  return best;
+}
+
+/**
+ * Fractions of the centre line where a satin is diced into pieces of about
+ * `step` mm: at stitch pairs (Ink/Stitch `find_cut_points`), so every cut
+ * runs across the column the way its stitches do.
+ */
+function cutFractions(s: SatinShape, step: number): number[] {
+  const total = s.cum[s.cum.length - 1];
+  const n = Math.max(1, Math.ceil(total / step));
+  if (!s.rails || total <= 1e-9) return Array.from({ length: n + 1 }, (_, i) => i / n);
+  const out = [0];
+  for (let i = 1; i < n; i++) {
+    const f = s.cum[pairAt(s, i / n)] / total;
+    if (f > out[out.length - 1] + 1e-9 && f < 1 - 1e-9) out.push(f);
+  }
+  out.push(1);
+  return out;
+}
+
+/** A two-rail satin's piece between two pairs: its rails cut there, its rungs kept. */
+function satinPiece(s: SatinShape, start: number, end: number): SubPath[] {
+  const [r0, r1] = s.rails!;
+  const pairs = s.pairs!;
+  const [i0, i1] = [pairAt(s, start), pairAt(s, end)];
+  const [a, b] = [pairs[i0], pairs[i1]];
+  const rails = [cutRail(r0, a.d0, b.d0), cutRail(r1, a.d1, b.d1)];
+  const rungs = s.rungs.filter((r) => r.pair > i0 && r.pair < i1).map((r) => r.sp);
+  // Ink/Stitch _add_rungs_if_necessary: no rung (or two, which reads as a
+  // "#") would let the engine guess rails or pair up nodes that do not
+  // correspond — a short rung just after the start says which is which
+  if (!s.nodeRungs && (rungs.length === 0 || rungs.length === 2)) {
+    const along = (r: Rail, d0: number, d1: number) => at(r.pts, r.cum, d0 + Math.min((0.3 * 25.4) / 96, (d1 - d0) / 2));
+    const [q0, q1] = [along(r0, a.d0, b.d0), along(r1, a.d1, b.d1)];
+    const m = lerp(q0, q1, 0.5);
+    const grow = (q: Vec2): Vec2 => [m[0] + (q[0] - m[0]) * 1.1, m[1] + (q[1] - m[1]) * 1.1];
+    rungs.push({ closed: false, nodes: [{ p: grow(q0) }, { p: grow(q1) }] });
+  }
+  return [...rails, ...rungs];
 }
 
 /** A piece of a satin (fractions of its centre line). */
@@ -210,9 +391,9 @@ export function autoSatin(objects: DesignObject[], opts: AutoSatinOptions = {}):
   type Edge = { a: string; b: string; op: Op; el: number; dir?: "fwd" };
   const edges: Edge[] = [];
   shapes.forEach((s, si) => {
-    const n = Math.max(1, Math.ceil(s.cum[s.cum.length - 1] / 1));
-    for (let i = 0; i < n; i++) {
-      const seg: Segment = { kind: "satin", shape: si, start: i / n, end: (i + 1) / n, reverse: false };
+    const fs = cutFractions(s, 1);
+    for (let i = 0; i + 1 < fs.length; i++) {
+      const seg: Segment = { kind: "satin", shape: si, start: fs[i], end: fs[i + 1], reverse: false };
       edges.push({ a: addNode(pointAt(s, seg.start), elemOf[si]), b: addNode(pointAt(s, seg.end), elemOf[si]), op: seg, el: elemOf[si] });
     }
   });
@@ -455,10 +636,8 @@ export function autoSatin(objects: DesignObject[], opts: AutoSatinOptions = {}):
     const whole = op.start <= 1e-9 && op.end >= 1 - 1e-9;
     let paths: SubPath[];
     if (whole) paths = src.paths;
-    else if (s.rails) {
-      const poly = (pts: Vec2[]): SubPath => ({ closed: false, nodes: simplify(pts).map((p) => ({ p })) });
-      paths = [poly(substring(s.rails[0], op.start, op.end)), poly(substring(s.rails[1], op.start, op.end)), ...s.rungs.filter((r) => r.f > op.start && r.f < op.end).map((r) => r.sp)];
-    } else paths = [{ closed: false, nodes: simplify(substring(s.center, op.start, op.end)).map((p) => ({ p })) }];
+    else if (s.rails) paths = satinPiece(s, op.start, op.end);
+    else paths = [{ closed: false, nodes: simplify(substring(s.center, op.start, op.end)).map((p) => ({ p })) }];
     const st = src.stitch;
     // the centre walk underlay sewn an even number of times, so the column ends where it began its underlay
     const walk = st.centerWalkRepeats ?? 2;

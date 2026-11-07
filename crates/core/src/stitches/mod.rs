@@ -378,9 +378,11 @@ mod pattern_tests {
         let sq = vec![SubPath::polyline(&[pt(0.0, 0.0), pt(30.0, 0.0), pt(30.0, 30.0), pt(0.0, 30.0)], true)];
         let fill = StitchParams::Fill(FillParams { underlay: false, ..Default::default() });
         let hole = StitchPattern { paths: vec![SubPath::polyline(&[pt(10.0, 10.0), pt(20.0, 10.0), pt(20.0, 20.0), pt(10.0, 20.0)], true)], add: false, remove: true, interval: vec![], offset: 0 };
+        // the rows' needle points (travel under the rows is kept, as its points are)
+        let rows = |o: &Object| -> Vec<Point> { generate(o, &Fabric::Cotton.profile()).into_iter().flatten().filter(|x| x.1 == 0).map(|x| x.0).collect() };
         let inside = |v: &[Point]| v.iter().filter(|p| p.x > 10.5 && p.x < 19.5 && p.y > 10.5 && p.y < 19.5).count();
-        let plain = pts(&obj(sq.clone(), fill.clone(), vec![]));
-        let holed = pts(&obj(sq, fill, vec![hole]));
+        let plain = rows(&obj(sq.clone(), fill.clone(), vec![]));
+        let holed = rows(&obj(sq, fill, vec![hole]));
         assert!(inside(&plain) > 20);
         assert_eq!(inside(&holed), 0, "no needle points inside the pattern");
         assert!(holed.len() < plain.len());

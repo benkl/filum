@@ -60,7 +60,10 @@ function pageHeightUU(root) {
   return h && h.unit !== "%" ? h.v * (PX_PER[h.unit] ?? 1) : null; // unknown page height
 }
 
-const KEEP_STYLE = new Set(["fill", "stroke", "stroke-width", "display", "visibility"]);
+// what the engine's SVG import reads: colours and visibility, stroke dashes
+// (running stitch in old files), Ink/Stitch markers (guide, anchor and
+// pattern lines) and clips
+const KEEP_STYLE = new Set(["fill", "stroke", "stroke-width", "stroke-dasharray", "display", "visibility", "marker-start", "clip-path"]);
 function cleanStyle(s) {
   const kept = s
     .split(";")
@@ -70,14 +73,32 @@ function cleanStyle(s) {
   return kept.join(";");
 }
 
-/** Minify one element's attribute list. */
-function cleanAttrs(tag, body, isGlyphRoot) {
+/** Ink/Stitch command connector attributes (a command reaches its object through them). */
+const CONNECTION = new Set(["inkscape:connection-start", "inkscape:connection-end"]);
+const q = (v) => v.replace(/"/g, "&quot;");
+
+/**
+ * Minify one element's attribute list. Ids are kept only where something
+ * refers to them (`keepIds`: command connectors, clips); a connector keeps
+ * just its two ends.
+ */
+function cleanAttrs(tag, body, isGlyphRoot, keepIds, connector = false) {
   const out = [];
   for (const a of body.matchAll(/([\w:.-]+)\s*=\s*("([^"]*)"|'([^']*)')/g)) {
     const name = a[1];
     let v = a[3] ?? a[4];
-    if (name === "id" || name === "class" || name === "xml:space" || name === "clip-path" || name === "mask") continue;
+    if (connector) {
+      if (CONNECTION.has(name)) out.push(`${name}="${q(v)}"`);
+      continue;
+    }
+    if (name === "id") {
+      if (keepIds.has(decode(v))) out.push(`id="${q(v)}"`);
+      continue;
+    }
+    if (name === "class" || name === "xml:space" || name === "mask") continue;
     if (name.startsWith("sodipodi:") || name.startsWith("inkscape:") || name.startsWith("xmlns")) continue;
+    // command symbols: what they are (href) and where they sit (x, y, transform)
+    if (tag === "use" && (name === "width" || name === "height")) continue;
     if (name === "style") {
       v = cleanStyle(v);
       if (isGlyphRoot) v = v.replace(/(^|;)display:[^;]*/g, "").replace(/^;|;$/g, "");
@@ -86,25 +107,50 @@ function cleanAttrs(tag, body, isGlyphRoot) {
     if (isGlyphRoot && name === "display") continue;
     if (name === "d" || name === "transform" || name === "points") v = roundNums(v).replace(/\s+/g, " ").trim();
     else if (/^(x|y|x1|x2|y1|y2|cx|cy|r|rx|ry|width|height|stroke-width)$/.test(name)) v = roundNums(v);
-    out.push(`${name}="${v.replace(/"/g, "&quot;")}"`);
+    out.push(`${name}="${q(v)}"`);
   }
   return out.length ? " " + out.join(" ") : "";
 }
 
-const DROP = new Set(["metadata", "title", "desc", "defs", "sodipodi:namedview", "use", "clipPath", "mask", "style", "script"]);
+/** Clip-path ids an element refers to (attribute or style). */
+const clipRefs = (body) => [...body.matchAll(/clip-path\s*[:=]\s*["']?\s*url\(\s*["']?#([^"')\s]+)/g)].map((m) => decode(m[1]));
+
+const DROP = new Set(["metadata", "title", "desc", "sodipodi:namedview", "use", "clipPath", "mask", "style", "script", "symbol", "marker", "pattern", "linearGradient", "radialGradient"]);
 const TOKEN = /<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<\?[\s\S]*?\?>|<!DOCTYPE[\s\S]*?>|<(\/?)([\w:.-]+)((?:[^>"']|"[^"]*"|'[^']*')*?)(\/?)>|([^<]+)/g;
 
-/** Extract and minify all GlyphLayer groups of one Inkscape file. */
+/** An Ink/Stitch command symbol (`<use xlink:href="#inkstitch_trim">`). */
+const isCommand = (a) => /^#inkstitch_/.test(a.get("xlink:href") ?? a.get("href") ?? "");
+
+/**
+ * Extract and minify all GlyphLayer groups of one Inkscape file. Kept for the
+ * engine's SVG import, as Ink/Stitch's Glyph keeps them: command symbols
+ * with their connectors and the ids these link (start / end points, trims,
+ * stops of the glyph's objects), marker paths (guide, anchor and pattern
+ * lines, which are not sewn) and clip paths (copied into every glyph that
+ * uses them).
+ */
 export function extractGlyphs(text) {
+  // ids something refers to: command connector ends and clip paths
+  const keepIds = new Set();
+  for (const m of text.matchAll(/inkscape:connection-(?:start|end)\s*=\s*["']#([^"']+)["']/g)) keepIds.add(decode(m[1]));
+  for (const id of clipRefs(text)) keepIds.add(id);
   const glyphs = {};
+  const glyphClips = {}; // glyph name → ids of the clips it uses
+  const clips = new Map(); // clip id → markup
   let root = null;
   let baselineGuide = null;
   const stack = []; // { tag, transform }
   let dropDepth = 0; // inside a dropped element
-  let glyph = null; // { name, depth, parts, wrap }
+  let glyph = null; // { name, depth, parts, wrap, clips }
+  let clip = null; // { id, depth, parts }: a clip path being copied
   let page = null; // viewport transform as an SVG matrix
+  const drop = (tag, selfClose) => {
+    if (selfClose) return;
+    stack.push({ tag, transform: null });
+    dropDepth = stack.length;
+  };
   for (const m of text.matchAll(TOKEN)) {
-    const [whole, close, tag, body = "", selfClose, textNode] = m;
+    const [, close, tag, body = "", selfClose, textNode] = m;
     if (textNode !== undefined || !tag) continue; // comments, text, PIs
     if (tag === "sodipodi:guide" && !close) {
       const a = attrs(body);
@@ -116,11 +162,20 @@ export function extractGlyphs(text) {
         if (stack.length < dropDepth) dropDepth = 0;
         continue;
       }
+      if (clip) {
+        clip.parts.push(`</${top.tag}>`);
+        if (stack.length < clip.depth) {
+          clips.set(clip.id, clip.parts.join(""));
+          clip = null;
+        }
+        continue;
+      }
       if (glyph) {
         if (stack.length < glyph.depth) {
           glyph.parts.push("</g>");
           const inner = glyph.parts.join("");
           glyphs[glyph.name] = glyph.wrap.length ? `<g transform="${glyph.wrap.join(" ")}">${inner}</g>` : inner;
+          if (glyph.clips.size) glyphClips[glyph.name] = glyph.clips;
           glyph = null;
         } else glyph.parts.push(`</${top.tag}>`);
       }
@@ -138,13 +193,30 @@ export function extractGlyphs(text) {
       if (!selfClose) stack.push({ tag, transform: null });
       continue;
     }
-    const label = a.get("inkscape:label") ?? "";
-    const isConnector = a.has("inkscape:connection-start") || a.has("inkscape:connector-type");
-    if (DROP.has(tag) || isConnector) {
-      if (!selfClose) {
-        stack.push({ tag, transform: null });
-        dropDepth = stack.length;
+    if (clip) {
+      // the clip's shapes as drawn (their own transforms kept)
+      if (DROP.has(tag)) drop(tag, selfClose);
+      else {
+        if (!selfClose) stack.push({ tag, transform: null });
+        clip.parts.push(`<${tag}${cleanAttrs(tag, body, false, keepIds)}${selfClose ? "/" : ""}>`);
       }
+      continue;
+    }
+    if (tag === "clipPath" && a.has("id") && !selfClose) {
+      stack.push({ tag, transform: null });
+      clip = { id: decode(a.get("id")), depth: stack.length, parts: [`<clipPath${cleanAttrs(tag, body, false, keepIds)}>`] };
+      continue;
+    }
+    // definitions: only their clip paths are of use
+    if (tag === "defs") {
+      if (!selfClose) stack.push({ tag, transform: null });
+      continue;
+    }
+    const label = a.get("inkscape:label") ?? "";
+    const isConnector = a.has("inkscape:connection-start") || a.has("inkscape:connection-end") || a.has("inkscape:connector-type");
+    const command = tag === "use" && isCommand(a);
+    if ((DROP.has(tag) && !command) || (isConnector && !glyph)) {
+      drop(tag, selfClose);
       continue;
     }
     if (!glyph && tag === "g" && label.startsWith("GlyphLayer-") && !selfClose) {
@@ -153,13 +225,27 @@ export function extractGlyphs(text) {
       const wrap = [page, ...stack.slice(1, -1).map((s) => s.transform)]
         .filter(Boolean)
         .map((t) => roundNums(t).replace(/\s+/g, " ").trim());
-      glyph = { name, depth: stack.length, parts: [`<g${cleanAttrs(tag, body, true)}>`], wrap };
+      glyph = { name, depth: stack.length, parts: [`<g${cleanAttrs(tag, body, true, keepIds)}>`], wrap, clips: new Set(clipRefs(body)) };
+      continue;
+    }
+    if (isConnector) {
+      // a command's connector: its two ends only (its line isn't sewn)
+      drop(tag, selfClose);
+      if (a.has("inkscape:connection-start") && a.has("inkscape:connection-end")) glyph.parts.push(`<path${cleanAttrs(tag, body, false, keepIds, true)}/>`);
       continue;
     }
     if (!selfClose) stack.push({ tag, transform: a.get("transform") ?? null });
-    if (glyph) glyph.parts.push(`<${tag}${cleanAttrs(tag, body, false)}${selfClose ? "/" : ""}>`);
+    if (glyph) {
+      for (const c of clipRefs(body)) glyph.clips.add(c);
+      glyph.parts.push(`<${tag}${cleanAttrs(tag, body, false, keepIds)}${selfClose ? "/" : ""}>`);
+    }
   }
   if (!root) throw new Error("no <svg> root");
+  // the clip paths a glyph uses travel with it
+  for (const [name, ids] of Object.entries(glyphClips)) {
+    const defs = [...ids].map((id) => clips.get(id)).filter(Boolean);
+    if (defs.length) glyphs[name] = `<defs>${defs.join("")}</defs>${glyphs[name]}`;
+  }
   // Inkscape guides are measured from the bottom of the page in user units;
   // without a "baseline" guide the loader derives one from a capital letter
   let baseline = null;
@@ -193,14 +279,18 @@ export const roundMap = (m, keepZero) => {
 
 /**
  * Thread colours of glyph fragments (#rrggbb), added to `colors` in order
- * of first use.
+ * of first use. Clip paths, marker lines (guides, patterns) and command
+ * connectors aren't sewn: their colours don't count.
  */
 export function collectColors(glyphs, colors) {
   for (const frag of Object.values(glyphs))
-    for (const m of frag.matchAll(/(?:fill|stroke)(?::|=")\s*(#[0-9a-f]{6}|#[0-9a-f]{3})\b/gi)) {
-      let c = m[1].toLowerCase();
-      if (c.length === 4) c = "#" + [...c.slice(1)].map((h) => h + h).join("");
-      if (!colors.includes(c)) colors.push(c);
+    for (const el of frag.replace(/<defs>[\s\S]*?<\/defs>/g, "").matchAll(/<[\w:.-]+(?:[^>"']|"[^"]*"|'[^']*')*>/g)) {
+      if (/marker-start|connection-(?:start|end)/.test(el[0])) continue;
+      for (const m of el[0].matchAll(/(?:fill|stroke)(?::|=")\s*(#[0-9a-f]{6}|#[0-9a-f]{3})\b/gi)) {
+        let c = m[1].toLowerCase();
+        if (c.length === 4) c = "#" + [...c.slice(1)].map((h) => h + h).join("");
+        if (!colors.includes(c)) colors.push(c);
+      }
     }
   return colors;
 }
@@ -243,6 +333,12 @@ export function fontMetrics(meta) {
     max_scale: pick("max_scale", 1),
     reversible: pick("reversible", true),
     sortable: pick("sortable", false),
+    /** Colour sort indices whose objects become one each (Ink/Stitch combine_at_sort_indices). */
+    combine_at_sort_indices: Array.isArray(meta.combine_at_sort_indices) ? meta.combine_at_sort_indices.map(Number).filter(Number.isFinite) : [],
+    /** Route the lettering's satins (Ink/Stitch auto_satin, on unless the font says no). */
+    auto_satin: pick("auto_satin", true) !== false,
+    /** Cross-stitch fonts: the crosses scale with the lettering (Ink/Stitch scale_cross_stitch_pattern). */
+    scale_cross_stitch_pattern: pick("scale_cross_stitch_pattern", false) === true,
   };
 }
 
