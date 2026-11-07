@@ -14,35 +14,69 @@ pub struct PaletteEntry {
 pub struct Palette {
     pub name: String,
     pub entries: Vec<PaletteEntry>,
+    /// Brand (product line) of each entry, from Filum's own exports (see
+    /// [`FILUM_ENTRY`]); `None` where the file doesn't name one — the palette's
+    /// name is the brand then. Empty when no entry names one.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub brands: Vec<Option<String>>,
 }
 
+/// A comment before an entry with its exact name, code and brand
+/// (tab-separated), written by Filum's "My threads" export: a collection mixes
+/// brands, and a name or code alone can't be told apart on the entry line
+/// ("Red 2" without a code, codes without digits). Other programs (GIMP,
+/// Ink/Stitch) skip it as a comment and read the entry line as usual.
+pub const FILUM_ENTRY: &str = "# Filum:";
+
 /// Parse a GIMP palette file as used by Ink/Stitch (`palettes/InkStitch *.gpl`).
-/// Lines look like `  0   0   0	Black 1000` (rgb, then "name code").
+/// Lines look like `  0   0   0	Black 1000` (rgb, then "name code"); a
+/// [`FILUM_ENTRY`] comment before a line gives its name, code and brand exactly.
 pub fn parse_gpl(text: &str) -> Palette {
     let mut name = String::new();
     let mut entries = Vec::new();
+    let mut brands: Vec<Option<String>> = Vec::new();
+    // the Filum comment for the next entry: name, code, brand
+    let mut meta: Option<(String, String, String)> = None;
     for line in text.lines() {
         let l = line.trim();
+        if let Some(m) = l.strip_prefix(FILUM_ENTRY) {
+            // "# Filum:" then a tab-separated name, code and brand
+            let m = m.strip_prefix('\t').unwrap_or_else(|| m.trim_start_matches(' '));
+            let f: Vec<&str> = m.split('\t').collect();
+            let field = |i: usize| f.get(i).map(|s| s.trim().to_string()).unwrap_or_default();
+            meta = Some((field(0), field(1), field(2)));
+            continue;
+        }
         if l.is_empty() || l.starts_with('#') || l == "GIMP Palette" || l.starts_with("Columns:") {
             continue;
         }
         if let Some(n) = l.strip_prefix("Name:") {
             name = n.trim().to_string();
+            meta = None;
             continue;
         }
+        let entry_meta = meta.take();
         let mut parts = l.split_whitespace();
         let (Some(r), Some(g), Some(b)) = (parts.next(), parts.next(), parts.next()) else { continue };
         let (Ok(r), Ok(g), Ok(b)) = (r.parse::<u8>(), g.parse::<u8>(), b.parse::<u8>()) else { continue };
         let rest: Vec<&str> = parts.collect();
-        let (n, code) = match rest.split_last() {
-            Some((last, init)) if !init.is_empty() && last.chars().any(|c| c.is_ascii_digit()) => {
-                (init.join(" "), last.to_string())
+        let (n, code, brand) = match entry_meta {
+            Some((n, code, brand)) => (n, code, Some(brand)),
+            None => {
+                let (n, code) = match rest.split_last() {
+                    Some((last, init)) if !init.is_empty() && last.chars().any(|c| c.is_ascii_digit()) => (init.join(" "), last.to_string()),
+                    _ => (rest.join(" "), String::new()),
+                };
+                (n, code, None)
             }
-            _ => (rest.join(" "), String::new()),
         };
         entries.push(PaletteEntry { name: n, code, rgb: [r, g, b] });
+        brands.push(brand);
     }
-    Palette { name, entries }
+    if brands.iter().all(Option::is_none) {
+        brands.clear();
+    }
+    Palette { name, entries, brands }
 }
 
 fn srgb_to_linear(c: u8) -> f64 {
@@ -205,6 +239,46 @@ mod tests {
         assert_eq!(p.entries.len(), 2);
         assert_eq!(p.entries[0].name, "Black");
         assert_eq!(p.entries[0].code, "1000");
+        assert!(p.brands.is_empty(), "a plain palette names no brands");
+    }
+
+    /// The text Filum's "My threads" export writes (ui/src/lib/gpl.ts, myThreadsGpl).
+    #[test]
+    fn gpl_my_threads_round_trip() {
+        let text = "GIMP Palette\nName: My threads\nColumns: 4\n# RGB Value\tColor Name Number\n\
+            # Filum:\tRed\t1147\tMadeira Polyneon\n200\t 16\t 46\tRed 1147\n\
+            # Filum:\tSky\t\tGunold 12\n126\t200\t227\tSky\n\
+            # Filum:\tRed 2\t\t\n210\t 22\t 35\tRed 2\n\
+            # Filum:\tGold\tGLD\tIsacord 40\n212\t160\t 23\tGold GLD\n\
+            # Filum:\t\t1000\t\n 40\t 41\t 42\t1000\n\
+            255 255 255\tWhite 1001\n";
+        let p = parse_gpl(text);
+        assert_eq!(p.name, "My threads");
+        let got: Vec<(&str, &str, Option<&str>, [u8; 3])> = p.entries.iter().zip(&p.brands).map(|(e, b)| (e.name.as_str(), e.code.as_str(), b.as_deref(), e.rgb)).collect();
+        assert_eq!(
+            got,
+            vec![
+                ("Red", "1147", Some("Madeira Polyneon"), [200, 16, 46]),
+                // a brand with digits, no code
+                ("Sky", "", Some("Gunold 12"), [126, 200, 227]),
+                // a name ending in a number, no code, no brand
+                ("Red 2", "", Some(""), [210, 22, 35]),
+                // a code without digits
+                ("Gold", "GLD", Some("Isacord 40"), [212, 160, 23]),
+                ("", "1000", Some(""), [40, 41, 42]),
+                // no Filum comment: read as before, the brand is the palette's
+                ("White", "1001", None, [255, 255, 255]),
+            ]
+        );
+    }
+
+    #[test]
+    fn gpl_comment_only_applies_to_the_next_entry() {
+        // a Filum comment whose entry line is broken doesn't name the following entry
+        let p = parse_gpl("GIMP Palette\n# Filum:\tX\t9\tB\nnot an entry\n1 2 3\tBlue 1076\n");
+        assert_eq!(p.entries.len(), 1);
+        assert_eq!((p.entries[0].name.as_str(), p.entries[0].code.as_str()), ("Blue", "1076"));
+        assert!(p.brands.is_empty());
     }
 
     #[test]

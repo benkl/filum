@@ -12,7 +12,7 @@ import { defaultDesignOptions, objectBounds, objectBoundsCached, unionBoxes } fr
 import { cleanFileName, exportChecks, MACHINES, machineById, pickFrame, presetById, type CheckLevel, type OvalReach } from "../lib/machines";
 import { inHoop, ovalNorm } from "../lib/materials";
 import { useStore } from "../store";
-import { FLAG, type ExportOptions, type FormatInfo, type MachineColorInfo } from "../types";
+import { FLAG, type ExportOptions, type FormatInfo, type MachineColorInfo, type PlanData } from "../types";
 import { Dialog, fmtTime, Num } from "./ui";
 import { FrameButtons, MachineOptions } from "./MachineOptions";
 import { cutterOf, DEFAULT_CUT_OVER, uncutTrims } from "../lib/cuts";
@@ -154,18 +154,42 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
       })()));
   const fileName = cleanFileName(name, machineFormat ? machine.fileNames : undefined);
   const distinct = useMemo(() => new Set((colours ?? []).map((c) => `${c.color}|${c.code}|${c.brand}`)).size, [colours]);
-  // with repeats the file holds a bigger design
+  // the plan as it goes into the file (long stitches split at the machine's
+  // limit, repeats, frame out on stops): its numbers are the file's
+  const [filePlan, setFilePlan] = useState<{ key: string; plan: PlanData } | null>(null);
+  const fileKey = JSON.stringify(repeat);
+  useEffect(() => {
+    let live = true;
+    if (!stats?.stitches) return;
+    const t = setTimeout(() => {
+      engine
+        .exportPlan(doc, repeat)
+        .then((p) => live && setFilePlan({ key: fileKey, plan: p }))
+        .catch(() => live && setFilePlan(null));
+    }, 120);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [doc, repeat, fileKey, stats?.stitches]);
+  const exported = filePlan && filePlan.key === fileKey ? filePlan.plan : null;
+  // until it is there: the editor's plan (with repeats, an estimate — each copy
+  // sews every colour block, colour changes stay as they are)
   const fileStats =
-    stats && copies > 1
+    exported?.stats ??
+    (stats && copies > 1
       ? {
           ...stats,
           stitches: stats.stitches * copies,
           width: stats.width + ((repeat.xRepeats ?? 1) - 1) * Math.abs(repeat.xSpacing ?? 100),
           height: stats.height + ((repeat.yRepeats ?? 1) - 1) * Math.abs(repeat.ySpacing ?? 100),
           trims: stats.trims * copies + (copies - 1) * (stats.colorChanges + 1),
-          seconds: stats.seconds * copies,
+          seconds:
+            (stats.seconds - stats.colorChanges * (doc.machine.colorChangeSeconds ?? 0)) * copies +
+            stats.colorChanges * (doc.machine.colorChangeSeconds ?? 0) +
+            (copies - 1) * (stats.colorChanges + 1) * (doc.machine.trimSeconds ?? 0),
         }
-      : stats;
+      : stats);
   // the chosen frame, else the smallest that fits the design (with its repeats)
   const frame = machine.frames.find(sameHoop) ?? pickFrame(machine, fileStats, copies === 1 ? reach : undefined) ?? null;
   const checks = exportChecks({
@@ -178,13 +202,19 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     reach: copies === 1 ? reach : undefined,
     machineFormat,
     distinctColours: distinct,
-    cuts: plan
+    cuts: exported
       ? {
           cutter: cutterOf(doc.machine),
-          uncut: (plan.uncut?.count ?? 0) * copies,
-          brother: (uncutTrims(plan.flags, plan.coords, { kind: "jumps", over: DEFAULT_CUT_OVER })?.count ?? 0) * copies,
+          uncut: exported.uncut?.count ?? 0,
+          brother: uncutTrims(exported.flags, exported.coords, { kind: "jumps", over: DEFAULT_CUT_OVER })?.count ?? 0,
         }
-      : undefined,
+      : plan
+        ? {
+            cutter: cutterOf(doc.machine),
+            uncut: (plan.uncut?.count ?? 0) * copies,
+            brother: (uncutTrims(plan.flags, plan.coords, { kind: "jumps", over: DEFAULT_CUT_OVER })?.count ?? 0) * copies,
+          }
+        : undefined,
   });
   // colours the machine screen shows quite differently (the order is right)
   const far = (colours ?? []).filter((c) => c.shown && !c.exact && (c.deltaE ?? 0) > 10).length;
@@ -223,7 +253,12 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   /** The design's machine: its preset sets the stitch-out and time values too (as in Design ▸ Machine). */
   const pickMachine = (id: string) => {
     const p = presetById(id);
-    useStore.getState().commit((d) => ({ ...d, machine: p ? { ...p.values, profile: p.id } : { ...d.machine, profile: undefined } }));
+    // the preset's values over the design's own (lock stitches and the rest
+    // stay); a preset without a cutter clears the old one
+    useStore.getState().commit((d) => ({
+      ...d,
+      machine: p ? { ...d.machine, cutter: undefined, cutOver: undefined, ...p.values, profile: p.id } : { ...d.machine, profile: undefined },
+    }));
     const m = machineById(id);
     if (m.formats.length && !m.formats.includes(fmt) && isMachine(fmt)) setFmt(m.formats[0]);
   };

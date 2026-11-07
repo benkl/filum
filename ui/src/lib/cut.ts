@@ -3,8 +3,13 @@
 //    on the curve (de Casteljau), keeping the Bézier shape
 //  • fills are cut along a straight line into two objects (half-plane clip)
 
-import type { DesignObject, PathNode, SubPath, Vec2 } from "../types";
+import type { DesignObject, PathNode, StitchDocument, SubPath, Vec2 } from "../types";
+import { unlinkClone } from "./clones";
+import { gradientLayers, layerSetOf, rampMembers } from "./fillLayers";
 import { flatten, satinRailIndices, uid } from "./geometry";
+import { parentOf, withParent } from "./groups";
+import { pruneGroups } from "./layerRows";
+import { tartanLayers } from "./tartan";
 
 type Hit = { sp: number; seg: number; t: number; p: Vec2; d: number };
 
@@ -210,4 +215,82 @@ export function cutFillObject(o: DesignObject, a: Vec2, b: Vec2): DesignObject[]
     { ...o, ...strip, id: uid(), name: `${o.name} a`, paths: left },
     { ...o, ...strip, id: uid(), name: `${o.name} b`, paths: right },
   ];
+}
+
+/** A cut half of a layer: in the half's own gradient / tartan / blend `to` (the set was `from`). */
+function intoSet(o: DesignObject, from: string, to: string): DesignObject {
+  if (o.stitch.type !== "fill") return o;
+  const st = o.stitch;
+  return {
+    ...o,
+    group: o.group === from ? to : o.group,
+    stitch: {
+      ...st,
+      ...(st.gradient?.group === from ? { gradient: { ...st.gradient, group: to } } : {}),
+      ...(st.tartan?.group === from ? { tartan: { ...st.tartan, group: to } } : {}),
+      ...(st.ramp?.group === from ? { ramp: { ...st.ramp, group: to } } : {}),
+    },
+  };
+}
+
+/** "Shape · colour 2" cut into "Shape a · colour 2" and "Shape b · colour 2". */
+const halfName = (name: string, half: "a" | "b") => name.replace(/^(.*?)( · colour \d+)?$/, `$1 ${half}$2`);
+
+/**
+ * Cut the fills `targets` of `doc` along the line through a→b (the Cutter
+ * tool). A gradient, tartan or colour blend is cut as one: all its layers,
+ * each half a set of its own (new group, the layers numbered as before). A
+ * set with a layer that isn't among `targets` (locked, hidden) is left
+ * whole and counted in `left`. A linked clone cut becomes plain pieces.
+ * `n`: how many shapes were cut (a set counts once).
+ */
+export function cutFills(doc: StitchDocument, targets: DesignObject[], a: Vec2, b: Vec2): { doc: StitchDocument; n: number; left: number } {
+  const replace = new Map<string, DesignObject[]>();
+  const tids = new Set(targets.map((o) => o.id));
+  const seen = new Set<string>();
+  let parents = doc.groupParents;
+  let names = doc.groupNames;
+  let n = 0;
+  let left = 0;
+  for (const o0 of targets) {
+    const o = o0.clone ? unlinkClone(o0, doc) : o0;
+    const key = layerSetOf(o);
+    if (!key || o.stitch.type !== "fill") {
+      const parts = cutFillObject(o, a, b);
+      if (parts) {
+        replace.set(o.id, parts);
+        n++;
+      }
+      continue;
+    }
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const st = o.stitch;
+    const from = st.gradient?.group ?? st.tartan?.group ?? st.ramp!.group!;
+    const members = st.gradient ? gradientLayers(doc, from) : st.tartan ? tartanLayers(doc, from) : rampMembers(doc, o.id);
+    const cut = members.map((m) => (tids.has(m.id) ? cutFillObject(m, a, b) : null));
+    if (cut.some((c) => !c)) {
+      left++;
+      continue;
+    }
+    const own = st.gradient || st.tartan ? members.some((m) => m.group === from) : false;
+    const halves = (["a", "b"] as const).map((h) => ({ h, set: uid(st.gradient || st.tartan ? "g" : "blend") }));
+    const pieces = halves.flatMap(({ h, set }, k) => members.map((m, i) => ({ ...intoSet(cut[i]![k], from, set), name: halfName(m.name, h) })));
+    // the halves where the first layer was, each set's layers together
+    replace.set(members[0].id, pieces);
+    for (const m of members.slice(1)) replace.set(m.id, []);
+    if (own) {
+      const around = parentOf(doc, from);
+      for (const { set } of halves) {
+        parents = withParent(parents, set, around);
+        if (doc.groupNames?.[from]) names = { ...names, [set]: doc.groupNames[from] };
+      }
+    }
+    n++;
+  }
+  if (!replace.size) return { doc, n: 0, left };
+  const out: StitchDocument = { ...doc, objects: doc.objects.flatMap((x) => replace.get(x.id) ?? [x]) };
+  if (parents) out.groupParents = parents;
+  if (names) out.groupNames = names;
+  return { doc: pruneGroups(out), n, left };
 }

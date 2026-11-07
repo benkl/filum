@@ -7,7 +7,7 @@ import { uid } from "./geometry";
 import { flattenSubPath } from "./bezier";
 import { DEFAULT_TEXT, generateText, members, type TextSpec } from "./text";
 import { batchFileName, fontSampleText } from "./letteringTools";
-import { carryOver } from "./textSettle";
+import { carryOver, historyJump } from "./textSettle";
 import type { ZipEntry } from "./zip";
 import { engine } from "../engine/client";
 import { safeSetItem } from "./storage";
@@ -148,9 +148,10 @@ const busy = new Set<string>();
  * an undo step (call `useStore.getState().checkpoint()` once before a live
  * edit session). Edits of one lettering run one after the other: edits made
  * while one is generated (a font loading) are merged into one, which starts
- * from the lettering as it is then. A result whose lettering changed
- * meanwhile (undo, another document) is dropped. Locked letterings are
- * refused. Resolves to whether the edit was applied.
+ * from the lettering as it is then. A lettering edited meanwhile (moved
+ * while the font loaded) gets the edit again on top of that; one deleted,
+ * undone or replaced by another design drops it (with a toast). Locked
+ * letterings are refused. Resolves to whether the edit was applied.
  */
 export function updateText(group: string, patch: Partial<TextSpec>, live = false): Promise<boolean> {
   return queueEdit(group, patch, live);
@@ -194,9 +195,43 @@ async function drain(group: string) {
   }
 }
 
-async function applyEdit(group: string, { patch, live, also }: Edit): Promise<boolean> {
+/** How often an edit is laid out again because its lettering kept changing meanwhile. */
+const REBASES = 5;
+
+function droppedToast(why = "the lettering was deleted, or the design undone or replaced, while the font loaded") {
+  useStore.getState().toast(`A lettering change was left out: ${why}`, "info");
+}
+
+async function applyEdit(group: string, edit: Edit): Promise<boolean> {
+  // undo, redo or another design while the letters are generated
+  let jumped = false;
+  const stop = useStore.subscribe((next, prev) => {
+    if (!jumped && historyJump(prev, next)) jumped = true;
+  });
+  try {
+    for (let round = 0; ; round++) {
+      jumped = false;
+      const r = await layoutEdit(group, edit, round > 0, () => jumped);
+      // the lettering changed meanwhile by an edit (moved, nudged, recoloured):
+      // the patch again on the lettering as it is now, so that edit stays
+      if (r !== "rebase") return r;
+      if (round >= REBASES) {
+        droppedToast("the lettering kept changing while it was laid out");
+        return false;
+      }
+    }
+  } finally {
+    stop();
+  }
+}
+
+async function layoutEdit(group: string, { patch, live, also }: Edit, again: boolean, jumped: () => boolean): Promise<boolean | "rebase"> {
   const before = members(useStore.getState().doc.objects, group);
-  if (!before.length) return false;
+  if (!before.length) {
+    // gone while an earlier round generated
+    if (again) droppedToast();
+    return false;
+  }
   if (before.some((o) => o.locked)) {
     lockedToast();
     return false;
@@ -217,8 +252,14 @@ async function applyEdit(group: string, { patch, live, also }: Edit): Promise<bo
   }
   const s = useStore.getState();
   const old = members(s.doc.objects, group);
-  // undone, replaced or changed otherwise while the font loaded: the result is out of date
-  if (old.length !== before.length || old.some((o, i) => o !== before[i])) return false;
+  if (old.length !== before.length || old.some((o, i) => o !== before[i])) {
+    // deleted, undone or another design: the edit no longer applies
+    if (!old.length || jumped()) {
+      droppedToast();
+      return false;
+    }
+    return "rebase";
+  }
   if (!objs.length) {
     // nothing to stitch (font lacks these letters): keep the current lettering
     if (spec.content.trim() && !live) s.toast(`${fontLabel(spec.font)} has no letters for this text`, "error");

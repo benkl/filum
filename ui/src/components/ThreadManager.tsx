@@ -13,6 +13,7 @@ import {
   assignChart,
   chartLabel,
   colorSequence,
+  colourEdit,
   deleteThread,
   deltaE,
   lab,
@@ -157,6 +158,10 @@ function ThreadRow({
   onSelect: () => void;
 }) {
   const colorRef = useRef<HTMLInputElement>(null);
+  // the thread when its colour editing began: brand and code come back if the colour does
+  const editFrom = useRef<Thread | null>(null);
+  // the catalogue colour of the thread's spool (the chart's, when the chart has its code)
+  const spoolColor = (from: Thread) => (match && from.code && match.code === from.code ? match.color : from.color);
   const [hex, setHex] = useState(t.color.toUpperCase());
   useEffect(() => setHex(t.color.toUpperCase()), [t.color]);
   const used = usage.objects > 0;
@@ -172,11 +177,21 @@ function ThreadRow({
           e.stopPropagation();
           onSelect();
           useStore.getState().checkpoint();
+          editFrom.current = t;
           colorRef.current?.click();
         }}
       >
         {usage.blocks.length ? usage.blocks.slice(0, 3).join(" ") : ""}
-        <input ref={colorRef} type="color" value={t.color} onChange={(e) => updateThread(t.id, { color: e.target.value }, true)} tabIndex={-1} />
+        <input
+          ref={colorRef}
+          type="color"
+          value={t.color}
+          onChange={(e) => {
+            const from = editFrom.current ?? t;
+            updateThread(t.id, colourEdit(from, e.target.value, spoolColor(from)), true);
+          }}
+          tabIndex={-1}
+        />
       </button>
       <div className="tm-main">
         <input className="input tm-name" defaultValue={t.name} key={t.name} onBlur={(e) => e.target.value !== t.name && updateThread(t.id, { name: e.target.value })} />
@@ -188,7 +203,7 @@ function ThreadRow({
             onChange={(e) => setHex(e.target.value)}
             onBlur={() => {
               const h = normHex(hex);
-              if (h && h !== t.color) updateThread(t.id, { color: h });
+              if (h && h !== t.color) updateThread(t.id, colourEdit(t, h, spoolColor(t)));
               else setHex(t.color.toUpperCase());
             }}
             onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}

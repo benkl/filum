@@ -8,7 +8,7 @@
 //! sign bits and the unsigned y and x deltas in 0.1 mm. Colours are needle sets
 //! (C01–C14); the file stores no colours.
 
-use crate::encoder::{encode_with, Cmd, EncodeSettings, Encoded, ThreadChange};
+use crate::encoder::{check_extent, encode_with, Cmd, EncodeSettings, Encoded, ThreadChange};
 use crate::io::ByteWriter;
 use crate::raw::RawPattern;
 use crate::tbf::needle;
@@ -30,21 +30,23 @@ pub(crate) fn encode(p: &Pattern, opts: &WriteOptions) -> Encoded {
     encode_with(p, SETTINGS, opts.long_stitch_as_jumps, THREAD_CHANGE)
 }
 
-pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Vec<u8> {
+pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Result<Vec<u8>, Error> {
     let e = encode(p, opts);
     let mut out = Vec::new();
     out.fill(b'0', 0x80);
     if e.recs.is_empty() {
-        return out;
+        return Ok(out);
     }
     let (min_x, min_y, max_x, max_y) = e.bounds();
+    let last = e.recs[e.recs.len() - 1];
+    // The header's extents and end position are signed 16-bit.
+    check_extent("U01", &[min_x, -max_y, max_x, -min_y, last.x, -last.y], -0x8000, 0x7FFF)?;
     out.u16le(min_x as u32);
     out.u16le(-max_y as u32);
     out.u16le(max_x as u32);
     out.u16le(-min_y as u32);
     out.u32le(0);
     out.u32le(e.recs.len() as u32 + 1);
-    let last = e.recs[e.recs.len() - 1];
     out.u16le(last.x as u32);
     out.u16le(-last.y as u32);
     out.fill(0, HEADER_SIZE - out.len());
@@ -81,7 +83,7 @@ pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Vec<u8> {
         out.extend_from_slice(&[c, dy.unsigned_abs() as u8, dx.unsigned_abs() as u8]);
     }
     out.extend_from_slice(&[0xF8, 0x00, 0x00]);
-    out
+    Ok(out)
 }
 
 pub(crate) fn read(bytes: &[u8]) -> Result<Pattern, Error> {

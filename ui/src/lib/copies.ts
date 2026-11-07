@@ -6,6 +6,7 @@
 import type { DesignObject, Thread } from "../types";
 import { conjugate } from "./clones";
 import { transformObject, uid, type Mat } from "./geometry";
+import { layerFixes } from "./fillLayers";
 import { copiedParents, objectsIn, type GroupDoc } from "./groups";
 
 /** Every thread an object refers to (its own and its lettering's). */
@@ -31,9 +32,13 @@ export function mergeThreads(have: Thread[], incoming: Thread[]): { add: Thread[
   const add: Thread[] = [];
   const all = [...have];
   for (const t of incoming) {
-    // the same colour of the same thread (a Madeira red and an Isacord red stay two threads)
-    const sameColor = (x: Thread) => x.color.toLowerCase() === t.color.toLowerCase() && (x.code ?? "") === (t.code ?? "") && (x.brand ?? "") === (t.brand ?? "");
-    const same = all.find((x) => x.id === t.id && sameColor(x)) ?? all.find(sameColor);
+    // the same colour of the same thread (a Madeira red and an Isacord red stay two threads);
+    // a thread without a brand or code (a DST's, a colour picked by hand) matches any of its colour
+    const color = (x: Thread) => x.color.toLowerCase() === t.color.toLowerCase();
+    const fits = (a?: string, b?: string) => !a || !b || a.trim().toLowerCase() === b.trim().toLowerCase();
+    const exact = (x: Thread) => color(x) && (x.code ?? "") === (t.code ?? "") && (x.brand ?? "") === (t.brand ?? "");
+    const loose = (x: Thread) => color(x) && fits(x.brand, t.brand) && fits(x.code, t.code);
+    const same = all.find((x) => x.id === t.id && exact(x)) ?? all.find(exact) ?? all.find((x) => x.id === t.id && loose(x)) ?? all.find(loose);
     if (same) {
       map.set(t.id, same.id);
       continue;
@@ -92,6 +97,20 @@ export function freshCopies(
   });
   const names: Record<string, string> = {};
   for (const [old, now] of map) if (doc.groupNames?.[old]) names[now] = doc.groupNames[old];
+  // only some layers of a gradient / tartan copied: renumbered (one layer: a plain fill)
+  const fixes = layerFixes({ objects, groupParents: { ...doc.groupParents, ...parents } });
+  if (fixes.size) {
+    for (const [id, f] of fixes) {
+      const was = objects.find((o) => o.id === id)?.group;
+      if (was && was !== f.group && !objects.some((o) => o.id !== id && o.group === was)) {
+        // the layer's own group is left empty
+        for (const [k, v] of Object.entries(parents)) if (v === was && f.group) parents[k] = f.group;
+        delete parents[was];
+        delete names[was];
+      }
+    }
+    return { objects: objects.map((o) => fixes.get(o.id) ?? o), parents, names, ids };
+  }
   return { objects, parents, names, ids };
 }
 

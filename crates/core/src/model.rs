@@ -631,6 +631,20 @@ pub struct FlowField {
     pub angles: Vec<f32>,
 }
 
+impl FlowField {
+    /// Whether the field can steer rows: a finite grid with an angle for
+    /// every cell (an empty or broken field falls back to the shape's own).
+    pub fn is_usable(&self) -> bool {
+        self.cols > 0
+            && self.rows > 0
+            && self.cell.is_finite()
+            && self.cell > 1e-6
+            && self.origin.iter().all(|v| v.is_finite())
+            && (self.cols as u64) * (self.rows as u64) <= self.angles.len() as u64
+            && self.angles[..(self.cols as usize) * (self.rows as usize)].iter().all(|a| a.is_finite())
+    }
+}
+
 /// How a guided fill's rows follow its guide line (Ink/Stitch `guided_fill_strategy`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -657,8 +671,10 @@ pub enum MeanderPattern {
     Hexagon,
 }
 
+// `remote = "Self"`: the derived (de)serializers become inherent functions;
+// the trait impls below wrap them (older documents' contour direction).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
+#[serde(rename_all = "camelCase", default, remote = "Self")]
 pub struct FillParams {
     pub method: FillMethod,
     /// Row direction in degrees (counter-clockwise on screen).
@@ -699,7 +715,12 @@ pub struct FillParams {
     /// Spiral contour: in on every other ring and out on the rest, ending
     /// next to the start (Ink/Stitch `contour_strategy` = double spiral).
     pub contour_double: bool,
-    /// Contour / spiral: go round clockwise (on screen).
+    /// Contour / spiral: go round clockwise on screen (Ink/Stitch
+    /// `clockwise`, default true). Stored as `contourClockwise`: documents
+    /// before it stored `clockwise` with the opposite meaning (true went
+    /// round counter-clockwise on screen); they are read flipped, so they
+    /// sew as before (see [`FillParams`]'s `Deserialize`).
+    #[serde(rename = "contourClockwise")]
     pub clockwise: bool,
     /// Tatami: pull compensation as a share of each row's length, each side
     /// (Ink/Stitch `pull_compensation_percent`, here 0..1).
@@ -1053,6 +1074,32 @@ impl Default for GradientParams {
     }
 }
 
+impl Serialize for FillParams {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        FillParams::serialize(self, s)
+    }
+}
+
+impl<'de> Deserialize<'de> for FillParams {
+    /// Contour direction of older documents: their `clockwise` meant
+    /// counter-clockwise on screen when true (and clockwise when false or
+    /// missing). Without `contourClockwise` it is read flipped; a document
+    /// with neither key goes clockwise, as before and as in Ink/Stitch.
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let mut v = serde_json::Value::deserialize(d)?;
+        if let serde_json::Value::Object(m) = &mut v {
+            if let Some(old) = m.remove("clockwise") {
+                if !m.contains_key("contourClockwise") {
+                    if let Some(b) = old.as_bool() {
+                        m.insert("contourClockwise".into(), serde_json::Value::Bool(!b));
+                    }
+                }
+            }
+        }
+        FillParams::deserialize(v).map_err(serde::de::Error::custom)
+    }
+}
+
 impl Default for FillParams {
     fn default() -> Self {
         FillParams {
@@ -1075,7 +1122,7 @@ impl Default for FillParams {
             repeats: 1,
             bean_repeats: 0,
             contour_double: false,
-            clockwise: false,
+            clockwise: true,
             pull_comp_pct: 0.0,
             skip_last: false,
             underlay_skip_last: false,
@@ -1813,5 +1860,38 @@ impl Document {
             r = r.union(&o.bounds());
         }
         r
+    }
+}
+
+#[cfg(test)]
+mod contour_direction_tests {
+    use super::*;
+
+    fn fill(json: &str) -> FillParams {
+        match serde_json::from_str::<StitchParams>(json).unwrap() {
+            StitchParams::Fill(p) => p,
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn older_documents_keep_their_contour_direction() {
+        // before: `clockwise: true` went round counter-clockwise on screen
+        assert!(!fill(r#"{"type":"fill","method":"contour","clockwise":true}"#).clockwise);
+        assert!(fill(r#"{"type":"fill","method":"contour","clockwise":false}"#).clockwise);
+        // neither key: clockwise, as before and as Ink/Stitch
+        assert!(fill(r#"{"type":"fill","method":"contour"}"#).clockwise);
+        // the new key wins
+        assert!(!fill(r#"{"type":"fill","method":"contour","contourClockwise":false,"clockwise":false}"#).clockwise);
+        assert!(fill(r#"{"type":"fill","method":"spiral","contourClockwise":true}"#).clockwise);
+        // written under the new key only, and read back unchanged
+        let p = fill(r#"{"type":"fill","method":"contour","clockwise":true}"#);
+        let json = serde_json::to_string(&StitchParams::Fill(p.clone())).unwrap();
+        assert!(json.contains("\"contourClockwise\":false") && !json.contains("\"clockwise\""), "{json}");
+        assert_eq!(fill(&json), p);
+        // a whole document
+        let d: Document = serde_json::from_str(r#"{"objects":[{"id":"a","thread":"t","paths":[],"stitch":{"type":"fill","method":"spiral","clockwise":true}}]}"#).unwrap();
+        let StitchParams::Fill(p) = &d.objects[0].stitch else { panic!() };
+        assert!(!p.clockwise);
     }
 }

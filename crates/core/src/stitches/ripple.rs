@@ -547,8 +547,27 @@ fn orient_grid(mut grid: Vec<Vec<Point>>, last: Point) -> Vec<Vec<Point>> {
     grid
 }
 
+/// Smallest line distance / grid size (mm): finer values would make
+/// millions of lines (a hang) and sew a solid lump anyway.
+const MIN_DIST: f64 = 0.05;
+
+/// The options with values that would break the maths brought into range:
+/// an exponent ≤ 0 (0^0, 0^−1 = ∞ → NaN positions) becomes 0.01, a line
+/// distance or grid size below [`MIN_DIST`] becomes `MIN_DIST`.
+fn sane_params(p: &RippleParams) -> RippleParams {
+    let pos = |v: f64| if v.is_finite() && v > 0.0 { v.max(MIN_DIST) } else { 0.0 };
+    RippleParams {
+        exponent: if p.exponent.is_finite() { p.exponent.max(0.01) } else { 1.0 },
+        min_line_dist: pos(p.min_line_dist),
+        grid_size: pos(p.grid_size),
+        ..p.clone()
+    }
+}
+
 /// All stitch groups of a ripple object (Ink/Stitch `ripple_stitch`).
 pub fn ripple_stitches(paths: &[SubPath], p: &RippleParams, run: &RunningParams) -> Vec<Vec<Point>> {
+    let sane = sane_params(p);
+    let p = &sane;
     let usable: Vec<&SubPath> = paths.iter().filter(|s| s.nodes.len() >= 2).collect();
     if usable.is_empty() {
         return vec![];
@@ -688,6 +707,25 @@ mod tests {
         assert!((steps_exp[2] - 0.25).abs() < 1e-9);
         let flipped = steps(5, 0.0, 1.0, 2.0, true);
         assert!((flipped[2] - 0.75).abs() < 1e-9);
+    }
+
+    #[test]
+    fn bad_exponents_and_tiny_distances_stay_finite() {
+        let line = SubPath::polyline(&[pt(-30.0, 0.0), pt(0.0, 0.0)], false);
+        for exponent in [-1.0, 0.0, f64::NAN] {
+            let p = RippleParams { exponent, fan: true, ..Default::default() };
+            let g = ripple_stitches(&[line.clone()], &p, &run());
+            assert!(!g.is_empty() && g.iter().flatten().all(|q| q.x.is_finite() && q.y.is_finite()), "exponent {exponent}");
+        }
+        // a closed shape and a guided line with a line distance of 1e-6 mm: done quickly
+        let t = std::time::Instant::now();
+        let closed = SubPath::polyline(&[pt(20.0, 0.0), pt(0.0, 0.0)], true);
+        let _ = ripple_stitches(&[closed], &RippleParams { min_line_dist: 1e-6, ..Default::default() }, &run());
+        let open = SubPath::polyline(&[pt(20.0, 0.0), pt(0.0, 0.0)], false);
+        let guide = SubPath::polyline(&[pt(20.0, 0.0), pt(0.0, 0.0)], false);
+        let _ = ripple_stitches(&[open.clone()], &RippleParams { min_line_dist: 1e-6, guide: vec![guide], ..Default::default() }, &run());
+        let _ = ripple_stitches(&[open], &RippleParams { grid_size: 1e-6, ..Default::default() }, &run());
+        assert!(t.elapsed().as_secs_f64() < 20.0);
     }
 
     #[test]

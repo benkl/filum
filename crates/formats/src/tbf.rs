@@ -8,7 +8,7 @@
 //! colours (`DA`), then 3-byte records: signed 8-bit deltas in 0.1 mm (y up) and a
 //! command byte. Colours are needle sets; trims are explicit.
 
-use crate::encoder::{encode_with, Cmd, EncodeSettings, Encoded, ThreadChange};
+use crate::encoder::{check_count, encode_with, Cmd, EncodeSettings, Encoded, ThreadChange};
 use crate::io::ByteWriter;
 use crate::raw::RawPattern;
 use crate::{Error, Pattern, Thread, WriteOptions};
@@ -50,8 +50,12 @@ fn label(name: &str) -> String {
     }
 }
 
-pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Vec<u8> {
+pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Result<Vec<u8>, Error> {
     let e = encode(p, opts);
+    // DA: 5 bytes per thread; DO: one needle per needle set (colour block).
+    check_count("TBF", e.threads.len(), (THREADS_END - THREADS_AT) / 5, "colours")?;
+    check_count("TBF", e.count(Cmd::ColorChange), 0x100, "colour blocks")?;
+    crate::dst::check_header("TBF", &e, e.count(Cmd::ColorChange))?;
     let (min_x, min_y, max_x, max_y) = e.bounds();
     let mut out = Vec::new();
     out.str("3.00");
@@ -110,7 +114,7 @@ pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Vec<u8> {
         }
     }
     out.u8(0x1A);
-    out
+    Ok(out)
 }
 
 pub(crate) fn read(bytes: &[u8]) -> Result<Pattern, Error> {

@@ -1,21 +1,9 @@
 //! Tauri shell. The editor UI and the WebAssembly engine are shared with the
-//! browser build; native code adds file dialogs/filesystem access plus a few
-//! commands that run the same Rust engine natively (fast batch export).
+//! browser build; native code adds file dialogs and filesystem access, the
+//! files Filum is opened with, and one window at a time.
 
 use std::sync::Mutex;
 
-use filum_core::{io, Document, Engine};
-
-/// Export a document (JSON) straight to a file using the native engine.
-#[tauri::command]
-fn export_native(doc_json: String, path: String, pes_version: Option<u32>) -> Result<usize, String> {
-    let doc: Document = serde_json::from_str(&doc_json).map_err(|e| e.to_string())?;
-    let ext = std::path::Path::new(&path).extension().and_then(|e| e.to_str()).unwrap_or("dst").to_string();
-    let opts = io::ExportOptions { pes_version: pes_version.unwrap_or(1), ..Default::default() };
-    let bytes = io::export_with(&doc, &mut Engine::new(), &ext, &opts)?;
-    std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
-    Ok(bytes.len())
-}
 
 /// Files waiting to be opened by the editor: the ones Filum was started
 /// with ("Open with Filum" or a double-click on Windows and Linux), and on
@@ -28,18 +16,42 @@ fn startup_files(queue: tauri::State<OpenQueue>) -> Vec<String> {
     std::mem::take(&mut *queue.0.lock().unwrap())
 }
 
+/// The files among command-line arguments (a file name that isn't valid
+/// Unicode is passed on as well as it can be, rather than stopping the start).
+fn files_in<I: IntoIterator<Item = std::ffi::OsString>>(args: I) -> Vec<String> {
+    args.into_iter()
+        .skip(1)
+        .filter(|a| !a.to_string_lossy().starts_with('-') && std::path::Path::new(a).is_file())
+        .map(|a| a.to_string_lossy().into_owned())
+        .collect()
+}
+
 fn launch_files() -> Vec<String> {
-    std::env::args().skip(1).filter(|a| !a.starts_with('-') && std::path::Path::new(a).is_file()).collect()
+    files_in(std::env::args_os())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
+        // one Filum at a time: a file opened while it runs goes to the open
+        // window (two windows would share, and overwrite, one autosave)
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            use tauri::{Emitter, Manager};
+            let paths = files_in(argv.into_iter().map(std::ffi::OsString::from));
+            if !paths.is_empty() {
+                app.state::<OpenQueue>().0.lock().unwrap().extend(paths);
+                let _ = app.emit("open-files", ());
+            }
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.unminimize();
+                let _ = w.set_focus();
+            }
+        }))
         .manage(OpenQueue(Mutex::new(launch_files())))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![export_native, startup_files])
+        .invoke_handler(tauri::generate_handler![startup_files])
         .build(tauri::generate_context!())
         .expect("error while running Filum");
     app.run(|_app, _event| {

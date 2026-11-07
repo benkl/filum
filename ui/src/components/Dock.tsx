@@ -18,6 +18,7 @@ import { TransformPanel } from "./TransformPanel";
 import { MeanderPicker } from "./MeanderPicker";
 import { GradientSection } from "./GradientPanel";
 import { ThreadCard, ThreadPicker } from "./ThreadPicker";
+import { setObjectsThread } from "../lib/textSettle";
 import { computeIssues, type Issue } from "../lib/issues";
 import { memo, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -828,6 +829,16 @@ function KnockdownRow({ o, set }: { o: DesignOptions; set: (p: Partial<DesignOpt
   );
 }
 
+/**
+ * Contour / spiral direction, clockwise on screen (the engine's
+ * `contourClockwise`, default true as in Ink/Stitch). Designs saved before
+ * it stored `clockwise` with the opposite meaning (true = counter-clockwise);
+ * the engine reads that flipped, and so does this.
+ */
+function contourClockwise(st: { contourClockwise?: boolean; clockwise?: boolean }): boolean {
+  return st.contourClockwise ?? (st.clockwise === undefined ? true : !st.clockwise);
+}
+
 function StitchOptions({ o }: { o: DesignObject }) {
   const st = o.stitch;
   const up = (p: StitchPatch) => useStore.getState().updateStitch(o.id, p);
@@ -960,12 +971,17 @@ function StitchOptions({ o }: { o: DesignObject }) {
               <Slider min={0} max={100} step={5} digits={0} unit="%" value={Math.round((st.curve ?? 1) * 100)} onChange={(v) => up({ curve: v / 100 })} />
             </Row>
           )}
-          <Row label={st.method === "tatami" ? "Row spacing" : "Spacing"}>
-            <Slider min={0.15} max={st.method === "hilbert" || st.method === "stipple" ? 4 : 1.2} step={0.01} value={st.rowSpacing} unit="mm" {...sl("rowSpacing")} />
-          </Row>
-          <Row label="Max stitch">
-            <Slider min={1} max={7} step={0.1} value={st.maxStitchLength} unit="mm" {...sl("maxStitchLength")} />
-          </Row>
+          {/* cross stitch: the cell sets both (see the cross section below) */}
+          {st.method !== "cross" && (
+            <>
+              <Row label={st.method === "tatami" ? "Row spacing" : "Spacing"}>
+                <Slider min={0.15} max={st.method === "hilbert" || st.method === "stipple" ? 4 : 1.2} step={0.01} value={st.rowSpacing} unit="mm" {...sl("rowSpacing")} />
+              </Row>
+              <Row label="Max stitch">
+                <Slider min={1} max={7} step={0.1} value={st.maxStitchLength} unit="mm" {...sl("maxStitchLength")} />
+              </Row>
+            </>
+          )}
           {["tatami", "contour", "spiral", "guided", "circular"].includes(st.method) && !st.gradient && (
             <RandomLength value={st.randomLength ?? 0} onChange={(v) => up({ randomLength: v })} onShuffle={() => up({ seed: ((st.seed ?? 1) % 9973) + 1 })} />
           )}
@@ -1013,8 +1029,8 @@ function StitchOptions({ o }: { o: DesignObject }) {
             </Row>
           )}
           {(st.method === "contour" || st.method === "spiral") && (
-            <Row label="Clockwise">
-              <Toggle on={!!st.clockwise} onChange={(v) => up({ clockwise: v })} />
+            <Row label="Clockwise" title="Go round clockwise (Ink/Stitch's default) or counter-clockwise">
+              <Toggle on={contourClockwise(st)} onChange={(v) => up({ contourClockwise: v, clockwise: undefined })} />
             </Row>
           )}
           {(st.method === "meander" || st.method === "circular" || st.method === "contour" || st.method === "spiral") && (
@@ -1639,7 +1655,8 @@ function MultiProperties({ objects }: { objects: DesignObject[] }) {
         <ThreadPicker
           value={objects[0]?.thread}
           mixed={!objects.every((o) => o.thread === objects[0]?.thread)}
-          onPick={(id) => useStore.getState().commit((d) => ({ ...d, objects: d.objects.map((o) => (ids.includes(o.id) ? { ...o, thread: id } : o)) }))}
+          // letters: their lettering keeps the colour (all its letters of that colour take it)
+          onPick={(id) => useStore.getState().commit((d) => ({ ...d, objects: setObjectsThread(d.objects, ids, id) }))}
         />
         {!objects.every((o) => o.thread === objects[0]?.thread) && <p className="hint">{new Set(objects.map((o) => o.thread)).size} colours — pick one to give it to all.</p>}
         {threads.length === 0 && <p className="hint">No threads yet.</p>}

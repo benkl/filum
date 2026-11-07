@@ -4,7 +4,7 @@
 
 import type { DesignObject, Vec2 } from "../types";
 import type { TextSpec } from "./text";
-import { carryOver, matchMembers, sameTextSpec, settleTexts } from "./textSettle";
+import { carryOver, historyJump, matchMembers, sameTextSpec, setObjectsThread, settleTexts, syncTextThreads, threadSlot, transformable } from "./textSettle";
 
 let failed = 0;
 const check = (ok: boolean, msg: string) => {
@@ -131,6 +131,81 @@ const letter = (id: string, x: number, p: Partial<DesignObject> = {}, t?: TextSp
   const fresh = [letter("n1", 0)];
   carryOver([letter("a", 0, { group: "grp" })], [letter("1", 0)], fresh);
   check(fresh[0].group === undefined && fresh[0].id === "n1", "the generated objects stay as they are");
+}
+
+// --- a lettering with a locked letter ---------------------------------------------
+{
+  const a = letter("a", 0, { locked: true });
+  const b = letter("b", 4);
+  const c = letter("c", 8);
+  const shape = letter("s", 20, { text: undefined });
+  const doc = { objects: [a, b, c, shape] };
+  // a drag moved the unlocked letters (and a shape), not the locked one
+  const nudged = (o: DesignObject) => ({ ...o, paths: o.paths.map((sp) => ({ ...sp, nodes: sp.nodes.map((n) => ({ ...n, p: [n.p[0] + 5, n.p[1]] as Vec2 })) })), ...(o.text ? { text: { ...o.text, anchor: [5, 0] as Vec2 } } : {}) });
+  const moved = { objects: [a, nudged(b), nudged(c), nudged(shape)] };
+  const s = settleTexts(moved, doc);
+  check(s.objects.slice(0, 3).every((o) => !!o.text), "locked letter: the lettering keeps its text (none of its letters become shapes)");
+  check(s.objects[1] === b && s.objects[2] === c, "locked letter: the moved letters are taken back");
+  check(s.objects[3] === moved.objects[3], "locked letter: other objects still move");
+  check(!!settleTexts(moved).objects[0].text === false, "without the previous document: as before (shapes)");
+  // what a drag may move
+  const t = transformable([b, c, shape], doc.objects);
+  check(t.objects.length === 1 && t.objects[0] === shape && t.held === 1, "transformable: no letter of a lettering with a locked letter");
+  const free = transformable([letter("x", 0, {}, spec("h")), letter("l", 0, { locked: true, text: undefined })], doc.objects);
+  check(free.objects.length === 1 && free.held === 0, "transformable: unlocked letterings move, locked objects don't");
+}
+
+// --- lettering threads --------------------------------------------------------------
+{
+  // a two-colour embroidery font: glyph letters of colour 0 and 1
+  const pal = (p: Partial<TextSpec> = {}) => spec("g", { palette: ["p0", "p1"], thread: "p0", ...p });
+  const g0 = letter("g0", 0, { thread: "p0" }, pal({ colorIndex: 0 }));
+  const g1 = letter("g1", 0, { thread: "p1" }, pal({ colorIndex: 1 }));
+  const h0 = letter("h0", 4, { thread: "p0" }, pal({ colorIndex: 0 }));
+  const h1 = letter("h1", 4, { thread: "p1" }, pal({ colorIndex: 1 }));
+  const shape = letter("s", 20, { text: undefined, thread: "q" });
+  const objs = [g0, g1, h0, h1, shape];
+  check(threadSlot(g1.text!) === 1 && threadSlot(spec("g", { role: "border", style: "fillBorder" })) === "borderThread" && threadSlot(spec("g", { role: "border", style: "border" })) === "thread", "slots: palette index, border thread, main thread");
+  check(threadSlot(spec("g", { colorIndex: 3 })) === "thread", "slot: a font colour without a palette thread is the main thread");
+  // a mixed selection (letter g1 + the shape) given thread "n"
+  const out = setObjectsThread(objs, ["g1", "s"], "n");
+  check(out[4].thread === "n", "mixed selection: the shape takes the thread");
+  check(out[1].thread === "n" && out[3].thread === "n", "mixed selection: every letter of that font colour takes it");
+  check(out[0].thread === "p0" && out[2].thread === "p0", "mixed selection: the other font colour stays");
+  check(out.slice(0, 4).every((o) => o.text?.palette?.[1] === "n" && o.text.palette[0] === "p0" && o.text.thread === "p0"), "mixed selection: the lettering's palette keeps the colour for the next layout");
+  check(settleTexts({ objects: out }, { objects: objs }).objects.every((o, i) => i === 4 || !!o.text), "mixed selection: still one lettering");
+  // main and border threads of an outline font
+  const fill = letter("f", 0, { thread: "t" }, spec("k", { style: "fillBorder", role: "fill", borderThread: "b" }));
+  const border = letter("b", 0, { thread: "b" }, spec("k", { style: "fillBorder", role: "border", borderThread: "b" }));
+  const ob = setObjectsThread([fill, border], ["b"], "n");
+  check(ob[0].thread === "t" && ob[0].text?.thread === "t" && ob.every((o) => o.text?.borderThread === "n"), "border letter: the spec's border thread changes, the fill stays");
+  const of = setObjectsThread([fill, border], ["f", "b"], "n");
+  check(of.every((o) => o.thread === "n" && o.text?.thread === "n" && o.text.borderThread === "n"), "fill and border picked: both spec threads change");
+  // threads given from outside (a thread list)
+  const listed = objs.map((o) => (o.id === "g0" || o.id === "h0" ? { ...o, thread: "z" } : o));
+  const r = syncTextThreads(listed);
+  check(r.shapes === 0 && r.objects.slice(0, 4).every((o) => o.text?.palette?.[0] === "z"), "thread list: one new thread per font colour goes into the spec");
+  const split = objs.map((o) => (o.id === "g0" ? { ...o, thread: "z" } : o));
+  const rs = syncTextThreads(split);
+  check(rs.shapes === 1 && rs.objects.slice(0, 4).every((o) => !o.text) && rs.objects[0].thread === "z", "thread list: one font colour split in two: the lettering becomes shapes, colours kept");
+  check(syncTextThreads(split, new Set(["other"])).objects === split, "only the named letterings are looked at");
+  check(syncTextThreads(objs).objects === objs, "nothing to change: the same objects");
+}
+
+// --- history jumps (an edit generated while the font loads) ------------------------
+{
+  const [d0, d1, d2] = [{ n: 0 }, { n: 1 }, { n: 2 }];
+  const st = (doc: object, past: object[], future: object[] = [], filePath: string | null = null) => ({ doc, past, future, filePath });
+  const p0 = [d0];
+  const now = st(d1, p0);
+  check(!historyJump(now, st(d2, [...p0, d1])), "an edit (commit) is no jump");
+  check(!historyJump(now, st(d2, p0)), "a live edit is no jump");
+  check(!historyJump(now, st(d1, [...p0, d1])), "a checkpoint is no jump");
+  check(!historyJump(st(d1, [...p0, d1]), st(d1, p0)), "a checkpoint taken back is no jump");
+  check(historyJump(now, st(d0, [], [d1])), "undo is a jump");
+  check(historyJump(st(d0, [], [d1]), st(d1, [d0], [])), "redo is a jump");
+  check(historyJump(now, st(d1, [])), "the history cleared (a design opened) is a jump");
+  check(historyJump(now, st(d2, [...p0, d1], [], "other.filum")), "another file is a jump");
 }
 
 console.log(failed ? `${failed} FAILED` : "all passed");

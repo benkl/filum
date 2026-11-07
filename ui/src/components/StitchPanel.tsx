@@ -7,7 +7,8 @@ import { DEFAULT_SETS, defaultValues, matchesSet, setChanges } from "../lib/stit
 import { defaultApplique, defaultFill, defaultGuide, defaultRunning, defaultSatin, fillMethodDefaults, objectBounds } from "../lib/geometry";
 import { defaultVector, makeGradient } from "../lib/gradient";
 import { applyRamp } from "../lib/ramp";
-import { makeTartan, removeTartan } from "../lib/tartan";
+import { collapseLayers } from "../lib/fillLayers";
+import { makeTartan } from "../lib/tartan";
 import { useStore } from "../store";
 import type { DesignObject, StitchParams } from "../types";
 import { FLAG } from "../types";
@@ -350,7 +351,7 @@ const hasClosed = (o: DesignObject) => o.paths.some((p) => p.closed && p.nodes.l
 export function StylePicker({ o }: { o: DesignObject }) {
   const closed = hasClosed(o);
   const pickStyle = (s: Style) => {
-    let r = s.apply(o);
+    const r = s.apply(o);
     if (r === "shading") {
       const b = objectBounds(o);
       if (!b) return;
@@ -359,25 +360,45 @@ export function StylePicker({ o }: { o: DesignObject }) {
       else useStore.getState().toast("Shading: dense on the left, open on the right — drag a new direction with the gradient tool (G)");
       return;
     }
-    // leaving a tartan: its other colour layers go
-    if (r !== "tartan" && o.stitch.type === "fill" && o.stitch.tartan) {
-      const group = o.stitch.tartan.group;
-      useStore.getState().commit((d) => removeTartan(d, group));
-      if (typeof r === "object" && r.type === "fill") r = { ...r, tartan: undefined };
-    }
+    const st = useStore.getState();
+    // a layer of a gradient or tartan: the set becomes one plain fill first (its other layers go)
+    const layered = !o.clone && o.stitch.type === "fill" && (!!o.stitch.gradient || !!o.stitch.tartan);
+    const reselect = (id: string | undefined) => {
+      const now = useStore.getState();
+      if (id && !now.selection.includes(id) && st.selection.includes(o.id)) now.select([...now.selection, id]);
+    };
     if (r === "tartan") {
       if (o.stitch.type === "fill" && o.stitch.tartan) return;
-      useStore.getState().commit((d) => makeTartan(d, o.id));
-      useStore.getState().toast("Tartan: a layer per thread colour — edit the stripes in the Tartan section");
+      let kept: string | undefined = o.id;
+      st.commit((d) => {
+        const c = collapseLayers(d, o.id);
+        kept = c.id;
+        return c.id ? makeTartan(c.doc, c.id) : d;
+      });
+      reselect(kept);
+      st.toast("Tartan: a layer per thread colour — edit the stripes in the Tartan section");
       return;
     }
     if (r === "gradient") {
       const [a, b] = defaultVector([o]);
       if (!makeGradient(o.id, a, b)) return;
-      useStore.getState().toast("Gradient created — drag across the shape with the gradient tool (G) to set its direction");
+      st.toast("Gradient created — drag across the shape with the gradient tool (G) to set its direction");
       return;
     }
-    useStore.getState().commit((d) => ({ ...d, objects: d.objects.map((x) => (x.id === o.id ? { ...x, stitch: r } : x)) }));
+    const style = r;
+    if (!layered) {
+      st.commit((d) => ({ ...d, objects: d.objects.map((x) => (x.id === o.id ? { ...x, stitch: style } : x)) }));
+      return;
+    }
+    // one undo step: the set collapsed, the style on the layer left
+    const next: StitchParams = style.type === "fill" ? { ...style, gradient: undefined, tartan: undefined, ...(style.method === "tartan" ? { method: "tatami" as const } : {}) } : style;
+    let kept: string | undefined;
+    st.commit((d) => {
+      const c = collapseLayers(d, o.id);
+      kept = c.id;
+      return { ...c.doc, objects: c.doc.objects.map((x) => (x.id === c.id ? { ...x, stitch: next } : x)) };
+    });
+    reselect(kept);
   };
   const card = (s: Style) => {
     const missing = s.needs?.(o) ?? null;

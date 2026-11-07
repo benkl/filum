@@ -3,10 +3,10 @@
 // that keep such a set whole when commands reshape, combine or delete its
 // objects (no store here, so they can be tested in Node).
 
-import type { DensityRamp, DesignObject, FillParams, GradientParams, GradientStop, StitchDocument, StitchParams } from "../types";
+import type { DensityRamp, DesignObject, FillParams, GradientParams, GradientStop, StitchDocument, StitchParams, TartanParams } from "../types";
 import { parentOf } from "./groups";
 import { pruneGroups } from "./layerRows";
-import { tartanLayers } from "./tartan";
+import { paletteWithout, removeTartan, tartanColors, tartanLayers } from "./tartan";
 
 type GradientFill = FillParams & { gradient: GradientParams };
 
@@ -144,6 +144,11 @@ const stripColour = (name: string) => name.replace(/ · colour \d+$/, "");
  * Returns `doc` itself when every gradient is whole.
  */
 export function repairGradients(doc: StitchDocument): StitchDocument {
+  return applyFixes(doc, gradientFixes(doc));
+}
+
+/** The layer objects `repairGradients` rewrites (by id); `doc` gives the groups around. */
+export function gradientFixes(doc: Pick<StitchDocument, "objects" | "groupParents">): Map<string, DesignObject> {
   const groups = new Map<string, DesignObject[]>();
   for (const o of doc.objects) {
     if (o.clone || o.stitch.type !== "fill" || !o.stitch.gradient) continue;
@@ -154,6 +159,8 @@ export function repairGradients(doc: StitchDocument): StitchDocument {
   for (const [group, list] of groups) {
     const layers = [...list].sort((a, b) => (a.stitch as GradientFill).gradient.layer - (b.stitch as GradientFill).gradient.layer);
     const g = (layers[0].stitch as GradientFill).gradient;
+    // a gradient without stops (damaged): nothing to map the layers to
+    if (!Array.isArray(g.stops)) continue;
     const n = g.stops.length;
     const idx = layers.map((l) => (l.stitch as GradientFill).gradient.layer);
     if (idx.length === n && idx.every((k, i) => k === i)) continue;
@@ -193,6 +200,184 @@ export function repairGradients(doc: StitchDocument): StitchDocument {
       });
     });
   }
+  return replace;
+}
+
+function applyFixes(doc: StitchDocument, replace: Map<string, DesignObject>): StitchDocument {
   if (!replace.size) return doc;
   return pruneGroups({ ...doc, objects: doc.objects.map((o) => replace.get(o.id) ?? o) });
+}
+
+type TartanFill = FillParams & { tartan: TartanParams };
+
+/**
+ * After colour layers of tartans were deleted (or only some were copied):
+ * the colours of the missing layers are left out of the palette ("?"), the
+ * layers left are numbered 0, 1, … again (in the palette's colour order); a
+ * tartan with one layer left of several becomes a plain fill. Returns `doc`
+ * itself when every tartan is whole.
+ */
+export function repairTartans(doc: StitchDocument): StitchDocument {
+  return applyFixes(doc, tartanFixes(doc));
+}
+
+/** The layer objects `repairTartans` rewrites (by id); `doc` gives the groups around. */
+export function tartanFixes(doc: Pick<StitchDocument, "objects" | "groupParents">): Map<string, DesignObject> {
+  const groups = new Map<string, DesignObject[]>();
+  for (const o of doc.objects) {
+    if (o.clone || o.stitch.type !== "fill" || !o.stitch.tartan) continue;
+    const g = o.stitch.tartan.group;
+    groups.set(g, [...(groups.get(g) ?? []), o]);
+  }
+  const replace = new Map<string, DesignObject>();
+  for (const [group, list] of groups) {
+    const layers = [...list].sort((a, b) => ((a.stitch as TartanFill).tartan.layer ?? 0) - ((b.stitch as TartanFill).tartan.layer ?? 0));
+    const t = (layers[0].stitch as TartanFill).tartan;
+    if (typeof t.palette !== "string") continue;
+    const colors = tartanColors(t.palette);
+    const n = colors.length;
+    const idx = layers.map((l) => (l.stitch as TartanFill).tartan.layer ?? 0);
+    const samePalette = layers.every((l) => (l.stitch as TartanFill).tartan.palette === t.palette);
+    if (samePalette && idx.length === n && idx.every((k, i) => k === i)) continue;
+    // numbers we can't map to colours (duplicates, out of range): left alone
+    if (new Set(idx).size !== idx.length || idx.some((k) => !Number.isInteger(k) || k < 0 || k >= n)) continue;
+    if (layers.length === 1 && n > 1) {
+      const o = layers[0];
+      replace.set(o.id, {
+        ...o,
+        group: o.group === group ? parentOf(doc, group) : o.group,
+        name: stripColour(o.name),
+        stitch: { ...(o.stitch as TartanFill), type: "fill", method: "tatami", tartan: undefined },
+      });
+      continue;
+    }
+    const keep = new Set(idx);
+    const palette = paletteWithout(
+      t.palette,
+      colors.filter((_, k) => !keep.has(k)),
+    );
+    const base = stripColour(layers[0].name);
+    layers.forEach((o, i) => {
+      const st = o.stitch as TartanFill;
+      replace.set(o.id, {
+        ...o,
+        name: layers.length > 1 ? `${base} · colour ${i + 1}` : base,
+        stitch: { ...st, type: "fill", tartan: { ...t, ...st.tartan, palette, layer: i } },
+      });
+    });
+  }
+  return replace;
+}
+
+/** The layer objects of gradients and tartans that lost layers, made whole again (see `layerFixes`). */
+export const layerFixes = (doc: Pick<StitchDocument, "objects" | "groupParents">): Map<string, DesignObject> => new Map([...gradientFixes(doc), ...tartanFixes(doc)]);
+
+/** Gradients and tartans that lost layers made whole again (see repairGradients, repairTartans); groups left lone dissolve. */
+export function repairLayers(doc: StitchDocument): StitchDocument {
+  return applyFixes(doc, layerFixes(doc));
+}
+
+/** The gradient `group` back to a plain fill: its first layer stays (out of the gradient's own group). */
+export function removeGradientDoc(doc: StitchDocument, group: string): StitchDocument {
+  const layers = gradientLayers(doc, group);
+  if (!layers.length) return doc;
+  const keep = layers[0];
+  const ids = new Set(layers.slice(1).map((l) => l.id));
+  const { gradient: _g, ...fill } = keep.stitch as GradientFill;
+  void _g;
+  // the plain fill stays in the group the gradient was in
+  const around = parentOf(doc, group);
+  return pruneGroups({
+    ...doc,
+    objects: doc.objects
+      .filter((o) => !ids.has(o.id))
+      .map((o) => (o.id === keep.id ? { ...o, group: o.group === group ? around : o.group, name: stripColour(o.name), stitch: { ...fill, type: "fill" } } : o)),
+  });
+}
+
+/**
+ * The gradient or tartan `id` is a layer of, back to one plain fill (its
+ * first layer): the document, and the id of the object left. Other objects
+ * (and linked clones of layers) are returned as they are; `id` undefined
+ * when there is no such object.
+ */
+export function collapseLayers(doc: StitchDocument, id: string): { doc: StitchDocument; id: string | undefined } {
+  const o = doc.objects.find((x) => x.id === id);
+  if (!o) return { doc, id: undefined };
+  if (o.clone || o.stitch.type !== "fill") return { doc, id };
+  if (o.stitch.gradient) {
+    const keep = gradientLayers(doc, o.stitch.gradient.group)[0]?.id ?? id;
+    return { doc: removeGradientDoc(doc, o.stitch.gradient.group), id: keep };
+  }
+  if (o.stitch.tartan) {
+    const keep = tartanLayers(doc, o.stitch.tartan.group)[0]?.id ?? id;
+    return { doc: removeTartan(doc, o.stitch.tartan.group), id: keep };
+  }
+  return { doc, id };
+}
+
+const hasClosedPath = (o: DesignObject) => o.paths.some((p) => p.closed && p.nodes.length >= 3);
+
+/**
+ * Copied stitch settings as pasted onto `o`: the copy's gradient, tartan and
+ * colour-blend membership stay behind (they belong to the copied object's
+ * layers); `o` keeps its own. A satin centre line keeps its width.
+ */
+export function pastedStitch(o: DesignObject, copied: StitchParams): StitchParams {
+  let stitch = plainLayerStitch(structuredClone(copied));
+  if (stitch.type === "fill" && o.stitch.type === "fill") {
+    const own = o.stitch;
+    if (own.gradient) stitch = { ...stitch, gradient: own.gradient };
+    if (own.tartan) stitch = { ...stitch, method: "tartan", tartan: own.tartan };
+    if (own.ramp?.group) stitch = { ...stitch, ramp: own.ramp, underlay: own.underlay };
+  }
+  if (stitch.type === "satin" && o.stitch.type === "satin" && o.paths.length === 1) stitch = { ...stitch, width: o.stitch.width };
+  return stitch;
+}
+
+/**
+ * Paste stitch properties (`clip`) onto the objects `selection` names, as one
+ * change. A layer of a gradient or tartan given a stitch that isn't a fill
+ * becomes one plain object first (its other layers go). Returns the
+ * document, how many objects took the settings and how many open paths were
+ * skipped (fills need closed shapes), and the selection with removed layers
+ * replaced by the object left.
+ */
+export function pastedStitchDoc(
+  doc: StitchDocument,
+  selection: string[],
+  clip: { stitch: StitchParams; thread: string },
+  withColor = false,
+): { doc: StitchDocument; n: number; skipped: number; selection: string[] } {
+  const needsClosed = clip.stitch.type === "fill" || clip.stitch.type === "applique";
+  const usable = (o: DesignObject) => !o.locked && !o.text && (!needsClosed || hasClosedPath(o));
+  let d = doc;
+  let ids = selection;
+  if (clip.stitch.type !== "fill") {
+    const now = new Map<string, string>();
+    for (const id of selection) {
+      const o = d.objects.find((x) => x.id === id);
+      if (!o || !usable(o) || !(o.stitch.type === "fill" && !o.clone && (o.stitch.gradient || o.stitch.tartan))) continue;
+      const r = collapseLayers(d, id);
+      d = r.doc;
+      if (r.id) now.set(id, r.id);
+    }
+    if (now.size) {
+      const live = new Set(d.objects.map((o) => o.id));
+      ids = [...new Set(selection.map((id) => now.get(id) ?? id))].filter((id) => live.has(id));
+    }
+  }
+  const sel = new Set(ids);
+  let n = 0;
+  let skipped = 0;
+  const objects = d.objects.map((o) => {
+    if (!sel.has(o.id) || o.locked || o.text) return o;
+    if (needsClosed && !hasClosedPath(o)) {
+      skipped++;
+      return o;
+    }
+    n++;
+    return { ...o, stitch: pastedStitch(o, clip.stitch), ...(withColor ? { thread: clip.thread } : {}) };
+  });
+  return { doc: { ...d, objects }, n, skipped, selection: ids };
 }

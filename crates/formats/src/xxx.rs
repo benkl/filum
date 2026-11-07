@@ -7,7 +7,7 @@
 //! A 0x100-byte header, signed 8-bit deltas in 0.1 mm (y up) with `0x7F` control codes,
 //! then an RGB colour table after the end marker.
 
-use crate::encoder::{encode, Cmd, EncodeSettings};
+use crate::encoder::{check_count, check_extent, check_size, encode, Cmd, EncodeSettings};
 use crate::io::{ByteWriter, Reader};
 use crate::raw::RawPattern;
 use crate::{Error, Pattern, Thread, WriteOptions};
@@ -18,8 +18,15 @@ pub(crate) const SETTINGS: EncodeSettings = EncodeSettings {
     full_jump: true,
 };
 
-pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Vec<u8> {
+pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Result<Vec<u8>, Error> {
     let e = encode(p, SETTINGS, opts.long_stitch_as_jumps);
+    // Header sizes and positions are 16-bit (signed: positions can be negative);
+    // readers take the colour count as 16-bit.
+    let (min_x, min_y, max_x, max_y) = e.bounds();
+    let last = e.recs.last().map_or((0, 0), |r| (r.x, r.y));
+    check_count("XXX", e.threads.len(), 0xFFFF, "colours")?;
+    check_size("XXX", max_x - min_x, max_y - min_y, 0x7FFF, 0x7FFF)?;
+    check_extent("XXX", &[last.0, -last.1, -min_x, max_y], -0x8000, 0x7FFF)?;
     let mut out = Vec::new();
     // Header ("b" variant).
     out.fill(0, 0x17);
@@ -27,10 +34,8 @@ pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Vec<u8> {
     out.fill(0, 0x0C);
     out.u32le(e.threads.len() as u32);
     out.u16le(0);
-    let (min_x, min_y, max_x, max_y) = e.bounds();
     out.u16le((max_x - min_x) as u32);
     out.u16le((max_y - min_y) as u32);
-    let last = e.recs.last().map_or((0, 0), |r| (r.x, r.y));
     out.u16le(last.0 as u32);
     out.u16le((-last.1) as u32);
     out.u16le((-min_x) as u32);
@@ -97,7 +102,7 @@ pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Vec<u8> {
     out.u32le(0xFFFF_FF00);
     out.u8(0);
     out.u8(1);
-    out
+    Ok(out)
 }
 
 pub(crate) fn read(bytes: &[u8]) -> Result<Pattern, Error> {

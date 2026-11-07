@@ -11,7 +11,7 @@
 //! As in pystitch, the design centre is `max - size / 2` (a half unit for odd sizes,
 //! truncated when written) and long-form records are read as stitches.
 
-use crate::encoder::{encode, Cmd, EncodeSettings, Rec};
+use crate::encoder::{check_count, check_extent, check_size, encode, mm, too_big, Cmd, EncodeSettings, Rec};
 use crate::io::{ByteWriter, Reader};
 use crate::raw::RawPattern;
 use crate::{Error, Pattern, Thread, WriteOptions};
@@ -43,8 +43,17 @@ fn patch_offset(out: &mut Vec<u8>, pos: usize) {
     out.patch_u32be(pos, d as u32);
 }
 
-pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Vec<u8> {
+/// Header positions and sizes are i32 in 1/1000 mm (format units * 100).
+const MAX_HEADER_UNITS: i32 = i32::MAX / 100;
+
+pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Result<Vec<u8>, Error> {
     let e = encode(p, SETTINGS, opts.long_stitch_as_jumps);
+    let blocks = e.colorblocks_starting_with_change();
+    check_count("VP3", blocks.len(), 0xFFFF, "colour blocks")?;
+    let (min_x, min_y, max_x, max_y) = e.bounds();
+    // Every header value (centre, block offsets, half sizes) lies within these.
+    check_extent("VP3", &[min_x, min_y, max_x, max_y], -MAX_HEADER_UNITS, MAX_HEADER_UNITS)?;
+    check_size("VP3", max_x - min_x, max_y - min_y, MAX_HEADER_UNITS, MAX_HEADER_UNITS)?;
     let mut out = Vec::new();
     out.str("%vsm%");
     out.u8(0);
@@ -55,8 +64,6 @@ pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Vec<u8> {
     out.u32le(0);
     string16(&mut out, "");
 
-    let blocks = e.colorblocks_starting_with_change();
-    let (min_x, min_y, max_x, max_y) = e.bounds();
     out.i32be(max_x * 100);
     out.i32be(-min_y * 100);
     out.i32be(min_x * 100);
@@ -99,11 +106,11 @@ pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Vec<u8> {
     string16(&mut out, PRODUCER);
     out.u16be(blocks.len() as u32);
     for (i, b) in blocks.iter().enumerate() {
-        write_colorblock(&mut out, i == 0, center_x, center_y, b, &e.thread(i));
+        write_colorblock(&mut out, i == 0, center_x, center_y, b, &e.thread(i))?;
     }
     patch_offset(&mut out, design_end_pos);
     patch_offset(&mut out, file_end_pos);
-    out
+    Ok(out)
 }
 
 fn write_colorblock(
@@ -113,7 +120,7 @@ fn write_colorblock(
     cy: f64,
     recs: &[Rec],
     thread: &Thread,
-) {
+) -> Result<(), Error> {
     out.extend_from_slice(&[0x00, 0x05, 0x00]);
     let end_pos = out.len();
     out.u32le(0);
@@ -127,9 +134,10 @@ fn write_colorblock(
     write_thread(out, thread);
     out.i32be((lx - fx) * 100);
     out.i32be(-(ly - fy) * 100);
-    write_stitches(out, recs, fx, fy);
+    write_stitches(out, recs, fx, fy)?;
     out.u8(0);
     patch_offset(out, end_pos);
+    Ok(())
 }
 
 fn write_thread(out: &mut Vec<u8>, t: &Thread) {
@@ -145,7 +153,7 @@ fn write_thread(out: &mut Vec<u8>, t: &Thread) {
     string8(out, &t.brand);
 }
 
-fn write_stitches(out: &mut Vec<u8>, recs: &[Rec], fx: i32, fy: i32) {
+fn write_stitches(out: &mut Vec<u8>, recs: &[Rec], fx: i32, fy: i32) -> Result<(), Error> {
     out.extend_from_slice(&[0x00, 0x01, 0x00]);
     let end_pos = out.len();
     out.u32le(0);
@@ -168,15 +176,22 @@ fn write_stitches(out: &mut Vec<u8>, recs: &[Rec], fx: i32, fy: i32) {
                     out.i8(dx);
                     out.i8(dy);
                 } else {
+                    // The long form is 16-bit; VP3 has no jumps, so a jump chain
+                    // ends up in one such move.
+                    if !(-32768..=32767).contains(&dx) || !(-32768..=32767).contains(&dy) {
+                        let worst = dx.unsigned_abs().max(dy.unsigned_abs());
+                        return Err(too_big(format!("VP3: a move of {} mm exceeds the format's 3276.7 mm limit", mm(worst as i64))));
+                    }
                     out.extend_from_slice(&[0x80, 0x01]);
-                    out.u16be((dx.clamp(-32768, 32767) & 0xFFFF) as u32);
-                    out.u16be((dy.clamp(-32768, 32767) & 0xFFFF) as u32);
+                    out.u16be((dx & 0xFFFF) as u32);
+                    out.u16be((dy & 0xFFFF) as u32);
                     out.extend_from_slice(&[0x80, 0x02]);
                 }
             }
         }
     }
     patch_offset(out, end_pos);
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------------------

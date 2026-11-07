@@ -370,6 +370,15 @@ fn inset_short_stitches(pairs: &[(Point, Point)], inset: f64, min_dist: f64) -> 
     out
 }
 
+/// Shortest split length (mm): a 1e-6 mm maximum would split every stitch
+/// into millions of points (a hang); Ink/Stitch-sized values are unchanged.
+const MIN_SPLIT: f64 = 0.05;
+
+/// A split length brought into range (0 or less = no splitting).
+fn split_len(v: f64) -> f64 {
+    if v > 0.0 { v.max(MIN_SPLIT) } else { v }
+}
+
 fn split_points(a: Point, b: Point, max_len: f64) -> Vec<Point> {
     split_points_staggered(a, b, max_len, 0, 0)
 }
@@ -378,7 +387,8 @@ fn split_points(a: Point, b: Point, max_len: f64) -> Vec<Point> {
 /// of a section from stitch to stitch (repeating every `staggers` stitches)
 /// so the split points do not line up into a visible line.
 fn split_points_staggered(a: Point, b: Point, max_len: f64, row: usize, staggers: u32) -> Vec<Point> {
-    if max_len <= 0.0 {
+    let max_len = split_len(max_len);
+    if max_len.is_nan() || max_len <= 0.0 {
         return vec![];
     }
     let d = a.dist(b);
@@ -409,12 +419,13 @@ struct Splitter {
 
 impl Splitter {
     fn new(p: &SatinParams) -> Self {
+        let max_len = split_len(p.max_stitch_length);
         Splitter {
-            max_len: p.max_stitch_length,
+            max_len,
             staggers: p.split_staggers,
             jitter: p.split_jitter.clamp(0.0, 1.0),
             random_phase: p.split_random_phase,
-            min_len: if p.split_min_length > 0.0 { p.split_min_length.min(p.max_stitch_length) } else { p.max_stitch_length },
+            min_len: if p.split_min_length > 0.0 { p.split_min_length.min(max_len) } else { max_len },
             seed: p.random_seed,
         }
     }
@@ -436,7 +447,8 @@ impl Splitter {
             let mut out = Vec::new();
             while t < d {
                 out.push(a.lerp(b, t / d));
-                t += self.max_len * (1.0 + self.jitter * (rng.next() - 0.5) * 2.0);
+                // never a zero step (jitter 1 can draw one)
+                t += (self.max_len * (1.0 + self.jitter * (rng.next() - 0.5) * 2.0)).max(self.max_len * 0.05);
             }
             let min_stitch = 0.25;
             if out.len() > 1 && out[0].dist(a) <= min_stitch {
@@ -458,7 +470,7 @@ impl Splitter {
                 (k as f64 + j * self.jitter) / n as f64
             })
             .collect();
-        ts.sort_by(|x, y| x.partial_cmp(y).unwrap());
+        ts.sort_by(|x, y| x.total_cmp(y));
         ts.into_iter().map(|t| a.lerp(b, t.clamp(0.0, 1.0))).collect()
     }
 }

@@ -7,7 +7,7 @@
 //! Coordinates are converted to integer format units (0.1 mm) by rounding the absolute
 //! position, so per-record deltas carry no accumulated rounding error.
 
-use crate::{cmd, default_thread, Pattern, Thread};
+use crate::{cmd, default_thread, Error, Pattern, Thread};
 
 /// Format units per millimetre (all supported formats use 0.1 mm).
 pub(crate) const UNITS_PER_MM: f64 = 10.0;
@@ -127,6 +127,44 @@ impl Encoded {
             .cloned()
             .unwrap_or_else(|| default_thread(i))
     }
+}
+
+/// `units` (0.1 mm) as millimetres for error messages.
+pub(crate) fn mm(units: i64) -> String {
+    format!("{:.1}", units as f64 / UNITS_PER_MM)
+}
+
+/// An error for a design that does not fit a format's fixed-width fields.
+pub(crate) fn too_big(msg: String) -> Error {
+    Error::Malformed(msg)
+}
+
+/// Err unless every value (format units, measured from the design origin) lies in
+/// `lo..=hi`: the format stores them in a fixed-width field.
+pub(crate) fn check_extent(format: &str, values: &[i32], lo: i32, hi: i32) -> Result<(), Error> {
+    if values.iter().all(|v| (lo..=hi).contains(v)) {
+        return Ok(());
+    }
+    let worst = values.iter().map(|v| v.unsigned_abs()).max().unwrap_or(0);
+    Err(too_big(format!("{format}: the design extends {} mm from its origin; {format} stores at most {} mm", mm(worst as i64), mm(hi as i64))))
+}
+
+/// Err if the design is wider than `max_w` or taller than `max_h` (format units).
+pub(crate) fn check_size(format: &str, width: i32, height: i32, max_w: i32, max_h: i32) -> Result<(), Error> {
+    for (what, v, max) in [("wide", width, max_w), ("tall", height, max_h)] {
+        if v > max {
+            return Err(too_big(format!("{format}: the design is {} mm {what}; {format} stores at most {} mm", mm(v as i64), mm(max as i64))));
+        }
+    }
+    Ok(())
+}
+
+/// Err if a count is larger than the format's field can hold.
+pub(crate) fn check_count(format: &str, count: usize, max: usize, what: &str) -> Result<(), Error> {
+    if count > max {
+        return Err(too_big(format!("{format}: the design has {count} {what}; {format} stores at most {max}")));
+    }
+    Ok(())
 }
 
 pub(crate) fn to_units(v: f64) -> i32 {

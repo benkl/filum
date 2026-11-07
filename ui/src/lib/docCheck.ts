@@ -3,6 +3,7 @@
 // can't be drawn at all are left out (and counted).
 
 import type { DesignObject, StitchDocument } from "../types";
+import { defaultDesignOptions } from "./geometry";
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 const finite2 = (v: unknown) => Array.isArray(v) && v.length >= 2 && Number.isFinite(v[0]) && Number.isFinite(v[1]);
@@ -36,11 +37,26 @@ export function checkDoc(raw: unknown, base: StitchDocument): { doc: StitchDocum
     threads: threads as StitchDocument["threads"],
     machine: { ...base.machine, ...(isObj(raw.machine) ? raw.machine : {}) },
     hoop: isObj(raw.hoop) && Number.isFinite(raw.hoop.width) && Number.isFinite(raw.hoop.height) ? (raw.hoop as unknown as StitchDocument["hoop"]) : base.hoop,
-    options: { ...base.options, ...(isObj(raw.options) ? raw.options : {}) },
   } as StitchDocument;
+  // options: as saved over the defaults (an older file lacks newer ones); none saved: left out,
+  // so the panels show the defaults (`d.options ?? defaultDesignOptions()`)
+  if (isObj(raw.options)) doc.options = { ...defaultDesignOptions(), ...base.options, ...raw.options } as StitchDocument["options"];
+  else if (base.options) doc.options = base.options;
+  else delete doc.options;
   // every object's thread exists (a missing one gets the first, or a default)
   if (!doc.threads.length && unique.length) doc.threads = [{ id: "t1", name: "Thread", color: "#1f2a56", brand: "", code: "" } as StitchDocument["threads"][number]];
   const ids = new Set(doc.threads.map((t) => t.id));
-  doc.objects = doc.objects.map((o) => (typeof o.thread === "string" && ids.has(o.thread) ? o : { ...o, thread: doc.threads[0].id }));
+  const known = (id: unknown): id is string => typeof id === "string" && ids.has(id);
+  doc.objects = doc.objects.map((o) => {
+    const fixed = known(o.thread) ? o : { ...o, thread: doc.threads[0].id };
+    const t = fixed.text;
+    if (!isObj(t)) return fixed;
+    // a lettering's threads too: its colour, its edge colour, its font colours
+    const thread = known(t.thread) ? t.thread : fixed.thread;
+    const borderThread = known(t.borderThread) ? t.borderThread : thread;
+    const palette = Array.isArray(t.palette) ? t.palette.map((id) => (known(id) ? id : thread)) : t.palette;
+    if (thread === t.thread && borderThread === t.borderThread && (!Array.isArray(t.palette) || palette!.every((id, i) => id === t.palette![i]))) return fixed;
+    return { ...fixed, text: { ...t, thread, borderThread, ...(palette ? { palette } : {}) } };
+  });
   return { doc, dropped: raw.objects.length - unique.length };
 }

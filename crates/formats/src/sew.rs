@@ -7,7 +7,7 @@
 //! A 0x1D78-byte header with up to 12 indices into the SEW thread table and per-block
 //! stitch counts, then signed 8-bit deltas in 0.1 mm (y up) with `0x80` control codes.
 
-use crate::encoder::{encode, Cmd, EncodeSettings, Encoded};
+use crate::encoder::{encode, too_big, Cmd, EncodeSettings, Encoded};
 use crate::io::{ByteWriter, Reader};
 use crate::palette::{build_nonrepeat_palette, sew_slots, table_thread, SEW_PALETTE};
 use crate::raw::RawPattern;
@@ -58,6 +58,9 @@ pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Result<Vec<u8>, Error> 
         } else {
             *counts.last_mut().unwrap() += 1;
         }
+    }
+    if let Some(&c) = counts.iter().find(|&&c| c > 0xFFFF) {
+        return Err(too_big(format!("SEW: a colour block has {c} stitch records; SEW stores at most 65535 per colour")));
     }
     for (i, c) in counts.into_iter().take(MAX_COLORS).enumerate() {
         out.patch_u16le(STITCH_COUNT_OFFSET + 2 * i, c);

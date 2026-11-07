@@ -608,12 +608,14 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
       return;
     }
     const id = ++planRun.current;
+    // a settings change meanwhile starts a new run, which owns the busy state
+    const run = runId.current;
     setBusy("Building stitches…");
     engine
       .planDetached(previewDoc!)
       .then((pl) => id === planRun.current && setPlan(pl))
       .catch((e: Error) => id === planRun.current && setError(e.message))
-      .finally(() => id === planRun.current && setBusy(null));
+      .finally(() => id === planRun.current && run === runId.current && setBusy(null));
   }, [previewDoc]);
 
   // inputs: file picker, drag & drop, paste

@@ -36,11 +36,14 @@ impl Default for OutlineParams {
 
 /// Outline rings of stitch lines.
 pub fn outline_runs(runs: &[Vec<Point>], p: &OutlineParams) -> Vec<Vec<Point>> {
-    let buffer = p.buffer.max(0.001);
+    // a non-finite or absurd buffer / inset (it would exhaust memory) is
+    // brought back to a sane range
+    let buffer = if p.buffer.is_finite() { p.buffer.clamp(0.001, 100.0) } else { OutlineParams::default().buffer };
+    let inset = if p.inset.is_finite() { p.inset.clamp(0.0, 100.0) } else { 0.0 };
     let bands: Vec<clip::Region> = runs.iter().filter(|r| r.len() >= 2).map(|r| clip::band(r, buffer)).collect();
     let mut region = clip::union_all(bands.iter());
-    if p.inset > 0.0 {
-        region = clip::offset(&region, -p.inset);
+    if inset > 0.0 {
+        region = clip::offset(&region, -inset);
     }
     clip::rings(&region).into_iter().filter(|r| signed_area(r).abs() >= p.threshold.max(0.0)).collect()
 }
@@ -88,5 +91,15 @@ mod tests {
         // a closed running stitch: its outer and inner outline
         let sq = vec![pt(0.0, 0.0), pt(10.0, 0.0), pt(10.0, 10.0), pt(0.0, 10.0), pt(0.0, 0.0)];
         assert_eq!(outline_runs(&[sq], &p).len(), 2);
+    }
+
+    #[test]
+    fn absurd_buffers_do_not_exhaust_memory() {
+        for b in [1e300, f64::INFINITY, f64::NAN, -1e300] {
+            for i in [1e300, f64::INFINITY, f64::NAN] {
+                let p = OutlineParams { buffer: b, inset: i, smoothness: 0.3, threshold: 10.0 };
+                let _ = outline_runs(&[rows()], &p);
+            }
+        }
     }
 }

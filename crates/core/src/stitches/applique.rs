@@ -96,7 +96,7 @@ pub fn applique(paths: &[SubPath], p: &AppliqueParams, extra_pull: f64, density:
     }
 
     // 2. tack-down, a little inside the edge
-    let tack = if p.tackdown_inset > 1e-6 { oriented(offset_rings(&rings, -p.tackdown_inset, res)) } else { rings.clone() };
+    let tack = if p.tackdown_inset > 1e-6 { oriented(offset_rings(&rings, -within(p.tackdown_inset, 0.0, MAX_WIDTH, 0.0), res)) } else { rings.clone() };
     let tack = if tack.is_empty() { rings.clone() } else { tack };
     match p.tackdown {
         TackdownKind::None => {}
@@ -109,8 +109,8 @@ pub fn applique(paths: &[SubPath], p: &AppliqueParams, extra_pull: f64, density:
         TackdownKind::Zigzag | TackdownKind::EStitch => {
             let sp = SatinParams {
                 method: if p.tackdown == TackdownKind::Zigzag { SatinMethod::Zigzag } else { SatinMethod::EStitch },
-                width: p.tackdown_width.max(0.3),
-                spacing: p.tackdown_spacing.max(0.3),
+                width: within(p.tackdown_width, 0.3, MAX_WIDTH, 1.6),
+                spacing: within(p.tackdown_spacing, 0.3, MAX_WIDTH, 1.2),
                 pull_comp: 0.0,
                 short_stitch_inset: 0.0,
                 center_walk: false,
@@ -128,12 +128,12 @@ pub fn applique(paths: &[SubPath], p: &AppliqueParams, extra_pull: f64, density:
 
     // 3. cover stitch over the raw edge
     if p.cover != CoverKind::None {
-        let cover = if p.cover_offset.abs() > 1e-6 { oriented(offset_rings(&rings, p.cover_offset, res)) } else { rings.clone() };
+        let cover = if p.cover_offset.abs() > 1e-6 { oriented(offset_rings(&rings, within(p.cover_offset, -MAX_WIDTH, MAX_WIDTH, 0.0), res)) } else { rings.clone() };
         let cover = if cover.is_empty() { rings.clone() } else { cover };
         let sp = SatinParams {
             method: if p.cover == CoverKind::Satin { SatinMethod::Satin } else { SatinMethod::EStitch },
-            width: p.cover_width.max(0.5),
-            spacing: p.cover_spacing.max(0.15),
+            width: within(p.cover_width, 0.5, MAX_WIDTH, 3.0),
+            spacing: within(p.cover_spacing, 0.15, MAX_WIDTH, 0.4),
             pull_comp: p.pull_comp,
             center_walk: p.cover_underlay,
             multi: true,
@@ -143,6 +143,15 @@ pub fn applique(paths: &[SubPath], p: &AppliqueParams, extra_pull: f64, density:
     }
     runs.retain(|r| !r.is_empty());
     runs
+}
+
+/// Widest tack-down / cover column and furthest inset or offset (mm): far
+/// beyond any appliqué edge, and a 1e5 mm column would take forever.
+const MAX_WIDTH: f64 = 20.0;
+
+/// `v` brought into `lo..=hi` (`fallback` when it is not a number).
+fn within(v: f64, lo: f64, hi: f64, fallback: f64) -> f64 {
+    if v.is_finite() { v.clamp(lo, hi) } else if v.is_nan() { fallback } else if v > 0.0 { hi } else { lo }
 }
 
 #[cfg(test)]

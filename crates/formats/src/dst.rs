@@ -8,7 +8,7 @@
 //! There is no trim command: trims are written as a jump sequence
 //! (+2,+2), (-4,-4), (+2,+2) and recognised on read as three consecutive jumps.
 
-use crate::encoder::{encode, Cmd, EncodeSettings, Encoded};
+use crate::encoder::{check_count, check_extent, encode, Cmd, EncodeSettings, Encoded};
 use crate::io::ByteWriter;
 use crate::raw::RawPattern;
 use crate::{Error, Pattern, Thread, WriteOptions};
@@ -149,8 +149,19 @@ pub(crate) fn header(e: &Encoded) -> Vec<u8> {
     out
 }
 
-pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Vec<u8> {
+/// The DST / TBF header's fixed-width text fields (`ST:%7d`, `CO:%3d`, `+X:%5d`, …):
+/// a wider number would shift every later field.
+pub(crate) fn check_header(format: &str, e: &Encoded, color_changes: usize) -> Result<(), Error> {
+    check_count(format, e.recs.len(), 9_999_999, "stitch records")?;
+    check_count(format, color_changes, 999, "colour changes and stops")?;
+    let (min_x, min_y, max_x, max_y) = e.bounds();
+    // AX / AY (the last position) lie within the bounds.
+    check_extent(format, &[min_x, min_y, max_x, max_y], -99_999, 99_999)
+}
+
+pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Result<Vec<u8>, Error> {
     let e = encode(p, SETTINGS, opts.long_stitch_as_jumps);
+    check_header("DST", &e, e.count(Cmd::ColorChange) + e.count(Cmd::Stop))?;
     let mut out = header(&e);
     let (mut xx, mut yy) = (0i32, 0i32);
     for r in &e.recs {
@@ -176,7 +187,7 @@ pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Vec<u8> {
             }
         }
     }
-    out
+    Ok(out)
 }
 
 fn parse_hex(s: &str) -> Option<[u8; 3]> {
@@ -315,7 +326,7 @@ mod tests {
             threads: vec![],
             name: "Test design".into(),
         };
-        let bytes = write(&p, &WriteOptions::default());
+        let bytes = write(&p, &WriteOptions::default()).unwrap();
         assert_eq!(bytes.len() % 3, 512 % 3);
         let h = &bytes[..512];
         let text = String::from_utf8_lossy(h);
@@ -354,7 +365,7 @@ mod tests {
             ],
             ..Default::default()
         };
-        let bytes = write(&p, &WriteOptions::default());
+        let bytes = write(&p, &WriteOptions::default()).unwrap();
         let body = &bytes[512..];
         // stitch(0,0), stitch(10,0), 3 trim jumps, jump(20,0), stitch(0,0), end
         assert_eq!(body.len(), 8 * 3);

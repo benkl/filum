@@ -165,7 +165,8 @@ fn tally(plan: &StitchPlan, want: impl Fn(u32) -> bool) -> Tally {
 /// Stitches the minimum stitch length removes from an object's runs (as the
 /// plan assembly drops them).
 fn small_removed(engine: &mut Engine, doc: &Document, i: usize) -> usize {
-    let min = doc.machine.min_stitch;
+    // the object's own minimum wins, as in the assembly
+    let min = doc.objects[i].min_stitch.unwrap_or(doc.machine.min_stitch).max(0.0);
     let mut n = 0;
     for run in engine.object_runs(doc, i) {
         let Some(&(first, _)) = run.first() else { continue };
@@ -300,5 +301,22 @@ mod tests {
         let one = element_info(&doc, &mut e, &["o2".to_string()]);
         assert_eq!((one.objects.len(), one.total.colors, one.total.color_changes, one.total.stitches), (1, 1, 0, 3));
         assert_eq!(enum_id(&crate::model::FillMethod::Tatami), "tatami");
+    }
+
+    #[test]
+    fn small_stitches_follow_the_objects_own_minimum() {
+        let t = Thread { id: "a".into(), name: "a".into(), color: "#ff0000".into(), brand: String::new(), code: String::new(), weight: None };
+        let mut o = obj("o1", "a", &[pt(0.0, 0.0), pt(2.0, 0.0), pt(2.1, 0.0), pt(6.0, 0.0)]);
+        o.min_stitch = Some(0.0);
+        let mut doc = Document { threads: vec![t], objects: vec![o], ..Document::default() };
+        doc.machine.ties = false;
+        let mut e = Engine::new();
+        let info = element_info(&doc, &mut e, &[]);
+        // the object keeps its 0.1 mm stitch: none removed, all four sewn
+        assert_eq!((info.objects[0].stitches, info.objects[0].small_removed), (4, 0));
+        // a larger minimum of its own drops the 2 mm and the 2.1 mm stitch too
+        doc.objects[0].min_stitch = Some(2.2);
+        let info = element_info(&doc, &mut e, &[]);
+        assert_eq!((info.objects[0].stitches, info.objects[0].small_removed), (2, 2));
     }
 }

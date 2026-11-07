@@ -166,6 +166,22 @@ export function tartanColors(code: string): string[] {
   return out;
 }
 
+/**
+ * The palette code with the sewn stripes of `drop` (#rrggbb colours) marked
+ * "?" (left out): the sett keeps its widths, the other colours keep their
+ * stripes and their order (`tartanColors` without the dropped ones).
+ */
+export function paletteWithout(code: string, drop: Iterable<string>): string {
+  const gone = new Set([...drop].map((c) => c.toLowerCase()));
+  if (!gone.size) return code;
+  // the marks the engine reads between ")" and the width (see parseStripes)
+  return code.replace(/\(([^)]*)\)([/ ?*]*)/g, (m, raw: string, marks: string) => {
+    const c = paletteColor(raw);
+    if (!c || !gone.has(c) || /[?*]/.test(marks)) return m;
+    return `(${raw})?${marks}`;
+  });
+}
+
 /** The full sett as CSS stops for a swatch (warp across, weft down). */
 export function settStops(stripes: TartanStripe[], symmetric: boolean): { color: string | null; width: number }[] {
   const seq = stripes.map((s) => ({ color: s.render === 0 ? null : s.color, width: s.width }));

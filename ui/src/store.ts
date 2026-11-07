@@ -9,7 +9,7 @@ import { loadLayout, saveLayout, type Layout } from "./lib/layout";
 import type { DensityMode } from "./lib/density";
 import { freshCopies, mergeThreads, placeCopies, remapThreads } from "./lib/copies";
 import { settleTexts } from "./lib/textSettle";
-import { repairGradients } from "./lib/fillLayers";
+import { repairLayers } from "./lib/fillLayers";
 import { safeSetItem } from "./lib/storage";
 import { checkDoc } from "./lib/docCheck";
 import type {
@@ -353,7 +353,14 @@ export const useStore = create<State>((set, get) => ({
   commit: (fn) => {
     const s = get();
     pendingCheckpoint = null;
-    set({ past: [...s.past.slice(-99), s.doc], future: [], doc: settleTexts(syncClones(fn(s.doc), s.doc), s.doc), saved: false, live: null });
+    const doc = settleTexts(syncClones(fn(s.doc), s.doc), s.doc);
+    // ids of objects the change removed leave the selection
+    let selection = s.selection;
+    if (selection.length && doc.objects !== s.doc.objects) {
+      const ids = new Set(doc.objects.map((o) => o.id));
+      if (!selection.every((id) => ids.has(id))) selection = selection.filter((id) => ids.has(id));
+    }
+    set({ past: [...s.past.slice(-99), s.doc], future: [], doc, saved: false, live: null, ...(selection !== s.selection ? { selection } : {}) });
   },
   undo: () => {
     const s = get();
@@ -419,20 +426,23 @@ export const useStore = create<State>((set, get) => ({
       const placed = map.size ? objs.map((o) => remapThreads(o, (id) => map.get(id) ?? id)) : objs;
       const parents = groupParents && Object.keys(groupParents).length ? { ...d.groupParents, ...groupParents } : d.groupParents;
       const names = groupNames && Object.keys(groupNames).length ? { ...d.groupNames, ...groupNames } : d.groupNames;
-      // groups a paste holds only one thing of dissolve (one object copied out of a group)
-      return pruneGroups({
-        ...d,
-        threads: [...d.threads, ...add],
-        objects: [...d.objects, ...placed],
-        ...(parents ? { groupParents: parents } : {}),
-        ...(names ? { groupNames: names } : {}),
-      });
+      // groups a paste holds only one thing of dissolve (one object copied out of a group);
+      // a gradient or tartan copied only in part is renumbered (one layer: a plain fill)
+      return pruneGroups(
+        repairLayers({
+          ...d,
+          threads: [...d.threads, ...add],
+          objects: [...d.objects, ...placed],
+          ...(parents ? { groupParents: parents } : {}),
+          ...(names ? { groupNames: names } : {}),
+        }),
+      );
     }),
   deleteSelection: () => {
     const sel = new Set(get().selection);
     if (!sel.size) return;
-    // a gradient that lost colour layers is renumbered (one layer left: a plain fill)
-    get().commit((d) => pruneGroups(repairGradients({ ...d, objects: d.objects.filter((o) => !sel.has(o.id) || o.locked) })));
+    // a gradient or tartan that lost colour layers is renumbered (one layer left: a plain fill)
+    get().commit((d) => pruneGroups(repairLayers({ ...d, objects: d.objects.filter((o) => !sel.has(o.id) || o.locked) })));
     set({ selection: [] });
   },
   duplicateSelection: () => {
@@ -551,9 +561,8 @@ function requestDensity() {
   engine
     .densityField(s.doc)
     .then((density) => useStore.setState({ density }))
-    .catch(() => {
-      densityFor = null;
-    })
+    // a failure waits for the next plan (retrying the same one would loop)
+    .catch(() => {})
     .finally(() => {
       densityBusy = false;
       requestDensity();
@@ -570,29 +579,45 @@ useStore.subscribe((s, prev) => {
   if (VIEW_FIELDS.some((k) => s[k] !== prev[k])) safeSetItem(VIEW_KEY, JSON.stringify(Object.fromEntries(VIEW_FIELDS.map((k) => [k, s[k]]))));
   if (!s.prefs.autosave) return;
   // whether the autosaved design has changes not in a file (asked about before it's replaced)
-  if (s.saved !== prev.saved) safeSetItem(DIRTY_KEY, s.saved ? "0" : "1");
+  if (s.saved !== prev.saved && !autosaveDiscarded) safeSetItem(DIRTY_KEY, s.saved ? "0" : "1");
   if (s.doc === prev.doc) return;
   if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(flushAutosave, 600);
+  saveTimer = setTimeout(() => void flushAutosave(), 600);
 });
 
 let autosaveWarned = false;
 /** Write the autosave now (also when the window closes). */
-export function flushAutosave() {
+/**
+ * Write the autosave now (also when the window closes). True when the whole
+ * design is in it (false: autosave is off, or the pictures or all of it
+ * didn't fit).
+ */
+export function flushAutosave(): boolean {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = null;
   const s = useStore.getState();
-  if (!s.prefs.autosave) return;
+  if (!s.prefs.autosave || autosaveDiscarded) return false;
   safeSetItem(DIRTY_KEY, s.saved ? "0" : "1");
-  if (safeSetItem(DOC_KEY, JSON.stringify(s.doc))) return;
+  if (safeSetItem(DOC_KEY, JSON.stringify(s.doc))) return true;
   // quota: keep the design, drop the reference pictures from the autosave
-  if (safeSetItem(DOC_KEY, JSON.stringify({ ...s.doc, references: undefined }))) return;
+  if (safeSetItem(DOC_KEY, JSON.stringify({ ...s.doc, references: undefined }))) return !s.doc.references?.length;
   // not even that: an old autosave must not come back in its place
   localStorage.removeItem(DOC_KEY);
   if (!autosaveWarned) {
     autosaveWarned = true;
     s.toast("The design is too big to autosave: save it to a file", "error");
   }
+  return false;
+}
+
+let autosaveDiscarded = false;
+/** Forget the autosave for good in this session (the error screen's "Start afresh" reloads after it). */
+export function discardAutosave() {
+  autosaveDiscarded = true;
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = null;
+  localStorage.removeItem(DOC_KEY);
+  localStorage.removeItem(DIRTY_KEY);
 }
 
 /** The autosaved design (checked), and whether it had unsaved changes. */

@@ -191,10 +191,16 @@ impl StitchPlan {
     /// every stop, so the operator can reach the fabric (appliqué, puff foam).
     pub fn with_stop_position(&self, p: Point) -> StitchPlan {
         let mut out = Vec::with_capacity(self.stitches.len() + 8);
-        for s in &self.stitches {
-            if s.is(flags::STOP) {
+        for (i, s) in self.stitches.iter().enumerate() {
+            if s.is(flags::STOP) && (s.x != p.x || s.y != p.y) {
                 out.push(Stitch { x: p.x, y: p.y, flags: flags::JUMP, object: s.object });
                 out.push(Stitch { x: p.x, y: p.y, ..*s });
+                // and back to where the needle was, unless a jump follows
+                // anyway (a stitch or a trim straight after the stop would
+                // otherwise sew in from the stop position)
+                if self.stitches.get(i + 1).is_some_and(|n| !n.is(flags::JUMP) && !n.is(flags::STOP)) {
+                    out.push(Stitch { x: s.x, y: s.y, flags: flags::JUMP, object: s.object });
+                }
             } else {
                 out.push(*s);
             }
@@ -312,5 +318,29 @@ mod tests {
         let r = plan.with_stop_position(Point { x: 50.0, y: -10.0 });
         let f: Vec<(f64, u8)> = r.stitches.iter().map(|s| (s.y, s.flags)).collect();
         assert_eq!(f, vec![(1.0, 0), (1.0, flags::TRIM), (-10.0, flags::JUMP), (-10.0, flags::STOP), (2.0, flags::JUMP), (2.0, 0)]);
+    }
+
+    #[test]
+    fn returns_from_the_stop_position_before_sewing_on() {
+        // a stitch (not a jump) straight after the stop, then a trim
+        let plan = StitchPlan { stitches: vec![st(1.0, 1.0, 0), st(1.0, 1.0, flags::STOP), st(1.5, 1.0, 0), st(1.5, 1.0, flags::TRIM), st(1.5, 1.0, flags::END)], threads: vec![], ..Default::default() };
+        let r = plan.with_stop_position(Point { x: 50.0, y: -10.0 });
+        let f: Vec<(f64, f64, u8)> = r.stitches.iter().map(|s| (s.x, s.y, s.flags)).collect();
+        assert_eq!(f, vec![(1.0, 1.0, 0), (50.0, -10.0, flags::JUMP), (50.0, -10.0, flags::STOP), (1.0, 1.0, flags::JUMP), (1.5, 1.0, 0), (1.5, 1.0, flags::TRIM), (1.5, 1.0, flags::END)]);
+        // no sewn stitch from the stop position into the design
+        let mut cur = None::<Point>;
+        for s in &r.stitches {
+            if s.is_stitch() {
+                if let Some(c) = cur {
+                    assert!(c.dist(s.pos()) < 1.0, "long stitch from {c:?} to {:?}", s.pos());
+                }
+            }
+            if s.is_stitch() || s.is(flags::JUMP) {
+                cur = Some(s.pos());
+            }
+        }
+        // a stop at the stop position itself: unchanged
+        let at = StitchPlan { stitches: vec![st(5.0, 5.0, 0), st(5.0, 5.0, flags::STOP), st(6.0, 5.0, 0)], threads: vec![], ..Default::default() };
+        assert_eq!(at.with_stop_position(Point { x: 5.0, y: 5.0 }).stitches, at.stitches);
     }
 }

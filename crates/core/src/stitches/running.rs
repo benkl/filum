@@ -485,9 +485,11 @@ pub fn bean_stitch_pattern(stitches: &[Point], pattern: &[u32]) -> Vec<Point> {
 /// Split stitches longer than `max` into even parts (Ink/Stitch manual
 /// stitch `max_stitch_length_mm`).
 pub fn split_long(stitches: &[Point], max: f64) -> Vec<Point> {
-    if max <= 0.0 || stitches.len() < 2 {
+    if !(max > 0.0) || stitches.len() < 2 {
         return stitches.to_vec();
     }
+    // a 1e-6 mm maximum would make millions of stitches (a hang)
+    let max = max.max(MIN_SPLIT);
     let mut out = vec![stitches[0]];
     for w in stitches.windows(2) {
         let n = (w[0].dist(w[1]) / max).ceil().max(1.0) as usize;
@@ -497,6 +499,9 @@ pub fn split_long(stitches: &[Point], max: f64) -> Vec<Point> {
     }
     out
 }
+
+/// Shortest length [`split_long`] splits to (mm).
+pub const MIN_SPLIT: f64 = 0.05;
 
 /// Ink/Stitch's zig-zag stroke (`stroke_method=zigzag_stitch`, `zigzag_stitch`):
 /// points evenly along the line (an even number of half-spacings), moved

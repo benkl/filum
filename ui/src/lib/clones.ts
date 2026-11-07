@@ -9,6 +9,8 @@
 
 import type { DesignObject, StitchDocument } from "../types";
 import { mulMat, transformObject, translateMat, uid, type Mat } from "./geometry";
+import { layerSetOf, plainGroupOf, plainLayerStitch } from "./fillLayers";
+import { isFixedMember } from "./layerRows";
 
 export interface CloneLink {
   /** The original's id. */
@@ -97,19 +99,32 @@ export function syncClones(doc: StitchDocument, prev?: StitchDocument): StitchDo
   return changed ? { ...doc, objects } : doc;
 }
 
-/** A linked clone of `o`, shifted by `offset` mm. */
+/**
+ * A linked clone of `o`, shifted by `offset` mm. A clone of a clone follows
+ * the same original (its link moved on by the offset).
+ */
 export function makeClone(o: DesignObject, offset = 5): DesignObject {
   const link: CloneLink = o.clone ? { ...o.clone, m: mulMat(translateMat(offset, offset), o.clone.m) } : { of: o.id, m: translateMat(offset, offset), rot: 0 };
-  const base = { ...o, id: uid(), name: `${o.name.replace(/ clone( \d+)?$/, "")} clone`, clone: link, start: undefined, end: undefined, text: undefined, group: undefined };
-  const src = o.clone ? undefined : o;
-  return src ? { ...base, ...derive(src, link) } : { ...base, ...transformObject({ ...o, clone: undefined }, translateMat(offset, offset)) };
+  const base: DesignObject = { ...o, id: uid(), name: `${o.name.replace(/ clone( \d+)?$/, "")} clone`, clone: link, start: undefined, end: undefined, text: undefined, group: undefined };
+  if (!o.clone) return { ...base, ...derive(o, link) };
+  // the original isn't at hand: the clone's shape moved on (the store derives it again from the original)
+  const t = transformObject({ ...o, clone: undefined }, translateMat(offset, offset));
+  return { ...base, paths: t.paths, stitch: t.stitch };
 }
 
-/** The clone as a plain object (it stops following its original). */
-export function unlinkClone(o: DesignObject): DesignObject {
+/**
+ * The clone as a plain object (it stops following its original). Its
+ * stitch is a plain fill of its own: a clone of a gradient / tartan / blend
+ * layer carries the original's layer settings, which would make it one more
+ * layer of the original's set. With `doc`, a clone sitting in that set's
+ * own group moves to the group around it (without: it leaves the group).
+ */
+export function unlinkClone(o: DesignObject, doc?: StitchDocument): DesignObject {
   const { clone: _c, ...rest } = o;
   void _c;
-  return rest;
+  if (!layerSetOf(rest)) return rest;
+  const group = doc ? plainGroupOf(doc, rest) : isFixedMember(rest) ? undefined : rest.group;
+  return { ...rest, group, name: rest.name.replace(/ · colour \d+/, ""), stitch: plainLayerStitch(rest.stitch) };
 }
 
 /** How many clones follow `id`. */

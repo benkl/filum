@@ -10,7 +10,7 @@ import { gatherAtTop, groupInfo, isFixedMember, nextGroupName, pruneGroups } fro
 import { chainOf, commonGroup, groupsOf, objectsIn, parentOf, parentsOf, selectedUnits, topGroupOf, withParent } from "./groups";
 import { defaultApplique, defaultFill, defaultRunning, defaultSatin, normAngle, objectBounds, rotateAbout, scaleAbout, transformObject, translateMat, uid, unionBoxes, type Box } from "./geometry";
 import { freshCopies, placeCopies, threadsOf } from "./copies";
-import { layerSetOf, oneLayerEach, plainGroupOf, plainLayerStitch } from "./fillLayers";
+import { layerSetOf, oneLayerEach, pastedStitchDoc, plainGroupOf, plainLayerStitch } from "./fillLayers";
 
 type Mat = [number, number, number, number, number, number];
 
@@ -214,21 +214,15 @@ export function pasteProperties(withColor = false) {
   const c = clip;
   let n = 0;
   let skipped = 0;
-  s.commit((d) => ({
-    ...d,
-    objects: d.objects.map((o) => {
-      if (!s.selection.includes(o.id) || o.locked || o.text) return o;
-      if ((c.stitch.type === "fill" || c.stitch.type === "applique") && !hasClosed(o)) {
-        skipped++;
-        return o;
-      }
-      n++;
-      let stitch = structuredClone(c.stitch);
-      // a satin keeps its own width when it is a centre line
-      if (stitch.type === "satin" && o.stitch.type === "satin" && o.paths.length === 1) stitch = { ...stitch, width: o.stitch.width };
-      return { ...o, stitch, ...(withColor ? { thread: c.thread } : {}) };
-    }),
-  }));
+  let selection = s.selection;
+  s.commit((d0) => {
+    const r = pastedStitchDoc(d0, s.selection, c, withColor);
+    n = r.n;
+    skipped = r.skipped;
+    selection = r.selection;
+    return r.doc;
+  });
+  if (selection.join() !== s.selection.join()) s.select(selection);
   s.toast(`Applied to ${n} object${n === 1 ? "" : "s"}${skipped ? ` · ${skipped} open path${skipped > 1 ? "s" : ""} skipped` : ""}`);
 }
 

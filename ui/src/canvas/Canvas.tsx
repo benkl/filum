@@ -89,7 +89,7 @@ import {
   type StopEdit,
 } from "../lib/gradient";
 import type { GradientParams } from "../types";
-import { cutFillObject, cutPathObject, cutSatinObject, nearestOnPaths } from "../lib/cut";
+import { cutFills, cutPathObject, cutSatinObject, nearestOnPaths } from "../lib/cut";
 import { computeIssues } from "../lib/issues";
 import { issuesShown } from "../lib/panelActions";
 import { displayPlan } from "../lib/threads";
@@ -98,6 +98,7 @@ import { openDroppedFile } from "../lib/actions";
 import { flatten as flattenSub, normAngle } from "../lib/geometry";
 import { pruneGroups } from "../lib/layerRows";
 import { freshCopies } from "../lib/copies";
+import { transformable } from "../lib/textSettle";
 
 const hitCtx = (() => {
   const c = document.createElement("canvas");
@@ -1371,9 +1372,9 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
             return;
           }
         }
-        const sel = s.doc.objects.filter((o) => s.selection.includes(o.id));
+        const sel = transformable(s.doc.objects.filter((o) => s.selection.includes(o.id)), s.doc.objects).objects;
         const box = unionBoxes(sel.map(objectBounds));
-        if (box && sel.every((o) => !o.locked)) {
+        if (box && sel.length && sel.every((o) => !o.locked)) {
           const pv = pivotOf(box);
           // Alt-drag the pivot to move it (Alt-double-click: back to the centre)
           if (e.altKey && dist(p, pv) < tol * 1.2) {
@@ -1421,7 +1422,12 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
             kind: "move",
             start: p,
             // locked objects stay put; an Alt-drag copy takes them along
-            orig: s.doc.objects.filter((o) => ids.includes(o.id) && !o.locked),
+            // a lettering with locked letters stays in place with them
+            orig: (() => {
+              const t = transformable(s.doc.objects.filter((o) => ids.includes(o.id)), s.doc.objects);
+              if (t.held) s.toast("A lettering with locked letters stays in place: unlock it in Layers to move it");
+              return t.objects;
+            })(),
             all: s.doc.objects.filter((o) => ids.includes(o.id)),
             moved: false,
             targets: s.smartGuides ? snapTargets(s.doc, new Set(ids)) : null,
@@ -2428,18 +2434,13 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         iRef.current.cutPoint = null;
         if (d.moved) {
           const targets = s.doc.objects.filter((o) => o.visible && !o.locked && o.stitch.type === "fill" && crossesObject(o, d.a, p));
-          let n = 0;
-          let doc = s.doc;
-          for (const o of targets) {
-            const parts = cutFillObject(o, d.a, p);
-            if (!parts) continue;
-            doc = { ...doc, objects: doc.objects.flatMap((x) => (x.id === o.id ? parts : [x])) };
-            n++;
-          }
+          // gradients, tartans and colour blends: cut as one, each half a set of its own
+          const { doc, n, left } = cutFills(s.doc, targets, d.a, p);
           if (n) {
             s.setDoc(doc, { keepSelection: false });
             s.toast(`Cut ${n} fill${n > 1 ? "s" : ""} in two`, "success");
           }
+          if (left) s.toast(`${left} gradient${left > 1 ? "s, tartans or blends" : ", tartan or blend"} left whole: a layer is locked or hidden`, "error");
         } else {
           const hit = pick(p);
           if (hit && isPathObject(hit)) {

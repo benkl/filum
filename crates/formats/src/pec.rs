@@ -7,7 +7,7 @@
 //! PEC stores 7-bit or 12-bit deltas in 0.1 mm, y down, colours as indices into the
 //! Brother thread table, and monochrome 48x38 thumbnails.
 
-use crate::encoder::{encode, Cmd, EncodeSettings, Encoded, Rec};
+use crate::encoder::{check_size, encode, mm, too_big, Cmd, EncodeSettings, Encoded, Rec};
 use crate::io::{ByteWriter, Reader};
 use crate::palette::{pec_slots, pec_thread, build_unique_palette_keyed};
 use crate::raw::RawPattern;
@@ -53,19 +53,41 @@ pub(crate) fn header_color_list(indices: &[usize]) -> Vec<u8> {
     v
 }
 
-pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Vec<u8> {
+pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Result<Vec<u8>, Error> {
     let e = encode_for_pec(p, opts);
     let mut out = Vec::new();
     out.str("#PEC0001");
-    write_pec(&e, &color_indices(&e), &mut out);
-    out
+    write_pec(&e, &color_indices(&e), &mut out, "PEC")?;
+    Ok(out)
+}
+
+/// The largest stitch block the 24-bit length field holds.
+const MAX_BLOCK_LEN: usize = 0xFF_FFFF;
+
+/// Errs if `e` does not fit the PEC section's fixed-width fields (`format` names
+/// the file format in the message: PEC, or PES whose PEC section this is).
+pub(crate) fn check(e: &Encoded, indices: &[usize], format: &str) -> Result<(), Error> {
+    // One byte holds `count - 1`, and 0xFF means "no colours" (pystitch asserts this too).
+    if indices.len() > 255 {
+        return Err(too_big(format!("{format}: the design has {} colour blocks (each stop counts as one); {format} stores at most 255", indices.len())));
+    }
+    let (min_x, min_y, max_x, max_y) = e.bounds();
+    check_size(format, max_x - min_x, max_y - min_y, 0xFFFF, 0xFFFF)?;
+    // The stream opens with a 12-bit jump from the top-left corner to the origin.
+    if [min_x, min_y].iter().any(|&v| !(-2048..=2047).contains(&-v)) {
+        let worst = min_x.unsigned_abs().max(min_y.unsigned_abs());
+        return Err(too_big(format!("{format}: the design's top-left corner is {} mm from its origin; {format} stores at most 204.7 mm", mm(worst as i64))));
+    }
+    Ok(())
 }
 
 /// Writes the PEC section (header, stitch block, graphics).
-pub(crate) fn write_pec(e: &Encoded, indices: &[usize], out: &mut Vec<u8>) {
+pub(crate) fn write_pec(e: &Encoded, indices: &[usize], out: &mut Vec<u8>, format: &str) -> Result<(), Error> {
+    check(e, indices, format)?;
     write_header(e, indices, out);
-    write_block(e, out);
+    write_block(e, out, format)?;
     write_graphics(e, out);
+    Ok(())
 }
 
 fn write_header(e: &Encoded, indices: &[usize], out: &mut Vec<u8>) {
@@ -103,7 +125,7 @@ fn write_header(e: &Encoded, indices: &[usize], out: &mut Vec<u8>) {
     out.fill(0x20, 463 - count);
 }
 
-fn write_block(e: &Encoded, out: &mut Vec<u8>) {
+fn write_block(e: &Encoded, out: &mut Vec<u8>, format: &str) -> Result<(), Error> {
     let (min_x, min_y, max_x, max_y) = e.bounds();
     let start = out.len();
     out.extend_from_slice(&[0x00, 0x00]);
@@ -121,7 +143,11 @@ fn write_block(e: &Encoded, out: &mut Vec<u8>) {
     write_value(out, -min_y, true, JUMP_CODE);
     encode_stitches(e, out);
     let len = out.len() - start;
+    if len > MAX_BLOCK_LEN {
+        return Err(too_big(format!("{format}: the stitch data takes {len} bytes; {format} stores at most {MAX_BLOCK_LEN} bytes")));
+    }
     out.patch_u24le(start + 2, len as u32);
+    Ok(())
 }
 
 fn write_value(out: &mut Vec<u8>, value: i32, long: bool, flag: u8) {
@@ -462,6 +488,17 @@ mod tests {
         let mut raw = RawPattern::new();
         read_stitches(&out, &mut raw);
         assert_eq!(raw.recs.iter().filter(|r| r.cmd == Cmd::Trim).count(), 1);
+    }
+
+    #[test]
+    fn a_stitch_block_beyond_the_24_bit_length_is_an_error() {
+        // 4 bytes per long jump: just over 16 MB of stitch data.
+        let n = MAX_BLOCK_LEN / 4 + 1;
+        let mut recs: Vec<Rec> = (0..n).map(|i| Rec { x: if i % 2 == 0 { 2000 } else { 0 }, y: 0, cmd: Cmd::Jump }).collect();
+        recs.push(Rec { x: 0, y: 0, cmd: Cmd::End });
+        let e = Encoded { recs, threads: Vec::new(), name: String::new() };
+        let err = write_block(&e, &mut Vec::new(), "PEC").unwrap_err();
+        assert_eq!(err, Error::Malformed(format!("PEC: the stitch data takes {} bytes; PEC stores at most 16777215 bytes", 4 * n + 21)));
     }
 
     #[test]

@@ -5,9 +5,9 @@
 
 import { useStore } from "../store";
 import type { DesignObject, DitherMethod, FillParams, FreePoint, GradientKind, GradientMesh, GradientParams, GradientStop, StitchDocument, SubPath, TransitionCurve, Vec2 } from "../types";
-import { gradientLayers, gradientRefusal, plainGroupOf } from "./fillLayers";
+import { gradientLayers, gradientRefusal, plainGroupOf, removeGradientDoc } from "./fillLayers";
 import { defaultFill, normAngle, objectBounds, uid, unionBoxes, type Box } from "./geometry";
-import { parentOf, withParent } from "./groups";
+import { withParent } from "./groups";
 import { pruneGroups } from "./layerRows";
 
 export { gradientLayers, gradientRefusal, repairGradients, reverseStops } from "./fillLayers";
@@ -222,23 +222,7 @@ export function setStops(group: string, stops: StopEdit[], live = false, extra: 
 
 /** Back to a plain fill (keeps the first colour). */
 export function removeGradient(group: string) {
-  const s = store();
-  s.commit((d) => {
-    const layers = gradientLayers(d, group);
-    if (!layers.length) return d;
-    const keep = layers[0];
-    const ids = new Set(layers.slice(1).map((l) => l.id));
-    const { gradient: _g, ...fill } = keep.stitch as GradientFill;
-    void _g;
-    // the plain fill stays in the group the gradient was in
-    const around = parentOf(d, group);
-    return pruneGroups({
-      ...d,
-      objects: d.objects
-        .filter((o) => !ids.has(o.id))
-        .map((o) => (o.id === keep.id ? { ...o, group: around, name: o.name.replace(/ · colour \d+$/, ""), stitch: { ...fill, type: "fill" } } : o)),
-    });
-  });
+  store().commit((d) => removeGradientDoc(d, group));
 }
 
 /** After one layer's geometry changed, give every layer of its gradient the same paths. */

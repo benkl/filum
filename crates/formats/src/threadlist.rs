@@ -7,9 +7,9 @@
 //! They hold one entry per colour block and no stitches; machines and software load them
 //! next to a stitch file of the same name (e.g. a DST, which has no colours).
 
-use crate::encoder::{encode, UNLIMITED};
+use crate::encoder::{check_count, encode, too_big, UNLIMITED};
 use crate::io::ByteWriter;
-use crate::{Pattern, Thread};
+use crate::{Error, Pattern, Thread};
 
 /// One thread per colour block, as Ink/Stitch's pattern thread list.
 fn threads(p: &Pattern) -> Vec<Thread> {
@@ -37,8 +37,10 @@ pub(crate) fn write_edr(p: &Pattern) -> Vec<u8> {
 }
 
 /// INF: big-endian records with colour, needle number, description and chart.
-pub(crate) fn write_inf(p: &Pattern) -> Vec<u8> {
+pub(crate) fn write_inf(p: &Pattern) -> Result<Vec<u8>, Error> {
     let t = threads(p);
+    // record index and needle number are 16-bit
+    check_count("INF", t.len(), 0xFFFF, "colours")?;
     let mut out = Vec::new();
     out.extend_from_slice(&1u32.to_be_bytes());
     out.extend_from_slice(&8u32.to_be_bytes());
@@ -50,7 +52,11 @@ pub(crate) fn write_inf(p: &Pattern) -> Vec<u8> {
         // pystitch's chart: the thread chart / palette; the brand is ours.
         let chart = if t.brand.is_empty() { "Unknown" } else { &t.brand };
         // 2 + 2 + 3 + 2 + details + 1 + chart + 1 (pystitch counts characters; bytes here)
-        out.u16be((11 + details.len() + chart.len()) as u32);
+        let len = 11 + details.len() + chart.len();
+        if len > 0xFFFF {
+            return Err(too_big(format!("INF: the name and brand of colour {} take {} bytes; INF stores at most 65524", i + 1, len - 11)));
+        }
+        out.u16be(len as u32);
         out.u16be(i as u32); // record index
         out.extend_from_slice(&t.rgb);
         out.u16be(i as u32 + 1); // needle number
@@ -61,7 +67,7 @@ pub(crate) fn write_inf(p: &Pattern) -> Vec<u8> {
     }
     let size = (out.len() - placeholder - 4) as u32;
     out.patch_u32be(placeholder, size);
-    out
+    Ok(out)
 }
 
 // ---------------------------------------------------------------------------
@@ -156,7 +162,7 @@ mod tests {
 
     #[test]
     fn inf() {
-        let b = write_inf(&pattern());
+        let b = write_inf(&pattern()).unwrap();
         assert_eq!(&b[..8], &[0, 0, 0, 1, 0, 0, 0, 8]);
         assert_eq!(u32::from_be_bytes(b[8..12].try_into().unwrap()) as usize, b.len() - 12);
         assert_eq!(&b[12..16], &[0, 0, 0, 2]);
@@ -174,7 +180,7 @@ mod tests {
         assert_eq!(col[1].code, "1");
         let edr = read_edr(&write_edr(&p)).unwrap();
         assert_eq!(edr.iter().map(|t| t.rgb).collect::<Vec<_>>(), vec![[255, 0, 0], [0, 128, 255]]);
-        let inf = read_inf(&write_inf(&p)).unwrap();
+        let inf = read_inf(&write_inf(&p).unwrap()).unwrap();
         assert_eq!(inf.len(), 2);
         assert_eq!((inf[0].rgb, inf[0].name.as_str(), inf[0].brand.as_str()), ([255, 0, 0], "Red", "Madeira"));
         assert_eq!((inf[1].rgb, inf[1].name.as_str()), ([0, 128, 255], ""));

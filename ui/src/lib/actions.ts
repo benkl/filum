@@ -57,7 +57,8 @@ export function newDesign() {
   };
 }
 
-async function handleBytes(name: string, path: string | null, bytes: Uint8Array, mode: "open" | "import") {
+/** `launch`: a file Filum was opened with replaces the design (once it has loaded; the user was asked already). */
+async function handleBytes(name: string, path: string | null, bytes: Uint8Array, mode: "open" | "import" | "launch") {
   const s = useStore.getState();
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
   try {
@@ -84,8 +85,8 @@ async function handleBytes(name: string, path: string | null, bytes: Uint8Array,
     } else {
       doc = await engine.importEmbroidery(bytes, name);
     }
-    if (mode === "open" && (ext === "filum" || ext === "json" || !s.doc.objects.length)) {
-      if (!confirmDiscard()) return;
+    if (mode === "launch" || (mode === "open" && (ext === "filum" || ext === "json" || !s.doc.objects.length))) {
+      if (mode !== "launch" && !confirmDiscard()) return;
       loadDoc(doc, ext === "filum" ? path : null);
     } else {
       // merge into the current design, centred in the hoop
@@ -165,8 +166,8 @@ export async function openLaunchFiles() {
       s.toast(`Could not open ${name}: ${(e as Error).message ?? e}`, "error");
       return;
     }
-    loadDoc(newDesign(), null);
-    await handleBytes(name, path, bytes, "open");
+    // replaced only once the file has loaded (a broken file leaves the design as it was)
+    await handleBytes(name, path, bytes, "launch");
     if (rest.length) s.toast(`Opened ${name}. Open the other ${rest.length === 1 ? "file" : `${rest.length} files`} with File → Open…`);
   };
   await listen("open-files", () => void openQueued());
@@ -280,8 +281,9 @@ export async function withSvgTexts(doc: StitchDocument, texts: SvgText[]): Promi
   const { createLettering } = await import("./textOps");
   const objects = [...doc.objects];
   const threads = [...doc.threads];
-  // last first, so the sewing positions stay valid
-  for (const t of [...texts].sort((a, b) => b.index - a.index)) {
+  // last first, so the sewing positions stay valid; texts at one position
+  // also last first (reversed before the stable sort), so they keep document order
+  for (const t of [...texts].reverse().sort((a, b) => b.index - a.index)) {
     let thread = threads.find((x) => x.color.toLowerCase() === t.color.toLowerCase());
     if (!thread) {
       thread = { id: uid("t"), name: t.color, color: t.color, brand: "", code: "" };

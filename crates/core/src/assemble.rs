@@ -553,6 +553,9 @@ impl Builder<'_> {
         let behind = if behind.first().is_some_and(|p| p.dist(at) < 1e-6) { behind } else { std::iter::once(at).chain(behind).collect() };
         for p in crate::locks::lock_points(self.m.lock_end, &behind, self.m.lock_scale, self.m.lock_length, true) {
             self.out.push(Stitch::new(p, flags::TIE, o));
+            // a shape lock (arrow, star…) ends away from the lock point:
+            // the trim that follows is where the needle is
+            self.pos = Some(p);
         }
     }
 
@@ -588,6 +591,7 @@ impl Builder<'_> {
                 let owner = self.last_obj;
                 self.tie_off(p, owner);
             }
+            let p = self.pos.unwrap_or(p);
             // a colour change cuts the thread itself (the machine trims there;
             // Ink/Stitch writes no trim before it): no trim of our own
             if !color_change {
@@ -755,6 +759,7 @@ fn assemble_basted(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[Run], 
             let owner = b.last_obj;
             b.tie_off(p, owner);
         }
+        let p = b.pos.unwrap_or(p);
         b.out.push(Stitch::new(p, flags::TRIM, u32::MAX));
         b.out.push(Stitch::new(p, flags::END, u32::MAX));
     }
@@ -1181,6 +1186,34 @@ mod trim_tests {
         let set = plan(vec![first, line("2", "a", &[(22.5, 0.0), (40.0, 0.0)])]);
         assert_eq!(trims(&set), 1);
     }
+    /// Every command record (trim, stop, colour change, end) sits where the needle is.
+    fn commands_at_the_needle(p: &StitchPlan) {
+        let mut cur: Option<Point> = None;
+        for (k, s) in p.stitches.iter().enumerate() {
+            if s.flags & (flags::TRIM | flags::STOP | flags::COLOR_CHANGE | flags::END) != 0 {
+                let c = cur.expect("a command before any stitch");
+                assert!(c.dist(s.pos()) < 1e-9, "record {k} ({:#x}) at {:?}, the needle at {c:?}", s.flags, s.pos());
+            } else {
+                cur = Some(s.pos());
+            }
+        }
+    }
+
+    #[test]
+    fn the_trim_after_a_shape_lock_is_at_the_needle() {
+        for style in [LockStyle::Arrow, LockStyle::Star, LockStyle::Zigzag, LockStyle::HalfStitch, LockStyle::BackForth] {
+            let d = Document {
+                threads: vec![thread("a", "#000000"), thread("b", "#ff0000")],
+                objects: vec![line("1", "a", &[(55.0, 0.0), (0.0, 0.0)]), line("2", "a", &[(0.0, 30.0), (55.0, 30.0)]), line("3", "b", &[(0.0, 60.0), (55.0, 60.0)])],
+                machine: MachineSettings { lock_end: style, ..Default::default() },
+                ..Default::default()
+            };
+            let p = crate::Engine::new().plan(&d);
+            commands_at_the_needle(&p);
+            assert_eq!(trims(&p), 2, "{style:?}");
+        }
+    }
+
     #[test]
     fn the_plan_knows_where_the_basting_ends() {
         let objects = vec![line("1", "a", &[(0.0, 0.0), (20.0, 0.0)])];

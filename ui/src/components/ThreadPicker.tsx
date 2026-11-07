@@ -320,10 +320,11 @@ export function ChartBrowser({
       {closest.length > 0 && !q && (
         <div className="chart-near">
           <span className="chart-cap">Nearest</span>
-          {closest.map((e) => (
+          {closest.map((e, i) => (
             <button
               type="button"
-              key={e.code + e.name}
+              // charts and My threads can list one spool twice (or two brands' spools alike)
+              key={`${i}|${e.brand}|${e.code}|${e.name}`}
               className="chart-near-item"
               title={`${e.name} ${e.code} · ΔE ${e.d.toFixed(1)} (${deltaLabel(e.d)})`}
               onPointerEnter={() => setHover(e)}
@@ -339,10 +340,10 @@ export function ChartBrowser({
       <div className="chart-grid" style={{ maxHeight: height }}>
         {!entries && <span className="hint">Loading chart…</span>}
         {entries && !shown.length && <span className="hint">No match.</span>}
-        {shown.map((e) => (
+        {shown.map((e, i) => (
           <button
             type="button"
-            key={e.code + e.name + e.color}
+            key={`${i}|${e.brand}|${e.code}|${e.name}|${e.color}`}
             style={{ background: e.color, color: inkOn(e.color) }}
             className={owned?.has(ownedKey(e)) ? "owned" : undefined}
             title={`${e.name} · ${e.code}${owned?.has(ownedKey(e)) ? " · in My threads" : ""}`}

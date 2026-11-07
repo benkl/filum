@@ -198,7 +198,9 @@ export interface FillParams {
   beanRepeats?: number;
   /** Spiral: in on every other ring, out on the rest. */
   contourDouble?: boolean;
-  /** Contour / spiral: clockwise. */
+  /** Contour / spiral: clockwise on screen (Ink/Stitch's default; absent = clockwise). */
+  contourClockwise?: boolean;
+  /** Older designs: the contour direction with the opposite meaning (true = counter-clockwise). Read only. */
   clockwise?: boolean;
   /** Tatami: pull compensation as a share of each row's length, each side (0..1). */
   pullCompPct?: number;

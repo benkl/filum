@@ -7,7 +7,7 @@
 //! Reading uses the PEC section for stitches; for PES v5–v10 the embedded thread chart
 //! (with RGB) is used for colours.
 
-use crate::encoder::{Cmd, Encoded, Rec};
+use crate::encoder::{check_count, check_size, Cmd, Encoded, Rec};
 use crate::io::{ByteWriter, Reader};
 use crate::pec::{color_indices, encode_for_pec, header_color_list, read_pec, write_pec};
 use crate::raw::RawPattern;
@@ -16,9 +16,10 @@ use crate::{Error, Pattern, PesVersion, Thread, WriteOptions};
 const EMB_ONE: &str = "CEmbOne";
 const EMB_SEG: &str = "CSewSeg";
 
-pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Vec<u8> {
+pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Result<Vec<u8>, Error> {
     let e = encode_for_pec(p, opts);
     let indices = color_indices(&e);
+    crate::pec::check(&e, &indices, "PES")?;
     if opts.pes_version == PesVersion::V6 {
         return write_v6(&e, &indices);
     }
@@ -34,19 +35,19 @@ pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Vec<u8> {
         write_header_v1(&mut out, 1);
         out.u16le(0xFFFF);
         out.u16le(0x0000);
-        let _ = write_blocks(&e, &indices, &mut out);
+        write_blocks(&e, &indices, &mut out)?;
     }
     let pec_start = out.len();
     out.patch_u32le(pec_offset_pos, pec_start as u32);
-    write_pec(&e, &indices, &mut out);
-    out
+    write_pec(&e, &indices, &mut out, "PES")?;
+    Ok(out)
 }
 
 /// PES version 6 (pystitch `write_version_6`): the PES header carries the
 /// design's own thread list (catalogue code, RGB, name, brand) and every
 /// segment refers to it, so machines that read it show the exact threads;
 /// the PEC section is the same as in version 1.
-fn write_v6(e: &Encoded, indices: &[usize]) -> Vec<u8> {
+fn write_v6(e: &Encoded, indices: &[usize]) -> Result<Vec<u8>, Error> {
     // one chart entry per colour block (pystitch `fix_color_count`)
     let chart: Vec<Thread> = (0..e.threads.len().max(if e.recs.is_empty() { 0 } else { 1 })).map(|i| e.thread(i)).collect();
     // segment colour codes index the chart: nearest chart colour, ties to the
@@ -65,7 +66,7 @@ fn write_v6(e: &Encoded, indices: &[usize]) -> Vec<u8> {
         write_header_v6(&mut out, &e.name, &chart, 1);
         out.u16le(0xFFFF);
         out.u16le(0x0000);
-        let log = write_blocks(e, &codes, &mut out);
+        let log = write_blocks(e, &codes, &mut out)?;
         // version 6: a node / order table after the blocks
         out.u32le(0);
         out.u32le(0);
@@ -76,7 +77,7 @@ fn write_v6(e: &Encoded, indices: &[usize]) -> Vec<u8> {
     }
     let pec_start = out.len();
     out.patch_u32le(pec_offset_pos, pec_start as u32);
-    write_pec(e, indices, &mut out);
+    write_pec(e, indices, &mut out, "PES")?;
     // addendum: the PEC colour list again, then the RGB of every chart entry
     let list = header_color_list(indices);
     out.extend_from_slice(&list);
@@ -88,7 +89,7 @@ fn write_v6(e: &Encoded, indices: &[usize]) -> Vec<u8> {
         out.extend_from_slice(&[t.rgb[2], t.rgb[1], t.rgb[0]]);
     }
     out.u16le(0x0000);
-    out
+    Ok(out)
 }
 
 fn write_string8(out: &mut Vec<u8>, s: &str) {
@@ -155,18 +156,20 @@ fn write_string16(out: &mut Vec<u8>, s: &str) {
 }
 
 /// Writes the CEmbOne / CSewSeg blocks; returns the colour log length.
-fn write_blocks(e: &Encoded, indices: &[usize], out: &mut Vec<u8>) -> usize {
+fn write_blocks(e: &Encoded, indices: &[usize], out: &mut Vec<u8>) -> Result<usize, Error> {
     let (min_x, min_y, max_x, max_y) = e.bounds();
+    // Segment points are signed 16-bit: x - left in 0..=width, y - bottom in -height..=0.
+    check_size("PES", max_x - min_x, max_y - min_y, 0x7FFF, 0x8000)?;
     write_string16(out, EMB_ONE);
     let sections_pos = write_sewsegheader(out, (max_x - min_x) as f64, (max_y - min_y) as f64);
     out.u16le(0xFFFF);
     out.u16le(0x0000); // FFFF0000: more blocks follow
     write_string16(out, EMB_SEG);
-    let (sections, log) = write_segments(e, indices, min_x, max_y, out);
+    let (sections, log) = write_segments(e, indices, min_x, max_y, out)?;
     out.patch_u16le(sections_pos, sections as u32);
     out.u16le(0x0000);
     out.u16le(0x0000); // 00000000: no more blocks
-    log
+    Ok(log)
 }
 
 fn write_sewsegheader(out: &mut Vec<u8>, width: f64, height: f64) -> usize {
@@ -191,6 +194,28 @@ fn write_sewsegheader(out: &mut Vec<u8>, width: f64, height: f64) -> usize {
     pos
 }
 
+/// Most points one section holds (a 16-bit count).
+const MAX_SECTION_POINTS: usize = 0xFFFF;
+
+/// Splits a run of stitches into sections of at most [`MAX_SECTION_POINTS`]; each
+/// further section starts at the point where the previous one ended, as a stitch
+/// section starts where the jump before it ended.
+fn split_points(points: Vec<(i32, i32)>) -> Vec<Vec<(i32, i32)>> {
+    if points.len() <= MAX_SECTION_POINTS {
+        return vec![points];
+    }
+    let mut out = Vec::new();
+    let mut start = 0;
+    loop {
+        let end = (start + MAX_SECTION_POINTS).min(points.len());
+        out.push(points[start..end].to_vec());
+        if end == points.len() {
+            return out;
+        }
+        start = end - 1;
+    }
+}
+
 /// Writes the CSewSeg segments; returns the number of sections and of colour log entries.
 fn write_segments(
     e: &Encoded,
@@ -198,7 +223,7 @@ fn write_segments(
     adjust_x: i32,
     adjust_y: i32,
     out: &mut Vec<u8>,
-) -> (usize, usize) {
+) -> Result<(usize, usize), Error> {
     let code_for = |block: usize| -> u32 { indices.get(block).copied().unwrap_or(0) as u32 };
     let mut block_index = 0usize;
     let mut color_code = code_for(0);
@@ -243,30 +268,34 @@ fn write_segments(
             }
             _ => continue,
         };
-        if !first {
-            out.u16le(0x8003); // section end
+        for points in split_points(points) {
+            if !first {
+                out.u16le(0x8003); // section end
+            }
+            first = false;
+            if previous_code != Some(color_code) {
+                colorlog.push((section, color_code));
+                previous_code = Some(color_code);
+            }
+            out.u16le(flag);
+            out.u16le(color_code);
+            out.u16le(points.len() as u32);
+            for (x, y) in points {
+                out.u16le(x as u32);
+                out.u16le(y as u32);
+            }
+            section += 1;
         }
-        first = false;
-        if previous_code != Some(color_code) {
-            colorlog.push((section, color_code));
-            previous_code = Some(color_code);
-        }
-        out.u16le(flag);
-        out.u16le(color_code);
-        out.u16le(points.len() as u32);
-        for (x, y) in points {
-            out.u16le(x as u32);
-            out.u16le(y as u32);
-        }
-        section += 1;
     }
+    // The section count and the colour log's section numbers are 16-bit.
+    check_count("PES", section, 0xFFFF, "stitch and jump sections")?;
     out.u16le(colorlog.len() as u32);
     let log = colorlog.len();
     for (s, c) in colorlog {
         out.u16le(s as u32);
         out.u16le(c);
     }
-    (section, log)
+    Ok((section, log))
 }
 
 // ---------------------------------------------------------------------------------------
@@ -364,4 +393,21 @@ pub(crate) fn read(bytes: &[u8]) -> Result<Pattern, Error> {
     read_pec(bytes, pec_offset, &mut raw, chart)?;
     raw.duplicate_colors_as_stops();
     Ok(raw.finish())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn long_runs_split_into_sections_that_share_their_ends() {
+        let pts: Vec<(i32, i32)> = (0..2 * MAX_SECTION_POINTS as i32 + 10).map(|i| (i, 0)).collect();
+        let chunks = split_points(pts.clone());
+        assert_eq!(chunks.iter().map(Vec::len).collect::<Vec<_>>(), vec![MAX_SECTION_POINTS, MAX_SECTION_POINTS, 12]);
+        for w in chunks.windows(2) {
+            assert_eq!(w[0].last(), w[1].first());
+        }
+        assert_eq!(chunks.last().unwrap().last(), pts.last());
+        assert_eq!(split_points(pts[..10].to_vec()), vec![pts[..10].to_vec()]);
+    }
 }

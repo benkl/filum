@@ -22,6 +22,8 @@ export type { Lab } from "./colorMath";
 import { hexToRgb, rgbToHex, normHex, lab, deltaE, type Lab } from "./colorMath";
 import { remapThreads, threadsOf } from "./copies";
 import { safeSetItem } from "./storage";
+import { bySewOrder, chartIdFor, myThreadsGpl, ownedKey, paletteBrand, similarMerges, spoolsOfPalette, type ParsedPalette } from "./threadTools";
+export { colourEdit, ownedKey } from "./threadTools";
 
 export const hexDeltaE = (a: string, b: string) => deltaE(lab(a), lab(b));
 
@@ -102,8 +104,6 @@ export interface OwnedThread {
   color: string;
 }
 const MINE_KEY = "filum.myThreads";
-/** Identity of a spool: brand, code and colour. */
-export const ownedKey = (t: { brand?: string; code?: string; color: string }) => `${(t.brand ?? "").toLowerCase()}|${(t.code ?? "").toLowerCase()}|${t.color.toLowerCase()}`;
 export function myThreads(): OwnedThread[] {
   try {
     return JSON.parse(localStorage.getItem(MINE_KEY) ?? "[]");
@@ -171,17 +171,12 @@ export function addDesignThreadsToMine(): number {
 export async function importMyThreads(): Promise<number> {
   const f = await openFile([{ name: "GIMP palette", extensions: ["gpl"] }]);
   if (!f) return 0;
-  const pal = await engine.parsePalette(new TextDecoder().decode(f.bytes));
-  const brand = (pal.name || f.name).replace(/^(Ink\/Stitch|InkStitch|Embroidery Nerds|Filum):\s*/, "").replace(/\.gpl$/i, "").trim();
-  return addMyThreads(pal.entries.map((e) => ({ name: e.name || rgbToHex(e.rgb).toUpperCase(), code: e.code, brand: brand === "My threads" ? "" : brand, color: rgbToHex(e.rgb) })));
+  // a Filum export names each spool's name, code and brand (the engine reads them back, `brands`)
+  const pal = (await engine.parsePalette(new TextDecoder().decode(f.bytes))) as ParsedPalette;
+  return addMyThreads(spoolsOfPalette(pal, f.name));
 }
 export async function exportMyThreads() {
-  const lines = ["GIMP Palette", "Name: My threads", "Columns: 4", "# RGB Value\tColor Name Number"];
-  for (const t of myThreads()) {
-    const [r, g, b] = hexToRgb(t.color);
-    lines.push(`${String(r).padStart(3)} ${String(g).padStart(3)} ${String(b).padStart(3)}\t${[t.brand, t.name].filter(Boolean).join(" ")} ${t.code}`.trimEnd());
-  }
-  await saveFile("my-threads.gpl", new TextEncoder().encode(lines.join("\n") + "\n"), [{ name: "GIMP palette", extensions: ["gpl"] }]);
+  await saveFile("my-threads.gpl", new TextEncoder().encode(myThreadsGpl(myThreads())), [{ name: "GIMP palette", extensions: ["gpl"] }]);
 }
 
 let charts: ChartMeta[] = [...localMeta(), ...BUILTIN];
@@ -296,8 +291,9 @@ export async function installPalette(): Promise<ChartMeta | null> {
   if (!f) return null;
   const pal = await engine.parsePalette(new TextDecoder().decode(f.bytes));
   if (!pal.entries.length) throw new Error(`${f.name}: no colours found`);
-  const name = (pal.name || f.name).replace(/^(Ink\/Stitch|InkStitch|Embroidery Nerds):\s*/, "").replace(/\.gpl$/i, "").trim() || "Palette";
-  const id = `custom/${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+  const name = paletteBrand(pal.name || f.name) || "Palette";
+  // unique: a name in another script gives no letters for an id, two names can give the same
+  const id = chartIdFor(name, customCharts());
   const entry: CustomChart = { id, name, entries: pal.entries.map((e) => ({ name: e.name || rgbToHex(e.rgb).toUpperCase(), code: e.code, color: rgbToHex(e.rgb) })) };
   safeSetItem(CUSTOM_KEY, JSON.stringify([entry, ...customCharts().filter((c) => c.id !== id)]));
   chartCache.delete(id);
@@ -440,24 +436,13 @@ export function mergeSimilarColours() {
 
 export function mergeSimilar(threshold: number): number {
   const d = store().doc;
-  const use = (id: string) => d.objects.filter((o) => o.thread === id).length;
-  const order = [...d.threads].sort((a, b) => use(b.id) - use(a.id));
-  const labs = new Map(order.map((t) => [t.id, lab(t.color)]));
-  const taken = new Set<string>();
-  let merged = 0;
-  const groups: [string, string[]][] = [];
-  for (const keep of order) {
-    if (taken.has(keep.id)) continue;
-    taken.add(keep.id);
-    const near = order.filter((t) => !taken.has(t.id) && deltaE(labs.get(keep.id)!, labs.get(t.id)!) < threshold).map((t) => t.id);
-    near.forEach((x) => taken.add(x));
-    if (near.length) groups.push([keep.id, near]);
-    merged += near.length;
-  }
-  if (!merged) return 0;
+  const uses = new Map<string, number>();
+  for (const o of d.objects) for (const id of new Set(threadsOf(o))) uses.set(id, (uses.get(id) ?? 0) + 1);
+  // locked threads keep their spool; threads already on the keeper's spool are no merge
+  const map = similarMerges(d.threads, (id) => uses.get(id) ?? 0, new Set(d.threadLocks ?? []), threshold);
+  if (!map.size) return 0;
   // reversible: the threads stay, they share the keeper's spool (sewn as one
   // colour by the engine) and remember their own colour
-  const map = new Map(groups.flatMap(([k, xs]) => xs.map((x) => [x, k] as const)));
   store().commit((x) => {
     const byId = new Map(x.threads.map((t) => [t.id, t]));
     const sources = { ...(x.threadSources ?? {}) };
@@ -470,7 +455,7 @@ export function mergeSimilar(threshold: number): number {
     });
     return { ...x, threads, threadSources: sources };
   });
-  return merged;
+  return map.size;
 }
 
 /** Snap every thread to its nearest chart colour. */
@@ -738,13 +723,8 @@ export function fitSequence(doc: StitchDocument, plan: PlanData | null): FitBloc
 
 /** Threads in the order they are first sewn (unused ones last). */
 export function sortBySewOrder() {
-  store().commit((d) => {
-    const first = new Map<string, number>();
-    d.objects.forEach((o, i) => {
-      if (!first.has(o.thread)) first.set(o.thread, i);
-    });
-    return { ...d, threads: [...d.threads].sort((a, b) => (first.get(a.id) ?? 1e9) - (first.get(b.id) ?? 1e9)) };
-  });
+  // a lettering's threads (font colours too) count where its letters are
+  store().commit((d) => ({ ...d, threads: bySewOrder(d.threads, d.objects) }));
 }
 
 export function moveThread(id: string, delta: number) {

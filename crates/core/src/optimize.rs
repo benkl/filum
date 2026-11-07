@@ -44,8 +44,10 @@ fn travel(ends: &[(Point, Point)], order: &[usize]) -> f64 {
 /// Compute an optimised order. Hidden objects keep their relative position at the end.
 pub fn optimize_order(doc: &Document, engine: &mut Engine) -> OptimizeReport {
     let n = doc.objects.len();
-    let visible: Vec<usize> = (0..n).filter(|i| doc.objects[*i].visible).collect();
     let bounds: Vec<Rect> = doc.objects.iter().map(|o| o.bounds()).collect();
+    // objects without geometry sew nothing: they go to the end with the hidden ones
+    let sews = |i: usize| doc.objects[i].visible && !bounds[i].is_empty() && bounds[i].center().x.is_finite() && bounds[i].center().y.is_finite();
+    let visible: Vec<usize> = (0..n).filter(|i| sews(*i)).collect();
     // objects on the same spool count as one colour
     let spool: Vec<String> = doc.objects.iter().map(|o| doc.spool_of(&o.thread)).collect();
     // first / last needle position of every object
@@ -54,7 +56,7 @@ pub fn optimize_order(doc: &Document, engine: &mut Engine) -> OptimizeReport {
             let runs = engine.object_runs(doc, i);
             let first = runs.first().and_then(|r| r.first()).map(|x| x.0);
             let last = runs.last().and_then(|r| r.last()).map(|x| x.0);
-            let c = bounds[i].center();
+            let c = if bounds[i].is_empty() { Point { x: 0.0, y: 0.0 } } else { bounds[i].center() };
             (first.unwrap_or(c), last.unwrap_or(c))
         })
         .collect();
@@ -85,7 +87,7 @@ pub fn optimize_order(doc: &Document, engine: &mut Engine) -> OptimizeReport {
                 .min_by(|a, b| {
                     let da = pos.map_or(0.0, |p| p.dist(ends[**a].0));
                     let db = pos.map_or(0.0, |p| p.dist(ends[**b].0));
-                    da.partial_cmp(&db).unwrap().then(a.cmp(b))
+                    da.total_cmp(&db).then(a.cmp(b))
                 })
                 .unwrap()
         } else {
@@ -112,7 +114,7 @@ pub fn optimize_order(doc: &Document, engine: &mut Engine) -> OptimizeReport {
         order: order
             .iter()
             .copied()
-            .chain((0..n).filter(|i| !doc.objects[*i].visible))
+            .chain((0..n).filter(|i| !sews(*i)))
             .map(|i| doc.objects[i].id.clone())
             .collect(),
     };
@@ -172,5 +174,20 @@ mod tests {
         assert_eq!(r.color_changes_after, 1);
         let pos = |id: &str| r.order.iter().position(|x| x == id).unwrap();
         assert!(pos("A") < pos("B"), "stacking broken: {:?}", r.order);
+    }
+
+    #[test]
+    fn objects_without_geometry_do_not_panic() {
+        let mut doc = Document::default();
+        let mut no_paths = sq("B", "red", 0.0, 0.0);
+        no_paths.paths = vec![];
+        let mut no_nodes = sq("D", "red", 0.0, 0.0);
+        no_nodes.paths = vec![SubPath { nodes: vec![], closed: false }];
+        doc.objects = vec![sq("A", "red", 0.0, 0.0), no_paths, sq("C", "red", 0.0, 10.0), no_nodes, sq("E", "red", 20.0, 0.0)];
+        let r = optimize_order(&doc, &mut Engine::new());
+        assert_eq!(r.order.len(), 5);
+        assert!(r.travel_after_mm.is_finite() && r.travel_before_mm.is_finite());
+        // the empty ones go to the end
+        assert_eq!(&r.order[3..], &["B".to_string(), "D".to_string()]);
     }
 }

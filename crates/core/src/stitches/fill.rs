@@ -694,12 +694,13 @@ fn orient_ccw(ring: &mut Ring) {
 }
 
 pub fn contour(rings: &[Ring], spacing: f64, length: f64, spiral: bool, start: Option<Point>, f: u8) -> Vec<Run> {
-    contour_ex(rings, spacing, length, spiral, false, false, start, f)
+    contour_ex(rings, spacing, length, spiral, false, true, start, f)
 }
 
 /// Contour fill with Ink/Stitch's strategies: a double spiral goes in on
 /// every other ring and back out on the rest (ending next to its start);
-/// `clockwise` turns the direction round.
+/// `clockwise`: round clockwise on screen (Ink/Stitch
+/// `contour_fill._orient_linear_ring`), else counter-clockwise.
 #[allow(clippy::too_many_arguments)]
 pub fn contour_ex(rings: &[Ring], spacing: f64, length: f64, spiral: bool, double: bool, clockwise: bool, start: Option<Point>, f: u8) -> Vec<Run> {
     let all = inset_levels(rings, spacing);
@@ -710,9 +711,10 @@ pub fn contour_ex(rings: &[Ring], spacing: f64, length: f64, spiral: bool, doubl
     } else {
         all
     };
+    // a positive signed area (y down) goes round clockwise on screen
     let orient = |r: &mut Ring| {
         orient_ccw(r);
-        if clockwise {
+        if !clockwise {
             r.reverse();
         }
     };
@@ -1445,8 +1447,8 @@ pub fn fill_on(paths: &[SubPath], p: &FillParams, fabric: &crate::model::FabricP
             p.ramp.as_ref().map(|r| (r, density)),
             0,
         ),
-        FillMethod::Contour => contour_ex(&rings, spacing, p.max_stitch_length.min(3.0), false, false, p.clockwise, top_start, 0),
-        FillMethod::Spiral => contour_ex(&rings, spacing, p.max_stitch_length.min(3.0), true, p.contour_double, p.clockwise, top_start, 0),
+        FillMethod::Contour => contour_ex(&rings, spacing, p.max_stitch_length, false, false, p.clockwise, top_start, 0),
+        FillMethod::Spiral => contour_ex(&rings, spacing, p.max_stitch_length, true, p.contour_double, p.clockwise, top_start, 0),
         FillMethod::Radial => radial(&rings, p.center, spacing, p.max_stitch_length, 0),
         FillMethod::Hilbert => hilbert(&rings, spacing, p.max_stitch_length, 0),
         FillMethod::Stipple => stipple(&rings, spacing, p.max_stitch_length, 0),
@@ -1487,7 +1489,7 @@ pub fn fill_on(paths: &[SubPath], p: &FillParams, fabric: &crate::model::FabricP
                 tatami(&rings, p.angle, spacing, 0.0, false, p.max_stitch_length, p.staggers, p.pull_comp + extra_pull * 0.5, p.travel_length, top_start, end, None, 0)
             }),
         // the picture's flow; without one the rows follow the shape
-        FillMethod::Flow => match &p.flow {
+        FillMethod::Flow => match p.flow.as_ref().filter(|f| f.is_usable()) {
             Some(field) => streamlines(&rings, field, p, spacing, density, top_start),
             // a gradient: the rows follow its colour bands (or cross them)
             None => {
@@ -2040,6 +2042,56 @@ mod ink_param_tests {
         let bean = sewn(&fill(&sq(20.0), &FillParams { bean_repeats: 2, ..p.clone() }, 0.0, 1.0, false, 1.0, None, None));
         assert!(twice as f64 > once as f64 * 1.8, "{once} {twice}");
         assert!(bean as f64 > once as f64 * 2.5, "{once} {bean}");
+    }
+
+    /// Turning of a sewn path about its centre: > 0 clockwise on screen (y down).
+    fn turning(runs: &[Run]) -> f64 {
+        let pts: Vec<Point> = runs.iter().flatten().filter(|x| x.1 & flags::TRAVEL == 0).map(|x| x.0).collect();
+        let c = pts.iter().fold(pt(0.0, 0.0), |a, q| a + *q) * (1.0 / pts.len() as f64);
+        pts.windows(2).map(|w| (w[0] - c).cross(w[1] - w[0])).sum()
+    }
+
+    #[test]
+    fn contour_clockwise_means_clockwise_on_screen() {
+        for method in [M::Contour, M::Spiral] {
+            let p = FillParams { method, row_spacing: 1.0, underlay: false, ..Default::default() };
+            // Ink/Stitch's default: clockwise
+            assert!(p.clockwise);
+            let cw = turning(&fill(&sq(20.0), &p, 0.0, 1.0, false, 1.0, None, None));
+            let ccw = turning(&fill(&sq(20.0), &FillParams { clockwise: false, ..p.clone() }, 0.0, 1.0, false, 1.0, None, None));
+            assert!(cw > 0.0 && ccw < 0.0, "{method:?}: {cw} {ccw}");
+        }
+    }
+
+    #[test]
+    fn contour_and_spiral_keep_long_stitches() {
+        // Ink/Stitch's contour default is 4 mm: not capped at 3
+        for method in [M::Contour, M::Spiral] {
+            let p = FillParams { method, row_spacing: 1.0, underlay: false, max_stitch_length: 4.0, ..Default::default() };
+            let runs = fill(&sq(20.0), &p, 0.0, 1.0, false, 1.0, None, None);
+            let longest = runs.iter().flat_map(|r| r.windows(2).map(|w| w[0].0.dist(w[1].0))).fold(0.0, f64::max);
+            assert!(longest > 3.5 && longest < 4.0 + 1e-6, "{method:?}: {longest}");
+        }
+    }
+
+    #[test]
+    fn a_flow_fill_without_a_usable_field_follows_the_shape() {
+        let fields = [
+            crate::model::FlowField::default(),
+            crate::model::FlowField { origin: [0.0, 0.0], cell: 1.0, cols: 2, rows: 2, angles: vec![f32::NAN; 4] },
+            crate::model::FlowField { origin: [0.0, 0.0], cell: 0.0, cols: 2, rows: 2, angles: vec![0.0; 4] },
+            crate::model::FlowField { origin: [0.0, 0.0], cell: 1.0, cols: 5, rows: 5, angles: vec![0.0; 3] },
+        ];
+        for field in fields {
+            let t = std::time::Instant::now();
+            let p = FillParams { method: M::Flow, flow: Some(field.clone()), underlay: false, ..Default::default() };
+            let runs = fill(&sq(20.0), &p, 0.0, 1.0, false, 1.0, None, None);
+            assert!(sewn(&runs) > 100, "{field:?}: falls back to the curved field");
+            assert!(t.elapsed().as_secs_f64() < 20.0);
+            // the streamline tracer itself returns at once
+            let rings = fill_rings(&sq(20.0));
+            assert!(super::super::inkfills::flow(&rings, &field, 0.5, 2.5, 2.5, None, 0).is_empty());
+        }
     }
 
     #[test]

@@ -30,7 +30,9 @@ export function MachineSettings() {
   const profile = preset && MACHINES.find((x) => x.id === preset.id);
   const apply = (id: string) => {
     const p = presetById(id);
-    if (p) commit((d) => ({ ...d, machine: { ...p.values, profile: p.id } }));
+    // the preset's values over the design's own: lock stitches (not part of a
+    // preset) stay; a preset without a cutter clears the old one
+    if (p) commit((d) => ({ ...d, machine: { ...d.machine, cutter: undefined, cutOver: undefined, ...p.values, profile: p.id } }));
   };
   const fmtField = (w: number, h: number) => `${w / 10} × ${h / 10} cm`;
   const cut = cutterOf(m);

@@ -21,40 +21,63 @@ export function routableSelection(): DesignObject[] {
 }
 
 /**
- * Route the selected running-stitch lines into one object (Ink/Stitch
- * "Auto-route running stitch"): placed where the first of them was, in its
- * thread and stitch settings; lines sewn twice where the route travels.
+ * Route the selected running-stitch lines (Ink/Stitch "Auto-route running
+ * stitch"): the lines of one thread and stitch settings into one object,
+ * placed where the first of them was, in their thread and settings (lines
+ * of other threads or settings are routed apart, so each keeps its style);
+ * lines sewn twice where the route travels.
  */
 export function autoRouteSelection(redwork = false): string | null {
   const s = useStore.getState();
   const objs = routableSelection();
   if (objs.length < 1) return "Select running-stitch lines";
-  const lines = objs.flatMap((o) => o.paths.map((sp) => flattenSubPath(sp, 0.1)));
-  const paths = routeRunning(lines, { start: objs[0].start ?? lines[0]?.[0], redwork });
-  if (!paths.length) return "Nothing to route";
-  const first = objs[0];
-  const routed: DesignObject = {
-    ...first,
-    id: uid(),
-    name: `${first.name} (${redwork ? "redwork" : "routed"})`,
-    paths: paths.map((pts) => ({ closed: false, nodes: pts.map((p) => ({ p })) })),
-    start: undefined,
-    end: undefined,
-  };
-  const ids = new Set(objs.map((o) => o.id));
-  const at = s.doc.objects.findIndex((o) => ids.has(o.id));
-  s.commit((d) => {
-    const rest = d.objects.filter((o) => !ids.has(o.id));
-    rest.splice(Math.min(at, rest.length), 0, routed);
-    return { ...d, objects: rest };
-  });
-  s.select([routed.id]);
-  const jumps = paths.length - 1;
+  // one route per thread and stitch settings
+  const sets = new Map<string, DesignObject[]>();
+  for (const o of objs) {
+    const k = `${o.thread} ${JSON.stringify(o.stitch)}`;
+    sets.set(k, [...(sets.get(k) ?? []), o]);
+  }
+  const routes: { first: string; members: string[]; obj: DesignObject; lines: number; parts: number }[] = [];
+  for (const set of sets.values()) {
+    const lines = set.flatMap((o) => o.paths.map((sp) => flattenSubPath(sp, 0.1)));
+    const paths = routeRunning(lines, { start: set[0].start ?? lines[0]?.[0], redwork });
+    if (!paths.length) continue;
+    const first = set[0];
+    routes.push({
+      first: first.id,
+      members: set.map((o) => o.id),
+      lines: lines.length,
+      parts: paths.length,
+      obj: {
+        ...first,
+        id: uid(),
+        name: `${first.name} (${redwork ? "redwork" : "routed"})`,
+        paths: paths.map((pts) => ({ closed: false, nodes: pts.map((p) => ({ p })) })),
+        start: undefined,
+        end: undefined,
+      },
+    });
+  }
+  if (!routes.length) return "Nothing to route";
+  // the lines of a style that routed to nothing stay as they were
+  const ids = new Set(routes.flatMap((r) => r.members));
+  const at = new Map(routes.map((r) => [r.first, r.obj]));
+  s.commit((d) =>
+    pruneGroups({
+      ...d,
+      objects: d.objects.flatMap((o) => (at.has(o.id) ? [at.get(o.id)!] : ids.has(o.id) ? [] : [o])),
+    }),
+  );
+  s.select(routes.map((r) => r.obj.id));
+  const lines = routes.reduce((n, r) => n + r.lines, 0);
+  const parts = routes.reduce((n, r) => n + r.parts, 0);
+  const apart = routes.length > 1 ? ` (${routes.length} routes: one per thread and stitch settings)` : "";
   if (redwork) {
-    s.toast(`Redwork: ${lines.length} line${lines.length > 1 ? "s" : ""} sewn out and back${paths.length > 1 ? ` in ${paths.length} separate parts` : " — one path, no jumps"}`);
+    s.toast(`Redwork: ${lines} line${lines > 1 ? "s" : ""} sewn out and back${parts > routes.length ? ` in ${parts} separate parts` : routes.length > 1 ? "" : " — one path, no jumps"}${apart}`);
     return null;
   }
-  s.toast(`Routed ${lines.length} line${lines.length > 1 ? "s" : ""} into ${paths.length} path${paths.length > 1 ? "s" : ""}${jumps ? ` (${jumps} jump${jumps > 1 ? "s" : ""} between separate parts)` : " — no jumps"}`);
+  const jumps = parts - routes.length;
+  s.toast(`Routed ${lines} line${lines > 1 ? "s" : ""} into ${parts} path${parts > 1 ? "s" : ""}${jumps ? ` (${jumps} jump${jumps > 1 ? "s" : ""} between separate parts)` : " — no jumps"}${apart}`);
   return null;
 }
 

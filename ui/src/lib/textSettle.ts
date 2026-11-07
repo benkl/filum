@@ -68,7 +68,173 @@ export function settleTexts<D extends { objects: DesignObject[] }>(doc: D, prev?
     else if (!sameTextSpec(f, t)) broken.add(t.group);
   }
   if (!broken.size) return doc;
-  return { ...doc, objects: doc.objects.map((o) => (o.text && broken.has(o.text.group) ? { ...o, text: undefined } : o)) };
+  // a lettering with a locked letter stays one: the change to its letters is
+  // taken back (its locked letters would lose their lettering otherwise)
+  const back = prev ? heldBack(doc.objects, prev.objects, broken) : null;
+  return {
+    ...doc,
+    objects: doc.objects.map((o) => {
+      if (!o.text || !broken.has(o.text.group)) return o;
+      return back?.get(o.id) ?? { ...o, text: undefined };
+    }),
+  };
+}
+
+/**
+ * The letters, as they were in `before`, of the broken letterings that have a
+ * locked letter — when every letter was there and the lettering was whole.
+ */
+function heldBack(objects: DesignObject[], before: DesignObject[], broken: Set<string>): Map<string, DesignObject> | null {
+  const locked = new Set(objects.filter((o) => o.locked && o.text && broken.has(o.text.group)).map((o) => o.text!.group));
+  if (!locked.size) return null;
+  const was = new Map(before.map((o) => [o.id, o]));
+  const out = new Map<string, DesignObject>();
+  for (const g of locked) {
+    const now = objects.filter((o) => o.text?.group === g);
+    const then = now.map((o) => was.get(o.id));
+    if (!then.every((o): o is DesignObject => !!o?.text && o.text.group === g)) continue;
+    if (!then.every((o) => sameTextSpec(o.text!, then[0].text!))) continue;
+    then.forEach((o) => out.set(o.id, o));
+  }
+  return out;
+}
+
+/**
+ * The objects a move, scale or turn may change: unlocked ones, but no letter
+ * of a lettering that has a locked letter (in `all`, the whole document) —
+ * moving part of it would break the lettering apart. `held` counts the
+ * letterings kept in place (to say so).
+ */
+export function transformable(objects: DesignObject[], all: DesignObject[]): { objects: DesignObject[]; held: number } {
+  const lockedGroups = new Set(all.filter((o) => o.locked && o.text).map((o) => o.text!.group));
+  const held = new Set<string>();
+  const out = objects.filter((o) => {
+    if (o.locked) return false;
+    if (o.text && lockedGroups.has(o.text.group)) {
+      held.add(o.text.group);
+      return false;
+    }
+    return true;
+  });
+  return { objects: out, held: held.size };
+}
+
+// ---------------------------------------------------------------------------
+// Lettering threads
+
+/** The spec field a letter's thread comes from: the main thread, the border's or a font colour (palette index). */
+export type ThreadSlot = "thread" | "borderThread" | number;
+
+/** Where a letter's thread comes from when its lettering is laid out (see textLayout.ts). */
+export function threadSlot(t: TextSpec): ThreadSlot {
+  if (t.role === "glyph") return t.colorIndex !== undefined && t.palette?.[t.colorIndex] !== undefined ? t.colorIndex : "thread";
+  if (t.role === "border" && t.style === "fillBorder") return "borderThread";
+  return "thread";
+}
+
+const slotThread = (t: TextSpec, slot: ThreadSlot) => (typeof slot === "number" ? t.palette?.[slot] : t[slot]);
+const slotKey = (o: DesignObject) => (o.text ? `${o.text.group}|${threadSlot(o.text)}` : "");
+
+/**
+ * Letterings take the threads their letters have into their spec, so laying
+ * them out again keeps the colours (letters given a thread from outside the
+ * lettering panel: a mixed selection, a thread list). Letters of one colour
+ * (slot) with different threads can't be kept by a spec: those letterings
+ * become plain shapes (`shapes` counts them). Only `groups` are looked at
+ * when given. Returns `objects` itself when nothing changes.
+ */
+export function syncTextThreads(objects: DesignObject[], groups?: ReadonlySet<string>): { objects: DesignObject[]; shapes: number } {
+  const slots = new Map<string, { spec: TextSpec; threads: Map<ThreadSlot, Set<string>> }>();
+  for (const o of objects) {
+    const t = o.text;
+    if (!t || (groups && !groups.has(t.group))) continue;
+    let g = slots.get(t.group);
+    if (!g) slots.set(t.group, (g = { spec: t, threads: new Map() }));
+    const slot = threadSlot(t);
+    const set = g.threads.get(slot) ?? new Set<string>();
+    set.add(o.thread);
+    g.threads.set(slot, set);
+  }
+  const patches = new Map<string, Partial<TextSpec>>();
+  const broken = new Set<string>();
+  for (const [group, { spec, threads }] of slots) {
+    const patch: Partial<TextSpec> = {};
+    for (const [slot, ids] of threads) {
+      if (ids.size > 1) {
+        broken.add(group);
+        break;
+      }
+      const id = [...ids][0];
+      if (slotThread(spec, slot) === id) continue;
+      if (typeof slot === "number") (patch.palette ??= [...(spec.palette ?? [])])[slot] = id;
+      else patch[slot] = id;
+    }
+    if (!broken.has(group) && Object.keys(patch).length) patches.set(group, patch);
+  }
+  if (!patches.size && !broken.size) return { objects, shapes: 0 };
+  return {
+    objects: objects.map((o) => {
+      if (!o.text) return o;
+      if (broken.has(o.text.group)) return { ...o, text: undefined };
+      const p = patches.get(o.text.group);
+      return p ? { ...o, text: { ...o.text, ...p } } : o;
+    }),
+    shapes: broken.size,
+  };
+}
+
+/**
+ * Objects `ids` get the thread `thread`. A letter's colour is its
+ * lettering's: every letter of that colour takes it (as the lettering panel
+ * does), and the lettering's spec keeps it for the next layout.
+ */
+export function setObjectsThread(objects: DesignObject[], ids: Iterable<string>, thread: string): DesignObject[] {
+  const pick = new Set(ids);
+  const slots = new Set<string>();
+  const groups = new Set<string>();
+  for (const o of objects)
+    if (o.text && pick.has(o.id)) {
+      slots.add(slotKey(o));
+      groups.add(o.text.group);
+    }
+  const next = objects.map((o) => ((pick.has(o.id) || (o.text && slots.has(slotKey(o)))) && o.thread !== thread ? { ...o, thread } : o));
+  return groups.size ? syncTextThreads(next, groups).objects : next;
+}
+
+// ---------------------------------------------------------------------------
+// Edits that take a while (a font loading)
+
+/** The parts of the editor state that tell how the document changed. */
+export interface HistoryState<D> {
+  doc: D;
+  past: D[];
+  future: D[];
+  filePath?: string | null;
+}
+
+/**
+ * Did the document go from `prev` to `next` by anything but an edit of it —
+ * undo, redo, another design opened (or the history cleared)? An edit made
+ * meanwhile can be redone on top of an edit; not on top of these.
+ */
+export function historyJump<D>(prev: HistoryState<D>, next: HistoryState<D>): boolean {
+  if ((next.filePath ?? null) !== (prev.filePath ?? null)) return true;
+  const p = prev.past;
+  const n = next.past;
+  if (next.doc === prev.doc) {
+    if (n.length >= p.length) return false;
+    // a checkpoint taken back (nothing changed after it) is no jump; the history cleared is
+    return !(n.length === p.length - 1 && p[p.length - 1] === next.doc);
+  }
+  // live edits: the history stays
+  if (n === p && next.future.length === prev.future.length && next.future.every((d, i) => d === prev.future[i])) return false;
+  // undo: back to the last step, the document goes to the future
+  if (next.future[0] === prev.doc && p[p.length - 1] === next.doc) return true;
+  // redo
+  if (prev.future.length && next.doc === prev.future[0]) return true;
+  // an edit: the document before it is the last step, nothing to redo
+  if (n[n.length - 1] === prev.doc && next.future.length === 0) return false;
+  return true;
 }
 
 // ---------------------------------------------------------------------------

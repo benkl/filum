@@ -81,12 +81,29 @@ class EngineClient {
     this.worker.terminate();
     const waiting = [...this.pending.values()];
     this.pending.clear();
-    this.spawn();
-    for (const p of waiting) p.reject(new Error("The stitch engine stopped and was restarted"));
+    // a design that crashes it every time, or a worker that can't load: not in a loop
+    const now = Date.now();
+    this.restarts = this.restarts.filter((t) => now - t < 30_000);
+    this.restarts.push(now);
+    const giveUp = this.restarts.length > 3;
+    if (!giveUp) this.spawn();
+    else this.broken = true;
+    const msg = giveUp ? "The stitch engine keeps stopping: undo the last change, or reload the app" : "The stitch engine stopped and was restarted";
+    for (const p of waiting) p.reject(new Error(msg));
+    // after a pause it may try again (the design may have changed)
+    if (giveUp)
+      setTimeout(() => {
+        this.broken = false;
+        this.restarts = [];
+        this.spawn();
+      }, 10_000);
   }
+  private restarts: number[] = [];
+  private broken = false;
 
   private call<T>(op: string, args: unknown[], transfer: Transferable[] = []): Promise<T> {
     const id = ++this.seq;
+    if (this.broken) return Promise.reject(new Error("The stitch engine keeps stopping: undo the last change, or reload the app"));
     return new Promise<T>((resolve, reject) => {
       this.pending.set(id, { resolve: resolve as (v: unknown) => void, reject });
       this.worker.postMessage({ id, op, args }, transfer);

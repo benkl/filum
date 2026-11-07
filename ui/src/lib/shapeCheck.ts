@@ -5,6 +5,8 @@
 import type { DesignObject, StitchDocument, SubPath, Vec2 } from "../types";
 import { flattenSubPath } from "./bezier";
 import { satinRailIndices } from "./geometry";
+import { repairLayers } from "./fillLayers";
+import { pruneGroups } from "./layerRows";
 
 const sub = (a: Vec2, b: Vec2): Vec2 => [a[0] - b[0], a[1] - b[1]];
 const crossZ = (a: Vec2, b: Vec2) => a[0] * b[1] - a[1] * b[0];
@@ -130,6 +132,7 @@ export function cleanupCandidates(doc: StitchDocument, opts: CleanupOptions = DE
 /** Remove the cleanup candidates in one undo step; returns how many went. */
 export function cleanupDocument(commit: (fn: (d: StitchDocument) => StitchDocument) => void, doc: StitchDocument, opts: CleanupOptions = DEFAULT_CLEANUP): number {
   const ids = new Set(cleanupCandidates(doc, opts).map((o) => o.id));
-  if (ids.size) commit((d) => ({ ...d, objects: d.objects.filter((o) => !ids.has(o.id)) }));
+  // a gradient or tartan that lost layers is renumbered, groups left lone dissolve
+  if (ids.size) commit((d) => pruneGroups(repairLayers({ ...d, objects: d.objects.filter((o) => !ids.has(o.id)) })));
   return ids.size;
 }

@@ -3,7 +3,7 @@
 // (or, if the design itself is what breaks it, a way to start afresh).
 
 import { Component, type ErrorInfo, type ReactNode } from "react";
-import { useStore } from "../store";
+import { discardAutosave, useStore } from "../store";
 
 export class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state: { error: Error | null } = { error: null };
@@ -25,8 +25,8 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
       retry();
     };
     const fresh = () => {
-      localStorage.removeItem("filum.autosave");
-      localStorage.removeItem("filum.autosave.dirty");
+      // the reload would write the broken design back: the autosave stays off until then
+      discardAutosave();
       location.reload();
     };
     return (

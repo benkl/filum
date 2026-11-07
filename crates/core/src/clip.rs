@@ -53,17 +53,56 @@ pub fn polygons(polys: &[Ring]) -> Region {
 
 /// A band of half-width `half` around a polyline (round caps and joins).
 pub fn band(pts: &[Point], half: f64) -> Region {
-    if pts.len() < 2 || half <= 0.0 {
+    if pts.len() < 2 || !half.is_finite() || half <= 0.0 {
         return vec![];
     }
-    c2::inflate_paths_d(&vec![path_of(pts)], half, JoinType::Round, EndType::Round, 2.0, PREC, ARC_TOL)
+    let path = path_of(pts);
+    let size = extent(&vec![path.clone()]);
+    if !size.is_finite() {
+        return vec![];
+    }
+    let half = half.min(MAX_GROW.max(size));
+    c2::inflate_paths_d(&vec![path], half, JoinType::Round, EndType::Round, 2.0, PREC, ARC_TOL)
+}
+
+/// Furthest a region grows in one offset (mm), unless the region is larger:
+/// round joins take points in proportion to √delta, so an absurd offset
+/// (1e300, ∞) would exhaust memory.
+const MAX_GROW: f64 = 1000.0;
+
+/// The extent of a region (its bounding box's larger side).
+fn extent(r: &Region) -> f64 {
+    let (mut x0, mut y0, mut x1, mut y1) = (f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY);
+    for p in r.iter().flatten() {
+        x0 = x0.min(p.x);
+        y0 = y0.min(p.y);
+        x1 = x1.max(p.x);
+        y1 = y1.max(p.y);
+    }
+    if x1 < x0 { 0.0 } else { (x1 - x0).max(y1 - y0) }
+}
+
+/// A usable offset distance for a region: `None` for a non-finite one,
+/// shrinking past the whole region stops at its size (empty either way),
+/// growing is capped at [`MAX_GROW`] or the region's own size.
+fn sane_delta(r: &Region, delta: f64) -> Option<f64> {
+    if !delta.is_finite() {
+        return None;
+    }
+    let size = extent(r);
+    if !size.is_finite() {
+        return None;
+    }
+    Some(delta.clamp(-(size + 1.0), MAX_GROW.max(size)))
 }
 
 /// Grow (positive) or shrink (negative) a region with round corners.
+/// A non-finite offset leaves the region as it is.
 pub fn offset(r: &Region, delta: f64) -> Region {
     if delta.abs() < 1e-9 || r.is_empty() {
         return r.clone();
     }
+    let Some(delta) = sane_delta(r, delta) else { return r.clone() };
     c2::inflate_paths_d(r, delta, JoinType::Round, EndType::Polygon, 2.0, PREC, ARC_TOL)
 }
 
@@ -81,6 +120,7 @@ pub fn offset_joined(r: &Region, delta: f64, join: Join, mitre_limit: f64) -> Re
     if delta.abs() < 1e-9 || r.is_empty() {
         return r.clone();
     }
+    let Some(delta) = sane_delta(r, delta) else { return r.clone() };
     let jt = match join {
         Join::Round => JoinType::Round,
         Join::Mitre => JoinType::Miter,
@@ -325,6 +365,23 @@ mod tests {
         let r = region(&[square(0.0, 0.0, 20.0), square(5.0, 5.0, 10.0)]);
         assert!((area(&r) - 300.0).abs() < 1e-3);
         assert_eq!(rings(&r).len(), 2);
+    }
+
+    #[test]
+    fn absurd_offsets_are_refused_or_clamped() {
+        let sq = region(&[square(0.0, 0.0, 10.0)]);
+        // non-finite: the region as it is
+        for d in [f64::INFINITY, f64::NEG_INFINITY, f64::NAN] {
+            assert_eq!(offset(&sq, d), sq);
+            assert_eq!(offset_joined(&sq, d, Join::Mitre, 4.0), sq);
+            assert!(band(&[pt(0.0, 0.0), pt(10.0, 0.0)], d).is_empty());
+        }
+        // huge: grows by at most MAX_GROW, shrinks to nothing
+        let big = offset(&sq, 1e300);
+        assert!(!big.is_empty() && area(&big) < (2.0 * MAX_GROW + 20.0).powi(2));
+        assert!(offset(&sq, -1e300).is_empty());
+        assert!(!offset_joined(&sq, 1e300, Join::Round, 4.0).is_empty());
+        assert!(!band(&[pt(0.0, 0.0), pt(10.0, 0.0)], 1e300).is_empty());
     }
 
     #[test]

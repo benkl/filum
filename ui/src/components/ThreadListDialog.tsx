@@ -8,6 +8,7 @@ import { engine } from "../engine/client";
 import { openFile } from "../lib/platform";
 import { chartLabel, loadChart, useCharts } from "../lib/threads";
 import { matchCatalog, needsChart, pendingThreadList, THREAD_LIST_EXT } from "../lib/threadList";
+import { syncTextThreads } from "../lib/textSettle";
 import { useStore } from "../store";
 import type { ThreadListEntry } from "../types";
 import { lastChart } from "./ThreadPicker";
@@ -72,8 +73,26 @@ export function ThreadListDialog({ onClose }: { onClose: () => void }) {
     const s = useStore.getState();
     try {
       const r = await engine.applyThreadList(s.doc, entries);
-      s.commit((d) => ({ ...d, threads: r.document.threads, objects: d.objects.map((o, i) => ({ ...o, thread: r.document.objects[i]?.thread ?? o.thread })), threadSources: r.document.threadSources }));
-      s.toast(`Applied ${r.report.applied} of ${r.report.blocks} colour block${r.report.blocks === 1 ? "" : "s"} from ${file.name}`, "success");
+      let shapes = 0;
+      s.commit((d) => {
+        const touched = new Set<string>();
+        const objects = d.objects.map((o, i) => {
+          const thread = r.document.objects[i]?.thread ?? o.thread;
+          if (thread === o.thread) return o;
+          if (o.text) touched.add(o.text.group);
+          return { ...o, thread };
+        });
+        // letterings keep their new colours when laid out again (a thread the
+        // engine split into two can't be one lettering colour: those become shapes)
+        const synced = syncTextThreads(objects, touched);
+        shapes = synced.shapes;
+        return { ...d, threads: r.document.threads, objects: synced.objects, threadSources: r.document.threadSources };
+      });
+      s.toast(
+        `Applied ${r.report.applied} of ${r.report.blocks} colour block${r.report.blocks === 1 ? "" : "s"} from ${file.name}` +
+          (shapes ? ` · ${shapes} lettering${shapes === 1 ? "" : "s"} got several colours for one font colour and became shapes` : ""),
+        "success",
+      );
       onClose();
     } catch (e) {
       s.toast(`Could not apply the thread list: ${(e as Error).message}`, "error");

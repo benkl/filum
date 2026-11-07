@@ -687,7 +687,7 @@ pub fn circular(rings: &[Ring], center_rel: [f64; 2], spacing: f64, stitch_len: 
 
 /// Unit row direction at a point (sign arbitrary): bilinear in doubled angles.
 fn field_dir(f: &crate::model::FlowField, p: Point) -> Option<Point> {
-    if f.cols == 0 || f.rows == 0 || f.angles.len() < (f.cols * f.rows) as usize || f.cell <= 0.0 {
+    if f.cols == 0 || f.rows == 0 || (f.angles.len() as u64) < f.cols as u64 * f.rows as u64 || f.cell.is_nan() || f.cell <= 0.0 || !p.x.is_finite() || !p.y.is_finite() {
         return None;
     }
     let gx = ((p.x - f.origin[0]) / f.cell - 0.5).clamp(0.0, (f.cols - 1) as f64);
@@ -705,7 +705,7 @@ fn field_dir(f: &crate::model::FlowField, p: Point) -> Option<Point> {
         return None;
     }
     let a = 0.5 * s.atan2(c);
-    Some(pt(a.cos(), a.sin()))
+    a.is_finite().then(|| pt(a.cos(), a.sin()))
 }
 
 /// Fast inside test: a raster of the shape (scanlines), exact only next to
@@ -844,7 +844,7 @@ pub fn flow(rings: &[Ring], field: &crate::model::FlowField, spacing: f64, stitc
 /// variable separation (density ramps) and per-layer pieces (gradients).
 #[allow(clippy::too_many_arguments)]
 pub fn flow_ex(rings: &[Ring], field: &crate::model::FlowField, spacing: f64, stitch_len: f64, travel_len: f64, start: Option<Point>, o: &FlowOpts, f: u8) -> Vec<Run> {
-    if rings.is_empty() {
+    if rings.is_empty() || !field.is_usable() {
         return vec![];
     }
     let base = spacing.max(0.2);
@@ -885,7 +885,11 @@ pub fn flow_ex(rings: &[Ring], field: &crate::model::FlowField, spacing: f64, st
         for sign in [1.0, -1.0] {
             let mut pts = Vec::new();
             let mut p = seed;
-            let Some(d0) = field_dir(field, p) else { return vec![] };
+            let Some(d0) = field_dir(field, p) else {
+                // no direction here: the seed is spent (the caller marks it)
+                *budget = budget.saturating_sub(1);
+                return vec![];
+            };
             let mut prev = d0 * sign;
             let mut len = 0.0;
             while len < max_len && *budget > 0 {
@@ -964,6 +968,8 @@ pub fn flow_ex(rings: &[Ring], field: &crate::model::FlowField, spacing: f64, st
     };
     let accept = |line: Vec<Point>, seed: Point, grid: &mut SpatialHash, queue: &mut std::collections::VecDeque<Point>, lines: &mut Vec<Vec<Point>>, ranks: &mut Vec<i64>, owner: &mut Owners| {
         if line.is_empty() {
+            // nothing traced from here: mark the seed so the scan moves on
+            grid.add(seed);
             return;
         }
         if polyline_length(&line) < sep(line[0]) * 1.5 {
@@ -1464,6 +1470,19 @@ mod tests {
         let len: f64 = runs.iter().map(|r| r.windows(2).filter(|w| w[1].1 == 0).map(|w| w[0].0.dist(w[1].0)).sum::<f64>()).sum();
         // evenly spaced rows: thread length close to area / spacing
         assert!(len > 400.0 / 0.5 * 0.6 && len < 400.0 / 0.5 * 1.4, "{len}");
+    }
+
+    #[test]
+    fn flow_field_with_dead_spots_terminates() {
+        // the doubled angles cancel in the middle: no direction there, the
+        // seeds there are used up instead of found again and again
+        let rings = vec![square(20.0)];
+        let field = crate::model::FlowField { origin: [0.0, 0.0], cell: 10.0, cols: 2, rows: 2, angles: vec![0.0, std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2, 0.0] };
+        let t = std::time::Instant::now();
+        let _ = flow(&rings, &field, 0.5, 2.5, 2.5, None, 0);
+        assert!(t.elapsed().as_secs_f64() < 20.0);
+        // an empty field: nothing, at once
+        assert!(flow(&rings, &crate::model::FlowField::default(), 0.5, 2.5, 2.5, None, 0).is_empty());
     }
 
     #[test]
