@@ -322,6 +322,10 @@ function paintStitches(
     // realistic: soft shadow, dark rim, body, specular highlight
     // the thread's own weight, else the design's
     const THREAD_W = weight ? threadWidth(weight as ThreadWeight) : r.doc ? threadWidth(r.doc.options?.threadWeight) : THREAD_W0;
+    // the thread ends at the needle hole: no rounded end or corner reaching past it
+    // (a satin's turns are its edges — round ones made narrow columns a thread wider)
+    ctx.lineCap = "butt";
+    ctx.lineJoin = "bevel";
     ctx.save();
     ctx.translate(0.05, 0.07);
     ctx.strokeStyle = "rgba(0,0,0,0.28)";

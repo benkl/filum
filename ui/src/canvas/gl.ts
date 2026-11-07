@@ -135,12 +135,14 @@ void main() {
   float dist = length(vec2(dx, v_local.y));
   float hw = v_hw;
   if (kind == 6.0) {
-    // shaded thread: it dips into the needle hole at both ends
+    // shaded thread: it ends in the needle hole at both ends, narrowing as it
+    // dips in, so a column is as wide on screen as between its needle points
+    // (no rounded end past the hole: that made narrow satins look a thread wider)
     float e = min(v_local.x, v_len - v_local.x);
     float te = max(min(0.6 * v_tw * u_view.x, v_len * 0.4), 1.0);
     float dip = smoothstep(0.0, te, e);
     hw *= mix(0.45, 1.0, dip);
-    float cov = clamp(hw - dist + 0.5, 0.0, 1.0);
+    float cov = clamp(hw - abs(v_local.y) + 0.5, 0.0, 1.0) * clamp(e + 0.5, 0.0, 1.0);
     if (cov <= 0.0) discard;
     vec3 base = v_color.rgb / max(v_color.a, 1e-4);
     vec3 lin = base * base; // ~sRGB → linear
@@ -168,9 +170,10 @@ void main() {
   }
   float cov;
   if (kind == 7.0) {
-    // soft contact shadow
+    // soft contact shadow, fading out at the needle holes (not past them)
     float soft = max(hw, 1.0);
-    cov = 1.0 - smoothstep(soft * 0.3, soft + 0.5, dist);
+    float e = min(v_local.x, v_len - v_local.x);
+    cov = (1.0 - smoothstep(soft * 0.3, soft + 0.5, abs(v_local.y))) * clamp(0.5 + e / soft, 0.0, 1.0);
   } else {
     cov = clamp(hw - dist + 0.5, 0.0, 1.0);
   }
