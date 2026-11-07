@@ -792,6 +792,8 @@ mod tests {
             patterns: vec![],
             start: None,
             end: None,
+            lock: None,
+            color_sort_index: None,
         }
     }
     fn square(x: f64, y: f64, s: f64) -> Vec<SubPath> {
@@ -1142,6 +1144,8 @@ mod trim_tests {
             patterns: vec![],
             start: None,
             end: None,
+            lock: None,
+            color_sort_index: None,
         }
     }
     fn thread(id: &str, color: &str) -> Thread {

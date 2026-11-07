@@ -280,6 +280,8 @@ mod tests {
             patterns: vec![],
             start,
             end,
+            lock: None,
+            color_sort_index: None,
         }
     }
 
@@ -342,6 +344,8 @@ mod pattern_tests {
             hidden: None,
             start: None,
             end: None,
+            lock: None,
+            color_sort_index: None,
         }
     }
     fn pts(o: &Object) -> Vec<Point> {

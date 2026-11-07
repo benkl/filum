@@ -134,6 +134,8 @@ pub fn plan_to_document(plan: &StitchPlan, name: &str) -> Document {
             patterns: vec![],
             start: None,
             end: None,
+            lock: None,
+            color_sort_index: None,
         });
     };
     for s in &plan.stitches {
@@ -352,6 +354,8 @@ mod origin_tests {
             hidden: None,
             start: None,
             end: None,
+            lock: None,
+            color_sort_index: None,
         }];
         let mut e = Engine::new();
         let one = export_plan(&doc, &mut e, &ExportOptions::default());

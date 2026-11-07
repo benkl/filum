@@ -516,6 +516,8 @@ mod tests {
             hidden: None,
             start: None,
             end: None,
+            lock: None,
+            color_sort_index: None,
         }
     }
     fn doc(objects: Vec<Object>) -> Document {

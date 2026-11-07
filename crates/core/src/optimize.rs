@@ -160,6 +160,8 @@ mod tests {
             patterns: vec![],
             start: None,
             end: None,
+            lock: None,
+            color_sort_index: None,
         }
     }
 

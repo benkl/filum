@@ -917,6 +917,7 @@ fn ink_satin(ink: &Ink) -> SatinParams {
         guides: Vec::new(),
         swap_rails: ink.b("swap_satin_rails", false),
         reverse: false,
+        second_rail: None,
         multi: false,
     }
 }
@@ -1085,6 +1086,8 @@ impl<'a> Ctx<'a> {
             patterns: vec![],
             start: None,
             end: None,
+            lock: None,
+            color_sort_index: None,
         };
         self.doc.objects.push(obj);
     }

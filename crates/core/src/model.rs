@@ -462,6 +462,9 @@ pub struct SatinParams {
     /// Every sub-path is its own centre-line column (e.g. satin borders around letters).
     pub multi: bool,
     pub reverse: bool,
+    /// The second rail's own values where Ink/Stitch gives two ("0.2 0.5").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub second_rail: Option<SecondRail>,
 }
 
 impl Default for SatinParams {
@@ -502,6 +505,7 @@ impl Default for SatinParams {
             split_min_length: 0.0,
             multi: false,
             reverse: false,
+            second_rail: None,
         }
     }
 }
@@ -1304,6 +1308,57 @@ pub struct Object {
     /// Where stitching should end (Ink/Stitch "ending point" / "fill end" command).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub end: Option<[f64; 2]>,
+    /// This object's own lock stitches (Ink/Stitch per-element `lock_start`,
+    /// `lock_end`, `lock_*_scale_*`); what's left out comes from the machine.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lock: Option<LockOverride>,
+    /// Ink/Stitch `color_sort_index` (lettering fonts): the place of this
+    /// object's colour when a lettering is sewn colour by colour.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color_sort_index: Option<u32>,
+}
+
+/// An object's own lock stitches; `None` fields: the machine's.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct LockOverride {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start: Option<LockStyle>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end: Option<LockStyle>,
+    /// Size of the shape locks (%), Ink/Stitch `lock_start_scale_percent` / `lock_end_scale_percent`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_scale: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_scale: Option<f64>,
+    /// Length of the back-and-forth lock (mm), Ink/Stitch `lock_start_scale_mm` / `lock_end_scale_mm`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_length: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_length: Option<f64>,
+}
+
+/// A satin's settings for its second rail where Ink/Stitch gives two values
+/// ("0.2 0.5": first rail, second rail); `None`: the same as the first.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct SecondRail {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pull_comp: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pull_comp_pct: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contour_inset: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contour_inset_pct: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zigzag_underlay_inset: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zigzag_inset_pct: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub random_wider: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub random_narrower: Option<f64>,
 }
 
 /// A user-drawn stitch pattern (Ink/Stitch "selection to pattern"):

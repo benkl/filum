@@ -139,6 +139,17 @@ export interface SatinParams {
   reverse: boolean;
   /** Every sub-path is its own centre-line column (letter borders). */
   multi?: boolean;
+  /** The second rail's own values where Ink/Stitch gives two ("0.2 0.5"). */
+  secondRail?: {
+    pullComp?: number;
+    pullCompPct?: number;
+    contourInset?: number;
+    contourInsetPct?: number;
+    zigzagUnderlayInset?: number;
+    zigzagInsetPct?: number;
+    randomWider?: number;
+    randomNarrower?: number;
+  };
 }
 
 export type FillMethod = "tatami" | "contour" | "spiral" | "radial" | "hilbert" | "stipple" | "meander" | "guided" | "circular" | "flow" | "curved" | "cross" | "tartan";
@@ -396,6 +407,10 @@ export interface DesignObject {
   start?: Vec2;
   /** Where stitching ends (Ink/Stitch ending point / fill end command), mm. */
   end?: Vec2;
+  /** This object's own lock stitches (Ink/Stitch per-element lock settings); left out: the machine's. */
+  lock?: { start?: LockStyle; end?: LockStyle; startScale?: number; endScale?: number; startLength?: number; endLength?: number };
+  /** Ink/Stitch `color_sort_index` (lettering fonts): this colour's place when sewn colour by colour. */
+  colorSortIndex?: number;
   /** Parametric lettering this object belongs to (regenerated when edited). */
   text?: import("./lib/text").TextSpec;
   /** Objects with the same group are selected and transformed together. */

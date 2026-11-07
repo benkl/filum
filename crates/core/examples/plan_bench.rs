@@ -249,6 +249,8 @@ fn object(id: String, thread: usize, paths: Vec<SubPath>, stitch: StitchParams) 
         patterns: vec![],
         start: None,
         end: None,
+        lock: None,
+        color_sort_index: None,
     }
 }
 

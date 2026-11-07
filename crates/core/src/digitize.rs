@@ -1201,6 +1201,8 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
             patterns: vec![],
                 start: None,
                 end: None,
+                lock: None,
+                color_sort_index: None,
             });
         };
         if let StitchParams::Fill(fp) = &r.stitch {
@@ -1313,6 +1315,8 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
             patterns: vec![],
                     start: None,
                     end: None,
+                    lock: None,
+                    color_sort_index: None,
                 });
             }
             let batch = if opts.route_lines { crate::outline_route::route_lines(batch, from) } else { batch };
@@ -1349,6 +1353,8 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
             patterns: vec![],
             start: None,
             end: None,
+            lock: None,
+            color_sort_index: None,
         });
     };
 
@@ -2014,6 +2020,8 @@ fn photo_zigzag(prep: &Prepared, opts: &DigitizeOptions) -> DigitizeResult {
             patterns: vec![],
             start: None,
             end: None,
+            lock: None,
+            color_sort_index: None,
         });
     }
     DigitizeResult { threads, objects, colors: prep.info.clone(), width_mm: wm, height_mm: hm }
