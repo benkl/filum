@@ -60,7 +60,7 @@ check(defaultFill().pullComp === 0.45 && defaultFill().expand === -0.2 && defaul
 const sw2 = swatchDocument("cotton", machine);
 check(sw2.objects.every((o) => (o.stitch.type === "satin" ? o.stitch.pullComp === 0 : o.stitch.type === "fill" ? o.stitch.pullComp === 0 && o.stitch.expand === 0 : true)), "the swatch itself ignores any calibration");
 setFabricDefaults(() => ({}));
-check(defaultSatin().pullComp === 0.2, "without a calibration: the standard numbers");
+check(defaultSatin().pullComp === 0, "without a calibration: Ink/Stitch's numbers");
 
 if (failed) throw new Error(`${failed} calibration check(s) failed`);
 console.log("all passed");

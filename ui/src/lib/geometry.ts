@@ -11,10 +11,12 @@ import type {
   Vec2,
   FlowField,
 } from "../types";
+import { INK_FILL_METHODS, INK_RUNNING, INK_SATIN, INK_TATAMI } from "./inkDefaults";
 
 export const uid = (p = "o") => `${p}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
-export const defaultRunning = (): RunningParams => ({ length: 2.5, tolerance: 0.2, repeats: 1, beanRepeats: 0 });
+// new objects start from Ink/Stitch's defaults (lib/inkDefaults.ts)
+export const defaultRunning = (): RunningParams => ({ ...INK_RUNNING });
 
 /** Per-fabric starting numbers for new objects (fabric calibration); set once by the app. */
 let fabricDefaults: () => { satin?: Partial<SatinParams>; fill?: Partial<FillParams> } = () => ({});
@@ -25,41 +27,19 @@ export const setFabricDefaults = (f: typeof fabricDefaults) => {
 export const defaultSatin = (): SatinParams => ({ ...baseSatin(), ...fabricDefaults().satin });
 const baseSatin = (): SatinParams => ({
   method: "satin",
-  spacing: 0.4,
+  // a satin drawn as one line (Filum's; Ink/Stitch's satins have two rails)
   width: 3,
-  pullComp: 0.2,
-  pullCompPct: 0,
-  maxStitchLength: 0,
-  shortStitchInset: 0.15,
-  centerWalk: true,
-  contourUnderlay: false,
-  contourInset: 0.4,
-  zigzagUnderlay: false,
-  zigzagUnderlaySpacing: 3,
-  zigzagUnderlayInset: 0.6,
-  underlayAuto: true,
   swapRails: false,
   reverse: false,
+  ...INK_SATIN,
 });
 
 export const defaultFill = (): FillParams => ({ ...baseFill(), ...fabricDefaults().fill });
 const baseFill = (): FillParams => ({
   method: "tatami",
   angle: 0,
-  // commercial practice for 40 wt thread (Ink/Stitch: 0.25 mm, its own default set)
-  rowSpacing: 0.4,
-  endRowSpacing: 0,
-  maxStitchLength: 3,
-  staggers: 4,
-  pullComp: 0,
-  underlay: true,
-  underlayAngle: 90,
-  underlaySpacing: 0.75,
-  underlayInset: 0.3,
-  underlayStitchLength: 3,
-  underlayAuto: true,
-  travelLength: 2.5,
   center: [0.5, 0.5],
+  ...INK_TATAMI,
 });
 
 export const defaultApplique = (): AppliqueParams => ({
@@ -118,28 +98,30 @@ export function defaultStitch(type: StitchParams["type"], prev?: StitchParams): 
   }
 }
 
-/** Sensible spacing default when switching fill methods. */
+/**
+ * The values a fill method starts with when chosen: Ink/Stitch's for the
+ * methods it has, Filum's own for the others.
+ */
 export function fillMethodDefaults(method: FillParams["method"]): Partial<FillParams> {
   switch (method) {
+    case "tatami":
+      return { method, rowSpacing: INK_TATAMI.rowSpacing, maxStitchLength: INK_TATAMI.maxStitchLength };
     case "meander":
-      return { method, maxStitchLength: 2.5, underlay: false, meanderScale: 2.5, smoothness: 0.5 };
+      return { method, ...INK_FILL_METHODS.meander };
     case "guided":
-      return { method, rowSpacing: 0.4, maxStitchLength: 3 };
+    case "contour":
+    case "spiral":
+      return { method, ...INK_FILL_METHODS[method] };
     case "circular":
-      return { method, rowSpacing: 0.4, maxStitchLength: 2.5, center: [0.5, 0.5] };
+      return { method, ...INK_FILL_METHODS.circular, center: [0.5, 0.5] };
+    case "cross":
+      return { method, ...INK_FILL_METHODS.cross, crossKind: "cross" };
     case "flow":
       return { method, rowSpacing: 0.4, maxStitchLength: 2.5 };
     case "curved":
       return { method, rowSpacing: 0.4, maxStitchLength: 2.5, curve: 1 };
-    case "cross":
-      return { method, crossSize: 2.5, crossCoverage: 0.5, crossKind: "cross", underlay: false };
     case "tartan":
       return { method, rowSpacing: 0.35, maxStitchLength: 3 };
-    case "tatami":
-      return { method, rowSpacing: 0.4, maxStitchLength: 3 };
-    case "contour":
-    case "spiral":
-      return { method, rowSpacing: 0.4, maxStitchLength: 2.5 };
     case "radial":
       return { method, rowSpacing: 0.3, maxStitchLength: 4, underlay: true };
     case "hilbert":

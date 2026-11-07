@@ -3,9 +3,10 @@
 
 import { defaultFill, defaultRunning, defaultSatin } from "./geometry";
 import { HOOPS, hoopIndex, hoopOf } from "./hoops";
-import { areaFits, currentPreset, cutterFor, exportChecks, INKSTITCH_DEFAULTS, jefHoop, MACHINES, machineById, pickFrame, presetById, profileValues, FILUM_DEFAULTS } from "./machines";
+import { areaFits, currentPreset, cutterFor, exportChecks, INKSTITCH_DEFAULTS, jefHoop, MACHINES, machineById, pickFrame, presetById, profileValues } from "./machines";
 import { FABRICS, inHoop, threadWeightInfo } from "./materials";
-import { defaultValues, matchesSet, setChanges } from "./stitchDefaults";
+import { holdsInkDefaults, inkChanges, inkDefaults } from "./stitchDefaults";
+import { fillMethodDefaults } from "./geometry";
 import type { PlanStats, StitchParams } from "../types";
 
 let failed = 0;
@@ -27,7 +28,6 @@ check(inHoop({ name: "", width: 100, height: 100, shape: "oval" }, 50, 2) && !in
 // machine profiles and settings presets
 check(unique(MACHINES.map((m) => m.id)), "machine ids are unique");
 check(MACHINES.every((m) => m.id === "doc" || m.formats.length > 0), "every machine reads a format");
-check(currentPreset({ ...FILUM_DEFAULTS }).preset?.id === "filum", "new designs hold the Filum default");
 check(currentPreset({ ...INKSTITCH_DEFAULTS }).preset?.id === "inkstitch", "Ink/Stitch values are recognised");
 const pr10 = presetById("brother-pr10")!;
 check(pr10.values.spm === 1000 && pr10.values.colorChangeSeconds === 4, "multi-needle: rated speed, automatic colour change");
@@ -67,15 +67,19 @@ check(FABRICS.every((f) => f.backing && f.topping && f.needle), "every fabric ha
 check(FABRICS.filter((f) => f.confidence !== "agreed").every((f) => !!f.note), "disputed advice says why");
 check(threadWeightInfo(undefined).weight === 40 && threadWeightInfo(60).minText === 3, "thread weights: No. 40 default, No. 60 letters from 3 mm");
 
-// stitch default sets
+// new objects start from Ink/Stitch's defaults
 const satin = { type: "satin", ...defaultSatin() } as StitchParams;
-check(matchesSet("filum", satin) && !matchesSet("inkstitch", satin), "satin: Filum default is not Ink/Stitch's");
-check(setChanges("inkstitch", satin).includes("centre-walk underlay off"), "Ink/Stitch satin has no centre-walk underlay");
+check(holdsInkDefaults(satin), "a new satin holds Ink/Stitch's defaults");
 const fill = { type: "fill", ...defaultFill() } as StitchParams;
-check(defaultValues("inkstitch", fill)?.maxStitchLength === 4, "Ink/Stitch tatami: 4 mm stitches");
-check(defaultValues("inkstitch", { ...fill, method: "radial" } as StitchParams) === null, "no Ink/Stitch set for fills it lacks");
+check(holdsInkDefaults(fill) && (fill as { rowSpacing: number }).rowSpacing === 0.25, "a new fill holds Ink/Stitch's defaults (0.25 mm rows)");
+check(inkDefaults(fill)?.maxStitchLength === 4, "Ink/Stitch tatami: 4 mm stitches");
+for (const m of ["contour", "spiral", "guided", "circular", "meander", "cross"] as const)
+  check(holdsInkDefaults({ ...fill, ...fillMethodDefaults(m) } as StitchParams), `switching to ${m}: Ink/Stitch's values for it`);
+check(inkDefaults({ ...fill, method: "radial" } as StitchParams) === null, "no Ink/Stitch defaults for fills it lacks");
 const run = { type: "running", ...defaultRunning() } as StitchParams;
-check(matchesSet("filum", run) && matchesSet("inkstitch", run), "running stitch: both sets agree");
+check(holdsInkDefaults(run), "a new line holds Ink/Stitch's defaults");
+const edited = { ...satin, centerWalk: true, pullComp: 0.2 } as StitchParams;
+check(!holdsInkDefaults(edited) && inkChanges(edited).includes("centre-walk underlay off"), "an edited satin lists what the defaults would change");
 
 console.log(failed ? `${failed} FAILED` : "all passed");
 if (failed) throw new Error(`${failed} preset checks failed`);

@@ -202,7 +202,7 @@ export function computeIssues(doc: StitchDocument, plan: PlanData | null): Issue
           title: "Very dense fill",
           detail: `Row spacing ${st.rowSpacing} mm can make the fabric stiff and break needles.`,
           at: c,
-          fix: { label: "Set 0.4 mm", apply: (x) => (x.stitch.type === "fill" ? { ...x, stitch: { ...x.stitch, rowSpacing: 0.4 } } : x) },
+          fix: { label: "Set 0.25 mm (Ink/Stitch)", apply: (x) => (x.stitch.type === "fill" ? { ...x, stitch: { ...x.stitch, rowSpacing: 0.25 } } : x) },
         });
       }
     }

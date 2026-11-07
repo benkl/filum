@@ -12,6 +12,7 @@ import { settleTexts } from "./lib/textSettle";
 import { repairLayers } from "./lib/fillLayers";
 import { safeSetItem } from "./lib/storage";
 import { checkDoc } from "./lib/docCheck";
+import { INKSTITCH_DEFAULTS } from "./lib/machines";
 import type {
   DensityField,
   DesignObject,
@@ -258,15 +259,8 @@ export const emptyDoc = (): StitchDocument => ({
   objects: [],
   hoop: { name: "100 × 100 mm", width: 100, height: 100 },
   fabric: "cotton",
-  machine: {
-    trimDistance: 3,
-    ties: true,
-    minStitch: 0.3,
-    maxStitch: 12.1,
-    spm: 800,
-    trimSeconds: 6,
-    colorChangeSeconds: 12,
-  },
+  // Ink/Stitch's machine defaults
+  machine: { ...INKSTITCH_DEFAULTS },
 });
 
 /** The thread new objects get: the one last picked, if the design still has it. */

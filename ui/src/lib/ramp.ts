@@ -6,6 +6,7 @@ import { activeThreadOf, useStore } from "../store";
 import type { DensityRamp, DesignObject, FillParams, RampProfile, StitchDocument, Vec2 } from "../types";
 import { rampMembers, rampOf, removeRampDoc } from "./fillLayers";
 import { uid } from "./geometry";
+import { INK_TATAMI } from "./inkDefaults";
 
 export const RAMP_PROFILES: { id: RampProfile; label: string; hint: string }[] = [
   { id: "linear", label: "Linear", hint: "Even change from dense to open" },
@@ -141,7 +142,7 @@ function secondThread(first: string): string {
 }
 
 function defaultFill(): Partial<FillParams> {
-  return { type: "fill", method: "tatami", angle: 0, rowSpacing: 0.4, maxStitchLength: 3 } as Partial<FillParams>;
+  return { type: "fill", method: "tatami", angle: 0, rowSpacing: INK_TATAMI.rowSpacing, maxStitchLength: INK_TATAMI.maxStitchLength } as Partial<FillParams>;
 }
 
 /** Change the ramp of an object and its blend partner (the partner keeps its direction). */

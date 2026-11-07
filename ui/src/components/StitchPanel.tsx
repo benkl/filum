@@ -3,7 +3,7 @@
 
 import { Check } from "lucide-react";
 import { useEffect, useRef } from "react";
-import { DEFAULT_SETS, defaultValues, matchesSet, setChanges } from "../lib/stitchDefaults";
+import { holdsInkDefaults, inkChanges, inkDefaults } from "../lib/stitchDefaults";
 import { defaultApplique, defaultFill, defaultGuide, defaultRunning, defaultSatin, fillMethodDefaults, objectBounds } from "../lib/geometry";
 import { defaultVector, makeGradient } from "../lib/gradient";
 import { applyRamp } from "../lib/ramp";
@@ -541,29 +541,27 @@ export function Presets<T>({ items, value, onPick, eq }: { items: [string, T, st
   );
 }
 
-/** Filum / Ink/Stitch defaults for the object's stitch type, with which one it holds. */
+/** Ink/Stitch's defaults for the object's stitch type: whether it holds them, and a button to put them back. */
 export function StitchDefaults({ o }: { o: DesignObject }) {
-  const sets = DEFAULT_SETS.map((s) => ({ ...s, values: defaultValues(s.id, o.stitch) })).filter((s) => s.values);
-  if (!sets.length) return null;
+  const values = inkDefaults(o.stitch);
   const targets = useEditTargets(o);
-  const apply = (values: Record<string, unknown>) => useStore.getState().updateStitch(targets, values);
-  const anyOn = sets.some((s) => matchesSet(s.id, o.stitch));
+  if (!values) return null;
+  const on = holdsInkDefaults(o.stitch);
+  const changes = inkChanges(o.stitch);
   return (
     <div className="st-defaults">
       <span className="st-defaults-label">Defaults</span>
       <div className="seg">
-        {sets.map((s) => {
-          const on = matchesSet(s.id, o.stitch);
-          const changes = setChanges(s.id, o.stitch);
-          return (
-            <button key={s.id} className={on ? "on" : ""} title={on ? `Holds ${s.hint}` : `${s.hint}: ${changes.join(", ")}`} onClick={() => apply(s.values!)}>
-              {on && <Check size={11} />}
-              {s.label}
-            </button>
-          );
-        })}
+        <button
+          className={on ? "on" : ""}
+          title={on ? "Holds Ink/Stitch's defaults" : `Back to Ink/Stitch's defaults: ${changes.join(", ")}`}
+          onClick={() => useStore.getState().updateStitch(targets, values)}
+        >
+          {on && <Check size={11} />}
+          Ink/Stitch
+        </button>
       </div>
-      {!anyOn && <span className="stat">custom</span>}
+      {!on && <span className="stat">custom</span>}
     </div>
   );
 }

@@ -5,7 +5,7 @@
 //
 // The profiles double as settings presets for the design (Design ▸
 // Machine): speed and the trim / colour-change times for the estimates, next
-// to two general presets — Filum's own defaults and Ink/Stitch's.
+// to Ink/Stitch's defaults (what a new design starts with).
 
 import type { MachineSettings, PlanStats } from "../types";
 import { cutterOf, DEFAULT_CUT_OVER, type Cutter } from "./cuts";
@@ -583,19 +583,8 @@ export interface SettingsPreset {
   values: MachineValues;
 }
 
-/** Filum's own defaults (a new design starts with these). */
-export const FILUM_DEFAULTS: MachineValues = {
-  trimDistance: 3,
-  ties: true,
-  minStitch: 0.3,
-  maxStitch: 12.1,
-  spm: 800,
-  trimSeconds: 6,
-  colorChangeSeconds: 12,
-};
-
 /**
- * Ink/Stitch: minimum jump stitch length 3 mm and minimum stitch length
+ * Ink/Stitch's defaults, what a new design starts with: minimum jump stitch length 3 mm and minimum stitch length
  * 0.1 mm (lib/utils/settings.py), lock stitches on, 12.1 mm the longest DST
  * stitch pystitch writes, and the print preview's estimate defaults
  * (700 spm, 10 s per trim and colour change).
@@ -637,17 +626,10 @@ export function profileValues(m: MachineProfile): MachineValues {
 
 export const SETTINGS_PRESETS: SettingsPreset[] = [
   {
-    id: "filum",
-    name: "Filum default",
-    group: "General",
-    hint: "Balanced settings for any machine — what a new design starts with.",
-    values: FILUM_DEFAULTS,
-  },
-  {
     id: "inkstitch",
     name: "Ink/Stitch",
     group: "General",
-    hint: "Ink/Stitch's defaults: 0.1 mm shortest stitch, 3 mm jumps, 700 spm and 10 s per trim / colour change.",
+    hint: "Ink/Stitch's defaults, what a new design starts with: 0.1 mm shortest stitch, 3 mm jumps, 700 spm and 10 s per trim / colour change.",
     values: INKSTITCH_DEFAULTS,
   },
   ...MACHINES.filter((m) => m.id !== "doc").map((m) => ({
@@ -661,7 +643,7 @@ export const SETTINGS_PRESETS: SettingsPreset[] = [
 
 export const presetById = (id?: string) => SETTINGS_PRESETS.find((p) => p.id === id);
 
-const KEYS = Object.keys(FILUM_DEFAULTS) as (keyof MachineValues)[];
+const KEYS = Object.keys(INKSTITCH_DEFAULTS) as (keyof MachineValues)[];
 const sameCutter = (a: MachineValues, b: MachineValues) => {
   const [x, y] = [cutterOf(a), cutterOf(b)];
   return x.kind === y.kind && (x.kind !== "jumps" || x.over === y.over);
