@@ -27,8 +27,9 @@ import {
 import { defaultStitch, uid } from "./geometry";
 import { withParent } from "./groups";
 import { pruneGroups } from "./layerRows";
+import { connectLines, DEFAULT_CONNECT, type ConnectOptions } from "./connectLines";
 
-export type ConvertId = "fillToSatin" | "fillToStroke" | "satinToStroke" | "satinToRails" | "zigzagToSatin" | "patternSatin" | "breakApart" | "dedupe";
+export type ConvertId = "fillToSatin" | "fillToStroke" | "satinToStroke" | "satinToRails" | "zigzagToSatin" | "patternSatin" | "breakApart" | "dedupe" | "connectLines";
 
 /** What a conversion does to the document. */
 export interface ConvertPlan {
@@ -70,6 +71,7 @@ export interface ConvertOptions {
   patternSatin: PatternOptions;
   breakApart: { method: "simple" | "complex"; minArea: number };
   dedupe: DedupeOptions;
+  connectLines: ConnectOptions;
 }
 
 export const DEFAULT_CONVERT: ConvertOptions = {
@@ -82,6 +84,7 @@ export const DEFAULT_CONVERT: ConvertOptions = {
   // Ink/Stitch: 20 px² ≈ 1.4 mm²
   breakApart: { method: "simple", minArea: 1.4 },
   dedupe: DEFAULT_DEDUPE,
+  connectLines: DEFAULT_CONNECT,
 };
 
 export const UNDERLAYS: [UnderlayPreset, string, Partial<SatinParams>, string][] = [
@@ -121,6 +124,8 @@ export function applies(id: ConvertId, sel: DesignObject[]): boolean {
       return sel.some((o) => isLineObj(o) || isCentreSatin(o));
     case "dedupe":
       return sel.some((o) => !o.text && o.paths.length > 0);
+    case "connectLines":
+      return sel.filter(isLineObj).reduce((n, o) => n + openLines(o).length, 0) >= 2;
   }
 }
 
@@ -432,6 +437,43 @@ export async function planDedupe(sel: DesignObject[], o: DedupeOptions): Promise
   return { replace, select: objs.map((x) => x.id), summary: `${plural(removed, "duplicated point")} removed` };
 }
 
+/**
+ * Connect lines: the selected line pieces of one thread and stitch become as
+ * few continuous lines as possible, in the first of them (see lib/connectLines.ts).
+ */
+export function planConnectLines(sel: DesignObject[], o: ConnectOptions): ConvertPlan | string {
+  const lines = sel.filter((x) => isLineObj(x) && !x.clone && !x.locked);
+  if (lines.reduce((n, x) => n + openLines(x).length, 0) < 2) return "Select two or more line pieces";
+  // lines of one thread and one stitch are connected together
+  const groups = new Map<string, DesignObject[]>();
+  for (const x of lines) {
+    const k = `${x.thread}|${JSON.stringify(x.stitch)}`;
+    groups.set(k, [...(groups.get(k) ?? []), x]);
+  }
+  const replace: Record<string, DesignObject[]> = {};
+  const select: string[] = [];
+  let pieces = 0;
+  let made = 0;
+  let bridged = 0;
+  let doubled = 0;
+  for (const objs of groups.values()) {
+    const r = connectLines(objs.flatMap((x) => x.paths), o);
+    pieces += r.pieces;
+    made += r.lines;
+    bridged += r.bridged;
+    doubled += r.doubled;
+    // one object already as connected as it gets: left as it is
+    if (objs.length === 1 && r.lines === objs[0].paths.filter((sp) => sp.nodes.length >= 2).length && !r.doubled && !r.bridged) continue;
+    const [first, ...rest] = objs;
+    replace[first.id] = [{ ...first, paths: r.paths, start: first.start, end: undefined }];
+    for (const x of rest) replace[x.id] = [];
+    select.push(first.id);
+  }
+  if (!select.length) return "These lines don't meet: nothing to connect (raise “Bridge gaps up to”)";
+  const extra = [bridged ? `${plural(bridged, "gap")} bridged` : "", doubled ? `${plural(doubled, "doubled piece")} left out` : ""].filter(Boolean).join(", ");
+  return { replace, select, summary: `${plural(pieces, "piece")} → ${plural(made, "line")}${extra ? ` · ${extra}` : ""}` };
+}
+
 export function planConversion(id: ConvertId, sel: DesignObject[], opts: ConvertOptions): Promise<ConvertPlan | string> {
   switch (id) {
     case "fillToSatin":
@@ -450,5 +492,7 @@ export function planConversion(id: ConvertId, sel: DesignObject[], opts: Convert
       return planBreakApart(sel, opts.breakApart);
     case "dedupe":
       return planDedupe(sel, opts.dedupe);
+    case "connectLines":
+      return Promise.resolve(planConnectLines(sel, opts.connectLines));
   }
 }

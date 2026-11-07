@@ -411,6 +411,8 @@ export interface DesignObject {
   lock?: { start?: LockStyle; end?: LockStyle; startScale?: number; endScale?: number; startLength?: number; endLength?: number };
   /** Ink/Stitch `color_sort_index` (lettering fonts): this colour's place when sewn colour by colour. */
   colorSortIndex?: number;
+  /** An auto-routed line: it travels back over itself on purpose (its underpaths). */
+  routed?: boolean;
   /** Parametric lettering this object belongs to (regenerated when edited). */
   text?: import("./lib/text").TextSpec;
   /** Objects with the same group are selected and transformed together. */

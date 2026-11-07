@@ -83,6 +83,13 @@ export const CONVERSIONS: { id: ConvertId; label: string; menu: string; title: s
     title: "Remove points that repeat (or nearly repeat) an earlier point of the path",
     icon: [{ d: "M4 24 L12 8 L20 20 L28 6", thin: true }, { d: "M10.5 6.5 h3 v3 h-3 Z M18.5 18.5 h3 v3 h-3 Z", fill: true }],
   },
+  {
+    id: "connectLines",
+    label: "Connect lines",
+    menu: "Connect lines…",
+    title: "Join line pieces into as few continuous lines as possible: ends that meet, small gaps bridged, straight on through crossings",
+    icon: [{ d: "M4 22 L11 10", thin: true }, { d: "M13 9 L20 21", thin: true }, { d: "M22 21 L28 9", thin: true }, { d: "M4 26 L11 14 L20 25 L28 13" }],
+  },
 ];
 
 function loadOptions(): ConvertOptions {
@@ -395,6 +402,23 @@ export function ConvertDialog({ onClose }: { onClose: () => void }) {
                 <Num value={o.breakApart.minArea} unit="mm²" step={0.5} min={0.05} max={100} onChange={(v) => set("breakApart", { minArea: v })} />
               </Row>
               <p className="hint">A shape that is already one clean outline with holes is left as it is.</p>
+            </>
+          )}
+          {id === "connectLines" && (
+            <>
+              <Row label="Join ends within" title="Line ends closer than this meet (they move to their middle)">
+                <Num value={o.connectLines.join} unit="mm" step={0.1} min={0.01} max={5} digits={2} onChange={(v) => set("connectLines", { join: v })} />
+              </Row>
+              <Row label="Bridge gaps up to" title="Loose ends this close are joined by a short straight line (0: never)">
+                <Num value={o.connectLines.bridge} unit="mm" step={0.5} min={0} max={50} digits={1} onChange={(v) => set("connectLines", { bridge: v })} />
+              </Row>
+              <Row label="Straight through" title="Where lines cross or branch, go on along the straightest one (else: any)">
+                <Toggle on={o.connectLines.straight} onChange={(v) => set("connectLines", { straight: v })} />
+              </Row>
+              <Row label="Leave out doubled" title="Pieces lying on top of another piece are left out">
+                <Toggle on={o.connectLines.dropDoubled} onChange={(v) => set("connectLines", { dropDoubled: v })} />
+              </Row>
+              <p className="hint">Lines of one colour and stitch are connected together. Each piece is sewn once: a network that branches needs a line per pair of loose ends.</p>
             </>
           )}
           {id === "dedupe" && (

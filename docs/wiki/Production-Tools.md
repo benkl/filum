@@ -108,7 +108,7 @@ For machines with cutwork needles, **Path → Cutwork segmentation** splits runn
 
 ## Before you export
 
-- **Issues** (left panel, or **Stitch → Troubleshoot…**) lists anything that could go wrong on the machine.
+- **Issues** (left panel, or **Stitch → Troubleshoot…**) lists anything that could go wrong on the machine. Among them: lines lying on top of each other (a stroke imported twice, a piece drawn over another, a line running back over itself), which sew the thread twice and look heavier. The fix deletes a line that lies wholly on another, or cuts out just the doubled stretch.
 - The **Density map** (<kbd>Shift</kbd>+<kbd>D</kbd>) shows where stitches pile up.
 - **Animate** in the bottom bar opens the stitch-out player and plays the design stitch by stitch, so you can check the sew order and the jumps.
 

@@ -8,6 +8,7 @@ import { objectBoundsCached, transformObject, translateMat } from "./geometry";
 import { rowAngleFor, rowsAlongGradient } from "./gradient";
 import { ovalNorm, threadWeightInfo } from "./materials";
 import { shapeProblems } from "./shapeCheck";
+import { lineOverlaps } from "./lineOverlaps";
 
 export interface Issue {
   id: string;
@@ -18,7 +19,7 @@ export interface Issue {
   at: Vec2;
   /** A one-click fix: `apply` to the object, or to every object `scope` picks
    *  (all the layers of a gradient). */
-  fix?: { label: string; apply: (o: DesignObject) => DesignObject; scope?: (o: DesignObject) => boolean };
+  fix?: { label: string; apply: (o: DesignObject) => DesignObject | null; scope?: (o: DesignObject) => boolean };
 }
 
 const cache = new WeakMap<StitchDocument, { plan: PlanData | null; issues: Issue[] }>();
@@ -104,6 +105,10 @@ export function computeIssues(doc: StitchDocument, plan: PlanData | null): Issue
   const longestOf = (i: number): { len: number; at: Vec2 } | undefined =>
     ps && i < ps.longest.length && ps.longest[i] > 0 ? { len: ps.longest[i], at: [ps.longestAt[2 * i], ps.longestAt[2 * i + 1]] } : undefined;
 
+  // lines lying on top of each other (auto-routed lines travel back on purpose)
+  const overlaps = new Map(lineOverlaps(doc.objects, { skipSelf: (o) => !!o.routed }).map((x) => [x.id, x]));
+  const nameOf = (id: string) => doc.objects.find((o) => o.id === id)?.name ?? "another line";
+
   // lettering smaller than the thread weight allows (once per text group)
   const weight = threadWeightInfo(doc.options?.threadWeight);
   const smallText = new Set<string>();
@@ -115,6 +120,29 @@ export function computeIssues(doc: StitchDocument, plan: PlanData | null): Issue
     const c: Vec2 = [b.x + b.w / 2, b.y + b.h / 2];
     const add = (i: Omit<Issue, "id" | "objId">) => out.push({ ...i, id: `${o.id}:${out.length}`, objId: o.id });
     const st = o.stitch;
+
+    const ov = overlaps.get(o.id);
+    if (ov) {
+      const mm = ov.length.toFixed(ov.length < 10 ? 1 : 0);
+      if (ov.other && ov.share >= 0.95)
+        add({
+          level: "warning",
+          title: "Line on top of another line",
+          detail: `It lies on “${nameOf(ov.other)}”: the thread is sewn twice there (${mm} mm).`,
+          at: ov.at,
+          fix: { label: "Delete it", apply: () => null },
+        });
+      else
+        add({
+          level: ov.other ? "warning" : "info",
+          title: ov.other ? "Lines on top of each other" : "Line runs over itself",
+          detail: ov.other
+            ? `${mm} mm of it lies on “${nameOf(ov.other)}” and is sewn twice.`
+            : `${mm} mm of it goes back over itself and is sewn twice (fine for an underpath you meant).`,
+          at: ov.at,
+          fix: { label: "Cut out the doubled part", apply: () => ov.cut() },
+        });
+    }
 
     const outsideBox = b.x < -0.01 || b.y < -0.01 || b.x + b.w > hw + 0.01 || b.y + b.h > hh + 0.01;
     const outsideOval = oval && !outsideBox && (reachOf(index) ?? Math.max(...[[b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]].map(([x, y]) => ovalNorm(hw / 2, hh / 2, hw, hh, x, y)))) > 1.0005;

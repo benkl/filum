@@ -1837,7 +1837,17 @@ export function IssuesPanel() {
                 className="btn sm"
                 onClick={(e) => {
                   e.stopPropagation();
-                  useStore.getState().commit((d) => ({ ...d, objects: d.objects.map((x) => ((i.fix!.scope ? i.fix!.scope(x) : x.id === o.id) ? i.fix!.apply(x) : x)) }));
+                  // a fix may remove the object (null)
+                  useStore.getState().commit((d) =>
+                    pruneGroups({
+                      ...d,
+                      objects: d.objects.flatMap((x) => {
+                        if (!(i.fix!.scope ? i.fix!.scope(x) : x.id === o.id)) return [x];
+                        const y = i.fix!.apply(x);
+                        return y ? [y] : [];
+                      }),
+                    }),
+                  );
                 }}
               >
                 {i.fix.label}

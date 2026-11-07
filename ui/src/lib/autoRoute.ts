@@ -52,6 +52,8 @@ export function autoRouteSelection(redwork = false): string | null {
         ...first,
         id: uid(),
         name: `${first.name} (${redwork ? "redwork" : "routed"})`,
+        // its doubled stretches are meant (the overlap check leaves them alone)
+        routed: true,
         paths: paths.map((pts) => ({ closed: false, nodes: pts.map((p) => ({ p })) })),
         start: undefined,
         end: undefined,
