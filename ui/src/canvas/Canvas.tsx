@@ -101,6 +101,23 @@ import { freshCopies } from "../lib/copies";
 import { transformable } from "../lib/textSettle";
 import { loadFont } from "../lib/fonts";
 
+/**
+ * The points a node-tool box picks on the selected paths: those inside it,
+ * added to (Shift) or taken from (Alt) the points selected when the drag began.
+ */
+function boxedNodes(doc: StitchDocument, ids: string[], m: { x: number; y: number; w: number; h: number }, d: { add: boolean; sub: boolean; base: NodeRef[] }): NodeRef[] {
+  const found = nodesInBox(doc, ids, m);
+  if (d.sub) {
+    const out = new Set(found.map(nodeKey));
+    return d.base.filter((x) => !out.has(nodeKey(x)));
+  }
+  if (d.add) {
+    const have = new Set(d.base.map(nodeKey));
+    return [...d.base, ...found.filter((x) => !have.has(nodeKey(x)))];
+  }
+  return found;
+}
+
 const hitCtx = (() => {
   const c = document.createElement("canvas");
   c.width = c.height = 1;
@@ -149,7 +166,7 @@ type Drag =
   | { kind: "pen-handle"; idx: number; part: "i" | "o"; orig: PathNode }
   | { kind: "cut"; a: Vec2; moved: boolean }
   | { kind: "nodes"; start: Vec2; orig: StitchDocument; sel: NodeRef[]; moved: boolean; anchor: Vec2 }
-  | { kind: "nodemarquee"; a: Vec2; add: boolean; hit: DesignObject | null }
+  | { kind: "nodemarquee"; a: Vec2; add: boolean; sub: boolean; base: NodeRef[]; hit: DesignObject | null }
   | { kind: "ref"; mode: "move" | "scale" | "rotate"; orig: ReferenceImage; start: Vec2; corner: number; a0: number; moved: boolean }
   | { kind: "rampend"; id: string; which: "from" | "to"; moved: boolean }
   | { kind: "rampvec"; a: Vec2; target: string | null; mode: "density" | "blend" }
@@ -1513,7 +1530,8 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         }
         // anywhere else: a box selects points (a click decides on release)
         const hit = pick(p);
-        dragRef.current = { kind: "nodemarquee", a: p, add: e.shiftKey, hit: hit && !s.selection.includes(hit.id) ? hit : null };
+        // Shift: add to the selected points, Alt: take away from them
+        dragRef.current = { kind: "nodemarquee", a: p, add: e.shiftKey, sub: e.altKey && !e.shiftKey, base: s.nodeSel, hit: hit && !s.selection.includes(hit.id) ? hit : null };
         return;
       }
       case "ruler":
@@ -1819,10 +1837,14 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         draw();
         return;
       }
-      case "nodemarquee":
-        overlayRef.current.nodeMarquee = { x: Math.min(d.a[0], p[0]), y: Math.min(d.a[1], p[1]), w: Math.abs(p[0] - d.a[0]), h: Math.abs(p[1] - d.a[1]) };
+      case "nodemarquee": {
+        const m = { x: Math.min(d.a[0], p[0]), y: Math.min(d.a[1], p[1]), w: Math.abs(p[0] - d.a[0]), h: Math.abs(p[1] - d.a[1]) };
+        overlayRef.current.nodeMarquee = m;
+        // the points inside light up while the box is drawn
+        if (Math.max(m.w, m.h) * s.view.scale > 3) s.set({ nodeSel: boxedNodes(s.doc, s.selection, m, d) });
         draw();
         return;
+      }
       case "ref": {
         const o = d.orig;
         d.moved = true;
@@ -2331,16 +2353,16 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
     if (d.kind === "nodemarquee") {
       const m = overlayRef.current.nodeMarquee;
       overlayRef.current.nodeMarquee = null;
-      if (m && m.w * s.view.scale > 3 && m.h * s.view.scale > 3) {
-        const found = nodesInBox(s.doc, s.selection, m);
-        if (d.add) {
-          const have = new Set(s.nodeSel.map(nodeKey));
-          s.set({ nodeSel: [...s.nodeSel, ...found.filter((x) => !have.has(nodeKey(x)))] });
-        } else s.set({ nodeSel: found });
+      // a box (a thin one too: points along a straight line); else a click
+      const boxed = !!m && Math.max(m.w, m.h) * s.view.scale > 3;
+      // a box that shrank back to a click: the points as they were
+      if (!boxed && s.nodeSel !== d.base) s.set({ nodeSel: d.base });
+      if (boxed) {
+        s.set({ nodeSel: boxedNodes(s.doc, s.selection, m!, d) });
       } else if (d.hit) {
         // a click on another object: edit its points (Shift: as well)
         s.select(e.shiftKey ? [...s.selection, d.hit.id] : [d.hit.id]);
-      } else if (!d.add) {
+      } else if (!d.add && !d.sub) {
         if (s.nodeSel.length) s.set({ nodeSel: [] });
         else if (!pick(toMm(e))) {
           s.select([]);

@@ -74,6 +74,8 @@ function hintsFor(s: ReturnType<typeof useStore.getState>): Hint[] {
             [["Shift", "Drag"], "Straight only"],
             [["Ctrl", "Drag"], "No snapping"],
             [["Shift", "LMB"], "Add / remove a point"],
+            [["Shift", "Drag"], "Box: add points"],
+            [["Alt", "Drag"], "Box: remove points"],
             [["Arrows"], `Nudge ${s.prefs.nodeNudge} mm`],
             [["Shift", "Arrows"], `Nudge ${s.prefs.nodeNudgeBig} mm`],
             [["Del"], "Delete, keep the shape"],
@@ -91,6 +93,7 @@ function hintsFor(s: ReturnType<typeof useStore.getState>): Hint[] {
         : [
             [["LMB"], "Select a point"],
             [["Drag"], "Box select points"],
+            [["Shift", "Drag"], "Box: add points"],
             [["LMB", "path"], "Add a point"],
             [["Drag", "path"], "Bend the curve"],
             [["Alt", "LMB"], "Delete a point"],
