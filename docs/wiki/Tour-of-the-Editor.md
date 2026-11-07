@@ -53,6 +53,7 @@ To find your way in a big design, type in the search box at the top of the Layer
 The right panel has two tabs, and Filum switches between them for you:
 
 - **Selection** shows what's selected: *Transform*, *Thread*, *Stitch patterns*, *Stitch options*, *Commands* and *Element info*. Lettering has its own sections: *Text*, *On a path*, *Shape*, *Stitches*, *Batch lettering* and *Font*.
+- With **several objects** selected, *Stitch options* appears once per stitch type (for example *Fill (3)* and *Satin (1)*). A change there, a slider, a style card or a defaults button, goes to every selected object of that type in one undo step; a line under the heading names the settings that still differ between them. Linked clones, locked objects, gradients and tartans are left out (edit them one at a time). To edit the outlines of several objects together, select them and press <kbd>A</kbd>: the node tool shows all their points, and a box or <kbd>Shift</kbd>-clicks can pick points on any of them to move, align or change together.
 - **Design** covers the whole design: *Hoop*, *Fabric & thread*, *Stitch processing*, *Machine*, *Stitch-out*, *Time estimates*, *Fabric look* and *Design info*.
 
 Lost a setting? Type into **Search properties** (<kbd>Ctrl</kbd>+<kbd>F</kbd>) at the top of the panel.

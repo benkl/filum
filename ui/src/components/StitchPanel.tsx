@@ -12,6 +12,7 @@ import { makeTartan } from "../lib/tartan";
 import { useStore } from "../store";
 import type { DesignObject, StitchParams } from "../types";
 import { FLAG } from "../types";
+import { useEditTargets } from "./editTargets";
 
 type St = StitchParams;
 
@@ -350,7 +351,23 @@ const hasClosed = (o: DesignObject) => o.paths.some((p) => p.closed && p.nodes.l
 /** Visual stitch style picker. */
 export function StylePicker({ o }: { o: DesignObject }) {
   const closed = hasClosed(o);
+  const targets = useEditTargets(o);
+  const many = targets.length > 1;
+  // several objects: each takes the style with its own settings carried over
+  const pickMany = (s: Style) => {
+    const ids = new Set(targets);
+    useStore.getState().commit((d) => ({
+      ...d,
+      objects: d.objects.map((x) => {
+        // a fill style only on closed shapes
+        if (!ids.has(x.id) || s.needs?.(x) || (FILL_STYLES.includes(s) && !hasClosed(x))) return x;
+        const r = s.apply(x);
+        return typeof r === "string" ? x : { ...x, stitch: r };
+      }),
+    }));
+  };
   const pickStyle = (s: Style) => {
+    if (many) return pickMany(s);
     const r = s.apply(o);
     if (r === "shading") {
       const b = objectBounds(o);
@@ -401,7 +418,9 @@ export function StylePicker({ o }: { o: DesignObject }) {
     reselect(kept);
   };
   const card = (s: Style) => {
-    const missing = s.needs?.(o) ?? null;
+    // shading, gradients and tartans are made on one shape at a time
+    const special = many && typeof s.apply(o) === "string";
+    const missing = special ? "One object at a time" : (s.needs?.(o) ?? null);
     return (
       <button key={s.id} className={`style-card ${s.matches(o.stitch) ? "on" : ""}`} title={missing ?? s.title} disabled={!!missing} onClick={() => pickStyle(s)}>
         {s.icon}
@@ -526,7 +545,8 @@ export function Presets<T>({ items, value, onPick, eq }: { items: [string, T, st
 export function StitchDefaults({ o }: { o: DesignObject }) {
   const sets = DEFAULT_SETS.map((s) => ({ ...s, values: defaultValues(s.id, o.stitch) })).filter((s) => s.values);
   if (!sets.length) return null;
-  const apply = (values: Record<string, unknown>) => useStore.getState().updateStitch(o.id, values);
+  const targets = useEditTargets(o);
+  const apply = (values: Record<string, unknown>) => useStore.getState().updateStitch(targets, values);
   const anyOn = sets.some((s) => matchesSet(s.id, o.stitch));
   return (
     <div className="st-defaults">

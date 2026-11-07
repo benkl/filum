@@ -50,6 +50,7 @@ import { applyPatterns, patternPair } from "../lib/stitchPatterns";
 import { TartanSection } from "./TartanPanel";
 import { CutworkSection } from "./CutworkPanel";
 import { ElementInfoSection } from "./ElementInfo";
+import { differingSettings, EditTargets, settingLabel, useEditTargets } from "./editTargets";
 
 function Thumb({ o, color }: { o: DesignObject; color: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -841,8 +842,11 @@ function contourClockwise(st: { contourClockwise?: boolean; clockwise?: boolean 
 
 function StitchOptions({ o }: { o: DesignObject }) {
   const st = o.stitch;
-  const up = (p: StitchPatch) => useStore.getState().updateStitch(o.id, p);
-  const live = (p: StitchPatch) => useStore.getState().updateStitch(o.id, p, true);
+  // one object, or every selected object of this stitch type (multi-selection)
+  const targets = useEditTargets(o);
+  const many = targets.length > 1;
+  const up = (p: StitchPatch) => useStore.getState().updateStitch(targets, p);
+  const live = (p: StitchPatch) => useStore.getState().updateStitch(targets, p, true);
   const begin = () => useStore.getState().checkpoint();
   // sliders: preview live while dragging, one undo step
   const sl = (key: string) => ({
@@ -861,7 +865,7 @@ function StitchOptions({ o }: { o: DesignObject }) {
       <StylePicker o={o} />
       {st.type !== "none" && <StitchPreview o={o} />}
       <StitchDefaults o={o} />
-      {st.type === "fill" && st.gradient && <GradientSection group={st.gradient.group} />}
+      {st.type === "fill" && st.gradient && !many && <GradientSection group={st.gradient.group} />}
       {st.type === "fill" && !st.gradient && (
         <>
           {st.method === "tatami" && (
@@ -951,8 +955,15 @@ function StitchOptions({ o }: { o: DesignObject }) {
                   className="btn sm"
                   title="Reset the guide to an S-curve across the shape"
                   onClick={() => {
-                    const b = objectBounds(o);
-                    if (b) up({ guide: defaultGuide(b) });
+                    // each object's guide across its own shape
+                    const ids = new Set(targets);
+                    useStore.getState().commit((d) => ({
+                      ...d,
+                      objects: d.objects.map((x) => {
+                        const b = ids.has(x.id) && x.stitch.type === "fill" ? objectBounds(x) : null;
+                        return b && x.stitch.type === "fill" ? { ...x, stitch: { ...x.stitch, guide: defaultGuide(b) } } : x;
+                      }),
+                    }));
                   }}
                 >
                   Reset
@@ -1323,9 +1334,11 @@ function StitchOptions({ o }: { o: DesignObject }) {
               </Row>
             </>
           )}
-          <Section title="Colour stripes" defaultOpen={false}>
-            <MulticolorSatin o={o} />
-          </Section>
+          {!many && (
+            <Section title="Colour stripes" defaultOpen={false}>
+              <MulticolorSatin o={o} />
+            </Section>
+          )}
           <Section title="Underlay">
             <Presets
               items={[
@@ -1653,6 +1666,7 @@ function MultiProperties({ objects }: { objects: DesignObject[] }) {
       <Section title="Transform">
         <TransformPanel objects={objects} />
       </Section>
+      <MultiStitchOptions objects={objects} />
       <Section title="Thread">
         <ThreadPicker
           value={objects[0]?.thread}
@@ -1663,8 +1677,49 @@ function MultiProperties({ objects }: { objects: DesignObject[] }) {
         {!objects.every((o) => o.thread === objects[0]?.thread) && <p className="hint">{new Set(objects.map((o) => o.thread)).size} colours — pick one to give it to all.</p>}
         {threads.length === 0 && <p className="hint">No threads yet.</p>}
       </Section>
+      <CommandsSection objects={objects} />
       <ElementInfoSection ids={ids} />
     </div>
+  );
+}
+
+const TYPE_LABEL: Record<string, string> = { fill: "Fill", satin: "Satin", running: "Line", applique: "Appliqué", manual: "Manual stitch", none: "No stitches", zigzag: "Zig-zag" };
+
+/**
+ * Several objects selected: their stitch settings, one panel per stitch type,
+ * each change going to every selected object of that type. Linked clones
+ * follow their original and gradient or tartan layers are edited as a set,
+ * so they're left out here.
+ */
+function MultiStitchOptions({ objects }: { objects: DesignObject[] }) {
+  const editable = objects.filter((o) => !o.clone && !o.locked && !(o.stitch.type === "fill" && (o.stitch.gradient || o.stitch.tartan)));
+  const skipped = objects.length - editable.length;
+  const groups = new Map<string, DesignObject[]>();
+  for (const o of editable) groups.set(o.stitch.type, [...(groups.get(o.stitch.type) ?? []), o]);
+  if (!groups.size)
+    return skipped ? (
+      <Section title="Stitch options">
+        <p className="hint">Linked clones, locked objects, gradients and tartans are edited one at a time.</p>
+      </Section>
+    ) : null;
+  return (
+    <>
+      {[...groups].map(([type, objs]) => {
+        const differ = differingSettings(objs);
+        return (
+          <Section key={type} title={`Stitch options · ${TYPE_LABEL[type] ?? type}${groups.size > 1 || objs.length !== objects.length ? ` (${objs.length})` : ""}`}>
+            <p className="hint" style={{ margin: "2px 0 6px" }}>
+              {objs.length > 1 ? `Changes apply to all ${objs.length}.` : "Changes apply to this one."}
+              {differ.length > 0 && ` They differ in ${differ.slice(0, 5).map(settingLabel).join(", ")}${differ.length > 5 ? ` and ${differ.length - 5} more` : ""}: shown is the first one's.`}
+            </p>
+            <EditTargets.Provider value={objs.map((o) => o.id)}>
+              <StitchOptions o={objs[0]} />
+            </EditTargets.Provider>
+          </Section>
+        );
+      })}
+      {skipped > 0 && <p className="hint">{skipped} not included: linked clones, locked objects, gradients and tartans are edited one at a time.</p>}
+    </>
   );
 }
 
@@ -1825,7 +1880,15 @@ function RippleSection({ o }: { o: DesignObject }) {
   const st = o.stitch;
   if (!isRipple(o) || st.type !== "running" || !st.ripple) return null;
   const r = st.ripple;
-  const up = (patch: Partial<typeof r>) => useStore.getState().updateObject(o.id, { stitch: { ...st, ripple: { ...r, ...patch } } });
+  const targets = useEditTargets(o);
+  // every target keeps its own ripple settings and takes just the change
+  const up = (patch: Partial<typeof r>) => {
+    const ids = new Set(targets);
+    useStore.getState().commit((d) => ({
+      ...d,
+      objects: d.objects.map((x) => (ids.has(x.id) && x.stitch.type === "running" && x.stitch.ripple ? { ...x, stitch: { ...x.stitch, ripple: { ...x.stitch.ripple, ...patch } } } : x)),
+    }));
+  };
   const closed = o.paths.length === 1 && o.paths[0].closed;
   const rails = o.paths.filter((p) => !p.closed).length >= 2;
   const guide = r.guide ?? [];

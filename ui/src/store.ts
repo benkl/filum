@@ -207,7 +207,8 @@ export interface State {
   setTheme: (t: "light" | "dark") => void;
   setView: (v: Partial<View>) => void;
   updateObject: (id: string, patch: Partial<DesignObject>) => void;
-  updateStitch: (id: string, patch: StitchPatch, live?: boolean) => void;
+  /** A stitch change for one object or several (all of the same stitch type, edited together). */
+  updateStitch: (id: string | string[], patch: StitchPatch, live?: boolean) => void;
   addObjects: (objs: DesignObject[], threads?: Thread[], groupParents?: Record<string, string>, groupNames?: Record<string, string>) => void;
   deleteSelection: () => void;
   duplicateSelection: () => void;
@@ -404,10 +405,11 @@ export const useStore = create<State>((set, get) => ({
   updateObject: (id, patch) =>
     get().commit((d) => ({ ...d, objects: d.objects.map((o) => (o.id === id ? { ...o, ...patch } : o)) })),
   updateStitch: (id, patch, live) => {
+    const ids = new Set(typeof id === "string" ? [id] : id);
     const fn = (d: StitchDocument) => ({
       ...d,
       objects: d.objects.map((o) => {
-        if (o.id !== id) return o;
+        if (!ids.has(o.id)) return o;
         const next =
           "type" in patch && patch.type && patch.type !== o.stitch.type
             ? defaultStitch(patch.type as StitchParams["type"], o.stitch)
