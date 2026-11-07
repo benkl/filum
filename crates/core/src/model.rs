@@ -473,7 +473,8 @@ impl Default for SatinParams {
             method: SatinMethod::Satin,
             spacing: 0.4,
             width: 3.0,
-            pull_comp: 0.2,
+            // Ink/Stitch's default: none (a fabric calibration sets one)
+            pull_comp: 0.0,
             pull_comp_pct: 0.0,
             max_stitch_length: 0.0,
             short_stitch_inset: 0.15,
@@ -1229,7 +1230,7 @@ impl Default for AppliqueParams {
             cover_spacing: 0.4,
             cover_offset: 0.0,
             cover_underlay: true,
-            pull_comp: 0.2,
+            pull_comp: 0.0,
             flip: false,
             stops: true,
         }
@@ -1485,7 +1486,8 @@ pub enum Fabric {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FabricProfile {
-    /// Extra pull compensation (mm) added to satins and fills.
+    /// Extra pull compensation (mm) added to satins and fills: none from the
+    /// fabric itself (it comes from the objects, or a fabric calibration).
     pub pull_comp: f64,
     /// Multiplier for row/zigzag spacing (>1 = less dense).
     pub density_scale: f64,
@@ -1506,8 +1508,10 @@ pub struct FabricProfile {
 
 impl Fabric {
     pub fn profile(self) -> FabricProfile {
-        let p = |pull_comp, density_scale, force_underlay, underlay_density| FabricProfile {
-            pull_comp,
+        // no pull compensation from the fabric: it comes from the objects'
+        // own settings (0 as in Ink/Stitch, or a fabric calibration's numbers)
+        let p = |density_scale, force_underlay, underlay_density| FabricProfile {
+            pull_comp: 0.0,
             density_scale,
             force_underlay,
             underlay_density,
@@ -1516,32 +1520,26 @@ impl Fabric {
             knockdown: false,
         };
         match self {
-            Fabric::Cotton => p(0.0, 1.0, false, 1.0),
-            Fabric::Polyester => p(0.1, 1.0, false, 1.0),
-            // Denim / heavy twill: minimal pull compensation, reduced density
-            // (wider spacing) — like canvas.
-            Fabric::Denim => p(0.0, 1.05, false, 1.0),
-            // T-shirt knit: 0.35 mm pull compensation in total (our
-            // satin default holds 0.2), slightly reduced density, extra underlay.
-            Fabric::Knit => p(0.15, 1.05, true, 0.8),
-            Fabric::Sheer => p(0.1, 1.2, false, 1.3),
-            Fabric::Felt => p(0.05, 1.05, false, 1.2),
-            Fabric::Towel => p(0.25, 0.9, true, 0.7),
-            Fabric::Cap => p(0.35, 1.0, true, 0.8),
-            // Starting points from published digitizing guidance (pull
-            // compensation: fleece 0.40 mm, T-shirt 0.35 mm in total
-            // against 0.20 mm for cotton — our satin default already holds
-            // 0.2 mm, so the extra here is the difference).
-            // Fleece: more pull compensation, wider spacing, heavy underlay.
-            Fabric::Fleece => p(0.2, 1.1, true, 0.8),
+            Fabric::Cotton => p(1.0, false, 1.0),
+            Fabric::Polyester => p(1.0, false, 1.0),
+            // Denim / heavy twill: reduced density (wider spacing) — like canvas.
+            Fabric::Denim => p(1.05, false, 1.0),
+            // T-shirt knit: slightly reduced density, extra underlay.
+            Fabric::Knit => p(1.05, true, 0.8),
+            Fabric::Sheer => p(1.2, false, 1.3),
+            Fabric::Felt => p(1.05, false, 1.2),
+            Fabric::Towel => p(0.9, true, 0.7),
+            Fabric::Cap => p(1.0, true, 0.8),
+            // Fleece: wider spacing, heavy underlay.
+            Fabric::Fleece => p(1.1, true, 0.8),
             // Piqué / polo knit: slightly looser, extra edge + zigzag underlay.
-            Fabric::Pique => p(0.15, 1.05, true, 0.85),
+            Fabric::Pique => p(1.05, true, 0.85),
             // Leather / vinyl: lower density, minimal underlay (every needle hole stays).
-            Fabric::Leather => p(0.0, 1.15, false, 1.3),
-            // Canvas (like denim): minimal compensation, wider spacing.
-            Fabric::Canvas => p(0.0, 1.05, false, 1.0),
-            // Silk / satin: reduced compensation and density, minimal underlay.
-            Fabric::Silk => p(0.0, 1.1, false, 1.3),
+            Fabric::Leather => p(1.15, false, 1.3),
+            // Canvas (like denim): wider spacing.
+            Fabric::Canvas => p(1.05, false, 1.0),
+            // Silk / satin: reduced density, minimal underlay.
+            Fabric::Silk => p(1.1, false, 1.3),
         }
     }
 }

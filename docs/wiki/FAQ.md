@@ -43,7 +43,7 @@ Machine files hold only stitches. Keep the `.filum` project. It keeps every shap
 PES v1 describes colours as entries of Brother's thread table, so the machine shows the nearest Brother thread. Use **PES v6 · exact threads** to store your actual threads (newer machines only). DST stores no colours at all.
 
 **The stitching puckers or the fabric shows through.**
-- Choose the right **Fabric** preset in the title bar. It sets density, underlay and pull compensation for that fabric.
+- Choose the right **Fabric** preset in the title bar. It sets density and underlay for that fabric. Pull compensation is off until you calibrate the fabric (next point), as in Ink/Stitch.
 - Check the **Density map** (<kbd>Shift</kbd>+<kbd>D</kbd>) for areas that are too dense.
 - Use the recommended **backing** and **topping** (**Design → Fabric & thread**).
 - **Calibrate the fabric** (the ruler button next to the fabric): sew one swatch, measure it, and new objects start from the pull compensation your setup needs (see [Production tools](Production-Tools.md#calibrate-a-fabric)).

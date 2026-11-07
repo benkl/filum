@@ -52,7 +52,7 @@ You can also just start drawing with the tools on the left: <kbd>P</kbd> for a r
 
 ## 4. Set up the fabric and hoop
 
-The bar under the menus has a **Fabric** picker (Cotton, Denim, Knit / Jersey, Towel / Terry, Cap / Structured and more) and a **Hoop** picker. The fabric preset adjusts density, underlay and pull compensation for the whole design. It also suggests a backing, a topping and a needle under **Design → Fabric & thread**.
+The bar under the menus has a **Fabric** picker (Cotton, Denim, Knit / Jersey, Towel / Terry, Cap / Structured and more) and a **Hoop** picker. The fabric preset adjusts density and underlay for the whole design; pull compensation stays off until you calibrate the fabric. It also suggests a backing, a topping and a needle under **Design → Fabric & thread**.
 
 ## 5. Check and export
 

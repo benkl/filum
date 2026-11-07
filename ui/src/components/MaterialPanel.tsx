@@ -43,7 +43,7 @@ export function MaterialSection() {
   const setWeight = (w: ThreadWeight) => commit((d) => ({ ...d, options: { ...(d.options ?? defaultDesignOptions()), threadWeight: w } }));
   return (
     <>
-      <Row label="Fabric" title="Adjusts pull compensation, density and underlay for every object">
+      <Row label="Fabric" title="Adjusts density and underlay for every object; calibrate it for pull compensation">
         <div className="mt-fabric">
           <select className="select" value={doc.fabric} onChange={(e) => useStore.getState().setFabric(e.target.value as never)}>
             {FABRICS.map((f) => (

@@ -42,7 +42,7 @@ export const FABRICS: FabricInfo[] = [
   {
     id: "polyester",
     label: "Polyester",
-    effect: "A little more pull compensation",
+    effect: "Standard settings",
     backing: "Tear-away; cut-away for dense designs",
     topping: "None",
     needle: "Sharp / Microtex 65/9–75/11",
@@ -52,7 +52,7 @@ export const FABRICS: FabricInfo[] = [
   {
     id: "denim",
     label: "Denim",
-    effect: "Wider spacing, minimal compensation (denim / heavy twill)",
+    effect: "Wider spacing (denim / heavy twill)",
     backing: "Tear-away (Madeira, Floriani) or medium cut-away (OESD)",
     topping: "None",
     needle: "Sharp 80/12–90/14",
@@ -62,7 +62,7 @@ export const FABRICS: FabricInfo[] = [
   {
     id: "knit",
     label: "Knit / Jersey",
-    effect: "More pull compensation (0.35 mm for T-shirt knits), slightly looser, underlay always on",
+    effect: "Slightly looser, underlay always on",
     backing: "Cut-away (no-show mesh for light designs, medium cut-away for dense ones)",
     topping: "Water-soluble film",
     needle: "Ballpoint 70/10–75/11",
@@ -80,7 +80,7 @@ export const FABRICS: FabricInfo[] = [
   {
     id: "fleece",
     label: "Fleece",
-    effect: "More pull compensation, wider spacing, heavy underlay",
+    effect: "Wider spacing, heavy underlay",
     backing: "Heavy cut-away",
     topping: "Water-soluble film or a permanent cover",
     needle: "Ballpoint 75/11",
@@ -89,7 +89,7 @@ export const FABRICS: FabricInfo[] = [
   {
     id: "towel",
     label: "Towel / Terry",
-    effect: "More pull compensation, denser, underlay always on",
+    effect: "Denser, underlay always on",
     backing: "Tear-away",
     topping: "Water-soluble film — essential, or the loops swallow the stitches",
     needle: "75/11",
@@ -107,7 +107,7 @@ export const FABRICS: FabricInfo[] = [
   {
     id: "silk",
     label: "Silk / Satin",
-    effect: "Less density and compensation, minimal underlay",
+    effect: "Less density, minimal underlay",
     backing: "Fusible woven interfacing + tear-away",
     topping: "Optional water-soluble film",
     needle: "Fine sharp (Microtex) 65/9–75/11",
@@ -116,7 +116,7 @@ export const FABRICS: FabricInfo[] = [
   {
     id: "canvas",
     label: "Canvas",
-    effect: "Wider spacing, little compensation",
+    effect: "Wider spacing",
     backing: "Tear-away",
     topping: "None",
     needle: "Sharp 80/12",
@@ -145,7 +145,7 @@ export const FABRICS: FabricInfo[] = [
   {
     id: "cap",
     label: "Cap / Structured",
-    effect: "Most pull compensation, underlay always on",
+    effect: "Underlay always on",
     backing: "Cap tear-away",
     topping: "Optional",
     needle: "Sharp 75/11–80/12",

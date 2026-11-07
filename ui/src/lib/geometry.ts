@@ -54,7 +54,8 @@ export const defaultApplique = (): AppliqueParams => ({
   coverSpacing: 0.4,
   coverOffset: 0,
   coverUnderlay: true,
-  pullComp: 0.2,
+  // no pull compensation unless a fabric calibration gives one
+  pullComp: 0,
   flip: false,
   stops: true,
 });

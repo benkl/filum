@@ -52,12 +52,12 @@ export function TitleBar() {
         {saved ? <CircleCheck size={13} /> : <Circle size={11} />}
         {saved ? "Saved" : "Edited"}
       </span>
-      <label className="sel-icon" title="Fabric — adjusts pull compensation, density and underlay">
+      <label className="sel-icon" title="Fabric — adjusts density and underlay (calibrate it for pull compensation)">
         <FabricIcon size={14} />
         <select
           className="select"
           aria-label="Fabric preset"
-          title="Fabric — adjusts pull compensation, density and underlay"
+          title="Fabric — adjusts density and underlay (calibrate it for pull compensation)"
           value={doc.fabric}
           onChange={(e) => useStore.getState().setFabric(e.target.value as Fabric)}
         >
