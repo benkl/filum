@@ -1,7 +1,7 @@
 {
   "name": "filum-ui",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "scripts": {
     "wasm": "node scripts/build-wasm.mjs",
