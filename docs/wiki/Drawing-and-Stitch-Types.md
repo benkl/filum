@@ -86,6 +86,8 @@ For areas:
 | **Gradient** | A multi-colour gradient with dithering |
 | **Appliqué** | A fabric patch: placement line, tack-down and cover. See [Production tools](Production-Tools.md) |
 
+A tatami is sewn **one way**: every part from its top row down to its bottom row, so the fabric is always pushed the same way and never caught between two halves sewn towards each other. Vertical rows go from left to right. If you set an end point near the top, the fill goes upwards and ends there. **Sewing order** in the fill settings switches to **Centre out**, which starts in the middle and sews out to both sides, or to **Ink/Stitch**. The Ink/Stitch order has the least travel, but it ends where it started, which often splits a shape into two halves that meet in the middle. The underlay is sewn in the same order as the rows.
+
 ## Handy tricks
 
 - **Change the fill angle** of the selection with <kbd>[</kbd> and <kbd>]</kbd> (5° per press). On a satin, the same keys change the width.

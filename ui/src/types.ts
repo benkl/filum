@@ -225,6 +225,8 @@ export interface FillParams {
   guidedStrategy?: "copy" | "parallel" | "buffer";
   /** Tatami: start in the middle and sew outwards to either side. */
   centerOut?: boolean;
+  /** Tatami (rows and underlay): one way from top to bottom (the default), or Ink/Stitch's stitch path, which often sews a shape in two halves meeting in the middle. Centre out goes first. */
+  tatamiRoute?: "oneWay" | "inkStitch";
   travelLength: number;
   center: Vec2;
   /** With an end row spacing: interpolate density instead of spacing (colour blending). */

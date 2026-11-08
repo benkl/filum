@@ -10,7 +10,7 @@
 use std::f64::consts::TAU;
 
 use filum_core::geom::{dist_to_boundary, point_in_rings, pt, Point, Ring};
-use filum_core::model::{FillMethod, FillParams, SubPath};
+use filum_core::model::{FillMethod, FillParams, SubPath, TatamiRoute};
 use filum_core::plan::flags;
 use filum_core::stitches::fill::fill;
 use filum_core::stitches::Run;
@@ -215,12 +215,22 @@ fn tatami_sews_a_connected_shape_in_one_run() {
 #[test]
 fn tatami_travel_hides_under_later_rows() {
     // Ink/Stitch: ~10 mm of travel shows on the S, ~0 on the square
+    let ink = FillParams { tatami_route: TatamiRoute::InkStitch, ..params(FillMethod::Tatami, false) };
     for (name, rings, max_vis, max_travel) in [("S", vec![s_shape()], 20.0, 200.0), ("square", vec![rect(30.0, 30.0, 40.0, 40.0)], 1.0, 150.0), ("star", vec![star()], 10.0, 150.0)] {
-        let runs = sew(&rings, &params(FillMethod::Tatami, false));
+        let runs = sew(&rings, &ink);
         let vis = visible_travel_mm(&runs);
         let travel = travel_mm(&runs);
         assert!(vis < max_vis, "{name}: travel on top of sewn rows {vis:.1} mm");
         assert!(travel < max_travel, "{name}: travel {travel:.1} mm");
+    }
+    // one way: a branch left behind (the star's second leg) is reached back
+    // up along the outline, never across sewn rows
+    for (name, rings, max_vis, max_travel) in [("S", vec![s_shape()], 25.0, 200.0), ("square", vec![rect(30.0, 30.0, 40.0, 40.0)], 1.0, 150.0), ("star", vec![star()], 25.0, 150.0)] {
+        let runs = sew(&rings, &params(FillMethod::Tatami, false));
+        let vis = visible_travel_mm(&runs);
+        let travel = travel_mm(&runs);
+        assert!(vis < max_vis, "one way, {name}: travel on top of sewn rows {vis:.1} mm");
+        assert!(travel < max_travel, "one way, {name}: travel {travel:.1} mm");
     }
 }
 
@@ -229,14 +239,22 @@ fn tatami_without_an_end_finishes_where_it_started() {
     // Ink/Stitch's stitch path is a circuit from the start back to it
     let sq = vec![rect(30.0, 30.0, 40.0, 40.0)];
     let start = pt(30.0, 30.0);
-    let runs = fill(&paths(&sq), &params(FillMethod::Tatami, false), 0.0, 1.0, false, 1.0, Some(start), None);
+    let ink = FillParams { tatami_route: TatamiRoute::InkStitch, ..params(FillMethod::Tatami, false) };
+    let runs = fill(&paths(&sq), &ink, 0.0, 1.0, false, 1.0, Some(start), None);
     let last = runs.last().unwrap().last().unwrap().0;
     assert!(last.dist(start) < 1.0, "ends at {last:?}");
-    // with an end point it ends there
-    let end = pt(70.0, 70.0);
-    let runs = fill(&paths(&sq), &params(FillMethod::Tatami, false), 0.0, 1.0, false, 1.0, Some(start), Some(end));
+    // one way: it ends on the bottom row
+    let runs = fill(&paths(&sq), &params(FillMethod::Tatami, false), 0.0, 1.0, false, 1.0, Some(start), None);
     let last = runs.last().unwrap().last().unwrap().0;
-    assert!(last.dist(end) < 0.5, "ends at {last:?}");
+    assert!(last.y > 69.5, "one way ends at the bottom: {last:?}");
+    // with an end point both end there (one way: an end at the top turns it round)
+    for p in [ink, params(FillMethod::Tatami, false)] {
+        for end in [pt(70.0, 70.0), pt(60.0, 31.0)] {
+            let runs = fill(&paths(&sq), &p, 0.0, 1.0, false, 1.0, Some(start), Some(end));
+            let last = runs.last().unwrap().last().unwrap().0;
+            assert!(last.dist(end) < 0.5, "{:?}: ends at {last:?}, not {end:?}", p.tatami_route);
+        }
+    }
 }
 
 #[test]
@@ -333,8 +351,10 @@ fn islands_are_sewn_one_after_the_other() {
         let top = r.iter().position(|x| x.1 & (flags::UNDERLAY | flags::TRAVEL) == 0).expect("top");
         assert!(ul < top, "underlay first, then the top");
     }
-    // the O ends where the dot is nearest, so the jump is short
-    let gap = runs[0].last().unwrap().0.dist(runs[1][0].0);
+    // Ink/Stitch: the O ends where the dot is nearest, so the jump is short
+    // (one way: the O ends at its bottom)
+    let ink = sew(&rings, &FillParams { tatami_route: TatamiRoute::InkStitch, ..params(FillMethod::Tatami, true) });
+    let gap = ink[0].last().unwrap().0.dist(ink[1][0].0);
     assert!(gap < 10.0, "jump {gap:.1} mm");
     // contour and circular fills too
     for method in [FillMethod::Contour, FillMethod::Circular] {

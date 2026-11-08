@@ -663,6 +663,20 @@ pub enum GuidedStrategy {
     Buffer,
 }
 
+/// The order a tatami sews its rows in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum TatamiRoute {
+    /// Every part from its top row down to its bottom row, the parts from
+    /// the top of the design down: the fabric is pushed one way only, never
+    /// caught between two halves sewn towards each other.
+    #[default]
+    OneWay,
+    /// Ink/Stitch's stitch path (`auto_fill`): it ends where it started, so
+    /// a shape is often sewn in two halves that meet in the middle.
+    InkStitch,
+}
+
 /// Lattice the meander fill walks on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -747,6 +761,9 @@ pub struct FillParams {
     /// Tatami: start in the middle and sew outwards to either side, so the
     /// fabric is pushed out evenly rather than all towards one end.
     pub center_out: bool,
+    /// Tatami (rows and underlay): one way from top to bottom, or Ink/Stitch's
+    /// stitch path. Centre out goes first.
+    pub tatami_route: TatamiRoute,
     /// Stitch length for travel/underpath running stitches.
     pub travel_length: f64,
     /// Radial fill centre relative to the shape bounding box (0..1).
@@ -1135,6 +1152,7 @@ impl Default for FillParams {
             underpath: true,
             guided_strategy: GuidedStrategy::Copy,
             center_out: false,
+            tatami_route: TatamiRoute::OneWay,
             travel_length: 2.5,
             center: [0.5, 0.5],
             gradient_density: false,

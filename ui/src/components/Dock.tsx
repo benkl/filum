@@ -1026,8 +1026,23 @@ function StitchOptions({ o }: { o: DesignObject }) {
           )}
           {st.method === "tatami" && (
             <>
-              <Row label="Centre out" title="Start in the middle and sew outwards to either side: the fabric is pushed out evenly instead of all towards one end — less puckering on large fills">
-                <Toggle on={!!st.centerOut} onChange={(v) => up({ centerOut: v })} />
+              <Row
+                label="Sewing order"
+                title="The order the rows are sewn in (the underlay too). One way: from the top row down, so the fabric is pushed one way only and never caught between rows sewn towards each other. Centre out: from the middle out to both sides. Ink/Stitch: least travel, ends where it started, so a shape is often sewn in two halves that meet in the middle."
+              >
+                <select
+                  className="select"
+                  aria-label="Sewing order"
+                  value={st.centerOut ? "centre" : st.tatamiRoute === "inkStitch" ? "inkStitch" : "oneWay"}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    up(v === "centre" ? { centerOut: true } : { centerOut: false, tatamiRoute: v as "oneWay" | "inkStitch" });
+                  }}
+                >
+                  <option value="oneWay">One way</option>
+                  <option value="centre">Centre out</option>
+                  <option value="inkStitch">Ink/Stitch</option>
+                </select>
               </Row>
               <Row label="Skip last" title="Leave out the last stitch of every row: it sits right next to the first of the next one (fewer stitches, less build-up at the edges)">
                 <Toggle on={!!st.skipLast} onChange={(v) => up({ skipLast: v })} />

@@ -199,6 +199,8 @@ thread_local! {
     static CARVE: std::cell::Cell<Option<Carve>> = const { std::cell::Cell::new(None) };
     /// The tatami being sewn starts in the middle (set around one fill).
     static CENTER_OUT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The tatami being sewn goes one way, from top to bottom (set around one fill).
+    static ONE_WAY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The tatami being sewn leaves out the last stitch of every row.
     static SKIP_LAST: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// Pull compensation of the tatami being sewn as a share of each row's length.
@@ -425,7 +427,10 @@ pub fn tatami_ramp(
     let owns_row = |rn: i64| own_rows.as_ref().is_none_or(|m| m.get(&rn).copied() == Some(rows_mix.map_or(0, |g| g.layer.min(255) as u8)));
     let max_len = fill_stitch_len(max_len);
     let no_underpath = rows_mix.is_some() || NO_UNDERPATH.with(|c| c.get());
-    if mask.is_none() && rows_mix.is_none() && middle.is_none() {
+    // one way: every section from its top row down, the sections from the
+    // top of the design down (`down`: rows in the order of the row frame)
+    let one_way = ONE_WAY.with(|c| c.get()) && mask.is_none() && rows_mix.is_none() && middle.is_none();
+    if mask.is_none() && rows_mix.is_none() && middle.is_none() && !one_way {
         // Ink/Stitch's stitch path through all rows
         // pull compensation: rows end on the outline grown by it (Ink/Stitch
         // grows the shape itself, `adjust_shape_for_pull_compensation`)
@@ -440,6 +445,66 @@ pub fn tatami_ramp(
         return runs;
     }
     let mut remaining: Vec<usize> = (0..grating.sections.len()).filter(|i| !grating.sections[*i].rows.is_empty()).collect();
+    // the frame's rows run down the screen (vertical rows: left to right);
+    // an end point nearer the top turns it round, so it ends there
+    let mut down = if a.cos().abs() > 1e-6 { a.cos() > 0.0 } else { a.sin() > 0.0 };
+    if let (true, Some(e)) = (one_way, end.map(|p| p.rotate(a))) {
+        let ys = remaining.iter().flat_map(|&i| grating.sections[i].rows.iter().map(|r| r.0));
+        let (lo, hi) = ys.fold((f64::INFINITY, f64::NEG_INFINITY), |(l, h), y| (l.min(y), h.max(y)));
+        let (first, last) = if down { (lo, hi) } else { (hi, lo) };
+        if (e.y - first).abs() < (e.y - last).abs() {
+            down = !down;
+        }
+    }
+    // one way: a section is sewn once the sections right above it are (the
+    // rows go on down from them); of those ready, the nearest
+    let above: Vec<Vec<usize>> = if one_way {
+        let n = grating.sections.len();
+        let first = |i: usize| -> Option<(f64, f64, f64, i64)> { let r = &grating.sections[i].rows; if down { r.first().copied() } else { r.last().copied() } };
+        let last = |i: usize| -> Option<(f64, f64, f64, i64)> { let r = &grating.sections[i].rows; if down { r.last().copied() } else { r.first().copied() } };
+        (0..n)
+            .map(|y| match first(y) {
+                Some(fy) => (0..n)
+                    .filter(|&x| x != y)
+                    .filter(|&x| last(x).is_some_and(|lx| lx.3 + if down { 1 } else { -1 } == fy.3 && lx.1 < fy.2 && fy.1 < lx.2))
+                    .collect(),
+                None => Vec::new(),
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+    // how much hangs below a section (its height and that of every section
+    // that follows from it, mm): small dead ends are sewn while they are
+    // near, the long way on is kept for last, so the needle does not have to
+    // come back up over sewn rows for a branch it left behind
+    let hangs: Vec<f64> = if one_way {
+        let n = grating.sections.len();
+        let mut below: Vec<Vec<usize>> = vec![Vec::new(); n];
+        for (y, xs) in above.iter().enumerate() {
+            for &x in xs {
+                below[x].push(y);
+            }
+        }
+        (0..n)
+            .map(|i| {
+                let mut seen = vec![false; n];
+                let mut stack = vec![i];
+                let mut rows = 0usize;
+                while let Some(j) = stack.pop() {
+                    if std::mem::replace(&mut seen[j], true) {
+                        continue;
+                    }
+                    rows += grating.sections[j].rows.len();
+                    stack.extend(below[j].iter().copied());
+                }
+                rows as f64 * spacing
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let mut sewn_sec = vec![false; grating.sections.len()];
     let mut runs: Vec<Run> = Vec::new();
     let mut run: Run = Vec::new();
     let mut pos = middle.or(start.map(|p| p.rotate(a)));
@@ -479,7 +544,37 @@ pub fn tatami_ramp(
     });
     while !remaining.is_empty() {
         let mut best = (0usize, 0usize, f64::INFINITY);
-        if remaining.len() == 1 && last_section == Some(remaining[0]) {
+        if one_way {
+            // a ready section, entered at its first row, at the end nearer to
+            // where the needle is (the last one also by how near it finishes
+            // to the end point); with nothing to go by the top left one
+            let ready: Vec<usize> = (0..remaining.len()).filter(|&ri| above[remaining[ri]].iter().all(|&x| sewn_sec[x])).collect();
+            let ready = if ready.is_empty() { (0..remaining.len()).collect() } else { ready };
+            let ks: [usize; 2] = if down { [0, 1] } else { [2, 3] };
+            let cands: Vec<(usize, usize, Point)> = ready.iter().flat_map(|&ri| ks.iter().map(move |&k| (ri, k))).map(|(ri, k)| (ri, k, section_entries(&grating.sections[remaining[ri]])[k].0)).collect();
+            // how far the needle travels to each entry: along the travel
+            // routes (an entry no route reaches costs a jump)
+            let travel: Vec<f64> = match pos.filter(|_| !run.is_empty()) {
+                Some(p) => {
+                    travel_graph(&mut graph, &mut sewn_before);
+                    let targets: Vec<Point> = cands.iter().map(|c| c.2).collect();
+                    graph.as_ref().unwrap().routes(p, &targets).into_iter().zip(&targets).map(|(r, t)| r.map_or(1e4 + p.dist(*t), |path| path.windows(2).map(|w| w[0].dist(w[1])).sum())).collect()
+                }
+                None => cands.iter().map(|c| pos.map_or(0.0, |p| p.dist(c.2))).collect(),
+            };
+            for (ci, &(ri, k, entry)) in cands.iter().enumerate() {
+                let sec = &grating.sections[remaining[ri]];
+                let d = match (remaining.len() == 1).then_some(end_r).flatten() {
+                    Some(e) => travel[ci] + 0.5 * section_exit(sec, k).dist(e),
+                    // top first (along the rows' normal), then left
+                    None if pos.is_none() => (if down { entry.y } else { -entry.y }) * 1e3 + entry.x + hangs[remaining[ri]],
+                    None => travel[ci] + hangs[remaining[ri]],
+                };
+                if d < best.2 - 1e-9 {
+                    best = (ri, k, d);
+                }
+            }
+        } else if remaining.len() == 1 && last_section == Some(remaining[0]) {
             // final section: enter so that the exit lands next to the end point
             let e = end_r.unwrap();
             let sec = &grating.sections[remaining[0]];
@@ -508,6 +603,7 @@ pub fn tatami_ramp(
             }
         }
         let si = remaining.remove(best.0);
+        sewn_sec[si] = true;
         let sec = &grating.sections[si];
         let (entry, top, ltr0) = section_entries(sec)[best.1];
         // connect (into the first run there is nothing to travel from)
@@ -655,6 +751,17 @@ pub fn tatami_ramp(
             }
         }
         pos = run.last().map(|x| x.0);
+    }
+    // one way: from the bottom row on to the end point, inside the shape
+    if let (true, Some(p), Some(e)) = (one_way, pos.filter(|_| !run.is_empty()), end_r) {
+        if p.dist(e) > 0.5 {
+            travel_graph(&mut graph, &mut sewn_before);
+            if let Some(path) = graph.as_ref().unwrap().route(p, e) {
+                for q in resample_max(&path, travel_len.max(0.5)).into_iter().skip(1) {
+                    push(&mut run, q, f | flags::TRAVEL);
+                }
+            }
+        }
     }
     if !run.is_empty() {
         runs.push(run);
@@ -1819,6 +1926,8 @@ fn fill_part(rings: &[Ring], whole: &[Ring], original: &[Ring], p: &FillParams, 
             // edge run first (an edge run under tatami), then the tatami passes
             SKIP_LAST.with(|c| c.set(p.underlay_skip_last));
             NO_UNDERPATH.with(|c| c.set(!p.underpath));
+            // a tatami's underlay goes one way like its rows
+            ONE_WAY.with(|c| c.set(p.tatami_route == crate::model::TatamiRoute::OneWay && p.method == FillMethod::Tatami));
             let mut ul: Vec<Run> = Vec::new();
             if plan.edge {
                 ul.extend(edge_run(&inset, p.underlay_stitch_length.min(3.0), start, flags::UNDERLAY));
@@ -1842,6 +1951,7 @@ fn fill_part(rings: &[Ring], whole: &[Ring], original: &[Ring], p: &FillParams, 
                 ));
             }
             SKIP_LAST.with(|c| c.set(false));
+            ONE_WAY.with(|c| c.set(false));
             runs.extend(chain(&rings, ul, p.travel_length, flags::UNDERLAY));
         }
     }
@@ -1853,6 +1963,7 @@ fn fill_part(rings: &[Ring], whole: &[Ring], original: &[Ring], p: &FillParams, 
         p.method
     };
     CENTER_OUT.with(|c| c.set(p.center_out && method == FillMethod::Tatami));
+    ONE_WAY.with(|c| c.set(p.tatami_route == crate::model::TatamiRoute::OneWay && method == FillMethod::Tatami));
     SKIP_LAST.with(|c| c.set(p.skip_last && method == FillMethod::Tatami));
     NO_UNDERPATH.with(|c| c.set(!p.underpath));
     GAP_ROWS.with(|c| c.set(if method == FillMethod::Tatami { p.gap_fill_rows.div_ceil(2) * 2 } else { 0 }));
@@ -1991,6 +2102,7 @@ fn fill_part(rings: &[Ring], whole: &[Ring], original: &[Ring], p: &FillParams, 
         FillMethod::Tartan => super::tartan::tartan(&rings, p, &p.tartan.clone().unwrap_or_default(), spacing, top_start, 0),
     });
     CENTER_OUT.with(|c| c.set(false));
+    ONE_WAY.with(|c| c.set(false));
     SKIP_LAST.with(|c| c.set(false));
     PULL_PCT.with(|c| c.set(0.0));
     NO_UNDERPATH.with(|c| c.set(false));
@@ -2455,6 +2567,55 @@ mod travel_tests {
     }
 
     #[test]
+    fn tatami_goes_one_way_from_top_to_bottom() {
+        // a circle: Ink/Stitch's path sews it in two halves that meet in the
+        // middle; one way sews every row after the one above it
+        let circle: Vec<Point> = (0..96).map(|k| pt(20.0 + 15.0 * (k as f64 * TAU / 96.0).cos(), 20.0 + 15.0 * (k as f64 * TAU / 96.0).sin())).collect();
+        let shape = vec![SubPath::polyline(&circle, true)];
+        // the needle comes in at the left, halfway down (from what was sewn before)
+        let rows_in_order = |p: &FillParams| -> Vec<f64> {
+            let runs = fill(&shape, p, 0.0, 1.0, false, 1.0, Some(pt(5.0, 20.0)), None);
+            let mut ys: Vec<f64> = Vec::new();
+            for w in runs.iter().flatten().collect::<Vec<_>>().windows(2) {
+                let (a, b) = (w[0], w[1]);
+                if a.1 == 0 && b.1 == 0 && (a.0.y - b.0.y).abs() < 1e-6 && (a.0.x - b.0.x).abs() > 0.5 && ys.last().is_none_or(|y| (y - a.0.y).abs() > 1e-6) {
+                    ys.push(a.0.y);
+                }
+            }
+            ys
+        };
+        for angle in [0.0, 30.0, 90.0, 150.0] {
+            let base = FillParams { underlay: false, angle, row_spacing: 0.4, ..Default::default() };
+            assert_eq!(base.tatami_route, crate::model::TatamiRoute::OneWay, "one way by default");
+            let runs = fill(&shape, &base, 0.0, 1.0, false, 1.0, None, None);
+            // rows in the frame: their order along the row normal never turns back
+            let a = angle.to_radians();
+            let along: Vec<f64> = runs.iter().flatten().filter(|x| x.1 == 0).map(|x| x.0.rotate(a).y).collect();
+            let back = along.windows(2).filter(|w| w[1] < w[0] - 0.41).count();
+            let fwd = along.windows(2).filter(|w| w[1] > w[0] + 0.41).count();
+            assert!(back == 0 || fwd == 0, "{angle}°: one direction only ({fwd} forward, {back} back)");
+            // and on screen: from the top down (vertical rows: left to right)
+            let first = runs.iter().flatten().find(|x| x.1 == 0).unwrap().0;
+            let last = runs.iter().flatten().rev().find(|x| x.1 == 0).unwrap().0;
+            if angle == 90.0 {
+                assert!(first.x < 8.0 && last.x > 32.0, "{angle}°: {first:?} → {last:?}");
+            } else {
+                assert!(first.y < 12.0 && last.y > 28.0, "{angle}°: {first:?} → {last:?}");
+            }
+        }
+        let one = rows_in_order(&FillParams { underlay: false, row_spacing: 0.4, ..Default::default() });
+        assert!(one.windows(2).all(|w| w[1] > w[0]), "top to bottom, row after row, wherever the needle comes in");
+        // Ink/Stitch's route stays a setting away: it turns back somewhere
+        let ink = rows_in_order(&FillParams { underlay: false, row_spacing: 0.4, tatami_route: crate::model::TatamiRoute::InkStitch, ..Default::default() });
+        assert!(ink.windows(2).any(|w| w[1] < w[0]) && ink.windows(2).any(|w| w[1] > w[0]), "Ink/Stitch: two halves");
+        // the underlay goes one way as well
+        let ul = fill(&shape, &FillParams { underlay: true, row_spacing: 0.4, ..Default::default() }, 0.0, 1.0, false, 1.0, None, None);
+        let xs: Vec<f64> = ul.iter().flatten().filter(|x| x.1 & flags::UNDERLAY != 0 && x.1 & flags::TRAVEL == 0).map(|x| x.0.x).collect();
+        let (fwd, back) = (xs.windows(2).filter(|w| w[1] > w[0] + 1.0).count(), xs.windows(2).filter(|w| w[1] < w[0] - 1.0).count());
+        assert!(fwd == 0 || back == 0, "underlay one way: {fwd} {back}");
+    }
+
+    #[test]
     fn center_out_starts_in_the_middle() {
         let sq = SubPath::polyline(&[pt(0.0, 0.0), pt(30.0, 0.0), pt(30.0, 40.0), pt(0.0, 40.0)], true);
         let p = FillParams { row_spacing: 0.4, underlay: false, center_out: true, ..Default::default() };
@@ -2657,7 +2818,8 @@ mod gap_fill_tests {
         // (Ink/Stitch 3.1: 372 → 407 stitches on this one with 4 rows)
         let sq = vec![SubPath::polyline(&[pt(0.0, 0.0), pt(20.0, 0.0), pt(20.0, 20.0), pt(0.0, 20.0)], true)];
         let m = |p: &FillParams| fill(&sq, p, 0.0, 1.0, false, 1.0, None, None).iter().map(|r| r.len()).sum::<usize>();
-        let (a, b) = (m(&base), m(&FillParams { gap_fill_rows: 4, ..base.clone() }));
+        let ink = FillParams { tatami_route: crate::model::TatamiRoute::InkStitch, ..base.clone() };
+        let (a, b) = (m(&ink), m(&FillParams { gap_fill_rows: 4, ..ink.clone() }));
         assert!(b > a && b < a + a / 5, "square: {a} → {b}");
     }
 }
