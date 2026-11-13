@@ -107,6 +107,7 @@ async function handleBytes(name: string, path: string | null, bytes: Uint8Array,
     }
     for (const w of warnings) s.toast(w);
     s.toast(`Loaded ${name}`, "success");
+    warnIfLargerThanHoop();
   } catch (e) {
     s.toast(`Could not open ${name}: ${(e as Error).message}`, "error");
   }
@@ -236,6 +237,40 @@ export function nudge(dx: number, dy: number) {
   if (!s.selection.length) return;
   const m = translateMat(dx, dy);
   s.commit((d) => ({ ...d, objects: d.objects.map((o) => (s.selection.includes(o.id) && !o.locked ? transformObject(o, m) : o)) }));
+}
+
+/** The margin round the design when the hoop is fitted to it (mm). */
+const FIT_MARGIN = 10;
+
+/** The hoop size that holds the design with a margin, in whole centimetres (null: nothing to fit). */
+export function hoopForDesign(doc: StitchDocument): { width: number; height: number } | null {
+  const box = unionBoxes(doc.objects.map(objectBounds));
+  if (!box) return null;
+  const size = (v: number) => Math.max(20, Math.ceil((v + 2 * FIT_MARGIN) / 10) * 10);
+  return { width: size(box.w), height: size(box.h) };
+}
+
+/** A custom hoop round the whole design, and the design centred in it (one undo step). */
+export function fitHoopToDesign() {
+  const s = useStore.getState();
+  const fit = hoopForDesign(s.doc);
+  if (!fit) {
+    s.toast("Nothing to fit the hoop to", "info");
+    return;
+  }
+  const box = unionBoxes(s.doc.objects.map(objectBounds))!;
+  const m = translateMat(fit.width / 2 - (box.x + box.w / 2), fit.height / 2 - (box.y + box.h / 2));
+  s.commit((d) => ({ ...d, hoop: { name: "Custom", width: fit.width, height: fit.height }, objects: d.objects.map((o) => transformObject(o, m)) }));
+  s.toast(`Hoop set to ${fit.width} × ${fit.height} mm`, "success");
+}
+
+/** After opening a file: a design bigger than the hoop says so (else every object shows "Outside the hoop"). */
+function warnIfLargerThanHoop() {
+  const s = useStore.getState();
+  const box = unionBoxes(s.doc.objects.map(objectBounds));
+  const { width, height } = s.doc.hoop;
+  if (!box || (box.w <= width + 0.01 && box.h <= height + 0.01)) return;
+  s.toast(`The design (${Math.ceil(box.w)} × ${Math.ceil(box.h)} mm) is larger than the ${width} × ${height} mm hoop: choose a larger hoop, or Fit to design (Design ▸ Hoop)`, "error");
 }
 
 export function centerInHoop() {

@@ -391,6 +391,7 @@ export function buildMenus(): Record<string, MenuItem[]> {
           toggle("Jump stitches", s.showJumps, () => s.set({ showJumps: !s.showJumps })),
           toggle("Underlay", s.showUnderlay, () => s.set({ showUnderlay: !s.showUnderlay })),
           toggle("Grid", s.showGrid, () => s.set({ showGrid: !s.showGrid })),
+          toggle("Fabric in the hoop", s.fabricAll, () => s.set({ fabricAll: !s.fabricAll }), undefined, "The fabric colour inside the hoop in the vector and stitch views (off: the hoop is an outline only)"),
           {
             label: "Grid spacing",
             sub: [

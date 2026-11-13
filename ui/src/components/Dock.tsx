@@ -42,6 +42,7 @@ import type { DesignObject, DesignOptions } from "../types";
 import { HoopOptions } from "./Bars";
 import { HoopShapeRow, MaterialSection } from "./MaterialPanel";
 import { HOOPS, hoopIndex, hoopOf } from "../lib/hoops";
+import { fitHoopToDesign } from "../lib/actions";
 import { Num, PatternInput, Row, Section, Slider, Toggle } from "./ui";
 import { beansToPasses, formatPattern, parsePattern, passesToBeans } from "../lib/patterns";
 import { defaultRippleGuide, guidePair, isRipple, useAsRippleGuide } from "../lib/rippleGuide";
@@ -726,6 +727,7 @@ function ReferencesList() {
 export function ScenePanel() {
   const doc = useStore((s) => s.doc);
   const commit = useStore((s) => s.commit);
+  const fabricAll = useStore((s) => s.fabricAll);
   return (
     <div className="props">
       <Section title="Hoop">
@@ -754,6 +756,14 @@ export function ScenePanel() {
           </div>
         </div>
         <HoopShapeRow />
+        <Row label="Custom size" title="Any frame: type its width and height above, or fit a hoop round the whole design">
+          <button className="btn sm ghost" title="A custom hoop round the whole design with a 10 mm margin, the design centred in it" onClick={fitHoopToDesign} disabled={!doc.objects.length}>
+            Fit to design
+          </button>
+        </Row>
+        <Row label="Fabric inside" title="Fill the hoop with the fabric colour in the vector and stitch views (off: the hoop is an outline only)">
+          <Toggle on={fabricAll} onChange={(v) => useStore.getState().set({ fabricAll: v })} />
+        </Row>
       </Section>
       <Section title="Fabric & thread">
         <MaterialSection />

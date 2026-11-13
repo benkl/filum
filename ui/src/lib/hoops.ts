@@ -29,6 +29,15 @@ export const HOOPS: HoopPreset[] = [
     ["Cap 130 × 60 mm", 130, 60],
     ["Mini 70 × 70 mm", 70, 70],
   ]),
+  // industrial single- and multi-head machines: large tubular and border
+  // frames (sizes vary by maker; any other size is a custom hoop)
+  ...group("Industrial (large frames)", "Industrial", [
+    ["400 × 400 mm", 400, 400],
+    ["500 × 400 mm", 500, 400],
+    ["600 × 400 mm", 600, 400],
+    ["800 × 400 mm", 800, 400],
+    ["1200 × 400 mm (border)", 1200, 400],
+  ]),
   // Brother / Baby Lock domestic (SE, PE, Innov-is, Stellaire, Luminaire).
   // Manuals give "H × W": the 13 × 18 cm frame is 18 cm front to back.
   ...group("Brother / Baby Lock", "Brother", [

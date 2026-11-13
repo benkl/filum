@@ -91,8 +91,10 @@ pub fn plan_to_document(plan: &StitchPlan, name: &str) -> Document {
     let mut doc = Document { name: name.to_string(), ..Document::default() };
     let b = plan.bounds();
     let (ox, oy) = if b.is_empty() { (0.0, 0.0) } else { (b.min_x - 5.0, b.min_y - 5.0) };
+    // a custom hoop round the design (not the default hoop's name on another size)
     doc.hoop.width = (b.width() + 10.0).max(50.0).ceil();
     doc.hoop.height = (b.height() + 10.0).max(50.0).ceil();
+    doc.hoop.name = "Custom".into();
     let mut block = 0usize;
     let mut runs: Vec<Vec<crate::geom::Point>> = vec![vec![]];
     let flush = |doc: &mut Document, block: usize, runs: &mut Vec<Vec<crate::geom::Point>>| {

@@ -10,7 +10,7 @@ import { BuilderToolBar, GuidesToolBar, NodeToolBar, ToolOptionsBar } from "./To
 import { TextBar, useSelectedTextGroup } from "./Lettering";
 import { ConvertMenuButton } from "./ConvertTools";
 import { ArrowLeftRight, Circle, CircleCheck, Import, Layers3 } from "lucide-react";
-import { importFile, optimizeOrder } from "../lib/actions";
+import { fitHoopToDesign, importFile, optimizeOrder } from "../lib/actions";
 import { normAngle } from "../lib/geometry";
 import { FABRICS } from "../lib/materials";
 import { HOOP_GROUPS, HOOPS, hoopIndex, hoopOf } from "../lib/hoops";
@@ -76,12 +76,18 @@ export function TitleBar() {
           title={`Hoop: ${doc.hoop.name} — ${doc.hoop.width} × ${doc.hoop.height} mm`}
           value={hoopIdx >= 0 ? hoopIdx : "custom"}
           onChange={(e) => {
+            if (e.target.value === "fit") return fitHoopToDesign();
             const h = HOOPS[+e.target.value];
             if (h) commit((d) => ({ ...d, hoop: hoopOf(h) }));
           }}
         >
-          {hoopIdx < 0 && <option value="custom">{`${doc.hoop.width} × ${doc.hoop.height} mm`}</option>}
+          {hoopIdx < 0 && <option value="custom">{`Custom ${doc.hoop.width} × ${doc.hoop.height} mm`}</option>}
           <HoopOptions />
+          <optgroup label="Custom">
+            <option value="fit" disabled={!doc.objects.length}>
+              Fit to the design
+            </option>
+          </optgroup>
         </select>
       </label>
       <div className="spacer" />

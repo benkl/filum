@@ -54,6 +54,8 @@ You can also just start drawing with the tools on the left: <kbd>P</kbd> for a r
 
 The bar under the menus has a **Fabric** picker (Cotton, Denim, Knit / Jersey, Towel / Terry, Cap / Structured and more) and a **Hoop** picker. The fabric preset adjusts density and underlay for the whole design; pull compensation stays off until you calibrate the fabric. It also suggests a backing, a topping and a needle under **Design → Fabric & thread**.
 
+The Hoop picker lists frames by brand, including large industrial frames (400 × 400 up to 1200 × 400 mm). For any other frame, type its width and height under **Design → Hoop**, or choose **Fit to the design** to put a custom hoop round the whole design. A file larger than the hoop says so when it opens. **Fabric inside** (also **View → Show → Fabric in the hoop**) turns the fabric colour inside the hoop off, leaving only its outline in the vector and stitch views.
+
 ## 5. Check and export
 
 1. Look at the **Issues** tab next to *Layers*. It points out problems like a border that crosses itself or text that's too small, and often offers a one-click fix.
