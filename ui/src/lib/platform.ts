@@ -54,10 +54,12 @@ export async function saveFile(
 ): Promise<string | null> {
   if (isTauri) {
     const { save } = await import("@tauri-apps/plugin-dialog");
-    const { writeFile } = await import("@tauri-apps/plugin-fs");
+    const { invoke } = await import("@tauri-apps/api/core");
     const path = existingPath ?? (await save({ defaultPath: suggestedName, filters }));
     if (!path) return null;
-    await writeFile(path, bytes);
+    // written next to the file first and then put in its place (src-tauri/src/safe_write.rs):
+    // a save cut off by a crash or a full disk leaves the old file whole
+    await invoke("save_file", bytes, { headers: { path: encodeURIComponent(path) } });
     return path;
   }
   const w = window as unknown as {

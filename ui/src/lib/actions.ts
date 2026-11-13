@@ -4,10 +4,11 @@ import { conjugate, makeClone } from "./clones";
 import { emptyDoc, useStore } from "../store";
 import type { DesignObject, ExportOptions, StitchDocument } from "../types";
 import { objectBounds, transformObject, translateMat, unionBoxes, uid } from "./geometry";
-import { dec, enc, isTauri, openFile, saveFile } from "./platform";
+import { dec, isTauri, openFile, saveFile } from "./platform";
 import { pendingThreadList, THREAD_LIST_EXT } from "./threadList";
 import { freshCopies } from "./copies";
 import { checkDoc } from "./docCheck";
+import { projectBytes } from "./projectFile";
 
 // every embroidery format the engine reads (crates/formats), extension aliases included
 export const MACHINE_EXT = [
@@ -182,7 +183,7 @@ export async function openDroppedFile(file: File) {
 export async function saveDocument(saveAs = false): Promise<boolean> {
   const s = useStore.getState();
   const doc = s.doc;
-  const bytes = enc.encode(JSON.stringify(doc, null, 1));
+  const bytes = projectBytes(doc);
   let path: string | null;
   try {
     path = await saveFile(`${doc.name || "design"}.filum`, bytes, [{ name: "Filum project", extensions: ["filum"] }], saveAs ? null : s.filePath);

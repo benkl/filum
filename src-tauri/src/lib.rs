@@ -4,6 +4,7 @@
 
 use std::sync::Mutex;
 
+mod safe_write;
 
 /// Files waiting to be opened by the editor: the ones Filum was started
 /// with ("Open with Filum" or a double-click on Windows and Linux), and on
@@ -14,6 +15,23 @@ struct OpenQueue(Mutex<Vec<String>>);
 #[tauri::command]
 fn startup_files(queue: tauri::State<OpenQueue>) -> Vec<String> {
     std::mem::take(&mut *queue.0.lock().unwrap())
+}
+
+/// Saves a file the user chose (the bytes are the request body, the name is in
+/// the `path` header): written next to it first, then put in its place, so a
+/// save that is cut off never leaves a half-written file.
+#[tauri::command]
+fn save_file(request: tauri::ipc::Request<'_>) -> Result<(), String> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("save_file: the file's bytes are missing".into());
+    };
+    let path = request
+        .headers()
+        .get("path")
+        .and_then(|v| v.to_str().ok())
+        .and_then(safe_write::decode_path)
+        .ok_or("save_file: no file name")?;
+    safe_write::write_replacing(std::path::Path::new(&path), bytes).map_err(|e| format!("{path}: {e}"))
 }
 
 /// The files among command-line arguments (a file name that isn't valid
@@ -60,7 +78,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![startup_files])
+        .invoke_handler(tauri::generate_handler![startup_files, save_file])
         .build(tauri::generate_context!())
         .expect("error while running Filum");
     app.run(|_app, _event| {

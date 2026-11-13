@@ -8,6 +8,7 @@ import type { ExportOptions, StitchDocument } from "../types";
 import { PICTURE_DEFAULTS, planPng, type PictureBackground } from "./planImage";
 import { saveFile } from "./platform";
 import { zip } from "./zip";
+import { projectBytes } from "./projectFile";
 
 /** Picture targets and Ink/Stitch's thread list (not engine formats). */
 export const PNG_TARGETS = ["png_realistic", "png_simple"] as const;
@@ -59,7 +60,7 @@ export async function targetBytes(doc: StitchDocument, t: string, opts: ExportOp
       threadWeight: doc.options?.threadWeight,
     });
   }
-  if (t === "filum") return new TextEncoder().encode(JSON.stringify(doc, null, 1));
+  if (t === "filum") return projectBytes(doc);
   return engine.export(doc, t, opts);
 }
 
