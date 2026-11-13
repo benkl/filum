@@ -327,12 +327,26 @@ export function transformObject(o: DesignObject, m: Mat, rotationDeg = 0): Desig
         ...(stitch.gradient.points ? { points: stitch.gradient.points.map((q) => ({ ...q, p: applyMat(m, q.p), spread: Math.max(0.5, q.spread * scale) })) } : {}),
       },
     };
+  // a radial or circular fill's centre is relative to the shape's box (0..1): a move or a
+  // scale leaves it right, a mirror or a turn takes it to the same point of the shape
+  if (stitch.type === "fill" && stitch.center && (m[1] || m[2] || m[0] < 0 || m[3] < 0)) {
+    const before = boundsOfPoints(o.paths.flatMap((p) => flatten(p, 8)));
+    const after = boundsOfPoints(transformPaths(o.paths, m).flatMap((p) => flatten(p, 8)));
+    if (before && after && after.w > 1e-9 && after.h > 1e-9) {
+      const [x, y] = applyMat(m, [before.x + before.w * stitch.center[0], before.y + before.h * stitch.center[1]]);
+      const rel = (v: number) => Math.round(v * 1e6) / 1e6;
+      stitch = { ...stitch, center: [rel((x - after.x) / after.w), rel((y - after.y) / after.h)] };
+    }
+  }
   if (stitch.type === "fill" && stitch.guide) stitch = { ...stitch, guide: transformPaths([stitch.guide], m)[0] };
   if (stitch.type === "fill" && stitch.flow) stitch = { ...stitch, flow: transformFlow(stitch.flow, m) };
   if (stitch.type === "running" && stitch.ripple?.target) stitch = { ...stitch, ripple: { ...stitch.ripple, target: applyMat(m, stitch.ripple.target) } };
   if (stitch.type === "running" && stitch.ripple?.guide?.length) stitch = { ...stitch, ripple: { ...stitch.ripple, guide: transformPaths(stitch.ripple.guide, m) } };
   if (stitch.type === "running" && stitch.ripple?.anchor)
     stitch = { ...stitch, ripple: { ...stitch.ripple, anchor: [applyMat(m, stitch.ripple.anchor[0]), applyMat(m, stitch.ripple.anchor[1])] } };
+  // the direction guides (rungs) travel with the rails
+  if (stitch.type === "satin" && stitch.guides?.length)
+    stitch = { ...stitch, guides: stitch.guides.map(([a, b]) => [applyMat(m, a), applyMat(m, b)] as [Vec2, Vec2]) };
   if (stitch.type === "satin" && (o.paths.length === 1 || stitch.multi) && Math.abs(scale - 1) > 1e-6)
     stitch = { ...stitch, width: Math.max(0.3, +(stitch.width * scale).toFixed(2)) };
   const out: DesignObject = { ...o, paths: transformPaths(o.paths, m), stitch };
