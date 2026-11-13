@@ -1,0 +1,55 @@
+# The same checks as `npm test`, on every pull request and every push to main:
+# the engine's Rust tests, the engine built to WebAssembly (the editor type-checks
+# against it), TypeScript, the editor's logic tests, and the wording and design checks.
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            ui/package-lock.json
+
+      - name: Rust (stable, with the WebAssembly target)
+        run: |
+          rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown
+          rustup default stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      # the version must match wasm-bindgen in Cargo.lock
+      - name: wasm-bindgen-cli
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen-cli@0.2.130
+
+      - name: JavaScript dependencies
+        run: |
+          npm ci
+          npm --prefix ui ci
+
+      - name: Engine to WebAssembly
+        run: npm run wasm
+
+      - name: npm test
+        run: npm test
