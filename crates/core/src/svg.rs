@@ -388,7 +388,9 @@ impl Sheet {
                 }
                 let mut depth = 0;
                 let mut end = rest.len();
-                for (i, c) in rest.char_indices().skip(open) {
+                // `open` is a byte index: walk from there (skipping `open`
+                // characters would pass the brace after a non-ASCII header)
+                for (i, c) in rest[open..].char_indices().map(|(i, c)| (open + i, c)) {
                     match c {
                         '{' => depth += 1,
                         '}' => {
@@ -692,6 +694,10 @@ fn shape_subpaths(node: roxmltree::Node, tf: Affine) -> Vec<SubPath> {
     }
 }
 
+/// The most bean repeats read from a file: far more than a design uses, few
+/// enough to plan (every repeat sews each stitch twice more).
+const MAX_BEAN_REPEATS: f64 = 50.0;
+
 struct Ink<'a> {
     /// Values as written, or as set by the legacy file update.
     attrs: HashMap<&'a str, std::borrow::Cow<'a, str>>,
@@ -863,7 +869,8 @@ impl<'a> Ink<'a> {
     }
     /// Bean repeats as passes: one value, or a pattern of several.
     fn beans(&self) -> (u32, Vec<u32>) {
-        let v: Vec<u32> = self.list("bean_stitch_repeats").into_iter().map(|x| x.max(0.0) as u32 * 2).collect();
+        // capped: a huge value would multiply every stitch past what can be planned
+        let v: Vec<u32> = self.list("bean_stitch_repeats").into_iter().map(|x| x.clamp(0.0, MAX_BEAN_REPEATS) as u32 * 2).collect();
         match v.len() {
             0 => (0, vec![]),
             1 => (v[0], vec![]),
@@ -2997,6 +3004,18 @@ mod tests {
             ]
         );
         assert!(d.objects.iter().all(|o| matches!(o.stitch, StitchParams::Fill(_))), "stroke:none from the class");
+    }
+
+    #[test]
+    fn a_rule_after_an_at_rule_with_non_ascii_text_still_applies() {
+        let d = imp(&format!(r##"<style>@media (x:"é") {{ .q {{ fill:#ff0000 }} }} .a {{ fill:#0000ff }}</style><path class="a" {SQ}/>"##));
+        assert_eq!(color(&d, &d.objects[0]), "#0000ff");
+    }
+
+    #[test]
+    fn huge_bean_repeats_are_capped() {
+        let d = imp(&format!(r##"<path {SQ} style="fill:#f00" inkstitch:bean_stitch_repeats="1000000000000"/>"##));
+        assert_eq!(fill_of(&d.objects[0]).bean_repeats, MAX_BEAN_REPEATS as u32 * 2);
     }
 
     #[test]

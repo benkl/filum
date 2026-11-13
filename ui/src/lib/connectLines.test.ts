@@ -1,7 +1,7 @@
 // Connect line pieces into continuous lines (npm run test:match).
 
 import type { SubPath, Vec2 } from "../types";
-import { connectLines, DEFAULT_CONNECT, doubledPieces, reversePiece } from "./connectLines";
+import { connectLines, DEFAULT_CONNECT, doubledPieces, nearestPairs, reversePiece } from "./connectLines";
 
 let failed = 0;
 const check = (ok: boolean, msg: string) => {
@@ -61,6 +61,26 @@ check(cc.lines === 1 && !!mid.i && !!mid.o && near(mid.p, [10, 0]), "curved piec
 
 // closed paths stay as they are
 check(connectLines([{ closed: true, nodes: [{ p: [0, 0] }, { p: [5, 0] }, { p: [5, 5] }] }, line([20, 0], [30, 0])]).paths.length === 2, "closed shapes are left alone");
+
+// many loose ends (a hatching drawing): paired nearest first, quickly, without
+// comparing every pair (thousands of pieces ran out of memory)
+{
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const many: Vec2[] = Array.from({ length: 8001 }, () => [rnd() * 300, rnd() * 300] as Vec2);
+  const ids = many.map((_, i) => i);
+  const t0 = Date.now();
+  const pairs = nearestPairs(many, ids);
+  const seen = new Set(pairs.flat());
+  check(pairs.length === 4000 && seen.size === 8000, "8,001 ends: 4,000 pairs, each end once");
+  check(Date.now() - t0 < 5000, `8,001 ends paired in ${Date.now() - t0} ms`);
+  const mean = pairs.reduce((s, [u, v]) => s + Math.hypot(many[u][0] - many[v][0], many[u][1] - many[v][1]), 0) / pairs.length;
+  check(mean < 5, `mostly near neighbours (mean ${mean.toFixed(2)} mm)`);
+  // few ends: every pair compared, the nearest pair first
+  const few: Vec2[] = [[0, 0], [100, 0], [1, 0], [100, 2]];
+  const fp = nearestPairs(few, [0, 1, 2, 3]);
+  check(fp.length === 2 && fp[0].join() === "0,2" && fp[1].join() === "1,3", "few ends: nearest pairs first");
+}
 
 console.log(failed ? `${failed} FAILED` : "all passed");
 if (failed) throw new Error(`${failed} connect checks failed`);

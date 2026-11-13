@@ -85,7 +85,10 @@ function useShortcuts() {
         else joinSelection();
         return;
       }
-      if (mod && (k === "8" || e.code === "Digit8")) {
+      // the key code as well, for layouts where Shift+8 is another character,
+      // but not with AltGr: AltGr+8 types "[" on many European keyboards
+      // (and reports Ctrl and Alt on Windows)
+      if (mod && (k === "8" || (e.code === "Digit8" && !e.getModifierState?.("AltGraph")))) {
         e.preventDefault();
         if (e.altKey && e.shiftKey) releaseSelection();
         else compoundSelection();

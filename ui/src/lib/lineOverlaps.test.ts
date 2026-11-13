@@ -37,5 +37,11 @@ check(lineOverlaps([run("a", line([0, 0], [20, 0])), run("b", line([0, 1], [20, 
 check(lineOverlaps([run("a", line([0, 0], [10, 0])), run("b", line([10, 0], [20, 0]))]).length === 0, "pieces meeting end to end: not doubled");
 check(lineOverlaps([run("a", line([0, 0], [10, 0], [10, 10], [0, 10]))]).length === 0, "a line turning corners: not doubled");
 
+// a running stitch under a satin sewn after it: its underpath (Auto-route satins)
+const satin = (id: string, ...paths: SubPath[]): DesignObject => ({ ...run(id, ...paths), stitch: { type: "satin", width: 3 } }) as unknown as DesignObject;
+check(lineOverlaps([run("u", line([0, 0], [20, 0])), satin("s", line([0, 0], [20, 0]))]).length === 0, "a satin over its underpath: not doubled");
+check(lineOverlaps([satin("s", line([0, 0], [20, 0])), run("r", line([0, 0], [20, 0]))]).length === 1, "a running line sewn over a satin still is");
+check(lineOverlaps([satin("a", line([0, 0], [20, 0])), satin("b", line([0, 0], [20, 0]))]).length === 1, "two satins on top of each other still are");
+
 console.log(failed ? `${failed} FAILED` : "all passed");
 if (failed) throw new Error(`${failed} overlap checks failed`);

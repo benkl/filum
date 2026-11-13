@@ -6,6 +6,7 @@ import type { View } from "../store";
 import { threadWidth } from "../lib/materials";
 import { paintInteractive, paintUnderlays, type InteractiveOverlay } from "./interactive";
 import { colourGroup, groupPicture } from "./vectorGradient";
+import { transformable } from "../lib/textSettle";
 import type { DensityMode } from "../lib/density";
 
 // Rendering model
@@ -1074,7 +1075,9 @@ export class Renderer {
         ctx.lineWidth = (mode === "vector" ? 1.6 : 1.4) / scale;
         ctx.stroke(p);
       }
-      const box = unionBoxes(sel.map(objectBoundsCached));
+      // the handles go round what a drag transforms (locked objects, and
+      // letterings with a locked letter, stay put), as the pointer hit-tests them
+      const box = unionBoxes(transformable(sel, doc.objects).objects.map(objectBoundsCached));
       if (box && !overlay.nodes) drawHandles(ctx, box, scale, theme.select);
       if (overlay.nodes) {
         const picked = new Set((overlay.nodeSel ?? []).map((n) => `${n.id}/${n.sp}/${n.ni}`));

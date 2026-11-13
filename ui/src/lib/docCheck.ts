@@ -58,5 +58,20 @@ export function checkDoc(raw: unknown, base: StitchDocument): { doc: StitchDocum
     if (thread === t.thread && borderThread === t.borderThread && (!Array.isArray(t.palette) || palette!.every((id, i) => id === t.palette![i]))) return fixed;
     return { ...fixed, text: { ...t, thread, borderThread, ...(palette ? { palette } : {}) } };
   });
+  // a design from Filum 0.2.0 or earlier: its embroidery-font letterings keep
+  // their spacing in mm until they are laid out again (then it is converted)
+  const version = typeof raw.version === "number" ? raw.version : 1;
+  if (version < 2) {
+    doc.objects = doc.objects.map((o) => {
+      const t = o.text;
+      const emb = !!t && typeof t.font === "string" && (t.font.startsWith("emb:") || t.font.startsWith("inkfont:"));
+      return emb && (t.letterSpacing || t.wordSpacing) ? { ...o, text: { ...t, legacySpacing: true } } : o;
+    });
+  }
+  doc.version = Math.max(version, DOC_VERSION);
   return { doc, dropped: raw.objects.length - unique.length };
 }
+
+/** The version of the designs this Filum writes. 2: embroidery-font lettering
+ *  spacing at the font's own size (`TextSpec.legacySpacing` marks older ones). */
+export const DOC_VERSION = 2;

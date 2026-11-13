@@ -37,7 +37,7 @@ import { handlePoints, readTheme, Renderer, rotateHandle, RULER, type Overlay, t
 import { StitchGL } from "./gl";
 import { threadWidth } from "../lib/materials";
 import { computeHandles, computeTextHandles, dragHandle, HANDLE_HIT_PX, reverseObject, type Handle } from "./handles";
-import { createTextAt, selectedTextGroup, textSpec, updateText } from "../lib/textOps";
+import { createTextAt, modernSpacing, selectedTextGroup, textSpec, updateText } from "../lib/textOps";
 import { members, type TextSpec } from "../lib/text";
 import type { InteractiveOverlay } from "./interactive";
 import { buildSatin, satinOutlineOf, zigzagPreview } from "../lib/satinDraw";
@@ -100,6 +100,16 @@ import { pruneGroups } from "../lib/layerRows";
 import { freshCopies } from "../lib/copies";
 import { transformable } from "../lib/textSettle";
 import { loadFont } from "../lib/fonts";
+
+/**
+ * The box a transform drag works on: round the selected objects it moves
+ * (locked objects, and letterings with a locked letter, stay put). The handles
+ * are drawn, hit-tested and given cursors on this one box.
+ */
+function transformBox(doc: StitchDocument, selection: string[]) {
+  const sel = transformable(doc.objects.filter((o) => selection.includes(o.id)), doc.objects).objects;
+  return sel.length ? unionBoxes(sel.map(objectBoundsCached)) : null;
+}
 
 /**
  * The points a node-tool box picks on the selected paths: those inside it,
@@ -442,7 +452,7 @@ export function Canvas() {
       // transform pivot of the selection
       let pivot: Vec2 | null = null;
       if (s.tool === "select" && s.selection.length && s.anim.index == null && !s.editingText) {
-        const sb = unionBoxes(s.doc.objects.filter((o) => s.selection.includes(o.id)).map(objectBoundsCached));
+        const sb = transformBox(s.doc, s.selection);
         if (sb) pivot = pivotOf(sb);
       }
       // gradient annotator
@@ -1370,6 +1380,8 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
           void loadFont(spec.font).then((f) => {
             if (f.kind === "embroidery" && f.size > 0) drag.spacingScale = spec.size / f.size;
           });
+          // an older design's spacing (mm): the drag starts from it in today's terms
+          if (spec.legacySpacing) void modernSpacing(spec).then((m) => (drag.spec = m));
           iRef.current.activeHandle = hh;
           return;
         }
@@ -1753,8 +1765,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         if (changed) draw();
         if (hh) return;
         // transform box: resize / skew / rotate / pivot cursors
-        const sel = s.doc.objects.filter((o) => s.selection.includes(o.id));
-        const sb = sel.length && sel.every((o) => !o.locked) ? unionBoxes(sel.map(objectBoundsCached)) : null;
+        const sb = transformBox(s.doc, s.selection);
         if (sb && canvasRef.current) {
           const t = 6 / s.view.scale;
           const hi = handlePoints(sb).findIndex((h) => dist(h, p) < t);
@@ -2010,7 +2021,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
       }
       case "pivot": {
         // snap the pivot to the box's handles and centre
-        const sb = unionBoxes(s.doc.objects.filter((o) => s.selection.includes(o.id)).map(objectBoundsCached));
+        const sb = transformBox(s.doc, s.selection);
         let q: Vec2 = p;
         if (sb) {
           const cands = [...handlePoints(sb), [sb.x + sb.w / 2, sb.y + sb.h / 2] as Vec2];
@@ -2272,8 +2283,10 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
     // the drag's transform is done: the plan follows the document again
     if (s.live) s.liveTransform(null);
     if (!d) return;
-    // a click or a drag that changed nothing: no undo step, the redo steps stay
-    s.dropCheckpoint();
+    // a click or a drag that changed nothing: no undo step, the redo steps stay.
+    // A lettering handle that moved keeps it: its new layout may land only
+    // after the release (the font loads first), and that change needs the step.
+    if (!(d.kind === "texthandle" && d.moved)) s.dropCheckpoint();
     if (d.kind === "move" || d.kind === "scale" || d.kind === "rotate" || d.kind === "skew" || d.kind === "pivot") {
       iRef.current.guides = null;
       iRef.current.tooltip = null;

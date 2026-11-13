@@ -21,6 +21,10 @@ export interface TextSpec {
   letterSpacing: number;
   /** Extra space between words, mm (Ink/Stitch word spacing; scales like the letter spacing). */
   wordSpacing?: number;
+  /** Embroidery fonts in designs saved by Filum 0.2.0 and earlier: the letter
+   *  and word spacing are plain mm at the lettering's size. Converted to the
+   *  font's own size the next time the lettering is laid out (`modernSpacing`). */
+  legacySpacing?: boolean;
   /** Multiplier of the font's line height. */
   lineSpacing: number;
   /** "block": every line spread to the widest one by widening the gaps

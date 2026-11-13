@@ -225,6 +225,20 @@ async function applyEdit(group: string, edit: Edit): Promise<boolean> {
   }
 }
 
+/**
+ * A lettering saved by Filum 0.2.0 or earlier in an embroidery font kept its
+ * letter and word spacing in mm at its size; now they are at the font's own
+ * size and scale with the letters (as in Ink/Stitch). Converted so the
+ * lettering keeps its look.
+ */
+export async function modernSpacing(spec: TextSpec): Promise<TextSpec> {
+  if (!spec.legacySpacing) return spec;
+  const { legacySpacing: _, ...rest } = spec;
+  const f = await loadFont(spec.font);
+  const scale = f.kind === "embroidery" && f.size > 0 ? spec.size / f.size : 1;
+  return { ...rest, letterSpacing: spec.letterSpacing / scale, ...(spec.wordSpacing ? { wordSpacing: spec.wordSpacing / scale } : {}) };
+}
+
 async function layoutEdit(group: string, { patch, live, also }: Edit, again: boolean, jumped: () => boolean): Promise<boolean | "rebase"> {
   const before = members(useStore.getState().doc.objects, group);
   if (!before.length) {
@@ -236,9 +250,15 @@ async function layoutEdit(group: string, { patch, live, also }: Edit, again: boo
     lockedToast();
     return false;
   }
-  // the spec as it is now (earlier edits applied)
+  // the spec as it is now (earlier edits applied), its spacing in today's terms
   const cur = before[0].text!;
-  let spec: TextSpec = { ...cur, ...patch, role: undefined, colorIndex: undefined };
+  let spec: TextSpec;
+  try {
+    spec = { ...(await modernSpacing(cur)), ...patch, role: undefined, colorIndex: undefined };
+  } catch (e) {
+    useStore.getState().toast(`Lettering: ${(e as Error).message}`, "error");
+    return false;
+  }
   // another font has other colours
   if (patch.font && patch.font !== cur.font && !patch.palette) spec.palette = undefined;
   let objs: DesignObject[];

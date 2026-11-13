@@ -778,7 +778,11 @@ pub fn circular(
     let stop = distance + if end_spacing > 0.0 { end_spacing } else { sp } * 2.0;
     while r < stop && radii.len() < 100_000 {
         radii.push(r);
-        r += if end_spacing > 0.0 { sp + (end_spacing - sp) * (r / distance.max(1e-9)) } else { sp };
+        // the step goes from the row spacing at the centre to the end spacing
+        // at the edge; past the edge it never drops below the smaller of the
+        // two (else, with an end spacing under the row spacing, it shrinks
+        // towards zero before the circles reach `stop`)
+        r += if end_spacing > 0.0 { (sp + (end_spacing - sp) * (r / distance.max(1e-9))).max(end_spacing.min(sp)) } else { sp };
     }
     radii.reverse();
     let circles: Vec<Vec<Point>> = radii.iter().map(|&r| circle(r)).collect();

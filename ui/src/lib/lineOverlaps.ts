@@ -75,6 +75,7 @@ export function lineOverlaps(objects: DesignObject[], opts: { skipSelf?: (o: Des
   for (const { o, k, s } of lines) {
     if (!s) continue;
     const skipSelf = opts.skipSelf?.(o) ?? false;
+    const satin = o.stitch.type === "satin";
     // per sample: covered by another line (its index) or by itself
     const byOther = new Map<number, number>();
     let selfLen = 0;
@@ -90,6 +91,9 @@ export function lineOverlaps(objects: DesignObject[], opts: { skipSelf?: (o: Des
             for (const q of grid.get(`${cx + dx},${cy + dy}`) ?? []) {
               const qp = lines[q.k].s!.lines[q.l].pts[q.i];
               if ((qp[0] - p[0]) ** 2 + (qp[1] - p[1]) ** 2 > TOL * TOL) continue;
+              // a running stitch sewn first and covered by a satin is its
+              // underpath (Auto-route satins lays them so), not a doubled line
+              if (q.k !== k && satin && lines[q.k].o.stitch.type === "running") continue;
               if (q.k !== k) {
                 other = q.k;
                 break;

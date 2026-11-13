@@ -108,5 +108,14 @@ const bad = checkDoc({ objects: [obj("ok"), { id: "x" }, obj("ok")], threads: nu
 check(bad.doc.objects.length === 1 && bad.dropped === 2, "damaged and repeated objects are left out");
 check(bad.doc.threads.length === 1 && bad.doc.objects[0].thread === bad.doc.threads[0].id, "objects without their thread get one");
 
+// a design from Filum 0.2.0: its embroidery-font spacing (mm) is marked for converting
+const lettering = (font: string, letterSpacing: number) => obj(`l-${font}`, { text: { group: "g", content: "Hi", font, size: 10, letterSpacing, lineSpacing: 1 } as unknown as DesignObject["text"] });
+const old = checkDoc({ objects: [lettering("emb:amitaclo", 2), lettering("emb:other", 0), lettering("ttf:x", 2)], threads: [] }, base)!.doc;
+check(old.objects[0].text?.legacySpacing === true, "0.2.0 design: embroidery-font spacing marked as mm");
+check(!old.objects[1].text?.legacySpacing && !old.objects[2].text?.legacySpacing, "no spacing, or an outline font: nothing to convert");
+check(old.version === 2, "loaded as today's version (saved again, it isn't converted twice)");
+const now = checkDoc({ version: 2, objects: [lettering("emb:amitaclo", 2)], threads: [] }, base)!.doc;
+check(!now.objects[0].text?.legacySpacing, "a design saved today: its spacing stays as it is");
+
 console.log(failed ? `${failed} FAILED` : "all passed");
 if (failed) throw new Error(`${failed} copy checks failed`);

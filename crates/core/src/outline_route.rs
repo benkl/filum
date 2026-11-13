@@ -13,11 +13,13 @@
 use crate::geom::{polyline_length, Point};
 use crate::model::{HiddenRule, Object, RunningParams, SatinParams, StitchParams, SubPath};
 
-/// A line to route: its centre line and how it is sewn.
+/// A line to route: its centre line, and the object it comes from (whose
+/// settings its pieces are sewn with).
 #[derive(Clone)]
 struct Line {
     pts: Vec<Point>,
     closed: bool,
+    src: usize,
 }
 
 fn seg_project(p: Point, a: Point, b: Point) -> (f64, Point) {
@@ -79,18 +81,18 @@ fn cut(line: &Line, mut at: Vec<f64>, keep: f64) -> Vec<Line> {
     if line.closed {
         // a loop cut at k points: k pieces, the last one through the start
         for w in at.windows(2) {
-            out.push(Line { pts: piece(w[0], w[1]), closed: false });
+            out.push(Line { pts: piece(w[0], w[1]), closed: false, src: line.src });
         }
         let mut wrap = piece(*at.last().unwrap(), total);
         wrap.extend(piece(0.0, at[0]).into_iter().skip(1));
-        out.push(Line { pts: wrap, closed: false });
+        out.push(Line { pts: wrap, closed: false, src: line.src });
     } else {
         let mut s0 = 0.0;
         for &s in &at {
-            out.push(Line { pts: piece(s0, s), closed: false });
+            out.push(Line { pts: piece(s0, s), closed: false, src: line.src });
             s0 = s;
         }
-        out.push(Line { pts: piece(s0, total), closed: false });
+        out.push(Line { pts: piece(s0, total), closed: false, src: line.src });
     }
     out.into_iter().filter(|l| l.pts.len() >= 2).collect()
 }
@@ -162,24 +164,6 @@ pub fn route_lines(objects: Vec<Object>, cursor: Point) -> Vec<Object> {
     if mine.len() < 2 {
         return rest.into_iter().chain(mine).collect();
     }
-    // the widest column sets how near lines must come to meet
-    let width = mine
-        .iter()
-        .map(|o| match &o.stitch {
-            StitchParams::Satin(p) => p.width,
-            _ => 0.3,
-        })
-        .fold(0.3f64, f64::max);
-    let tol = (width * 0.75).max(0.5);
-    let template = mine[0].clone();
-    let satin = mine.iter().find_map(|o| match &o.stitch {
-        StitchParams::Satin(p) => Some(p.clone()),
-        _ => None,
-    });
-    let running = mine.iter().find_map(|o| match &o.stitch {
-        StitchParams::Running(p) => Some(p.clone()),
-        _ => None,
-    });
     // satin and running lines are routed apart (one network each)
     let mut out: Vec<Object> = rest;
     let mut pos = cursor;
@@ -187,20 +171,32 @@ pub fn route_lines(objects: Vec<Object>, cursor: Point) -> Vec<Object> {
     for want_satin in [false, true] {
         let lines: Vec<Line> = mine
             .iter()
-            .filter(|o| matches!(o.stitch, StitchParams::Satin(_)) == want_satin)
-            .map(|o| Line { pts: o.paths[0].flatten(0.05), closed: o.paths[0].closed })
+            .enumerate()
+            .filter(|(_, o)| matches!(o.stitch, StitchParams::Satin(_)) == want_satin)
+            .map(|(i, o)| Line { pts: o.paths[0].flatten(0.05), closed: o.paths[0].closed, src: i })
             .filter(|l| l.pts.len() >= 2)
             .collect();
         if lines.is_empty() {
             continue;
         }
+        // the network's widest column sets how near its lines must come to meet
+        let width = lines
+            .iter()
+            .map(|l| match &mine[l.src].stitch {
+                StitchParams::Satin(p) => p.width,
+                _ => 0.3,
+            })
+            .fold(0.3f64, f64::max);
+        let tol = (width * 0.75).max(0.5);
         let edges = split_at_junctions(lines, tol);
-        let make = |pts: Vec<Point>, closed: bool, step: &str, k: usize| -> Object {
-            let stitch = match (step, &satin, &running) {
-                ("path", _, _) => StitchParams::Running(RunningParams { length: 2.0, ..Default::default() }),
-                ("outback", Some(sp), _) if want_satin => StitchParams::Satin(SatinParams { center_walk: true, center_walk_repeats: 1, ..sp.clone() }),
-                (_, Some(sp), _) if want_satin => StitchParams::Satin(SatinParams { center_walk: true, center_walk_repeats: 2, ..sp.clone() }),
-                (_, _, Some(rp)) => StitchParams::Running(rp.clone()),
+        // every piece is sewn with the settings of the line it was cut from
+        let make = |pts: Vec<Point>, closed: bool, step: &str, k: usize, src: usize| -> Object {
+            let template = &mine[src];
+            let stitch = match (step, &template.stitch) {
+                ("path", _) => StitchParams::Running(RunningParams { length: 2.0, ..Default::default() }),
+                ("outback", StitchParams::Satin(sp)) => StitchParams::Satin(SatinParams { center_walk: true, center_walk_repeats: 1, ..sp.clone() }),
+                (_, StitchParams::Satin(sp)) => StitchParams::Satin(SatinParams { center_walk: true, center_walk_repeats: 2, ..sp.clone() }),
+                (_, StitchParams::Running(rp)) => StitchParams::Running(rp.clone()),
                 _ => StitchParams::Running(RunningParams::default()),
             };
             let name = match step {
@@ -211,7 +207,7 @@ pub fn route_lines(objects: Vec<Object>, cursor: Point) -> Vec<Object> {
             // running stitches under covers are removed (a gap there would
             // bring the trims back)
             let hidden = if step == "path" { Some(HiddenRule { keep: true, ..template.hidden.unwrap_or_default() }) } else { template.hidden };
-            Object { id: format!("{}r{k}", template.id), name, paths: vec![SubPath::polyline(&pts, closed)], stitch, hidden, ..template.clone() }
+            Object { id: format!("{}r{k}", mine[0].id), name, paths: vec![SubPath::polyline(&pts, closed)], stitch, hidden, ..template.clone() }
         };
         let steps = walk(&edges, tol, &mut pos);
         for st in steps {
@@ -226,17 +222,18 @@ pub fn route_lines(objects: Vec<Object>, cursor: Point) -> Vec<Object> {
                 pts.reverse();
             }
             let closed = edges[e].closed;
+            let src = edges[e].src;
             if kind == "outback" && !want_satin {
                 // a running line: a plain path out, the line itself sewn back
                 // (a triple stitch would lay six passes going out and back)
-                out.push(make(pts.clone(), closed, "path", k));
+                out.push(make(pts.clone(), closed, "path", k, src));
                 pts.reverse();
                 k += 1;
-                out.push(make(pts, closed, "sew", k));
+                out.push(make(pts, closed, "sew", k, src));
                 continue;
             }
             if kind != "path" || polyline_length(&pts) > 0.5 {
-                out.push(make(pts, closed, kind, k));
+                out.push(make(pts, closed, kind, k, src));
             }
         }
     }
@@ -325,7 +322,7 @@ fn walk(edges: &[Line], tol: f64, pos: &mut Point) -> Vec<Step> {
             }
             depth.insert(u, d);
         }
-        let end = emit(start, true, &items, &mut steps);
+        let end = emit(start, &items, &mut steps);
         *pos = nodes[end];
     }
     steps
@@ -344,13 +341,42 @@ enum Item {
 
 /// The steps of the subtree at `u`. On the final chain the last item is sewn
 /// forward and the walk ends below it; elsewhere every branch comes back.
-/// Returns the node the walk ends at.
-fn emit(u: usize, chain: bool, items: &std::collections::HashMap<usize, Vec<Item>>, steps: &mut Vec<Step>) -> usize {
-    let list = items.get(&u).map(|v| v.as_slice()).unwrap_or(&[]);
-    let n = list.len();
-    for (i, it) in list.iter().enumerate() {
-        let last = chain && i + 1 == n;
-        match *it {
+/// Returns the node the walk ends at. An explicit stack, not recursion: a
+/// mesh of lines can make the tree as deep as it has nodes.
+fn emit(start: usize, items: &std::collections::HashMap<usize, Vec<Item>>, steps: &mut Vec<Step>) -> usize {
+    /// A node being emitted: the next item to emit, and the branch it went
+    /// down (where its steps began, the edge) to finish when it comes back.
+    struct Frame {
+        u: usize,
+        chain: bool,
+        next: usize,
+        branch: Option<(usize, usize, bool)>,
+    }
+    let mut stack = vec![Frame { u: start, chain: true, next: 0, branch: None }];
+    loop {
+        let top = stack.len() - 1;
+        if let Some((mark, e, fwd)) = stack[top].branch.take() {
+            if steps.len() == mark + 1 {
+                // a dead end: one column out under itself and back
+                steps.pop();
+                steps.push(Step::OutBack(e, fwd));
+            } else {
+                steps.push(Step::Sew(e, !fwd));
+            }
+        }
+        let Frame { u, chain, next: i, .. } = stack[top];
+        let list = items.get(&u).map(|v| v.as_slice()).unwrap_or(&[]);
+        if i == list.len() {
+            stack.pop();
+            // the chain is only ever the bottom frame: the walk ends here
+            if chain || stack.is_empty() {
+                return u;
+            }
+            continue;
+        }
+        stack[top].next += 1;
+        let last = chain && i + 1 == list.len();
+        match list[i] {
             Item::Loop(e) => steps.push(Step::Sew(e, true)),
             Item::Back(e, fwd, v) if last => {
                 // nothing left to come back for: sewn once, ending over there
@@ -359,24 +385,17 @@ fn emit(u: usize, chain: bool, items: &std::collections::HashMap<usize, Vec<Item
             }
             Item::Back(e, fwd, _) => steps.push(Step::OutBack(e, fwd)),
             Item::Child(e, fwd, v) if last => {
+                // the final chain goes on below the child (in place of this node)
                 steps.push(Step::Sew(e, fwd));
-                return emit(v, true, items, steps);
+                stack[top] = Frame { u: v, chain: true, next: 0, branch: None };
             }
             Item::Child(e, fwd, v) => {
-                let mark = steps.len();
+                stack[top].branch = Some((steps.len(), e, fwd));
                 steps.push(Step::Path(e, fwd));
-                emit(v, false, items, steps);
-                if steps.len() == mark + 1 {
-                    // a dead end: one column out under itself and back
-                    steps.pop();
-                    steps.push(Step::OutBack(e, fwd));
-                } else {
-                    steps.push(Step::Sew(e, !fwd));
-                }
+                stack.push(Frame { u: v, chain: false, next: 0, branch: None });
             }
         }
     }
-    u
 }
 
 #[cfg(test)]
@@ -448,5 +467,44 @@ mod tests {
             let covered = routed[i + 1..].iter().any(|c| matches!(c.stitch, StitchParams::Satin(_)) && c.paths[0].flatten(0.05).windows(2).any(|w| seg_project(mid, w[0], w[1]).1.dist(mid) < 0.1));
             assert!(covered, "{} is never covered", o.name);
         }
+    }
+
+    #[test]
+    fn every_piece_keeps_its_own_lines_width() {
+        // a thin and a wide column crossing: cut into four, each as wide as its line
+        let mut thin = line(&[(0.0, 5.0), (20.0, 5.0)], true);
+        let mut wide = line(&[(10.0, 0.0), (10.0, 10.0)], true);
+        thin.stitch = StitchParams::Satin(SatinParams { width: 1.2, ..Default::default() });
+        wide.stitch = StitchParams::Satin(SatinParams { width: 4.0, ..Default::default() });
+        let routed = route_lines(vec![thin, wide], pt(0.0, 5.0));
+        let mut widths: Vec<(bool, f64)> = Vec::new();
+        for o in &routed {
+            if let StitchParams::Satin(p) = &o.stitch {
+                let pts = o.paths[0].flatten(0.05);
+                let horizontal = (pts[0].y - pts[pts.len() - 1].y).abs() < 1e-6;
+                widths.push((horizontal, p.width));
+            }
+        }
+        assert!(widths.len() >= 4, "{widths:?}");
+        for (horizontal, w) in widths {
+            assert_eq!(w, if horizontal { 1.2 } else { 4.0 }, "a {} piece", if horizontal { "thin" } else { "wide" });
+        }
+    }
+
+    #[test]
+    fn a_very_deep_walk_does_not_overflow_the_stack() {
+        // a chain of branches as deep as a big mesh of lines: every node has a
+        // child that comes back and a loop after it
+        let n = 200_000;
+        let mut items: std::collections::HashMap<usize, Vec<Item>> = Default::default();
+        for u in 0..n {
+            items.insert(u, vec![Item::Child(u, true, u + 1), Item::Loop(n + u)]);
+        }
+        let mut steps = Vec::new();
+        let end = emit(0, &items, &mut steps);
+        assert_eq!(end, 0, "the last item is a loop at the start: the walk ends there");
+        // every edge once: a path out and a sew back for each child, a sew for
+        // each loop, but the last child is a dead end (one out-and-back)
+        assert_eq!(steps.len(), 3 * n - 1);
     }
 }

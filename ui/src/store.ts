@@ -11,7 +11,7 @@ import { freshCopies, mergeThreads, placeCopies, remapThreads } from "./lib/copi
 import { settleTexts } from "./lib/textSettle";
 import { repairLayers } from "./lib/fillLayers";
 import { safeSetItem } from "./lib/storage";
-import { checkDoc } from "./lib/docCheck";
+import { checkDoc, DOC_VERSION } from "./lib/docCheck";
 import { INKSTITCH_DEFAULTS } from "./lib/machines";
 import type {
   DensityField,
@@ -253,7 +253,8 @@ function playerPrefs(): { speed: number; follow: boolean } {
 }
 
 export const emptyDoc = (): StitchDocument => ({
-  version: 1,
+  // 2: embroidery-font lettering spacing at the font's own size (see `TextSpec.legacySpacing`)
+  version: DOC_VERSION,
   name: "Untitled",
   threads: [],
   objects: [],

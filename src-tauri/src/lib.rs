@@ -18,16 +18,23 @@ fn startup_files(queue: tauri::State<OpenQueue>) -> Vec<String> {
 
 /// The files among command-line arguments (a file name that isn't valid
 /// Unicode is passed on as well as it can be, rather than stopping the start).
-fn files_in<I: IntoIterator<Item = std::ffi::OsString>>(args: I) -> Vec<String> {
+/// `cwd`: the folder relative names are in, when it isn't this process's own
+/// (a second launch hands its arguments to the running Filum).
+fn files_in<I: IntoIterator<Item = std::ffi::OsString>>(args: I, cwd: Option<&std::path::Path>) -> Vec<String> {
     args.into_iter()
         .skip(1)
-        .filter(|a| !a.to_string_lossy().starts_with('-') && std::path::Path::new(a).is_file())
-        .map(|a| a.to_string_lossy().into_owned())
+        .filter(|a| !a.to_string_lossy().starts_with('-'))
+        .map(|a| match cwd {
+            Some(dir) => dir.join(&a),
+            None => std::path::PathBuf::from(a),
+        })
+        .filter(|p| p.is_file())
+        .map(|p| p.to_string_lossy().into_owned())
         .collect()
 }
 
 fn launch_files() -> Vec<String> {
-    files_in(std::env::args_os())
+    files_in(std::env::args_os(), None)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -35,9 +42,11 @@ pub fn run() {
     let app = tauri::Builder::default()
         // one Filum at a time: a file opened while it runs goes to the open
         // window (two windows would share, and overwrite, one autosave)
-        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+        .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
             use tauri::{Emitter, Manager};
-            let paths = files_in(argv.into_iter().map(std::ffi::OsString::from));
+            // relative names are in the second launch's folder, not ours
+            // (joining keeps an absolute name as it is)
+            let paths = files_in(argv.into_iter().map(std::ffi::OsString::from), Some(std::path::Path::new(&cwd)));
             if !paths.is_empty() {
                 app.state::<OpenQueue>().0.lock().unwrap().extend(paths);
                 let _ = app.emit("open-files", ());

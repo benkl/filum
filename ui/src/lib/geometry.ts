@@ -343,8 +343,9 @@ export function transformObject(o: DesignObject, m: Mat, rotationDeg = 0): Desig
     // keep the lettering parametric: its spec follows the transform
     const t = o.text;
     // embroidery fonts keep their spacing at the font's own size (it scales with
-    // the letters already); outline fonts' spacing is in mm
-    const spaced = t.font.startsWith("emb:") || t.font.startsWith("inkfont:") ? 1 : scale;
+    // the letters already); outline fonts' spacing is in mm, and so is an older
+    // design's embroidery-font spacing until it is converted
+    const spaced = (t.font.startsWith("emb:") || t.font.startsWith("inkfont:")) && !t.legacySpacing ? 1 : scale;
     out.text = {
       ...t,
       anchor: applyMat(m, t.anchor),

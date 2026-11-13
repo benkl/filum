@@ -63,6 +63,78 @@ function startDir(sp: SubPath): Vec2 {
   return Math.hypot(d[0], d[1]) > 1e-9 ? norm(d) : norm(sub(sp.nodes[1].p, a));
 }
 
+/** Every pair among this many points is compared; above it, only each point's
+ *  nearest neighbours (all pairs of thousands of loose ends ran out of memory). */
+const ALL_PAIRS_UP_TO = 1500;
+const NEIGHBOURS = 8;
+
+/** The points `ids` (into `pos`) paired up, nearest pairs first and each point
+ *  once (one is left over when their number is odd). */
+export function nearestPairs(pos: Vec2[], ids: number[]): [number, number][] {
+  const out: [number, number][] = [];
+  const used = new Set<number>();
+  let left = ids;
+  // every round pairs at least its nearest candidate pair; with all pairs
+  // compared, one round pairs every point
+  while (left.length > 1) {
+    const cand: [number, number, number][] = [];
+    if (left.length <= ALL_PAIRS_UP_TO) {
+      for (let i = 0; i < left.length; i++) for (let j = i + 1; j < left.length; j++) cand.push([d2(pos[left[i]], pos[left[j]]), left[i], left[j]]);
+    } else {
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (const v of left) {
+        const [x, y] = pos[v];
+        x0 = Math.min(x0, x); y0 = Math.min(y0, y);
+        x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+      }
+      // about one point per cell
+      const cell = Math.max(x1 - x0, y1 - y0, 1e-6) / Math.sqrt(left.length);
+      const cols = Math.floor((x1 - x0) / cell) + 1;
+      const rows = Math.floor((y1 - y0) / cell) + 1;
+      const cellOf = (p: Vec2): [number, number] => [Math.floor((p[0] - x0) / cell), Math.floor((p[1] - y0) / cell)];
+      const grid = new Map<number, number[]>();
+      for (const v of left) {
+        const [cx, cy] = cellOf(pos[v]);
+        const k = cy * cols + cx;
+        const list = grid.get(k);
+        if (list) list.push(v);
+        else grid.set(k, [v]);
+      }
+      for (const u of left) {
+        const [cx, cy] = cellOf(pos[u]);
+        const found: [number, number][] = [];
+        // rings of cells outwards, one more ring after enough are found
+        let enoughAt = -1;
+        for (let r = 0; r <= Math.max(cols, rows); r++) {
+          for (let dy = -r; dy <= r; dy++) {
+            const y = cy + dy;
+            if (y < 0 || y >= rows) continue;
+            const step = Math.abs(dy) === r ? 1 : 2 * r;
+            for (let dx = -r; dx <= r; dx += Math.max(step, 1)) {
+              const x = cx + dx;
+              if (x < 0 || x >= cols) continue;
+              for (const v of grid.get(y * cols + x) ?? []) if (v !== u) found.push([d2(pos[u], pos[v]), v]);
+            }
+          }
+          if (enoughAt < 0 && found.length >= NEIGHBOURS) enoughAt = r;
+          if (enoughAt >= 0 && r > enoughAt) break;
+        }
+        found.sort((a, b) => a[0] - b[0]);
+        for (const [dd, v] of found.slice(0, NEIGHBOURS)) cand.push([dd, u, v]);
+      }
+    }
+    cand.sort((x, y) => x[0] - y[0]);
+    for (const [, u, v] of cand) {
+      if (used.has(u) || used.has(v)) continue;
+      used.add(u);
+      used.add(v);
+      out.push([u, v]);
+    }
+    left = left.filter((v) => !used.has(v));
+  }
+  return out;
+}
+
 /** Pieces whose every point lies within `tol` of an earlier piece (doubled strokes). */
 export function doubledPieces(pieces: SubPath[], tol = 0.3): Set<number> {
   const cell = Math.max(tol, 0.25) * 2;
@@ -185,15 +257,8 @@ export function connectLines(input: SubPath[], o: ConnectOptions = DEFAULT_CONNE
   const d = deg();
   const odd = vpos.map((_, v) => v).filter((v) => d[v] % 2 === 1);
   const isVirtual = new Set<number>();
-  const usedOdd = new Set<number>();
   // nearest pairs first: lines that end close to where the next starts
-  const oddPairs: [number, number, number][] = [];
-  for (let i = 0; i < odd.length; i++) for (let j = i + 1; j < odd.length; j++) oddPairs.push([d2(vpos[odd[i]], vpos[odd[j]]), odd[i], odd[j]]);
-  oddPairs.sort((x, y) => x[0] - y[0]);
-  for (const [, u, v] of oddPairs) {
-    if (usedOdd.has(u) || usedOdd.has(v)) continue;
-    usedOdd.add(u);
-    usedOdd.add(v);
+  for (const [u, v] of nearestPairs(vpos, odd)) {
     isVirtual.add(edges.length);
     edges.push({ a: u, b: v, sp: null, da: [0, 0], db: [0, 0] });
   }

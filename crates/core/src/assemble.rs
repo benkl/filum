@@ -798,19 +798,24 @@ fn assemble_basted(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[Run], 
             }
         }
         let prefix: Vec<&Run> = prefix.iter().filter(|r| !r.is_empty()).collect();
+        let mut cut_after_prefix = prefix_thread.is_none();
         for (k, run) in prefix.iter().enumerate() {
             b.run(run, u32::MAX);
             if k + 1 == basting {
                 // the basting is pulled out after sewing: tied off and cut
-                // on its own, whatever comes next (the knockdown)
+                // on its own, whatever comes next (the knockdown); its tie-off
+                // and trim are part of it
                 if k + 1 < prefix.len() {
                     b.cut(u32::MAX, false, false);
+                } else if cut_after_prefix {
+                    b.cut(u32::MAX, false, false);
+                    cut_after_prefix = false;
                 }
                 basting_end = Some(b.out.len());
             }
         }
         // in its own colour the colour change before the design trims
-        if prefix_thread.is_none() {
+        if cut_after_prefix {
             b.cut(u32::MAX, false, false);
         }
     }
@@ -1341,5 +1346,8 @@ mod trim_tests {
         assert!(p.stitches[a..b].iter().all(|s| s.object == u32::MAX));
         assert!(p.stitches[b..].iter().any(|s| s.object == 0 && s.is_stitch()));
         assert!(p.stitches[a..b].iter().filter(|s| s.is_stitch()).count() > 10, "the box around the design");
+        // nothing follows it in the prefix: its tie-off and trim are still its own
+        assert!(p.stitches[a..b].iter().any(|s| s.is(flags::TRIM)), "the basting ends cut");
+        assert!(!p.stitches[b..].iter().take_while(|s| !s.is_stitch()).any(|s| s.is(flags::TRIM)), "no second trim after it");
     }
 }
