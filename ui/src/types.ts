@@ -135,6 +135,8 @@ export interface SatinParams {
   reverseRails?: "automatic" | "none" | "first" | "second" | "both";
   /** Direction guides: lines across the column setting the stitch angle (Ink/Stitch rungs). */
   guides?: [Vec2, Vec2][];
+  /** Two rails with the same number of points: the point pairs act as rungs (absent = on, Ink/Stitch's convention). Off once the orientation lines are edited. */
+  nodeRungs?: boolean;
   swapRails: boolean;
   reverse: boolean;
   /** Every sub-path is its own centre-line column (letter borders). */

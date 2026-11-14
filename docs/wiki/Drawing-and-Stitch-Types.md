@@ -16,8 +16,8 @@ Every object in Filum is a shape plus a **stitch type**. Draw a shape with a too
 | Pen | <kbd>P</kbd> | Draw a running-stitch path with Bézier curves. Click for a corner, drag for a curve, <kbd>Enter</kbd> to finish. Close the shape to make a fill. |
 | Curvature | <kbd>U</kbd> | Click points and the path curves smoothly through them; it bends towards the pointer as you go. Double-click a point to make it a corner (and back), drag a point to move it, click the first point to close. |
 | Freehand | <kbd>F</kbd> | Draw by hand. A stabiliser smooths your line into a clean curve, which can become a run, a triple run or a satin. |
-| Satin column | <kbd>S</kbd> | Draw a satin column along a path. The scroll wheel or <kbd>[</kbd> <kbd>]</kbd> sets the width of the next point. |
-| Stitch direction | <kbd>D</kbd> | Draw guide lines across a satin or fill to steer the stitch direction. |
+| Satin column | <kbd>S</kbd> | Draw a satin column along a path. The scroll wheel or <kbd>[</kbd> <kbd>]</kbd> sets the width of the next point. Choose **Centre line** or **Two sides** in the bar above the canvas. |
+| Stitch direction | <kbd>D</kbd> | Draw guide lines across a satin or fill to steer the stitch direction. Click a line and press <kbd>Delete</kbd> (or <kbd>Alt</kbd>-click it) to remove it. |
 | Rectangle | <kbd>R</kbd> | Rectangles, polygons and stars, with rounded corners. |
 | Ellipse | <kbd>E</kbd> | Ellipses. Hold <kbd>Shift</kbd> for a circle. |
 | Lettering | <kbd>T</kbd> | Click and type. See [Lettering](Lettering.md). |
@@ -59,6 +59,10 @@ For borders, columns and lettering:
 | **Blanket** | E-stitch / blanket stitch, for appliqué edges |
 
 Satins have underlay (centre walk, contour, zig-zag), pull compensation and a width you set per point. **Path → Convert** turns fills into satins, satins into centre lines and back again.
+
+**Two ways to edit a satin.** As a **centre line**, a satin is one line with a width: drag the line's points and use the width handles, and the column keeps an even width. As **two sides**, each side is shaped on its own. Choose the way for new satins in the satin tool's bar, and switch any satin back and forth under *Sides* in its stitch options. With the node tool (<kbd>A</kbd>), each side of a two-sided satin takes points of its own: click a side to add a point there, <kbd>Alt</kbd>-click a point to delete it, and drag points and handles freely. <kbd>Ctrl</kbd>-click adds a point to both sides at once. Switching back to a centre line keeps the points where the two sides have the same number, and uses the column's average width.
+
+**Orientation lines.** The dashed lines across a selected satin set its stitch angle. They are its direction guides or, on two sides with the same number of points, the point pairs. Delete one with <kbd>Alt</kbd>-click in the node tool, or pick it in the stitch direction tool (<kbd>D</kbd>) and press <kbd>Delete</kbd>; the trash button under *Direction* removes them all. As soon as you change the lines or the points of one side, the point pairs become ordinary guides, so the stitches keep their angle and every line can be moved or deleted. A deleted line stays deleted. The lines belong to their satin: they move, turn and scale with it, and when you move a point, bend a side or change the width, each line stays at its place on the column.
 
 A drawing imported as many short strokes can be tidied with **Path → Convert → Connect lines…**: select the pieces and they become as few continuous lines as possible. Ends that meet are joined, loose ends a little apart are bridged by a short straight line (*Bridge gaps up to*), the line carries straight on where strokes cross, and pieces lying on top of another are left out. Each piece is still sewn once, so a branching network needs one line per pair of loose ends. The preview shows how many lines you get before you apply it.
 

@@ -10,7 +10,7 @@ import { FLAG } from "../types";
 import { cubicAt, type Cubic } from "../lib/bezier";
 import { rowDir, type Handle } from "./handles";
 import type { PenHover } from "./penTool";
-import { railMap } from "../lib/nodeOps";
+import { orientationLines } from "../lib/satinSides";
 
 export interface InteractiveOverlay {
   handles?: Handle[];
@@ -221,23 +221,20 @@ function pin(ctx: CanvasRenderingContext2D, p: Vec2, scale: number, color: strin
 export function paintInteractive(c: Ctx, o: { selected: DesignObject[]; overlay: InteractiveOverlay; onIssue?: (i: Issue) => boolean }) {
   const { ctx, scale } = c;
   const ov = o.overlay;
-  // rungs of two-rail satins (node pairs act as rungs)
+  // a selected satin's orientation lines: its guides, or the point pairs acting as rungs
   for (const obj of o.selected) {
-    if (obj.stitch.type !== "satin" || obj.paths.length !== 2) continue;
-    const [a, b] = obj.paths;
-    const map = railMap(a, b);
-    if (!map) continue;
+    const lines = orientationLines(obj).lines;
+    if (!lines.length) continue;
     ctx.save();
     ctx.strokeStyle = c.select;
     ctx.globalAlpha = 0.7;
     ctx.lineWidth = 1 / scale;
     ctx.setLineDash([3 / scale, 2 / scale]);
     ctx.beginPath();
-    a.nodes.forEach((n, i) => {
-      const m = b.nodes[map.at(i)];
-      ctx.moveTo(n.p[0], n.p[1]);
-      ctx.lineTo(m.p[0], m.p[1]);
-    });
+    for (const [p, q] of lines) {
+      ctx.moveTo(p[0], p[1]);
+      ctx.lineTo(q[0], q[1]);
+    }
     ctx.stroke();
     ctx.restore();
   }

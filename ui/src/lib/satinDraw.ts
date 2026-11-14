@@ -102,10 +102,10 @@ function nodeTangent(nodes: PathNode[], i: number, closed: boolean): Vec2 {
   return t[0] || t[1] ? t : a[0] || a[1] ? a : b;
 }
 
-/** Final geometry: centre line + width, or two rails for a varying width. */
-export function buildSatin(nodes: PathNode[], widths: number[], closed: boolean): { paths: SubPath[]; width: number } {
+/** Final geometry: centre line + width, or two rails for a varying width (`twoSides`: always two rails, each side editable). */
+export function buildSatin(nodes: PathNode[], widths: number[], closed: boolean, twoSides = false): { paths: SubPath[]; width: number } {
   const w0 = widths[0];
-  if (widths.every((w) => Math.abs(w - w0) < 0.01)) return { paths: [{ nodes, closed }], width: w0 };
+  if (!twoSides && widths.every((w) => Math.abs(w - w0) < 0.01)) return { paths: [{ nodes, closed }], width: w0 };
   const left: PathNode[] = [];
   const right: PathNode[] = [];
   nodes.forEach((nd, i) => {

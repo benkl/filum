@@ -6,6 +6,7 @@ import { MachineSettings } from "./MachineSettings";
 import { FabricLookRows } from "./FabricLook";
 import { autoFillHint, autoSatinHint } from "../lib/underlay";
 import { GuideActions } from "./SatinGuides";
+import { toCentreLine, toTwoSides } from "../lib/satinSides";
 import { openKnockdown } from "./KnockdownDialog";
 import { MulticolorSatin } from "./MulticolorSatin";
 import { cleanupCandidates, cleanupDocument, DEFAULT_CLEANUP } from "../lib/shapeCheck";
@@ -1339,6 +1340,33 @@ function StitchOptions({ o }: { o: DesignObject }) {
           </Row>
           <Row label="Direction" title="Direction guides: lines across the column that set the stitch angle there (Ink/Stitch rungs)">
             <GuideActions />
+          </Row>
+          <Row label="Sides" title="Centre line: one line with a width, edited with the width handles. Two sides: each side shaped on its own with the node tool (A). Switch at any time.">
+            {st.multi ? (
+              <span className="stat">One line per column</span>
+            ) : (
+              <div className="seg" role="group" aria-label="Sides">
+                <button
+                  className={o.paths.length === 1 ? "on" : ""}
+                  title="One centre line with a width: the column keeps an even width"
+                  onClick={() => o.paths.length !== 1 && useStore.getState().commit((d) => ({ ...d, objects: d.objects.map((x) => (targets.includes(x.id) && !x.locked ? toCentreLine(x) : x)) }))}
+                >
+                  Centre line
+                </button>
+                <button
+                  className={o.paths.length > 1 ? "on" : ""}
+                  title="Two sides, point for point: shape each side on its own with the node tool (A)"
+                  onClick={() => {
+                    if (o.paths.length !== 1) return;
+                    const s = useStore.getState();
+                    s.commit((d) => ({ ...d, objects: d.objects.map((x) => (targets.includes(x.id) && !x.locked ? toTwoSides(x) : x)) }));
+                    s.setTool("node");
+                  }}
+                >
+                  Two sides
+                </button>
+              </div>
+            )}
           </Row>
           <Row label="Reverse">
             <Toggle on={st.reverse} onChange={(v) => up({ reverse: v })} />

@@ -9,6 +9,7 @@ import { loadLayout, saveLayout, type Layout } from "./lib/layout";
 import type { DensityMode } from "./lib/density";
 import { freshCopies, mergeThreads, placeCopies, remapThreads } from "./lib/copies";
 import { settleTexts } from "./lib/textSettle";
+import { followGuides } from "./lib/satinSides";
 import { repairLayers } from "./lib/fillLayers";
 import { safeSetItem } from "./lib/storage";
 import { checkDoc, DOC_VERSION } from "./lib/docCheck";
@@ -70,7 +71,8 @@ export interface Toast {
 export interface ToolOptions {
   pen: { stitch: "running" | "triple"; length: number; closed: "run" | "fill" };
   freehand: { smoothing: number; output: "running" | "triple" | "satin"; width: number; closed: "run" | "fill"; corners?: number; lines?: boolean };
-  satin: { width: number };
+  /** `twoSides`: new satins are drawn as two sides, each editable on its own. */
+  satin: { width: number; twoSides?: boolean };
   /** Rectangle tool: rectangle / polygon / star, corner radius. */
   shape: { kind: "rect" | "polygon" | "star"; radius: number; sides: number; inner: number };
   /** Type of the gradients the gradient tool creates. */
@@ -226,6 +228,16 @@ export interface State {
   openSettings: (tab?: string) => void;
 }
 
+/**
+ * A changed document made whole: clones follow their originals, a lettering
+ * moved apart letter by letter becomes plain shapes, and satin orientation
+ * lines stay on their columns (the old document marks where they were drawn).
+ */
+function settled(next: StitchDocument, prev: StitchDocument): StitchDocument {
+  followGuides(prev);
+  return followGuides(settleTexts(syncClones(next, prev), prev));
+}
+
 const THEME_KEY = "filum.theme";
 /** The last checkpoint, so a drag that changed nothing can take it back. */
 let pendingCheckpoint: { doc: StitchDocument; future: StitchDocument[]; saved: boolean } | null = null;
@@ -321,7 +333,7 @@ export const useStore = create<State>((set, get) => ({
 
   setDoc: (doc0, opts) => {
     const s = get();
-    const doc = settleTexts(syncClones(doc0));
+    const doc = followGuides(settleTexts(syncClones(doc0)));
     pendingCheckpoint = null;
     set({
       nodeSel: opts?.keepSelection ? s.nodeSel.filter((n) => doc.objects.find((o) => o.id === n.id)?.paths[n.sp]?.nodes[n.ni]) : [],
@@ -344,12 +356,12 @@ export const useStore = create<State>((set, get) => ({
     if (cp && s.doc === cp.doc && s.past[s.past.length - 1] === cp.doc) set({ past: s.past.slice(0, -1), future: cp.future, saved: cp.saved });
   },
   // clones follow their originals; a lettering moved apart letter by letter becomes plain shapes
-  liveUpdate: (fn) => set({ doc: settleTexts(syncClones(fn(get().doc), get().doc), get().doc), saved: false }),
-  liveTransform: (live, fn) => set(fn ? { live, doc: settleTexts(syncClones(fn(get().doc), get().doc), get().doc), saved: false } : { live }),
+  liveUpdate: (fn) => set({ doc: settled(fn(get().doc), get().doc), saved: false }),
+  liveTransform: (live, fn) => set(fn ? { live, doc: settled(fn(get().doc), get().doc), saved: false } : { live }),
   commit: (fn) => {
     const s = get();
     pendingCheckpoint = null;
-    const doc = settleTexts(syncClones(fn(s.doc), s.doc), s.doc);
+    const doc = settled(fn(s.doc), s.doc);
     // ids of objects the change removed leave the selection
     let selection = s.selection;
     if (selection.length && doc.objects !== s.doc.objects) {

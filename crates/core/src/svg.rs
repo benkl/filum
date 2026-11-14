@@ -1099,6 +1099,7 @@ fn ink_satin(ink: &Ink) -> SatinParams {
             _ => 0,
         },
         guides: Vec::new(),
+        node_rungs: true,
         swap_rails: ink.b("swap_satin_rails", false),
         reverse: false,
         second_rail: (rail != SecondRail::default()).then_some(rail),

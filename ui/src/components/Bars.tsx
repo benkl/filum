@@ -309,7 +309,7 @@ const RAIL: ({ tool: Tool; title: string } | "-")[] = [
   { tool: "curve", title: "Curvature (U) — click points, the path curves smoothly through them; double-click a point for a corner" },
   { tool: "freehand", title: "Freehand (F)" },
   { tool: "satin", title: "Satin column (S) — click / drag for curves, scroll or [ ] for width, Enter to finish" },
-  { tool: "guides", title: "Stitch direction (D): drag across a satin to guide its stitch angle, drag an end to turn it, Alt-click to delete" },
+  { tool: "guides", title: "Stitch direction (D): drag across a satin to guide its stitch angle, drag an end to turn it, click a line and press Delete (or Alt-click) to delete it" },
   { tool: "rect", title: "Rectangle (R)" },
   { tool: "ellipse", title: "Ellipse (E)" },
   "-",

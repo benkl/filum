@@ -5,6 +5,7 @@
 
 import type { DesignObject, NodeRef, PathNode, StitchDocument, SubPath, Vec2 } from "../types";
 import { cubicAt, segmentOf, vdist } from "./bezier";
+import { freeSides } from "./satinSides";
 
 const sub = (a: Vec2, b: Vec2): Vec2 => [a[0] - b[0], a[1] - b[1]];
 const add = (a: Vec2, b: Vec2): Vec2 => [a[0] + b[0], a[1] + b[1]];
@@ -174,18 +175,12 @@ export function deleteSelectedNodes(doc: StitchDocument, sel: NodeRef[], keepSha
   let removedObjects = 0;
   const next = mapObjects(doc, sel, (o, per) => {
     if (isRailSatin(o)) {
-      // keep the rung pairs: delete the same rung on both rails
-      const [a, b] = o.paths;
-      const map = railMap(a, b);
-      if (!map) return o;
-      const n = a.nodes.length;
-      // b's node j pairs with a's node at(j) too (the pairing is its own inverse)
-      const rungs = new Set<number>();
-      for (const [si, list] of per) for (const ni of list) rungs.add(si === 0 ? ni : map.at(ni) % n);
-      const ra = removeNodes(a, [...rungs].sort((x, y) => x - y), keepShape);
-      const rb = removeNodes(b, [...rungs].map((k) => map.at(k)).sort((x, y) => x - y), keepShape);
-      if (!ra || !rb) return o;
-      return { ...o, paths: [ra, rb] };
+      // each side on its own: the point pairs become guides first, so the
+      // stitch angle stays where it was; each rail keeps at least two points
+      const f = freeSides(o);
+      const paths = f.paths.map((sp, si) => (per.has(si) ? removeNodes(sp, per.get(si)!, keepShape) : sp));
+      if (paths.some((sp) => !sp)) return o;
+      return { ...f, paths: paths as SubPath[] };
     }
     const paths: SubPath[] = [];
     o.paths.forEach((sp, si) => {

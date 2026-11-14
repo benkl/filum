@@ -99,7 +99,8 @@ Press <kbd>?</kbd> in Filum to see this list in the app, with a filter box. On a
 
 | Keys | What it does |
 |---|---|
-| Click a segment / Alt-click a point | Add a point (a rung pair on two-rail satins) / delete it |
+| Click a segment / Alt-click a point | Add a point / delete it (on one side of a two-sided satin; <kbd>Ctrl</kbd>: on both sides) |
+| Alt-click a satin's orientation line | Delete it |
 | Click · Shift-click · drag a box | Select points · drag to move them (Shift: straight, Ctrl: no snapping) |
 | Del / Shift+Del | Delete the points keeping the curve's shape / plain delete |
 | Arrows (Shift) | Nudge the points 0.1 mm (1 mm) |

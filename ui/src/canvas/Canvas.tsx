@@ -31,7 +31,8 @@ import { addReference, refCenter, refContains, refCorners, referenceAt, refRotat
 import { ReferenceBar } from "../components/ReferenceBar";
 import { applyRamp, rampMembers, rampOf, rampRows, selectedRamp, updateRamp } from "../lib/ramp";
 import { builderRefusal } from "../lib/shapeBuilder";
-import { guideAcross, guideHit, guidesOf, selectedSatin, setGuides } from "../lib/satinGuides";
+import { guideAcross, guideHit, guidesOf, pickLine, pickedLine, selectedSatin, setGuides } from "../lib/satinGuides";
+import { freeSides, orientationLines, removeOrientationLine } from "../lib/satinSides";
 import { engine, type ShapeRegion } from "../engine/client";
 import { handlePoints, readTheme, Renderer, rotateHandle, RULER, type Overlay, type Theme } from "./render";
 import { StitchGL } from "./gl";
@@ -169,7 +170,7 @@ type Drag =
   | { kind: "handle"; h: Handle; orig: DesignObject; moved: boolean }
   | { kind: "texthandle"; h: Handle; group: string; spec: TextSpec; start: Vec2; moved: boolean; spacingScale?: number }
   | { kind: "pen-new"; idx: number; moved: boolean; last: Vec2 }
-  | { kind: "bend"; o: DesignObject; sp: number; seg: number; t: number; start: Vec2; moved: boolean }
+  | { kind: "bend"; o: DesignObject; sp: number; seg: number; t: number; start: Vec2; moved: boolean; both: boolean }
   | { kind: "pen-close"; moved: boolean }
   | { kind: "pen-last"; moved: boolean; keepIn?: Vec2 }
   | { kind: "pen-anchor"; idx: number; orig: PathNode; start: Vec2; moved: boolean }
@@ -708,10 +709,13 @@ export function Canvas() {
 
   // ---- satin direction guides (stitch direction tool)
   const guideHover = useRef<number | null>(null);
+  /** The document before a click on a point pair turned the pairs into guides (undone when nothing moved). */
+  const guideFreedFrom = useRef<StitchDocument | null>(null);
   const guidesOverlay = () => {
     const o = selectedSatin();
     const draft = overlayRef.current.guideDraft ?? null;
-    return { lines: guidesOf(o), hover: guideHover.current, draft };
+    const pl = pickedLine();
+    return { lines: orientationLines(o).lines, hover: guideHover.current, picked: o && pl?.id === o.id ? pl.index : null, draft };
   };
 
   // ---- density ramps (gradient tool, Density / Blend)
@@ -956,7 +960,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
     if (isClosed) smoothDraft(d, true);
     let o: DesignObject;
     if (d.kind === "satin") {
-      const { paths, width } = buildSatin(d.nodes, d.widths, isClosed);
+      const { paths, width } = buildSatin(d.nodes, d.widths, isClosed, !!s.toolOptions.satin.twoSides);
       o = newObject(paths, { ...defaultStitch("satin"), width } as StitchParams, "Satin");
     } else {
       const opts = s.toolOptions.pen;
@@ -1209,26 +1213,31 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
     return near ? null : b;
   };
 
-  const insertIntoObject = (o: DesignObject, si: number, seg: number, t: number) => {
-    const pair = railPair(o);
-    const paths = [...o.paths];
+  // A two-rail satin's sides are shaped one at a time: the point pairs turn
+  // into guides first (the stitches keep their angle). `both` (Ctrl): a pair
+  // on both rails, as long as the rails still pair up.
+  const insertIntoObject = (o: DesignObject, si: number, seg: number, t: number, both = false) => {
+    const pair = both ? railPair(o) : null;
+    const base = isRailSatin(o) && !pair ? freeSides(o) : o;
+    const paths = [...base.paths];
     const r = insertNode(paths[si], seg, t);
     paths[si] = r.sp;
     if (pair) {
       // the same rung on the other rail (the pairing is its own inverse)
       paths[1 - si] = insertNode(paths[1 - si], pair.seg(seg), pair.rev ? 1 - t : t).sp;
     }
-    return { obj: { ...o, paths }, index: r.index };
+    return { obj: { ...base, paths }, index: r.index };
   };
 
-  const deleteFromObject = (o: DesignObject, si: number, ni: number): DesignObject | null => {
+  const deleteFromObject = (o: DesignObject, si: number, ni: number, both = false): DesignObject | null => {
     const sp = o.paths[si];
     if (sp.nodes.length <= 2) return null;
-    const pair = railPair(o);
-    const paths = [...o.paths];
+    const pair = both ? railPair(o) : null;
+    const base = isRailSatin(o) && !pair ? freeSides(o) : o;
+    const paths = [...base.paths];
     paths[si] = deleteNode(sp, ni);
     if (pair) paths[1 - si] = deleteNode(paths[1 - si], pair.at(ni));
-    return { ...o, paths };
+    return { ...base, paths };
   };
 
   const penHint = (text: string, at: Vec2) => {
@@ -1335,22 +1344,31 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         const gtol = Math.max(tol, 8 / s.view.scale);
         const sat = selectedSatin();
         if (sat) {
-          const hit = guideHit(guidesOf(sat), p, gtol);
+          // the satin's orientation lines: its guides, or the point pairs of its rails
+          const hit = guideHit(orientationLines(sat).lines, p, gtol);
           if (hit) {
             if (e.altKey) {
-              setGuides(sat.id, guidesOf(sat).filter((_, i) => i !== hit.index));
+              const next = removeOrientationLine(sat, hit.index);
+              s.commit((doc) => ({ ...doc, objects: doc.objects.map((x) => (x.id === sat.id ? next : x)) }));
               guideHover.current = null;
+              pickLine(null);
               draw();
               return;
             }
+            pickLine({ id: sat.id, index: hit.index });
             s.checkpoint();
+            // point pairs become guides first (in the same order): then they move like any guide
+            const freed = freeSides(sat);
+            guideFreedFrom.current = freed !== sat ? s.doc : null;
+            if (freed !== sat) s.liveUpdate((doc) => ({ ...doc, objects: doc.objects.map((x) => (x.id === sat.id ? freed : x)) }));
             dragRef.current =
               hit.end === null
-                ? { kind: "guidemove", id: sat.id, index: hit.index, start: p, orig: guidesOf(sat)[hit.index], moved: false }
+                ? { kind: "guidemove", id: sat.id, index: hit.index, start: p, orig: guidesOf(freed)[hit.index], moved: false }
                 : { kind: "guideend", id: sat.id, index: hit.index, end: hit.end, moved: false };
             return;
           }
         }
+        pickLine(null);
         // on a satin (the selected one, or another): draw a new guide
         const h = pick(p);
         const target = sat && (!h || h.id === sat.id || h.stitch.type !== "satin") ? sat : h && h.stitch.type === "satin" ? h : null;
@@ -1489,8 +1507,8 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
                 const q = n[part];
                 if (q && dist(q, p) < tol) {
                   if (part === "p" && e.altKey) {
-                    // Alt-click: delete the point (both rails of a satin)
-                    const next = deleteFromObject(o, si, ni);
+                    // Alt-click: delete the point (Ctrl too: the pair on both rails of a satin)
+                    const next = deleteFromObject(o, si, ni, e.ctrlKey || e.metaKey);
                     if (next) s.commit((doc) => syncGradientGeometry({ ...doc, objects: doc.objects.map((x) => (x.id === o.id ? next : x)) }, next));
                     else s.toast("A path needs at least two points");
                     s.set({ nodeSel: [] });
@@ -1522,6 +1540,17 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
               }
             }
         }
+        if (e.altKey) {
+          // Alt-click a satin's orientation line (a guide or a point pair): delete it
+          for (const o of s.doc.objects.filter((x) => s.selection.includes(x.id) && !x.locked && x.stitch.type === "satin")) {
+            const hit = guideHit(orientationLines(o).lines, p, Math.max(tol, 6 / s.view.scale));
+            if (hit && hit.end === null) {
+              const next = removeOrientationLine(o, hit.index);
+              s.commit((doc) => ({ ...doc, objects: doc.objects.map((x) => (x.id === o.id ? next : x)) }));
+              return;
+            }
+          }
+        }
         const cw = cornerWidgetHit(p, Math.max(tol, 6 / s.view.scale));
         if (cw) {
           if (e.altKey) {
@@ -1536,7 +1565,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         const ins = nodeInsertTarget(p, Math.max(tol, 7 / s.view.scale));
         if (ins) {
           // on a segment: drag to bend it, click to add a point there
-          dragRef.current = { kind: "bend", o: ins.o, sp: ins.sp, seg: ins.seg, t: ins.t, start: p, moved: false };
+          dragRef.current = { kind: "bend", o: ins.o, sp: ins.sp, seg: ins.seg, t: ins.t, start: p, moved: false, both: e.ctrlKey || e.metaKey };
           iRef.current.insertAt = null;
           return;
         }
@@ -1724,7 +1753,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         return;
       }
       if (s.tool === "guides") {
-        const hit = guideHit(guidesOf(selectedSatin()), p, Math.max(6, 8) / s.view.scale);
+        const hit = guideHit(orientationLines(selectedSatin()).lines, p, Math.max(6, 8) / s.view.scale);
         const hv = hit?.index ?? null;
         if (hv !== guideHover.current) {
           guideHover.current = hv;
@@ -2317,6 +2346,12 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
       return;
     }
     if (d.kind === "guideend" || d.kind === "guidemove") {
+      // a click on a point pair: it is picked, the pairs stay pairs
+      if (!d.moved && guideFreedFrom.current) {
+        s.set({ doc: guideFreedFrom.current });
+        s.dropCheckpoint();
+      } else if (!d.moved) s.dropCheckpoint();
+      guideFreedFrom.current = null;
       iRef.current.tooltip = null;
       draw();
       return;
@@ -2328,7 +2363,9 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
       if (o) {
         // a click: a guide across the column there; a drag: the drawn line
         const g = !draft || dist(draft[0], draft[1]) * s.view.scale < 6 ? guideAcross(o, d.a) : draft;
-        if (g) setGuides(o.id, [...guidesOf(o), g]);
+        // added to the point pairs, which become guides too (a guide alone would replace them)
+        const f = freeSides(o);
+        if (g) s.commit((doc) => ({ ...doc, objects: doc.objects.map((x) => (x.id === o.id && f.stitch.type === "satin" ? { ...f, stitch: { ...f.stitch, guides: [...(f.stitch.guides ?? []), g] } } : x)) }));
       }
       draw();
       return;
@@ -2449,7 +2486,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         if (d.moved) return draw();
         // a click on a segment adds a point there
         s.checkpoint();
-        const r = insertIntoObject(d.o, d.sp, d.seg, d.t);
+        const r = insertIntoObject(d.o, d.sp, d.seg, d.t, d.both);
         s.liveUpdate((doc) => syncGradientGeometry({ ...doc, objects: doc.objects.map((x) => (x.id === r.obj.id ? r.obj : x)) }, r.obj));
         s.set({ nodeSel: [{ id: r.obj.id, sp: d.sp, ni: r.index }] });
         draw();

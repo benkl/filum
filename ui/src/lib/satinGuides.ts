@@ -144,3 +144,10 @@ export function guideAcross(o: DesignObject, p: Vec2): Guide | null {
   const h = c.width / 2 + 0.6;
   return [sub(c.pts[best], mul(nrm, h)), add(c.pts[best], mul(nrm, h))];
 }
+
+/** The orientation line picked in the stitch direction tool (Delete removes it). */
+let picked: { id: string; index: number } | null = null;
+export const pickedLine = () => picked;
+export const pickLine = (p: { id: string; index: number } | null) => {
+  picked = p;
+};

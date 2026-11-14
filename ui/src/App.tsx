@@ -25,6 +25,8 @@ import { StatusHints } from "./components/StatusHints";
 import type { Tool } from "./types";
 import { compoundSelection, joinSelection, releaseSelection } from "./lib/pathActions";
 import { averageSelectedNodes } from "./lib/nodeActions";
+import { pickLine, pickedLine } from "./lib/satinGuides";
+import { orientationLines, removeOrientationLine } from "./lib/satinSides";
 
 const TOOL_KEYS: Record<string, Tool> = {
   v: "select",
@@ -133,6 +135,17 @@ function useShortcuts() {
           const sg = selectedGradient();
           if (sg && is2D(sg.params.kind)) {
             if (!removeNodes(sg.group, s.gradNodes)) s.toast(sg.params.kind === "mesh" ? "The mesh border stays — select an inner node" : "A gradient keeps at least one colour point");
+            return;
+          }
+        }
+        // stitch direction tool: the picked orientation line, not the satin
+        if (s.tool === "guides") {
+          const pl = pickedLine();
+          const o = pl && s.doc.objects.find((x) => x.id === pl.id && !x.locked);
+          if (pl && o && orientationLines(o).lines[pl.index]) {
+            const next = removeOrientationLine(o, pl.index);
+            s.commit((d) => ({ ...d, objects: d.objects.map((x) => (x.id === o.id ? next : x)) }));
+            pickLine(null);
             return;
           }
         }

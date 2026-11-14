@@ -443,6 +443,12 @@ pub struct SatinParams {
     /// Kept apart from the paths so editing the outline keeps them.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub guides: Vec<[[f64; 2]; 2]>,
+    /// Two rails with the same number of points: the point pairs act as
+    /// rungs (Ink/Stitch's convention). Off once the orientation lines have
+    /// been edited, so the rails can be shaped freely and a deleted line
+    /// stays deleted.
+    #[serde(skip_serializing_if = "is_true")]
+    pub node_rungs: bool,
     pub swap_rails: bool,
     /// Which rail runs the wrong way (Ink/Stitch `reverse_rails`):
     /// detected automatically, or set when a satin renders strangely.
@@ -498,6 +504,7 @@ impl Default for SatinParams {
             random_seed: 1,
             split_staggers: 0,
             guides: Vec::new(),
+            node_rungs: true,
             swap_rails: false,
             reverse_rails: RailReverse::Automatic,
             random_spacing: 0.0,
@@ -1965,4 +1972,9 @@ mod contour_direction_tests {
         let StitchParams::Fill(p) = &d.objects[0].stitch else { panic!() };
         assert!(!p.clockwise);
     }
+}
+
+/// Serde: a flag that is on by default is written only when it is off.
+fn is_true(b: &bool) -> bool {
+    *b
 }

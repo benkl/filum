@@ -133,6 +133,14 @@ export function ToolOptionsBar({ tool }: { tool: DrawTool }) {
         <span className="sr-only">Width of the next point (scroll or [ ])</span>
         <Num value={opts.satin.width} unit="mm" step={0.1} min={0.3} max={15} onChange={(v) => set("satin", { width: v })} />
       </label>
+      <div className="seg" role="group" aria-label="New satins">
+        <button className={!opts.satin.twoSides ? "on" : ""} title="One line with a width: the column keeps its width (a varying width still gives two sides)" onClick={() => set("satin", { twoSides: false })}>
+          Centre line
+        </button>
+        <button className={opts.satin.twoSides ? "on" : ""} title="Two sides: shape each side on its own with the node tool (A)" onClick={() => set("satin", { twoSides: true })}>
+          Two sides
+        </button>
+      </div>
       <span className="ctx-help">
         Drag for curves · scroll over a point to change its width · click a segment to add a point · Alt-click to delete · click the first point to close
       </span>
@@ -434,7 +442,7 @@ export function GuidesToolBar() {
         <StitchAngle size={13} /> Stitch direction
       </span>
       <GuideActions compact />
-      <span className="ctx-help">Drag across a satin to guide its stitch angle · drag an end to turn it · Alt-click to delete · Shift: 15° steps</span>
+      <span className="ctx-help">Drag across a satin to guide its stitch angle · drag an end to turn it · click a line, then Delete (or Alt-click) to delete it · Shift: 15° steps</span>
     </div>
   );
 }

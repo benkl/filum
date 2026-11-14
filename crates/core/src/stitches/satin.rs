@@ -176,7 +176,7 @@ pub fn satin_geometry(paths: &[SubPath], p: &SatinParams) -> Option<SatinGeometr
     // direction guides are rungs too
     let width = (0..10).map(|k| point_at(&r0, &c0, l0 * k as f64 / 9.0).dist(point_at(&r1, &c1, l1 * k as f64 / 9.0))).fold(0.0, f64::max);
     cuts.extend(guide_cuts(&p.guides, &r0, &c0, &r1, &c1, width.max(1.0) * 1.5));
-    if cuts.is_empty() && n0.len() == n1.len() && n0.len() > 2 {
+    if cuts.is_empty() && p.node_rungs && n0.len() == n1.len() && n0.len() > 2 {
         // Ink/Stitch convention: equal node counts → nodes act as rungs
         for k in 1..n0.len() - 1 {
             cuts.push((c0[n0[k]], c1[n1[k]]));
@@ -835,6 +835,24 @@ mod tests {
         let geo = satin_geometry(&rails, &guided).unwrap();
         assert!(geo.sections.len() >= 3, "{} sections", geo.sections.len());
     }
+    #[test]
+    fn point_pairs_are_rungs_unless_turned_off() {
+        // two rails of three points each, the middle ones offset: as rungs they slant the stitches
+        let rails = vec![
+            SubPath::polyline(&[pt(0.0, 0.0), pt(10.0, 0.0), pt(20.0, 0.0)], false),
+            SubPath::polyline(&[pt(0.0, 4.0), pt(14.0, 4.0), pt(20.0, 4.0)], false),
+        ];
+        let paired = SatinParams { width: 4.0, ..Default::default() };
+        assert_eq!(satin_geometry(&rails, &paired).unwrap().sections.len(), 2, "the middle pair is a rung");
+        let free = SatinParams { node_rungs: false, ..paired.clone() };
+        assert_eq!(satin_geometry(&rails, &free).unwrap().sections.len(), 1, "no rungs: the rails are matched along their length");
+        // the flag is written only when it is off
+        let json = |p: &SatinParams| serde_json::to_string(p).unwrap();
+        assert!(!json(&paired).contains("nodeRungs") && json(&free).contains("\"nodeRungs\":false"));
+        let back: SatinParams = serde_json::from_str("{\"width\":2}").unwrap();
+        assert!(back.node_rungs, "older files keep their point pairs as rungs");
+    }
+
     use crate::geom::pt;
 
     fn line(a: Point, b: Point) -> SubPath {

@@ -51,7 +51,7 @@ export interface Overlay {
   /** Shape Builder: the overlap regions, the one under the pointer, the ones dragged across. */
   builder?: { faces: [number, number][][][]; hover: number | null; picked: number[]; del: boolean } | null;
   /** Satin direction guides of the selected satin, the one under the pointer and a draft. */
-  guides?: { lines: [Vec2, Vec2][]; hover: number | null; draft: [Vec2, Vec2] | null } | null;
+  guides?: { lines: [Vec2, Vec2][]; hover: number | null; picked?: number | null; draft: [Vec2, Vec2] | null } | null;
   hoverId?: string | null;
 }
 
@@ -1432,7 +1432,7 @@ function drawGuides(ctx: CanvasRenderingContext2D, g: NonNullable<Overlay["guide
     ctx.stroke();
   };
   g.lines.forEach(([a, b], i) => {
-    const hot = i === g.hover;
+    const hot = i === g.hover || i === g.picked;
     ctx.strokeStyle = "rgba(255,255,255,0.9)";
     line(a, b, hot ? 5 : 4, []);
     ctx.strokeStyle = color;

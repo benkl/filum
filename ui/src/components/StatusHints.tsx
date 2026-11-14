@@ -97,6 +97,8 @@ function hintsFor(s: ReturnType<typeof useStore.getState>): Hint[] {
             [["LMB", "path"], "Add a point"],
             [["Drag", "path"], "Bend the curve"],
             [["Alt", "LMB"], "Delete a point"],
+            [[mod, "LMB", "path"], "Satin: a point on both sides"],
+            [["Alt", "LMB", "line"], "Satin: delete an orientation line"],
             [["DblClick"], "Smooth ↔ corner"],
             [["Alt", "Drag", "handle"], "Break the handles"],
             [["Drag", "corner widget"], "Round the corner"],
@@ -162,7 +164,8 @@ function hintsFor(s: ReturnType<typeof useStore.getState>): Hint[] {
             [["Drag", "across"], "Add a direction guide"],
             [["Drag", "end"], "Turn it"],
             [["Drag", "guide"], "Move it"],
-            [["Alt", "LMB", "guide"], "Delete it"],
+            [["LMB", "line"], "Pick it (Del deletes it)"],
+            [["Alt", "LMB", "line"], "Delete it"],
             [["LMB", "other"], "Pick another satin"],
           ]
         : [[["LMB"], "Choose a satin column"]];
