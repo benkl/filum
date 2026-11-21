@@ -407,6 +407,8 @@ export interface DesignObject {
   minStitch?: number;
   /** Gaps after this object up to this long are sewn through without a trim (mm; default: the trim distance). */
   minJump?: number;
+  /** How the needle goes on to the next object, chosen by hand: sewn through ("join") or jumped without a trim ("jump"). Absent: automatic. trimAfter, stopAfter and a colour change win. */
+  link?: "join" | "jump";
   /** Where stitching begins (Ink/Stitch starting point / fill start command), mm. */
   start?: Vec2;
   /** Where stitching ends (Ink/Stitch ending point / fill end command), mm. */
@@ -504,6 +506,8 @@ export interface DesignOptions {
   bastingLength: number;
   /** Top thread weight (No. 40 = standard): scales satin and fill spacing. */
   threadWeight?: ThreadWeight;
+  /** Per-fabric starting values for new satins and fills (lib/fabricPresets.ts); none: Ink/Stitch's. */
+  presetSet?: "filum" | "nova";
   /** Knockdown (laydown): a light net sewn first under the whole design to flatten pile. */
   knockdown?: boolean;
   knockdownOffset?: number;
@@ -667,6 +671,22 @@ export interface PlanData {
   basting?: [number, number] | null;
   /** Records the canvas leaves out (the finished view), 1 = hidden. */
   hide?: Uint8Array | null;
+  /** What the plan does between consecutive objects (engine plan.links). */
+  links?: Connection[];
+}
+
+/** A connection between two consecutive objects of the plan (engine `Connection`). */
+export interface Connection {
+  /** Indices in the document's objects. */
+  from: number;
+  to: number;
+  kind: "trim" | "jump" | "sew" | "colorChange";
+  /** Chosen by hand (the object's link, trim after or stop after). */
+  manual: boolean;
+  /** A thread left on the fabric that nothing sewn later covers. */
+  visible: boolean;
+  start: Vec2;
+  end: Vec2;
 }
 
 export const FLAG = {
@@ -954,7 +974,8 @@ export type Tool =
   | "cut"
   | "gradient"
   | "builder"
-  | "guides";
+  | "guides"
+  | "split";
 
 /** A user-drawn stitch pattern: lines add needle points where stitches cross them, shapes leave the points inside out. */
 export interface StitchPattern {

@@ -9,6 +9,7 @@ import { ArrangeButtons } from "./ArrangeTools";
 import { BuilderToolBar, GuidesToolBar, NodeToolBar, ToolOptionsBar } from "./ToolOptions";
 import { TextBar, useSelectedTextGroup } from "./Lettering";
 import { ConvertMenuButton } from "./ConvertTools";
+import { SplitToolBar } from "./SplitTool";
 import { ArrowLeftRight, Circle, CircleCheck, Import, Layers3 } from "lucide-react";
 import { fitHoopToDesign, importFile, optimizeOrder } from "../lib/actions";
 import { normAngle } from "../lib/geometry";
@@ -121,6 +122,7 @@ export function ContextBar() {
   if (tool === "node") return <NodeToolBar />;
   if (tool === "builder") return <BuilderToolBar />;
   if (tool === "guides") return <GuidesToolBar />;
+  if (tool === "split") return <SplitToolBar />;
   if (tool === "rect") return <ShapeToolBar />;
   if (textGroup) return <TextBar group={textGroup} />;
   const sel = doc.objects.filter((o) => selection.includes(o.id));
@@ -303,7 +305,8 @@ const RAIL: ({ tool: Tool; title: string } | "-")[] = [
   { tool: "pan", title: "Pan (H / Space)" },
   { tool: "ruler", title: "Ruler (M)" },
   { tool: "node", title: "Edit nodes (A)" },
-  { tool: "cut", title: "Cutter (C) — click a line to split it, drag across a fill to cut it" },
+  { tool: "cut", title: "Cutter (C) — click a line to split it, drag across a fill to cut it where the line crosses it" },
+  { tool: "split", title: "Split into satins (K): on a fill, drag cut lines across it and Alt-drag direction lines; Enter turns each part into a satin sewn that way" },
   "-",
   { tool: "pen", title: "Pen (P) — click for corners, drag for curves; click first point to close" },
   { tool: "curve", title: "Curvature (U) — click points, the path curves smoothly through them; double-click a point for a corner" },

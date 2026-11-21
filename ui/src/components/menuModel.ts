@@ -47,6 +47,8 @@ import { addReference } from "../lib/references";
 import { divideSelection } from "../lib/shapeBuilder";
 import { cleanupDocument } from "../lib/shapeCheck";
 import { DEFAULT_LAYOUT } from "../lib/layout";
+import { validCalibration } from "../lib/screen";
+import { lastInOrder, linkMenu } from "./linkMenu";
 import { showDesign, showIssues, togglePanels } from "../lib/panelActions";
 import { reversePath, sharpen } from "../lib/shapeOps";
 import { chartLabel, exportPalette, fitThreads, importPalette, matchAll, mergeSimilarColours, mergeTolerance, removeUnused, revertFit, sortBySewOrder, STITCH_COLORS } from "../lib/threads";
@@ -226,7 +228,7 @@ export function buildMenus(): Record<string, MenuItem[]> {
       },
       { label: "Mirror horizontally", icon: FlipHorizontal2, run: () => mirrorSelection("h"), disabled: !hasSel },
       { label: "Mirror vertically", icon: FlipVertical2, run: () => mirrorSelection("v"), disabled: !hasSel },
-      { label: "Repeat: wreath, kaleidoscope, mirror-merge…", icon: Flower2, run: () => s.setDialog("repeat"), disabled: !hasSel },
+      { label: "Repeat: wreath, kaleidoscope, mirror-merge, grid…", icon: Flower2, run: () => s.setDialog("repeat"), disabled: !hasSel },
       "-",
       { label: "Group", icon: Group, kbd: `${mod}G`, run: groupSelection, disabled: !many },
       { label: "Ungroup", icon: Ungroup, kbd: `${mod}⇧G`, run: ungroupSelection, disabled: !hasSel },
@@ -308,6 +310,7 @@ export function buildMenus(): Record<string, MenuItem[]> {
         ],
       },
       tool("guides", "Stitch direction", "D", "Draw guide lines the rows follow"),
+      tool("split", "Split into satins", "K", "Draw cut lines and direction lines on a fill: each part becomes a satin sewn that way"),
       { label: "Test swatches…", icon: Grid2x2Check, run: () => s.setDialog("swatches"), disabled: !hasSel },
       { label: "Calibrate fabric…", icon: Ruler, run: () => s.setDialog("calibrate"), hint: "Sew a swatch, measure it: new objects on the fabric start from your pull compensation" },
       "-",
@@ -424,7 +427,8 @@ export function buildMenus(): Record<string, MenuItem[]> {
       "-",
       { label: "Fit hoop", kbd: "0", run: () => fit("hoop") },
       { label: "Fit design", kbd: "⇧0", run: () => fit("design") },
-      { label: "Actual size", run: () => fit(1) },
+      { label: "Actual size", run: () => fit(1), hint: validCalibration(s.prefs.screenPxPerMm) ? "The size it is sewn at" : "Assumes 96 dpi until the screen is calibrated" },
+      { label: "Calibrate the screen…", icon: Ruler, run: () => s.setDialog("screen"), hint: "Match a ruler on screen to a real one, so actual size is actual" },
       "-",
       {
         label: "Panels",
@@ -456,6 +460,7 @@ export function buildMenus(): Record<string, MenuItem[]> {
       tool("ruler", "Ruler", "M"),
       tool("node", "Edit nodes", "A"),
       tool("cut", "Cutter", "C"),
+      tool("split", "Split into satins", "K"),
       "-",
       tool("pen", "Pen", "P"),
       tool("curve", "Curvature", "U"),
@@ -518,10 +523,12 @@ export function contextMenu(onObject: boolean): MenuItem[] {
       "-",
       ...find("File", "Add reference picture…", "Digitize a picture…"),
     ];
+  const after = lastInOrder(useStore.getState().selection);
   return [
     ...find("Edit", "Cut", "Copy", "Paste", "Duplicate", "Delete"),
     "-",
     ...find("Object", "Stitch order", "Align", "Rotate", "Mirror horizontally", "Mirror vertically"),
+    ...(after ? ([{ label: "After it", hint: "Automatic, trim, jump or sew to the next object", sub: linkMenu(after) }] as MenuItem[]) : []),
     "-",
     ...find("Object", "Group", "Ungroup", "Hide", "Lock"),
     "-",

@@ -42,7 +42,7 @@ self.onmessage = async (e: MessageEvent<Req>) => {
           meta: string;
         };
         const meta = JSON.parse(r.meta);
-        result = { coords: r.coords, flags: r.flags, objects: r.objects, threads: meta.threads, stats: meta.stats, basting: meta.basting ?? null };
+        result = { coords: r.coords, flags: r.flags, objects: r.objects, threads: meta.threads, stats: meta.stats, basting: meta.basting ?? null, links: meta.links ?? [] };
         transfer.push(r.coords.buffer, r.flags.buffer, r.objects.buffer);
         break;
       }

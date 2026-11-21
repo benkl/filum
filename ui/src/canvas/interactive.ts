@@ -5,7 +5,7 @@
 import { densityCanvas, type DensityMode } from "../lib/density";
 import type { Issue } from "../lib/issues";
 import { objectOutline, objectPath, shade } from "../lib/geometry";
-import type { DensityField, DesignObject, PathNode, PlanData, Vec2 } from "../types";
+import type { Connection, DensityField, DesignObject, PathNode, PlanData, Vec2 } from "../types";
 import { FLAG } from "../types";
 import { cubicAt, type Cubic } from "../lib/bezier";
 import { rowDir, type Handle } from "./handles";
@@ -67,8 +67,21 @@ export interface InteractiveOverlay {
   /** Gradient vector being dragged. */
   gradDraft?: { a: Vec2; b: Vec2 } | null;
   tooltip?: { p: Vec2; text: string } | null;
-  cutLine?: { a: Vec2; b: Vec2 } | null;
+  /** The Cutter's line, and the stretches of it that will cut (inside a fill from edge to edge). */
+  cutLine?: { a: Vec2; b: Vec2; chords?: [Vec2, Vec2][] } | null;
   cutPoint?: Vec2 | null;
+  /** Split into satins: the shape's outline, cut and direction lines, where the cuts cut, the parts and their rungs. */
+  split?: {
+    outline: Vec2[][] | null;
+    cuts: [Vec2, Vec2][];
+    directions: [Vec2, Vec2][];
+    /** A line dragged before a shape is chosen. */
+    live: { a: Vec2; b: Vec2; dir: boolean } | null;
+    chords: [Vec2, Vec2][];
+    parts: { outline: Vec2[][]; rails: [Vec2[], Vec2[]]; auto: boolean; notOneColumn: boolean }[];
+  };
+  /** The connection between two objects under the pointer (select tool, jumps shown). */
+  connHover?: Connection | null;
   issues?: Issue[];
 }
 
@@ -518,6 +531,32 @@ export function paintInteractive(c: Ctx, o: { selected: DesignObject[]; overlay:
     ctx.strokeStyle = "#d64545";
     ctx.lineWidth = 1.6 / scale;
     ctx.setLineDash([6 / scale, 4 / scale]);
+    ctx.beginPath();
+    ctx.moveTo(a[0], a[1]);
+    ctx.lineTo(b[0], b[1]);
+    ctx.stroke();
+    // where it cuts: solid and wider
+    if (ov.cutLine.chords?.length) {
+      ctx.setLineDash([]);
+      ctx.lineWidth = 3 / scale;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      for (const [p, q] of ov.cutLine.chords) {
+        ctx.moveTo(p[0], p[1]);
+        ctx.lineTo(q[0], q[1]);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  if (ov.split) paintSplit(ctx, ov.split, scale, c.select);
+  if (ov.connHover) {
+    const { start: a, end: b, kind } = ov.connHover;
+    ctx.save();
+    ctx.strokeStyle = c.select;
+    ctx.lineWidth = 3 / scale;
+    ctx.lineCap = "round";
+    if (kind !== "sew") ctx.setLineDash([5 / scale, 4 / scale]);
     ctx.beginPath();
     ctx.moveTo(a[0], a[1]);
     ctx.lineTo(b[0], b[1]);
@@ -1014,5 +1053,91 @@ function cornerWidget(c: Ctx, p: Vec2) {
   ctx.arc(p[0], p[1], 1.2 / scale, 0, Math.PI * 2);
   ctx.fillStyle = c.select;
   ctx.fill();
+  ctx.restore();
+}
+
+/** Colours of the split tool: cut lines brown, direction lines red, parts tinted in turn. */
+const SPLIT = { cut: "#8b4513", direction: "#d62828", parts: ["#1f6feb", "#f08c00", "#2b8a3e", "#ae3ec9"] } as const;
+
+function paintSplit(ctx: CanvasRenderingContext2D, sp: NonNullable<InteractiveOverlay["split"]>, scale: number, select: string) {
+  const ring = (r: Vec2[]) => {
+    r.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
+    ctx.closePath();
+  };
+  const line = (a: Vec2, b: Vec2) => {
+    ctx.beginPath();
+    ctx.moveTo(a[0], a[1]);
+    ctx.lineTo(b[0], b[1]);
+    ctx.stroke();
+  };
+  ctx.save();
+  ctx.lineCap = "round";
+  // the parts: tinted, with their rungs (the way each is sewn)
+  sp.parts.forEach((part, k) => {
+    const col = SPLIT.parts[k % SPLIT.parts.length];
+    ctx.beginPath();
+    part.outline.forEach(ring);
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = col;
+    ctx.fill("evenodd");
+    ctx.globalAlpha = part.notOneColumn ? 0.9 : 0.6;
+    ctx.strokeStyle = part.notOneColumn ? SPLIT.direction : col;
+    ctx.lineWidth = 1 / scale;
+    ctx.setLineDash(part.auto ? [3 / scale, 3 / scale] : []);
+    // the way it is sewn: lines between the rails every 8 px on screen
+    const [r0, r1] = part.rails;
+    const gap = 8 / scale;
+    ctx.beginPath();
+    for (let i = 0; i + 1 < r0.length; i++) {
+      const span = Math.max(Math.hypot(r0[i + 1][0] - r0[i][0], r0[i + 1][1] - r0[i][1]), Math.hypot(r1[i + 1][0] - r1[i][0], r1[i + 1][1] - r1[i][1]));
+      const n = Math.max(1, Math.min(400, Math.floor(span / gap)));
+      for (let k = i ? 1 : 0; k <= n; k++) {
+        const t = k / n;
+        ctx.moveTo(r0[i][0] + (r0[i + 1][0] - r0[i][0]) * t, r0[i][1] + (r0[i + 1][1] - r0[i][1]) * t);
+        ctx.lineTo(r1[i][0] + (r1[i + 1][0] - r1[i][0]) * t, r1[i][1] + (r1[i + 1][1] - r1[i][1]) * t);
+      }
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  });
+  ctx.setLineDash([]);
+  // the shape being split
+  if (sp.outline) {
+    ctx.strokeStyle = select;
+    ctx.lineWidth = 1.5 / scale;
+    ctx.beginPath();
+    sp.outline.forEach(ring);
+    ctx.stroke();
+  }
+  // cut lines: dashed, solid where they cut
+  ctx.strokeStyle = SPLIT.cut;
+  ctx.lineWidth = 1.4 / scale;
+  ctx.setLineDash([5 / scale, 4 / scale]);
+  for (const [a, b] of sp.cuts) line(a, b);
+  ctx.setLineDash([]);
+  ctx.lineWidth = 3 / scale;
+  for (const [a, b] of sp.chords) line(a, b);
+  // direction lines with an arrow head
+  ctx.strokeStyle = SPLIT.direction;
+  ctx.fillStyle = SPLIT.direction;
+  ctx.lineWidth = 2 / scale;
+  const arrows = [...sp.directions, ...(sp.live?.dir ? [[sp.live.a, sp.live.b] as [Vec2, Vec2]] : [])];
+  for (const [a, b] of arrows) {
+    line(a, b);
+    const ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+    const k = 8 / scale;
+    ctx.beginPath();
+    ctx.moveTo(b[0], b[1]);
+    ctx.lineTo(b[0] - k * Math.cos(ang - 0.4), b[1] - k * Math.sin(ang - 0.4));
+    ctx.lineTo(b[0] - k * Math.cos(ang + 0.4), b[1] - k * Math.sin(ang + 0.4));
+    ctx.closePath();
+    ctx.fill();
+  }
+  if (sp.live && !sp.live.dir) {
+    ctx.strokeStyle = SPLIT.cut;
+    ctx.lineWidth = 1.4 / scale;
+    ctx.setLineDash([5 / scale, 4 / scale]);
+    line(sp.live.a, sp.live.b);
+  }
   ctx.restore();
 }

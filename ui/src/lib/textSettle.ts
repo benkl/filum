@@ -243,7 +243,7 @@ export function historyJump<D>(prev: HistoryState<D>, next: HistoryState<D>): bo
 /** Settings that apply to a lettering as a whole when they are the same on all its letters. */
 const UNIFORM = ["ties", "forceLock", "minStitch", "minJump", "hidden", "locked"] as const;
 /** Everything carried letter by letter when the letters stay the same. */
-const ALL = [...UNIFORM, "start", "end", "stopAfter", "trimAfter", "visible"] as const;
+const ALL = [...UNIFORM, "start", "end", "stopAfter", "trimAfter", "link", "visible"] as const;
 type Key = (typeof ALL)[number];
 
 /** Start / end points closer than this are the same (a regenerated lettering lands within rounding). */

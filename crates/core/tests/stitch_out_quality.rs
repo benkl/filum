@@ -29,6 +29,7 @@ fn obj(id: &str, thread: &str, paths: Vec<SubPath>, stitch: StitchParams) -> Obj
         end: None,
         lock: None,
         color_sort_index: None,
+        link: None,
     }
 }
 

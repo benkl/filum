@@ -1,4 +1,5 @@
 import { copyProperties, groupSelection, pasteProperties, ungroupSelection } from "./lib/arrange";
+import { applySplitDraft, clearSplit, undoSplitLine } from "./components/SplitTool";
 import { zoomBy } from "./components/menuModel";
 import { hideSelection, lockSelection, orderSelection, showAll, unlockAll } from "./lib/arrange";
 import { DensityLegend } from "./components/DensityPanel";
@@ -44,6 +45,7 @@ const TOOL_KEYS: Record<string, Tool> = {
   g: "gradient",
   b: "builder",
   d: "guides",
+  k: "split",
 };
 
 function useShortcuts() {
@@ -129,6 +131,12 @@ function useShortcuts() {
           map[k]();
         }
         return;
+      }
+      // split into satins: Enter makes them, Backspace takes back a line, Esc clears
+      if (s.tool === "split") {
+        if (k === "enter") return (e.preventDefault(), applySplitDraft());
+        if ((k === "delete" || k === "backspace") && undoSplitLine()) return e.preventDefault();
+        if (k === "escape" && clearSplit()) return;
       }
       if (k === "delete" || k === "backspace") {
         if (s.tool === "gradient" && s.gradNodes.length) {

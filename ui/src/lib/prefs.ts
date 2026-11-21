@@ -17,6 +17,8 @@ export interface Prefs {
   autosave: boolean;
   /** New points (pen, node tool) snap to existing points. */
   snapPoints: boolean;
+  /** This screen's size: device pixels per mm, measured with a ruler (lib/screen). Absent: 96 dpi. */
+  screenPxPerMm?: number;
 }
 
 /** The app colour (the icon's violet). */

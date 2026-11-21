@@ -71,6 +71,42 @@ pub struct StitchPlan {
     /// out after sewing (the finished view leaves them out).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub basting: Option<(usize, usize)>,
+    /// Every connection between consecutive objects, in sewing order: what
+    /// the plan does there (the editor draws them and lets you choose).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub links: Vec<Connection>,
+}
+
+/// What the plan does between the end of one object and the start of the next.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ConnectionKind {
+    /// Tied off and trimmed (a stop too, with stop after).
+    Trim,
+    /// Tied off, a jump without a trim, tied in.
+    Jump,
+    /// Sewn through.
+    Sew,
+    /// The thread changes: the machine cuts.
+    ColorChange,
+}
+
+/// A connection between two consecutive objects of the plan.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Connection {
+    /// The objects (indices in the document) it goes from and to.
+    pub from: u32,
+    pub to: u32,
+    pub kind: ConnectionKind,
+    /// Chosen by hand (the object's link, trim after or stop after), not automatic.
+    pub manual: bool,
+    /// The straight line from `start` to `end` would stay on the fabric
+    /// visibly: nothing sewn later covers a stretch of it longer than 1 mm.
+    pub visible: bool,
+    /// Where the first object ends and the next starts (mm).
+    pub start: [f64; 2],
+    pub end: [f64; 2],
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -127,7 +163,7 @@ impl StitchPlan {
             }
             out.push(*s);
         }
-        StitchPlan { stitches: out, threads: self.threads.clone(), basting: None }
+        StitchPlan { stitches: out, threads: self.threads.clone(), basting: None, links: Vec::new() }
     }
 
     /// Translate so the design is centred on (0,0) — embroidery files are
@@ -184,7 +220,7 @@ impl StitchPlan {
             let last = out[out.len() - 1];
             out.extend(block[body..].iter().map(|s| Stitch { x: last.x, y: last.y, ..*s }));
         }
-        StitchPlan { stitches: out, threads: self.threads.clone(), basting: None }
+        StitchPlan { stitches: out, threads: self.threads.clone(), basting: None, links: Vec::new() }
     }
 
     /// Ink/Stitch "stop position" (frame out): the frame moves to `p` before
@@ -205,7 +241,7 @@ impl StitchPlan {
                 out.push(*s);
             }
         }
-        StitchPlan { stitches: out, threads: self.threads.clone(), basting: None }
+        StitchPlan { stitches: out, threads: self.threads.clone(), basting: None, links: Vec::new() }
     }
 
     /// Offsets of an x × y grid of repeats `dx`, `dy` apart (Ink/Stitch order:

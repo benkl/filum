@@ -698,6 +698,83 @@ pub fn satin_on(paths: &[SubPath], p: &SatinParams, fabric: &crate::model::Fabri
     vec![run]
 }
 
+/// A satin that begins at `start` and ends at `end` where they lie partway
+/// along the column (Ink/Stitch `_connect_stitch_group_with_point`,
+/// `_split_top_layer`). Start: the needle comes in on the centre line there
+/// and runs along it to where the column begins (the satin covers that
+/// run). End: the cover is sewn up to it, the needle runs on to the far end
+/// along the centre line and the rest of the cover comes back to it. Points
+/// at (or near) the column's own ends change nothing.
+pub fn satin_between(paths: &[SubPath], p: &SatinParams, fabric: &crate::model::FabricProfile, start: Option<Point>, end: Option<Point>) -> Vec<Run> {
+    let mut runs = satin_on(paths, p, fabric);
+    if (start.is_none() && end.is_none()) || (p.multi && paths.len() > 1) || runs.len() != 1 {
+        return runs;
+    }
+    let Some(geo) = satin_geometry(paths, p) else { return runs };
+    let centre: Vec<Point> = plot_points_on_rails(&geo, 0.5, 0.0, 0.0).iter().map(|(a, b)| a.lerp(*b, 0.5)).collect();
+    let run = &mut runs[0];
+    if centre.len() < 2 || run.len() < 2 {
+        return runs;
+    }
+    let cum = cumulative_lengths(&centre);
+    let at = |q: Point| project(&centre, &cum, q).0;
+    let along = |d0: f64, d1: f64| -> Vec<Point> {
+        if d0 <= d1 {
+            substring(&centre, &cum, d0, d1)
+        } else {
+            let mut s = substring(&centre, &cum, d1, d0);
+            s.reverse();
+            s
+        }
+    };
+    let len = p.underlay_stitch_length.clamp(0.5, 8.0);
+    const NEAR: f64 = 1.5;
+    if let Some(e) = end {
+        let te = at(e);
+        let k0 = run.iter().position(|x| x.1 & flags::UNDERLAY == 0).unwrap_or(run.len());
+        let top: Run = run.split_off(k0);
+        let split = (|| {
+            let (t0, t1) = (at(top.first()?.0), at(top.last()?.0));
+            if (t1 - te).abs() <= NEAR || (t1 - t0).abs() < 1e-9 {
+                return None;
+            }
+            let dir = (t1 - t0).signum();
+            // the first cover stitch that reaches the end point
+            let k = top.iter().position(|x| (at(x.0) - te) * dir >= 0.0)?;
+            (k > 0 && k + 1 < top.len()).then_some((k, t1))
+        })();
+        match split {
+            Some((k, t1)) => {
+                for x in &top[..k] {
+                    push(run, x.0, x.1);
+                }
+                let from = at(top[k - 1].0);
+                for q in running_stitch(&along(from, t1), len, 0.1).into_iter().skip(1) {
+                    push(run, q, flags::TRAVEL);
+                }
+                for x in top[k..].iter().rev() {
+                    push(run, x.0, x.1);
+                }
+            }
+            None => run.extend(top),
+        }
+    }
+    if let Some(s) = start {
+        let (ts, t0) = (at(s), at(run[0].0));
+        if (ts - t0).abs() > NEAR {
+            let mut lead: Run = Vec::new();
+            for q in running_stitch(&along(ts, t0), len, 0.1) {
+                push(&mut lead, q, flags::UNDERLAY);
+            }
+            for x in run.drain(..) {
+                push(&mut lead, x.0, x.1);
+            }
+            *run = lead;
+        }
+    }
+    runs
+}
+
 /// The cover stitches (Ink/Stitch `do_satin`, `do_e_stitch`, `do_s_stitch`,
 /// `do_zigzag`): pairs plotted with pull compensation and the random
 /// texture, short stitches inset, long stitches split.

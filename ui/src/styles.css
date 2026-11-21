@@ -3338,6 +3338,73 @@ kbd {
 .repeat-preview circle {
   fill: var(--text);
 }
+.repeat-preview rect.hoop {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 0.6;
+  stroke-dasharray: 3 2;
+  vector-effect: non-scaling-stroke;
+}
+.repeat-preview text {
+  fill: var(--text);
+}
+/* ---------------------------------------------------------------- connections (after it) */
+.cmd-now {
+  margin: calc(-1 * var(--sp-1)) 0 var(--sp-2);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+.cmd-now.warn {
+  color: var(--warning-text);
+}
+.layer .link-mark {
+  color: var(--muted);
+}
+.layer .link-mark.manual {
+  color: var(--accent-text);
+}
+/* ---------------------------------------------------------------- screen calibration */
+.screen-cal p {
+  margin: 0 0 var(--sp-3);
+}
+.screen-cal-ruler {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: var(--sp-2) 0;
+}
+.screen-cal-ruler svg {
+  display: block;
+}
+.screen-cal-ruler line {
+  stroke: var(--text);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+.screen-cal-ruler text {
+  fill: var(--muted);
+  font-size: var(--fs-xs);
+  text-anchor: middle;
+}
+.screen-cal-card {
+  margin-top: var(--sp-2);
+  border: 1px dashed var(--muted);
+  border-radius: var(--r-md);
+  display: flex;
+  align-items: flex-end;
+  padding: var(--sp-2);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+.screen-cal-stretch,
+.screen-cal-measure {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: var(--sp-2) 0;
+}
+.screen-cal-stretch input[type="range"] {
+  flex: 1;
+}
 .blend-bar {
   height: 18px;
   border-radius: var(--r-md);

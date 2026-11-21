@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Menu } from "../components/MenuBar";
-import { contextMenu } from "../components/menuModel";
+import { contextMenu, type MenuItem } from "../components/menuModel";
+import { linkMenu } from "../components/linkMenu";
+import { addSplitLine, draftPlan, splittable } from "../components/SplitTool";
+import { regionRings, regionsOf } from "../lib/regions";
+import type { SplitDraft } from "../store";
+import { connectionAt, describeConnection } from "../lib/links";
 import { clipFromText, copySelection, pasteClipboard } from "../lib/arrange";
 import { setDensityHover } from "../lib/density";
 import { ImagePlus } from "lucide-react";
@@ -90,7 +95,8 @@ import {
   type StopEdit,
 } from "../lib/gradient";
 import type { GradientParams } from "../types";
-import { cutFills, cutPathObject, cutSatinObject, nearestOnPaths } from "../lib/cut";
+import { pxPerMm } from "../lib/screen";
+import { cutChords, cutFills, cutPathObject, cutSatinObject, nearestOnPaths } from "../lib/cut";
 import { computeIssues } from "../lib/issues";
 import { issuesShown } from "../lib/panelActions";
 import { displayPlan } from "../lib/threads";
@@ -176,6 +182,7 @@ type Drag =
   | { kind: "pen-anchor"; idx: number; orig: PathNode; start: Vec2; moved: boolean }
   | { kind: "pen-handle"; idx: number; part: "i" | "o"; orig: PathNode }
   | { kind: "cut"; a: Vec2; moved: boolean }
+  | { kind: "split"; a: Vec2; dir: boolean; moved: boolean }
   | { kind: "nodes"; start: Vec2; orig: StitchDocument; sel: NodeRef[]; moved: boolean; anchor: Vec2 }
   | { kind: "nodemarquee"; a: Vec2; add: boolean; sub: boolean; base: NodeRef[]; hit: DesignObject | null }
   | { kind: "ref"; mode: "move" | "scale" | "rotate"; orig: ReferenceImage; start: Vec2; corner: number; a0: number; moved: boolean }
@@ -208,6 +215,21 @@ function segmentsCross(a: Vec2, b: Vec2, c: Vec2, d: Vec2) {
 }
 
 /** Does the segment a→b cross the object's outline? */
+/** Split into satins on the canvas: the shape, the lines, where the cuts cut, and the parts with their rungs (the line being dragged included). */
+function splitOverlay(doc: StitchDocument, draft: SplitDraft, live: { a: Vec2; b: Vec2; dir: boolean } | null): InteractiveOverlay["split"] {
+  const shape = draft.id ? doc.objects.find((o) => o.id === draft.id) : undefined;
+  const d = live && shape ? { ...draft, ...(live.dir ? { directions: [...draft.directions, [live.a, live.b] as [Vec2, Vec2]] } : { cuts: [...draft.cuts, [live.a, live.b] as [Vec2, Vec2]] }) } : draft;
+  const plan = shape ? draftPlan(doc, d) : null;
+  return {
+    outline: shape ? regionsOf(shape).flatMap(regionRings) : null,
+    cuts: d.cuts,
+    directions: d.directions,
+    live: live && !shape ? live : null,
+    chords: shape ? d.cuts.flatMap(([a, b]) => cutChords(shape, a, b)) : [],
+    parts: plan?.parts ?? [],
+  };
+}
+
 function crossesObject(o: DesignObject, a: Vec2, b: Vec2) {
   return o.paths.some((sp) => {
     const pts = flattenSub(sp);
@@ -357,6 +379,8 @@ export function Canvas() {
   const pivotRef = useRef<{ key: string; p: Vec2 } | null>(null);
   if (import.meta.env.DEV) Object.assign(window, { __pen: penRef });
   const iRef = useRef<InteractiveOverlay>({});
+  /** Split into satins: the line being dragged. */
+  const splitLiveRef = useRef<{ a: Vec2; b: Vec2; dir: boolean } | null>(null);
   const handlesRef = useRef<Handle[]>([]);
   const spaceRef = useRef(false);
   const rafRef = useRef(0);
@@ -498,6 +522,7 @@ export function Canvas() {
         pen: penOv,
         freehand: freehandOv,
         issues: issuesShown(s) ? computeIssues(s.doc, s.plan) : undefined,
+        split: s.tool === "split" ? splitOverlay(s.doc, s.splitDraft, splitLiveRef.current) : undefined,
       };
       const more = rendererRef.current.render(bg.getContext("2d")!, {
         interactive,
@@ -510,7 +535,10 @@ export function Canvas() {
         plan: shownPlan,
         view,
         mode: s.viewMode,
-        selection: s.selection,
+        // while the stitch-out plays or is paused, the selection isn't drawn: its
+        // outline would cover what is still to sew (and an imported design's
+        // outline is every stitch, redrawn every frame)
+        selection: s.anim.index == null ? s.selection : [],
         theme: themeRef.current,
         overlay: {
           ...overlayRef.current,
@@ -675,8 +703,8 @@ export function Canvas() {
       const which = (e as CustomEvent).detail as "hoop" | "design" | number;
       const { w, h } = sizeRef.current;
       if (typeof which === "number") {
-        // zoom to a factor of "actual size" around the centre
-        const actual = (96 / 25.4) * which;
+        // zoom to a factor of "actual size" around the centre (the screen's calibration, else 96 dpi)
+        const actual = pxPerMm(s.prefs.screenPxPerMm) * which;
         const cx = (w / 2 - s.view.ox) / s.view.scale;
         const cy = (h / 2 - s.view.oy) / s.view.scale;
         s.setView({ scale: actual, ox: w / 2 - cx * actual, oy: h / 2 - cy * actual });
@@ -1457,6 +1485,18 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
             return;
           }
         }
+        // with the jumps shown, a click right on the line between two objects: Trim / Jump / Sew (Shift: select as usual)
+        const conn = s.showJumps && !e.shiftKey ? connectionAt(s.plan, p, 4 / s.view.scale) : undefined;
+        const from = conn && s.doc.objects[conn.from];
+        if (from) {
+          iRef.current.connHover = null;
+          iRef.current.tooltip = null;
+          // after this pointer event: the menu's outside-click listener would close it at once
+          const at = { x: e.clientX, y: e.clientY };
+          setTimeout(() => setCtxMenu({ ...at, onObject: false, items: linkMenu(from.id) }), 0);
+          draw();
+          return;
+        }
         const hit = pick(p);
         if (hit) {
           // groups and letterings are picked as a whole; Ctrl / Cmd picks one object inside
@@ -1595,6 +1635,21 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
       case "cut":
         dragRef.current = { kind: "cut", a: p, moved: false };
         return;
+      case "split": {
+        const dft = s.splitDraft;
+        const h = pick(p);
+        const cur = dft.id ? s.doc.objects.find((o) => o.id === dft.id) : undefined;
+        // the shape: the one clicked (while no line is drawn yet), else the one being split, else the selected fill
+        const lone = s.selection.length === 1 ? s.doc.objects.find((o) => o.id === s.selection[0]) : undefined;
+        const next = splittable(h) && (!cur || (!dft.cuts.length && !dft.directions.length)) ? h : cur && splittable(cur) ? cur : splittable(lone) ? lone : undefined;
+        if (next && next.id !== dft.id) {
+          // not selected: its stitches and handles would cover the preview of the parts
+          s.set({ splitDraft: { ...dft, id: next.id, cuts: [], directions: [], order: [] } });
+          if (s.selection.length) s.select([]);
+        } else if (!next && h) s.toast("Split into satins works on fill shapes");
+        dragRef.current = { kind: "split", a: p, dir: e.altKey || dft.draw === "direction", moved: false };
+        return;
+      }
       case "builder": {
         refreshRegions();
         const f = faceAt(p);
@@ -1806,9 +1861,17 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
           canvasRef.current.style.cursor = cur;
           if (cur) return;
         }
-        const hov = pick(p)?.id ?? null;
+        // with the jumps shown: the line between two objects offers Trim / Jump / Sew (right on it, even over an object)
+        const conn = s.showJumps ? (connectionAt(s.plan, p, 4 / s.view.scale) ?? null) : null;
+        const hov = conn ? null : (pick(p)?.id ?? null);
         if (hov !== overlayRef.current.hoverId) {
           overlayRef.current.hoverId = hov;
+          draw();
+        }
+        if (conn !== (iRef.current.connHover ?? null)) {
+          iRef.current.connHover = conn;
+          iRef.current.tooltip = conn ? { p, text: `After ${s.doc.objects[conn.from]?.name ?? "it"}: ${describeConnection(conn)} · click to change` } : null;
+          if (canvasRef.current) canvasRef.current.style.cursor = conn ? "pointer" : "";
           draw();
         }
       }
@@ -2294,11 +2357,22 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         draw();
         return;
       }
+      case "split": {
+        if (!d.moved && dist(d.a, p) * s.view.scale < 4) return;
+        d.moved = true;
+        splitLiveRef.current = { a: d.a, b: p, dir: d.dir };
+        iRef.current.tooltip = { p, text: d.dir ? "The part under this line is sewn this way" : "Cuts where the line is solid: start and end outside the shape" };
+        draw();
+        return;
+      }
       case "cut": {
         if (!d.moved && dist(d.a, p) * s.view.scale < 4) return;
         d.moved = true;
-        iRef.current.cutLine = { a: d.a, b: p };
+        // the stretches that will cut: inside a fill from edge to edge
+        const chords = s.doc.objects.filter((o) => o.visible && !o.locked && o.stitch.type === "fill" && crossesObject(o, d.a, p)).flatMap((o) => cutChords(o, d.a, p));
+        iRef.current.cutLine = { a: d.a, b: p, chords };
         iRef.current.cutPoint = null;
+        iRef.current.tooltip = { p, text: chords.length ? "Release to cut where the line is solid" : "Drag all the way across a fill to cut it" };
         draw();
         return;
       }
@@ -2507,10 +2581,27 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         iRef.current.tooltip = null;
         draw();
         return;
+      case "split": {
+        const p = toMm(e);
+        splitLiveRef.current = null;
+        iRef.current.tooltip = null;
+        if (d.moved && dist(d.a, p) > 0.3) {
+          if (!s.splitDraft.id) {
+            // no shape yet: the fill the line crosses
+            const f = s.doc.objects.find((o) => splittable(o) && o.visible && cutChords(o, d.a, p).length);
+            if (f) s.set({ splitDraft: { ...s.splitDraft, id: f.id } });
+          }
+          if (useStore.getState().splitDraft.id) addSplitLine([d.a, p], d.dir);
+          else s.toast("Draw across a fill shape");
+        }
+        draw();
+        return;
+      }
       case "cut": {
         const p = toMm(e);
         iRef.current.cutLine = null;
         iRef.current.cutPoint = null;
+        iRef.current.tooltip = null;
         if (d.moved) {
           const targets = s.doc.objects.filter((o) => o.visible && !o.locked && o.stitch.type === "fill" && crossesObject(o, d.a, p));
           // gradients, tartans and colour blends: cut as one, each half a set of its own
@@ -2520,6 +2611,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
             s.toast(`Cut ${n} fill${n > 1 ? "s" : ""} in two`, "success");
           }
           if (left) s.toast(`${left} gradient${left > 1 ? "s, tartans or blends" : ", tartan or blend"} left whole: a layer is locked or hidden`, "error");
+          if (!n && !left && targets.length) s.toast("Nothing cut: drag all the way across the shape", "info");
         } else {
           const hit = pick(p);
           if (hit && isPathObject(hit)) {
@@ -2631,7 +2723,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
     };
   }, []);
   const refEdit = useStore((s) => s.refEdit);
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; onObject: boolean } | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; onObject: boolean; items?: MenuItem[] } | null>(null);
   // the menu closes on any click elsewhere
   useEffect(() => {
     if (!ctxMenu) return;
@@ -2659,7 +2751,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
 
   return (
     <>
-    {ctxMenu && <Menu items={contextMenu(ctxMenu.onObject)} x={ctxMenu.x} y={ctxMenu.y} onClose={() => setCtxMenu(null)} />}
+    {ctxMenu && <Menu items={ctxMenu.items ?? contextMenu(ctxMenu.onObject)} x={ctxMenu.x} y={ctxMenu.y} onClose={() => setCtxMenu(null)} />}
     <div
       ref={wrapRef}
       className="canvas-wrap"

@@ -9,6 +9,7 @@ import { rowAngleFor, rowsAlongGradient } from "./gradient";
 import { ovalNorm, threadWeightInfo } from "./materials";
 import { shapeProblems } from "./shapeCheck";
 import { lineOverlaps } from "./lineOverlaps";
+import { withLinkChoice } from "./links";
 
 export interface Issue {
   id: string;
@@ -250,6 +251,21 @@ export function computeIssues(doc: StitchDocument, plan: PlanData | null): Issue
       add({ level: "warning", title: "Long stitches", detail: `Contains a ${lg.len.toFixed(1)} mm stitch that may snag.`, at: lg.at });
     }
   });
+  // a connection sewn through by hand that nothing sewn later covers
+  for (const c of plan?.links ?? []) {
+    const o = doc.objects[c.from];
+    if (!o || !c.manual || !c.visible || c.kind !== "sew" || o.trimAfter) continue;
+    const len = Math.hypot(c.end[0] - c.start[0], c.end[1] - c.start[1]);
+    out.push({
+      id: `link:${o.id}`,
+      objId: o.id,
+      level: "warning",
+      title: "Sewn-through connection shows",
+      detail: `After ${o.name} the needle sews ${len.toFixed(1)} mm to the next object and nothing sewn later covers it. Trim or jump there, or sew a later object over it.`,
+      at: [(c.start[0] + c.end[0]) / 2, (c.start[1] + c.end[1]) / 2],
+      fix: { label: "Trim instead", apply: (x) => withLinkChoice(x, "trim") },
+    });
+  }
   const total = plan?.stats.stitches ?? 0;
   if (total > 100000) out.push({ id: "big", objId: "", level: "info", title: "Very large design", detail: `${total.toLocaleString()} stitches.`, at: [hw / 2, hh / 2] });
   cache.set(doc, { plan, issues: out });

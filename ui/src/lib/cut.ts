@@ -1,12 +1,13 @@
 // Cutter tool: Ink/Stitch "Cut satin column", generalised.
 //  • paths (running, satin centre lines, manual) are split exactly at a point
 //    on the curve (de Casteljau), keeping the Bézier shape
-//  • fills are cut along a straight line into two objects (half-plane clip)
+//  • fills are cut where the drawn line runs inside them (lib/regions), into two objects
 
 import type { DesignObject, PathNode, StitchDocument, SubPath, Vec2 } from "../types";
 import { unlinkClone } from "./clones";
 import { gradientLayers, layerSetOf, rampMembers } from "./fillLayers";
-import { flatten, satinRailIndices, uid } from "./geometry";
+import { satinRailIndices, uid } from "./geometry";
+import { chordsOf, insideRegion, midOf, pointInside, regionPaths, regionsOf, splitRegion, type Region } from "./regions";
 import { parentOf, withParent } from "./groups";
 import { pruneGroups } from "./layerRows";
 import { tartanLayers } from "./tartan";
@@ -168,53 +169,54 @@ export function cutPathObject(o: DesignObject, q: Vec2): DesignObject[] | null {
   ];
 }
 
-/** Sutherland–Hodgman clip of a ring against the half-plane side(p) ≥ 0. */
-function clipRing(ring: Vec2[], side: (p: Vec2) => number): Vec2[] {
-  const out: Vec2[] = [];
-  for (let i = 0; i < ring.length; i++) {
-    const a = ring[i];
-    const b = ring[(i + 1) % ring.length];
-    const sa = side(a);
-    const sb = side(b);
-    if (sa >= 0) out.push(a);
-    if ((sa >= 0) !== (sb >= 0)) out.push(lerp(a, b, sa / (sa - sb)));
-  }
-  return out;
-}
-
-const area = (r: Vec2[]) => {
-  let s = 0;
-  for (let i = 0; i < r.length; i++) {
-    const a = r[i];
-    const b = r[(i + 1) % r.length];
-    s += a[0] * b[1] - b[0] * a[1];
-  }
-  return Math.abs(s / 2);
-};
-
-/** Cut a fill object along the infinite line through a→b. Null if the line misses it. */
+/**
+ * Cut a fill object along the segment a→b: only where the segment runs
+ * inside the shape from edge to edge (lib/regions), so a short cut across one
+ * stroke of a letter leaves its other strokes whole. The pieces and the parts
+ * it doesn't cross go to two objects by the side of the line they lie on.
+ * Null if the segment cuts nothing, or everything stays on one side.
+ */
 export function cutFillObject(o: DesignObject, a: Vec2, b: Vec2): DesignObject[] | null {
-  const d = [b[0] - a[0], b[1] - a[1]];
-  if (Math.hypot(d[0], d[1]) < 1e-6) return null;
+  const d: Vec2 = [b[0] - a[0], b[1] - a[1]];
+  const l = Math.hypot(d[0], d[1]);
+  if (l < 1e-6) return null;
+  const n: Vec2 = [-d[1] / l, d[0] / l];
   const side = (p: Vec2) => (p[0] - a[0]) * d[1] - (p[1] - a[1]) * d[0];
-  const rings = o.paths.map((sp) => {
-    const pts = flatten(sp, 16);
-    if (pts.length > 2 && Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]) < 1e-9) pts.pop();
-    return pts;
-  });
-  const half = (sgn: number) =>
-    rings
-      .map((r) => clipRing(r, (p) => sgn * side(p)))
-      .filter((r) => r.length >= 3 && area(r) > 0.05)
-      .map((r): SubPath => ({ closed: true, nodes: r.map((p) => ({ p })) }));
-  const left = half(1);
-  const right = half(-1);
-  if (!left.length || !right.length) return null;
+  const left: Region[] = [];
+  const right: Region[] = [];
+  let cut = false;
+  for (const g of regionsOf(o)) {
+    const chords = chordsOf(g, a, b);
+    if (!chords.length) {
+      (side(pointInside(g)) >= 0 ? left : right).push(g);
+      continue;
+    }
+    cut = true;
+    for (const piece of splitRegion(g, a, b)) {
+      // which side of a chord it lies on, just off the chord
+      let s = 0;
+      for (const c of chords) {
+        const m = midOf(c[0], c[1]);
+        const eps = 0.02;
+        if (insideRegion(piece, [m[0] + n[0] * eps, m[1] + n[1] * eps])) s = side([m[0] + n[0], m[1] + n[1]]);
+        else if (insideRegion(piece, [m[0] - n[0] * eps, m[1] - n[1] * eps])) s = side([m[0] - n[0], m[1] - n[1]]);
+        if (s) break;
+      }
+      if (!s) s = side(pointInside(piece));
+      (s >= 0 ? left : right).push(piece);
+    }
+  }
+  if (!cut || !left.length || !right.length) return null;
   const strip = { start: undefined, end: undefined };
   return [
-    { ...o, ...strip, id: uid(), name: `${o.name} a`, paths: left },
-    { ...o, ...strip, id: uid(), name: `${o.name} b`, paths: right },
+    { ...o, ...strip, id: uid(), name: `${o.name} a`, paths: left.flatMap(regionPaths) },
+    { ...o, ...strip, id: uid(), name: `${o.name} b`, paths: right.flatMap(regionPaths) },
   ];
+}
+
+/** Where the segment a→b would cut the object: the stretches inside it from edge to edge. */
+export function cutChords(o: DesignObject, a: Vec2, b: Vec2): [Vec2, Vec2][] {
+  return regionsOf(o).flatMap((g) => chordsOf(g, a, b));
 }
 
 /** A cut half of a layer: in the half's own gradient / tartan / blend `to` (the set was `from`). */

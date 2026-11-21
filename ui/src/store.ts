@@ -26,6 +26,7 @@ import type {
   SubPath,
   Thread,
   Tool,
+  Vec2,
   ViewMode,
 } from "./types";
 
@@ -39,6 +40,7 @@ export interface View {
 
 export type DialogName =
   | "calibrate"
+  | "screen"
   | "swatches"
   | "crossstitch"
   | "palette"
@@ -60,6 +62,16 @@ export type DialogName =
   | "threadlist"
   | "rebuild"
   | null;
+
+export interface SplitDraft {
+  id: string | null;
+  cuts: [Vec2, Vec2][];
+  directions: [Vec2, Vec2][];
+  /** The kinds in the order drawn (Backspace takes back the last). */
+  order: ("cut" | "direction")[];
+  draw: "cut" | "direction";
+}
+export const EMPTY_SPLIT: SplitDraft = { id: null, cuts: [], directions: [], order: [], draw: "cut" };
 
 export interface Toast {
   id: number;
@@ -172,6 +184,8 @@ export interface State {
   drawHint: string | null;
   /** Selected mesh nodes / freeform points of the selected gradient. */
   gradNodes: number[];
+  /** Split into satins: the shape being split, the cut and direction lines drawn on it, and which kind a drag draws. */
+  splitDraft: SplitDraft;
   /** Selected path nodes (node tool). */
   nodeSel: NodeRef[];
   /** Reference picture being adjusted on the canvas. */
@@ -317,6 +331,7 @@ export const useStore = create<State>((set, get) => ({
   smartGuides: true,
   drawHint: null,
   gradNodes: [],
+  splitDraft: EMPTY_SPLIT,
   nodeSel: [],
   refEdit: null,
   stitchColors: "thread",
@@ -402,7 +417,7 @@ export const useStore = create<State>((set, get) => ({
     });
   },
   select: (ids) => set({ selection: ids, gradNodes: [], nodeSel: get().nodeSel.filter((n) => ids.includes(n.id)) }),
-  setTool: (tool) => set({ tool, nodeSel: [], refEdit: null }),
+  setTool: (tool) => set({ tool, nodeSel: [], refEdit: null, ...(tool !== "split" ? { splitDraft: { ...EMPTY_SPLIT, draw: get().splitDraft.draw } } : {}) }),
   setViewMode: (viewMode) => set({ viewMode }),
   setTheme: (theme) => {
     safeSetItem(THEME_KEY, theme);

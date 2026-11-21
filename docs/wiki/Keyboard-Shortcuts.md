@@ -25,6 +25,7 @@ Press <kbd>?</kbd> in Filum to see this list in the app, with a filter box. On a
 | G | Gradient: drag across a shape · click the line to add a stop · Alt-click a stop to remove it |
 | G · Density / Blend | Drag across a fill: dense where you start, open where you end (Blend: a second colour fades in) |
 | D | Stitch direction: draw guide lines the rows follow |
+| K | Split into satins: drag cut lines across a fill · Alt-drag direction lines · Enter makes the satins · Backspace takes back a line · Esc clears |
 | B | Shape builder: drag across overlaps to merge them · Alt-drag deletes · Shift-click adds shapes |
 | Esc | Back to Select (or clear the selection) |
 
@@ -93,7 +94,7 @@ Press <kbd>?</kbd> in Filum to see this list in the app, with a filter box. On a
 | Enter / Esc / Backspace | Finish the path (the tool stays) / finish / remove the last point |
 | Freehand | The line trails the pointer and becomes a clean Bézier path · end at the start to close |
 | Pen | Points snap to existing points (Ctrl: off) · ending on the end of another running path joins them |
-| Cutter | Click a line to split it, drag across fills to cut them |
+| Cutter | Click a line to split it, drag across fills to cut them where the line crosses them |
 
 ## Node tool
 
@@ -126,6 +127,7 @@ Press <kbd>?</kbd> in Filum to see this list in the app, with a filter box. On a
 | <kbd>C</kbd> | Cutter |
 | <kbd>H</kbd> | Pan |
 | <kbd>M</kbd> | Ruler |
+| <kbd>K</kbd> | Split into satins |
 | <kbd>P</kbd> | Pen (running stitch) |
 | <kbd>U</kbd> | Curvature |
 | <kbd>F</kbd> | Freehand |

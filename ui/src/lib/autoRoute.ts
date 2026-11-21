@@ -111,7 +111,7 @@ export function jumpsToStrokes(min = 1, max = 15): string | null {
     const [a, ia] = visible[k];
     const [b, ib] = visible[k + 1];
     if (sel.size && !(sel.has(a.id) && sel.has(b.id))) continue;
-    if (a.thread !== b.thread || a.trimAfter || a.stopAfter) continue;
+    if (a.thread !== b.thread || a.trimAfter || a.stopAfter || a.link) continue;
     const p = last.get(ia)!;
     const q = first.get(ib)!;
     const d = Math.hypot(q[0] - p[0], q[1] - p[1]);

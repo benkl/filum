@@ -1,6 +1,7 @@
 // Calibrate a fabric: sew a swatch without pull compensation, measure it, and
 // save what new objects on that fabric start from (lib/calibration).
 
+import { presetSetOf, presetValues } from "../lib/fabricPresets";
 import { ArrowLeft, ArrowRight, Check, Download, Ruler, RotateCcw, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { DesignView } from "../canvas/DesignView";
@@ -86,6 +87,8 @@ export function CalibrateDialog({ onClose }: { onClose: () => void }) {
   const info = fabricInfo(fabric);
   const affected = fabric === doc.fabric ? doc.objects.filter((o) => (o.stitch.type === "satin" && result.satin) || (o.stitch.type === "fill" && result.fill)).length : 0;
 
+  // a preset's fill overlap stays, the calibration's expand on top (lib/fabricPresets.ts)
+  const overlapOf = (d: typeof doc, st: (typeof doc)["objects"][number]["stitch"]) => (presetValues(presetSetOf(d), d.fabric, st).expand as number | undefined) ?? 0;
   const save = () => {
     const s = useStore.getState();
     saveCalibration({
@@ -102,7 +105,7 @@ export function CalibrateDialog({ onClose }: { onClose: () => void }) {
           o.stitch.type === "satin" && result.satin
             ? { ...o, stitch: { ...o.stitch, pullComp: result.satin.pullComp, pushComp: result.satin.pushComp } }
             : o.stitch.type === "fill" && result.fill
-              ? { ...o, stitch: { ...o.stitch, pullComp: result.fill.pullComp, expand: result.fill.expand } }
+              ? { ...o, stitch: { ...o.stitch, pullComp: result.fill.pullComp, expand: +(overlapOf(d, o.stitch) + result.fill.expand).toFixed(3) } }
               : o,
         ),
       }));

@@ -256,6 +256,13 @@ export function ConvertDialog({ onClose }: { onClose: () => void }) {
           {id === "fillToSatin" && (
             <>
               <p className="hint">Select the fill together with lines drawn right across it (rungs): each rung crosses the outline twice and sets the stitch direction there. Where more than two rungs meet one part, the satins end.</p>
+              <p className="hint">
+                Or draw on the canvas:{" "}
+                <button className="link" onClick={() => (useStore.getState().setDialog(null), useStore.getState().setTool("split"))}>
+                  Split into satins
+                </button>{" "}
+                (K) — cut lines where to cut, direction lines which way to sew each part.
+              </p>
               <Row label="Start / end at rung" title="Leave out the rounded ends: the satins start and end at the first and last rung (needs at least two rungs)">
                 <Toggle on={o.fillToSatin.skipEndSection} onChange={(v) => set("fillToSatin", { skipEndSection: v })} />
               </Row>

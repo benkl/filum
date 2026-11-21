@@ -251,6 +251,7 @@ fn object(id: String, thread: usize, paths: Vec<SubPath>, stitch: StitchParams) 
         end: None,
         lock: None,
         color_sort_index: None,
+        link: None,
     }
 }
 

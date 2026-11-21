@@ -1,10 +1,11 @@
 // Arrange toolbar (align / distribute / mirror) and the arranging
-// dialogs: Wreath · Kaleidoscope · Mirror-merge, Outlines & offsets, Colour
+// dialogs: Wreath · Kaleidoscope · Mirror-merge · Grid, Outlines & offsets, Colour
 // blending.
 
 import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalDistributeCenter, AlignStartHorizontal, AlignStartVertical, AlignVerticalDistributeCenter, Crosshair, FlipHorizontal2, FlipVertical2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { align, distribute, mirrorSelection, outlineObject, repeatSelection, repeatTransforms, withOutline, type OutlineKind, type OutlineOptions, type RepeatMode } from "../lib/arrange";
+import { align, distribute, gridSelection, mirrorSelection, outlineObject, repeatSelection, repeatTransforms, withOutline, type OutlineKind, type OutlineOptions, type RepeatMode } from "../lib/arrange";
+import { colourChanges, gridBox, gridCells, gridSequence, MAX_PIECES, type GridColours, type GridOrder } from "../lib/grid";
 import { centerInHoop } from "../lib/actions";
 import { applyMat, objectBounds, unionBoxes } from "../lib/geometry";
 import { useStore } from "../store";
@@ -90,34 +91,85 @@ function RepeatPreview({ mode, copies, center }: { mode: RepeatMode; copies: num
   );
 }
 
+/** Where the pieces of a grid go in the hoop, numbered in their sewing order. */
+function GridPreview({ rows, cols, gap, order, hoop, shift }: { rows: number; cols: number; gap: Vec2; order: GridOrder; hoop: Vec2; shift: Vec2 }) {
+  const box = selectionBox();
+  if (!box) return null;
+  const all = gridBox(box, { rows, cols, gap });
+  const [x0, y0] = [Math.min(0, all.x + shift[0]), Math.min(0, all.y + shift[1])];
+  const [x1, y1] = [Math.max(hoop[0], all.x + shift[0] + all.w), Math.max(hoop[1], all.y + shift[1] + all.h)];
+  const pad = Math.max(x1 - x0, y1 - y0) * 0.04 + 1;
+  const numbered = rows * cols <= 60;
+  return (
+    <svg className="repeat-preview" viewBox={`${x0 - pad} ${y0 - pad} ${x1 - x0 + 2 * pad} ${y1 - y0 + 2 * pad}`}>
+      <rect className="hoop" x={0} y={0} width={hoop[0]} height={hoop[1]} />
+      {gridCells(rows, cols, order).map(({ row, col }, k) => {
+        const [x, y] = [box.x + shift[0] + col * (box.w + gap[0]), box.y + shift[1] + row * (box.h + gap[1])];
+        return (
+          <g key={k}>
+            <polygon points={`${x},${y} ${x + box.w},${y} ${x + box.w},${y + box.h} ${x},${y + box.h}`} className={row || col ? "" : "orig"} />
+            {numbered && (
+              <text x={x + box.w / 2} y={y + box.h / 2} fontSize={Math.min(box.w, box.h) * 0.45} textAnchor="middle" dominantBaseline="central">
+                {k + 1}
+              </text>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+type RepeatKind = RepeatMode | "grid";
+
 export function RepeatDialog({ onClose }: { onClose: () => void }) {
   const doc = useStore((s) => s.doc);
-  const [mode, setMode] = useState<RepeatMode>("wreath");
+  const selection = useStore((s) => s.selection);
+  const [mode, setMode] = useState<RepeatKind>("wreath");
   const [copies, setCopies] = useState(6);
   const [around, setAround] = useState<"hoop" | "radius">("radius");
   const [radius, setRadius] = useState(25);
+  const [rows, setRows] = useState(2);
+  const [cols, setCols] = useState(3);
+  const [gap, setGap] = useState<Vec2>([5, 5]);
+  const [order, setOrder] = useState<GridOrder>("serpentine");
+  const [colours, setColours] = useState<GridColours>("byColour");
+  const [centred, setCentred] = useState(false);
   const box = selectionBox();
+  const grid = mode === "grid";
+  const ring: RepeatMode = grid ? "wreath" : mode;
   const center: Vec2 =
-    around === "hoop" || !box ? [doc.hoop.width / 2, doc.hoop.height / 2] : [box.x + box.w / 2, box.y + box.h / 2 + (mode.startsWith("mirror") ? box.h / 2 + radius / 5 : radius)];
-  const rotational = mode === "wreath" || mode === "kaleidoscope";
-  const total = repeatTransforms({ mode, copies, center }).length + 1;
+    around === "hoop" || !box ? [doc.hoop.width / 2, doc.hoop.height / 2] : [box.x + box.w / 2, box.y + box.h / 2 + (ring.startsWith("mirror") ? box.h / 2 + radius / 5 : radius)];
+  const rotational = ring === "wreath" || ring === "kaleidoscope";
+  const total = grid ? rows * cols : repeatTransforms({ mode: ring, copies, center }).length + 1;
+  // the grid: where it lies, whether it fits in the hoop, and its colour changes
+  const all = box && gridBox(box, { rows, cols, gap });
+  const shift: Vec2 = all && centred ? [doc.hoop.width / 2 - (all.x + all.w / 2), doc.hoop.height / 2 - (all.y + all.h / 2)] : [0, 0];
+  const beyond =
+    !!all && (all.x + shift[0] < -0.05 || all.y + shift[1] < -0.05 || all.x + shift[0] + all.w > doc.hoop.width + 0.05 || all.y + shift[1] + all.h > doc.hoop.height + 0.05);
+  const tooMany = rows * cols < 2 || rows * cols > MAX_PIECES;
+  const changes = useMemo(() => {
+    const piece = doc.objects.filter((o) => selection.includes(o.id) && !o.locked);
+    const pieces = Array.from({ length: Math.min(rows * cols, MAX_PIECES) }, () => piece);
+    return { byColour: colourChanges(gridSequence(pieces, "byColour")), byPiece: colourChanges(gridSequence(pieces, "byPiece")) };
+  }, [doc.objects, selection, rows, cols]);
   return (
     <Dialog
       live
-      title="Wreath · Kaleidoscope · Mirror-merge"
+      title="Wreath · Kaleidoscope · Mirror-merge · Grid"
       onClose={onClose}
       footer={
         <>
-          <span className="hint">{total} copies in total</span>
+          <span className="hint">{grid ? `${total} pieces · ${changes[colours]} colour changes` : `${total} copies in total`}</span>
           <div className="spacer" />
           <button className="btn" onClick={onClose}>
             Cancel
           </button>
           <button
             className="btn primary"
-            disabled={!box}
+            disabled={!box || (grid && tooMany)}
             onClick={() => {
-              const n = repeatSelection({ mode, copies, center });
+              const n = grid ? gridSelection({ rows, cols, gap, order, colours }, shift) : repeatSelection({ mode: ring, copies, center });
               useStore.getState().toast(`Created ${n} objects`, "success");
               onClose();
             }}
@@ -136,7 +188,8 @@ export function RepeatDialog({ onClose }: { onClose: () => void }) {
             ["mirrorH", "Mirror ↔"],
             ["mirrorV", "Mirror ↕"],
             ["mirrorHV", "Mirror 4×"],
-          ] as [RepeatMode, string][]
+            ["grid", "Grid"],
+          ] as [RepeatKind, string][]
         ).map(([id, label]) => (
           <button key={id} className={mode === id ? "on" : ""} onClick={() => setMode(id)}>
             {label}
@@ -144,6 +197,55 @@ export function RepeatDialog({ onClose }: { onClose: () => void }) {
         ))}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 200px", gap: 16, alignItems: "start" }}>
+        {grid ? (
+          <div>
+            <Row label="Rows">
+              <Num value={rows} step={1} min={1} max={40} digits={0} onChange={(v) => setRows(Math.max(1, Math.round(v)))} />
+            </Row>
+            <Row label="Columns">
+              <Num value={cols} step={1} min={1} max={40} digits={0} onChange={(v) => setCols(Math.max(1, Math.round(v)))} />
+            </Row>
+            <Row label="Gap across" title="Space between the edges of neighbouring pieces">
+              <Num value={gap[0]} unit="mm" step={0.5} onChange={(v) => setGap([v, gap[1]])} />
+            </Row>
+            <Row label="Gap down" title="Space between the edges of neighbouring pieces">
+              <Num value={gap[1]} unit="mm" step={0.5} onChange={(v) => setGap([gap[0], v])} />
+            </Row>
+            <Row label="Order" title="The order the pieces are sewn in">
+              <div className="seg">
+                <button className={order === "rows" ? "on" : ""} onClick={() => setOrder("rows")} title="Every row from left to right">
+                  Row by row
+                </button>
+                <button className={order === "serpentine" ? "on" : ""} onClick={() => setOrder("serpentine")} title="Back along every second row, for shorter jumps">
+                  Serpentine
+                </button>
+              </div>
+            </Row>
+            <Row label="Colours">
+              <div className="seg">
+                <button
+                  className={colours === "byColour" ? "on" : ""}
+                  onClick={() => setColours("byColour")}
+                  title={`Each colour on every piece before the next colour: ${changes.byColour} colour changes`}
+                >
+                  One at a time
+                </button>
+                <button className={colours === "byPiece" ? "on" : ""} onClick={() => setColours("byPiece")} title={`Each piece finished before the next: ${changes.byPiece} colour changes`}>
+                  Piece by piece
+                </button>
+              </div>
+            </Row>
+            <Row label="Centre in hoop" title="Move the whole grid, the original too, into the middle of the hoop">
+              <Toggle on={centred} onChange={setCentred} />
+            </Row>
+            {tooMany && <p className="hint warn">Choose between 2 and {MAX_PIECES} pieces.</p>}
+            {!tooMany && beyond && <p className="hint warn">The grid goes beyond the hoop.</p>}
+            <p className="hint">
+              The selection stays as the first piece, top left. One colour at a time sews each colour on every piece before the next one, and every piece
+              keeps its own layering.
+            </p>
+          </div>
+        ) : (
         <div>
           {rotational && (
             <Row label="Copies" title="Number of repeats around the centre">
@@ -166,13 +268,18 @@ export function RepeatDialog({ onClose }: { onClose: () => void }) {
             </Row>
           )}
           <p className="hint">
-            {mode === "wreath" && "Copies rotate around the centre — rings, flowers, borders."}
-            {mode === "kaleidoscope" && "Rotated copies plus their mirror images — snowflake-like symmetry."}
-            {mode.startsWith("mirror") && "Mirror images joined at the centre line (mirror-merge)."} Fill angles follow every copy; mirrored
+            {ring === "wreath" && "Copies rotate around the centre — rings, flowers, borders."}
+            {ring === "kaleidoscope" && "Rotated copies plus their mirror images — snowflake-like symmetry."}
+            {ring.startsWith("mirror") && "Mirror images joined at the centre line (mirror-merge)."} Fill angles follow every copy; mirrored
             lettering becomes shapes.
           </p>
         </div>
-        <RepeatPreview mode={mode} copies={copies} center={center} />
+        )}
+        {grid ? (
+          <GridPreview rows={rows} cols={cols} gap={gap} order={order} hoop={[doc.hoop.width, doc.hoop.height]} shift={shift} />
+        ) : (
+          <RepeatPreview mode={ring} copies={copies} center={center} />
+        )}
       </div>
     </Dialog>
   );

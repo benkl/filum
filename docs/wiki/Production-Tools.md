@@ -6,6 +6,16 @@ These are the tools that take a design from "looks nice" to "sews nicely": fabri
 
 Choose your fabric in the title bar or under **Design → Fabric & thread**. The choices are Cotton, Polyester, Denim, Knit / Jersey, Piqué / Polo, Fleece, Towel / Terry, Organza / Sheer, Silk / Satin, Canvas, Leather / Vinyl, Felt and Cap / Structured. The preset adjusts the density and underlay of the whole design. Pull compensation is off by default, as in Ink/Stitch: calibrate the fabric (below) and new objects start from the pull compensation it measures.
 
+If you'd rather start from ready-made numbers, choose a **Preset** under **Design → Fabric & thread**. It sets what new satins and fills start with on the chosen fabric:
+
+| Preset | What new objects get |
+|---|---|
+| **Ink/Stitch** (default) | Ink/Stitch's values: no pull compensation |
+| **Filum** | Filum's earlier values: satins with 0.2 mm pull compensation plus a little more on stretchy and pile fabrics (0.35 mm on knit, 0.4 mm on fleece, 0.55 mm on caps), the same extra on fills, centre-walk and automatic underlay, and tatami rows 0.4 mm apart |
+| **NOVAstitch** | The presets of the [NOVAstitch Designer](https://github.com/effepol/NOVAstitch-designer) fork: 1 mm pull compensation on knit and piqué and 0.5 mm on fleece, none on the others; fills reaching 0.4 mm under their neighbours on stretchy fabrics and caps, 0.2 mm on the others; contour underlay 0.5 mm in on satins 2 mm wide and wider |
+
+The panel says in a line what the preset does on your fabric. Objects already in the design keep their settings. After you change the preset, or the fabric while a preset is on, the panel offers to **update** the satins and fills already there, in one undo step. A fabric calibration always wins: its measured pull compensation replaces the preset's, and its expand adds to the NOVAstitch overlap.
+
 Pick the **thread** weight too (No. 75 down to No. 12). Filum then recommends a **backing**, a **topping**, a **needle**, and the **smallest text** that will stitch cleanly. The recommendations come from stabiliser, needle and thread makers' guides, and the panel notes where the makers disagree.
 
 ## Machine and stitch-out
@@ -25,6 +35,18 @@ Filum follows the usual machine-embroidery conventions:
 - **A colour change** is tied off but not trimmed first: the machine cuts the thread itself when it changes colour.
 - **Stops** (appliqué steps) and the end of the design are tied off and trimmed.
 - **Inside a fill**, travel runs under stitching still to come or along sewn rows. Where a part is walled in by rows already sewn, a straight travel may cross them for at most 2 mm; anything longer is trimmed rather than left on top of the finished rows.
+
+### Choosing it yourself: Trim, Jump or Sew
+
+**Selection → Commands → After it** sets what happens between an object and the next one:
+- **Auto**: as above. The line under it says what Filum does there now, for example *trimmed (12.3 mm gap)*. **Min. jump** shows only here, because it only changes what Automatic does.
+- **Trim**: locked and trimmed, whatever the distance (the Ink/Stitch *trim after* command).
+- **Jump**: locked, then a jump without a trim. Use it when a later object covers the jump, or when you'd rather snip by hand than wait for the trim.
+- **Sew**: sewn straight through in running stitches of 2.5 mm at most, with no locks and no trim, however far apart the objects are. Use it for a connection that a later object will cover. If nothing covers it, the Issues panel warns you and offers to trim instead.
+
+A colour change, and *Stop after*, always win.
+
+With **View → Show → Jump stitches** on, you can also click the line between two objects on the canvas to choose; hold <kbd>Shift</kbd> to select the object underneath instead. Right-click an object (on the canvas or in Layers) for the same choices under **After it**. In Layers, a small mark shows every trim, jump, sew or stop you chose by hand, and clicking the mark opens the menu.
 
 ### What your machine cuts
 
@@ -101,6 +123,12 @@ The calibration is saved for that fabric on this device. New satins and fills on
 Not sure which density or pull compensation suits your fabric? Select an object and choose **Stitch → Test swatches…**. Pick a setting, such as row spacing (density), stitch length, pull compensation or angle. Then set a start value, a step and a grid. Filum makes copies of the object in a grid, one value per copy, each named after its value. Sew it once and keep the best.
 
 ![Test swatches](images/swatches.webp)
+
+## Many patches in one hoop
+
+To sew several copies of a patch or badge at once, select the whole design and choose **Object → Repeat…**, then **Grid**. Set the rows, the columns and the gap between the pieces. The selection stays where it is as the first piece, top left, and **Centre in hoop** moves the whole grid into the middle. The preview shows the hoop and numbers the pieces in their sewing order: **Row by row**, or **Serpentine**, which comes back along every second row for shorter jumps.
+
+**One at a time** sews each colour on every piece before the next colour, so six badges sewn in five colour blocks need four colour changes, not twenty-nine. Each colour is only grouped across the pieces where it comes next in the design, so every piece keeps its own layering: an outline sewn over a fill stays on top. **Piece by piece** finishes each piece before the next. The footer shows the colour changes for the choice you've made. The copies are ordinary objects of their own.
 
 ## Cutwork
 

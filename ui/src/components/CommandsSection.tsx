@@ -1,9 +1,12 @@
 // Sewing commands of objects (Ink/Stitch commands and per-object params):
-// start and end point, trim and stop after, lock stitches, minimum stitch and
+// start and end point, what follows it (Automatic / Trim / Jump / Sew, see
+// lib/links) and stop after, lock stitches, minimum stitch and
 // jump. For several objects — a lettering's glyphs, a selection — the
 // settings apply to all of them, and "after" means after the last one sewn.
 
+import { LINK_CHOICES, connectionAfter, describeConnection, linkChoiceOf } from "../lib/links";
 import { useStore } from "../store";
+import { setLinkChoice } from "./linkMenu";
 import type { DesignObject } from "../types";
 import { Num, Row, Section, Toggle } from "./ui";
 
@@ -35,16 +38,23 @@ const LOCKS = [
 export function CommandsSection({ objects }: { objects: DesignObject[] }) {
   const machine = useStore((s) => s.doc.machine);
   const order = useStore((s) => s.doc.objects);
+  const plan = useStore((s) => s.plan);
   if (!objects.length) return null;
   const one = objects.length === 1 ? objects[0] : null;
   // "after": the last of them in the stitch order
   const last = [...objects].sort((a, b) => order.indexOf(a) - order.indexOf(b)).at(-1)!;
   const ids = new Set(objects.map((o) => o.id));
-  const all = (p: Partial<DesignObject>) => useStore.getState().commit((d) => ({ ...d, objects: d.objects.map((o) => (ids.has(o.id) ? { ...o, ...p } : o)) }));
+  const choice = linkChoiceOf(last);
+  const conn = connectionAfter(plan, { objects: order }, last.id);
+  const all = (p: Partial<DesignObject>) =>
+    useStore.getState().commit((d) => ({
+      ...d,
+      objects: d.objects.map((o) => (ids.has(o.id) ? { ...o, ...p } : o)),
+    }));
   const ties = objects.every((o) => (o.ties ?? "both") === (objects[0].ties ?? "both")) ? (objects[0].ties ?? "both") : null;
   const same = <T,>(f: (o: DesignObject) => T) => (objects.every((o) => f(o) === f(objects[0])) ? f(objects[0]) : undefined);
   return (
-    <Section title="Commands" defaultOpen={!!(one?.start || one?.end)}>
+    <Section title="Commands" defaultOpen={!!(one?.start || one?.end || choice !== "auto" || last.stopAfter)}>
       {one &&
         (["start", "end"] as const).map((k) => (
           <Row key={k} label={k === "start" ? "Start point" : "End point"} title="Drag the S / E pins on the canvas; double-click a pin to go back to automatic">
@@ -58,9 +68,21 @@ export function CommandsSection({ objects }: { objects: DesignObject[] }) {
             </span>
           </Row>
         ))}
-      <Row label="Trim after" title={one ? undefined : "After the last of them"}>
-        <Toggle on={last.trimAfter} onChange={(v) => useStore.getState().updateObject(last.id, { trimAfter: v })} />
+      <Row label="After it" title={`How the needle goes on to the next object${one ? "" : " — after the last of them"}. Also: click the line between two objects on the canvas (View ▸ Jumps)`}>
+        <div className="seg">
+          {LINK_CHOICES.map((c) => (
+            <button key={c.id} className={choice === c.id ? "on" : ""} title={c.hint} onClick={() => setLinkChoice([last.id], c.id)}>
+              {c.label === "Automatic" ? "Auto" : c.label}
+            </button>
+          ))}
+        </div>
       </Row>
+      {conn && (
+        <p className={`cmd-now ${conn.visible && choice !== "auto" ? "warn" : ""}`}>
+          {choice === "auto" ? "Automatic: " : "Now: "}
+          {describeConnection(conn)}
+        </p>
+      )}
       <Row label="Stop after" title={`Machine pause (appliqué, puff foam, …)${one ? "" : " — after the last of them"}`}>
         <Toggle on={last.stopAfter} onChange={(v) => useStore.getState().updateObject(last.id, { stopAfter: v })} />
       </Row>
@@ -83,13 +105,15 @@ export function CommandsSection({ objects }: { objects: DesignObject[] }) {
         fallback={machine.minStitch}
         onChange={(v) => all({ minStitch: v })}
       />
-      <OwnValue
-        label="Min. jump"
-        title="Gaps after it up to this long are sewn through — no locks, no trim (Ink/Stitch minimum jump stitch length). Default: the trim distance"
-        value={same((o) => o.minJump)}
-        fallback={machine.trimDistance}
-        onChange={(v) => all({ minJump: v })}
-      />
+      {choice === "auto" && (
+        <OwnValue
+          label="Min. jump"
+          title="Automatic: gaps after it up to this long are sewn through — no locks, no trim (Ink/Stitch minimum jump stitch length). Default: the trim distance"
+          value={same((o) => o.minJump)}
+          fallback={machine.trimDistance}
+          onChange={(v) => all({ minJump: v })}
+        />
+      )}
     </Section>
   );
 }

@@ -518,6 +518,7 @@ mod tests {
             end: None,
             lock: None,
             color_sort_index: None,
+            link: None,
         }
     }
     fn doc(objects: Vec<Object>) -> Document {

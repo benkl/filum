@@ -2,7 +2,9 @@
 // recommend underneath and on top, the thread weight, and the hoop's shape.
 
 import { Circle, Ruler, Square, TriangleAlert } from "lucide-react";
-import { calibrationFor } from "../lib/calibration";
+import { calibratedDefaults, calibrationFor } from "../lib/calibration";
+import { applyPresetToObjects, objectsOffPreset, PRESET_SETS, presetSetOf, presetSummary, type PresetSet } from "../lib/fabricPresets";
+import { useMemo, useState } from "react";
 import { Fabric, Knockdown } from "../icons/stitch";
 import { defaultDesignOptions } from "../lib/geometry";
 import { FABRICS, fabricInfo, THREAD_WEIGHTS, threadWeightInfo } from "../lib/materials";
@@ -41,11 +43,29 @@ export function MaterialSection() {
   const calibrated = calibrationFor(doc.fabric);
   const weight = threadWeightInfo(doc.options?.threadWeight);
   const setWeight = (w: ThreadWeight) => commit((d) => ({ ...d, options: { ...(d.options ?? defaultDesignOptions()), threadWeight: w } }));
+  const preset = presetSetOf(doc);
+  // after a change of preset or fabric: offer the new values to the objects already in the design
+  const [offered, setOffered] = useState(false);
+  const setPreset = (v: PresetSet | "none") => {
+    commit((d) => {
+      const { presetSet: _p, ...rest } = d.options ?? defaultDesignOptions();
+      void _p;
+      return { ...d, options: v === "none" ? rest : { ...rest, presetSet: v } };
+    });
+    setOffered(true);
+  };
   return (
     <>
-      <Row label="Fabric" title="Adjusts density and underlay for every object; calibrate it for pull compensation">
+      <Row label="Fabric" title="Adjusts density and underlay for every object; choose a preset or calibrate it for pull compensation">
         <div className="mt-fabric">
-          <select className="select" value={doc.fabric} onChange={(e) => useStore.getState().setFabric(e.target.value as never)}>
+          <select
+            className="select"
+            value={doc.fabric}
+            onChange={(e) => {
+              useStore.getState().setFabric(e.target.value as never);
+              if (preset) setOffered(true);
+            }}
+          >
             {FABRICS.map((f) => (
               <option key={f.id} value={f.id}>
                 {f.label}
@@ -61,6 +81,18 @@ export function MaterialSection() {
           </button>
         </div>
       </Row>
+      <Row label="Preset" title="Starting values for new satins and fills on this fabric. Ink/Stitch: no pull compensation unless you calibrate the fabric">
+        <div className="mt-fabric">
+          <select className="select" value={preset ?? "none"} onChange={(e) => setPreset(e.target.value as PresetSet | "none")}>
+            {PRESET_SETS.map((p) => (
+              <option key={p.id} value={p.id} title={p.hint}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </Row>
+      {offered && <PresetSuggestion onDone={() => setOffered(false)} />}
       <Row label="Thread" title="Top thread weight — finer thread stitches denser, heavier thread wider (Madeira's density guide)">
         <div className="seg mt-weights">
           {THREAD_WEIGHTS.map((t) => (
@@ -73,6 +105,7 @@ export function MaterialSection() {
       <div className="mt-card">
         <p className="mt-effect">
           <Fabric size={12} /> {fabric.effect}
+          {preset && ` · ${presetSummary(preset, doc.fabric)}`}
           {calibrated && " · calibrated pull compensation for new objects"}
           {weight.weight !== 40 && ` · spacing ×${(weight.spacing / 0.4).toFixed(2)} for No. ${weight.weight}`}
         </p>
@@ -100,6 +133,29 @@ export function MaterialSection() {
       </div>
       {PILE.includes(doc.fabric) && <KnockdownSuggestion />}
     </>
+  );
+}
+
+/** The satins and fills already in the design, given the preset's values (one undo step). */
+function PresetSuggestion({ onDone }: { onDone: () => void }) {
+  const doc = useStore((s) => s.doc);
+  const off = useMemo(() => objectsOffPreset(doc, calibratedDefaults(doc.fabric)), [doc]);
+  if (!off.length) return null;
+  const apply = () => {
+    const s = useStore.getState();
+    s.commit((d) => applyPresetToObjects(d, calibratedDefaults(d.fabric)));
+    s.toast(`${off.length} object${off.length === 1 ? "" : "s"} updated`, "success");
+    onDone();
+  };
+  return (
+    <div className="mt-suggest">
+      <span>
+        New objects start from these values. {off.length} {off.length === 1 ? "satin or fill" : "satins and fills"} in this design {off.length === 1 ? "has" : "have"} others.
+      </span>
+      <button className="btn sm primary" onClick={apply}>
+        Update them
+      </button>
+    </div>
   );
 }
 

@@ -210,6 +210,9 @@ thread_local! {
     /// Extra rows sewn into the gap at the end of each section before
     /// travelling on (Ink/Stitch `gap_fill_rows`, an even number).
     static GAP_ROWS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+    /// The start point was set by the user (a pin), not just where the
+    /// previous object ended: a one-way tatami then turns round to begin at it.
+    pub(crate) static START_PINNED: std::cell::Cell<bool> = const { std::cell::Cell::new(true) };
 }
 
 /// Alternate rows: the colour of every row (by row number). Each row takes
@@ -446,13 +449,30 @@ pub fn tatami_ramp(
     }
     let mut remaining: Vec<usize> = (0..grating.sections.len()).filter(|i| !grating.sections[*i].rows.is_empty()).collect();
     // the frame's rows run down the screen (vertical rows: left to right);
-    // an end point nearer the top turns it round, so it ends there
+    // a start pin nearer the bottom turns it round, so it begins there, and
+    // so does an end point nearer the top, so it ends there. A start that is
+    // only where the previous object ended keeps the rows going down.
     let mut down = if a.cos().abs() > 1e-6 { a.cos() > 0.0 } else { a.sin() > 0.0 };
-    if let (true, Some(e)) = (one_way, end.map(|p| p.rotate(a))) {
+    if one_way && (start.is_some() || end.is_some()) {
         let ys = remaining.iter().flat_map(|&i| grating.sections[i].rows.iter().map(|r| r.0));
         let (lo, hi) = ys.fold((f64::INFINITY, f64::NEG_INFINITY), |(l, h), y| (l.min(y), h.max(y)));
         let (first, last) = if down { (lo, hi) } else { (hi, lo) };
-        if (e.y - first).abs() < (e.y - last).abs() {
+        let span = |p: Point| {
+            let y = p.rotate(a).y;
+            ((y - first).abs(), (y - last).abs())
+        };
+        // a start pin clearly nearer one end decides (halfway: the end point does)
+        let by_start = start.filter(|_| START_PINNED.with(|c| c.get())).map(span).and_then(|(f, l)| {
+            if l + spacing < f {
+                Some(true)
+            } else if f + spacing < l {
+                Some(false)
+            } else {
+                None
+            }
+        });
+        let turn = by_start.or_else(|| end.map(span).map(|(f, l)| f < l)).unwrap_or(false);
+        if turn {
             down = !down;
         }
     }
@@ -1325,7 +1345,7 @@ fn ray_intervals(rings: &[Ring], c: Point, u: Point, rmax: f64) -> Vec<(f64, f64
     out
 }
 
-pub fn radial(rings: &[Ring], center_rel: [f64; 2], spacing: f64, max_len: f64, f: u8) -> Vec<Run> {
+pub fn radial(rings: &[Ring], center_rel: [f64; 2], spacing: f64, max_len: f64, start: Option<Point>, f: u8) -> Vec<Run> {
     let b = rings_bounds(rings);
     if b.is_empty() {
         return vec![];
@@ -1337,11 +1357,13 @@ pub fn radial(rings: &[Ring], center_rel: [f64; 2], spacing: f64, max_len: f64, 
     let n = 1usize << m;
     let mut runs = Vec::new();
     let mut run: Run = Vec::new();
-    let mut outward = true;
+    // with a start point: the first ray points at it and is sewn from the rim in
+    let phase = start.map_or(0.0, |s| (s.y - c.y).atan2(s.x - c.x));
+    let mut outward = start.is_none();
     for i in 0..n {
         let level = if i == 0 { m } else { (i as u32).trailing_zeros() };
         let r_start = if level + 2 >= m { 0.0 } else { rmax / (1u64 << level) as f64 };
-        let th = TAU * i as f64 / n as f64;
+        let th = phase + TAU * i as f64 / n as f64;
         let u = pt(th.cos(), th.sin());
         let iv = ray_intervals(rings, c, u, rmax + 1.0);
         let Some(&(t0, t1)) = iv.iter().find(|(_, t1)| *t1 > r_start + 0.2) else { continue };
@@ -1393,7 +1415,7 @@ fn hilbert_d2xy(n: u32, d: u64) -> (u32, u32) {
     (x, y)
 }
 
-pub fn hilbert(rings: &[Ring], cell: f64, max_len: f64, f: u8) -> Vec<Run> {
+pub fn hilbert(rings: &[Ring], cell: f64, max_len: f64, start: Option<Point>, f: u8) -> Vec<Run> {
     let b = rings_bounds(rings);
     if b.is_empty() {
         return vec![];
@@ -1406,9 +1428,15 @@ pub fn hilbert(rings: &[Ring], cell: f64, max_len: f64, f: u8) -> Vec<Run> {
     let mut runs = Vec::new();
     let mut run: Run = Vec::new();
     let mut last_inside: Option<Point> = None;
+    // the curve begins in the corner of the shape nearest the start (mirrored)
+    let (cx, cy) = ((b.min_x + b.max_x) / 2.0, (b.min_y + b.max_y) / 2.0);
+    let (fx, fy) = start.map_or((false, false), |s| (s.x > cx, s.y > cy));
+    let x0 = if fx { b.max_x - side } else { b.min_x };
+    let y0 = if fy { b.max_y - side } else { b.min_y };
     for d in 0..(n as u64 * n as u64) {
         let (x, y) = hilbert_d2xy(n, d);
-        let p = pt(b.min_x + (x as f64 + 0.5) * cell, b.min_y + (y as f64 + 0.5) * cell);
+        let (x, y) = (if fx { n - 1 - x } else { x }, if fy { n - 1 - y } else { y });
+        let p = pt(x0 + (x as f64 + 0.5) * cell, y0 + (y as f64 + 0.5) * cell);
         if !point_in_rings(p, rings) {
             continue;
         }
@@ -1600,7 +1628,7 @@ pub fn tsp_tour(pts: &[Point], rings: &[Ring], start: Point) -> Vec<usize> {
     order
 }
 
-pub fn stipple(rings: &[Ring], spacing: f64, max_len: f64, f: u8) -> Vec<Run> {
+pub fn stipple(rings: &[Ring], spacing: f64, max_len: f64, start: Option<Point>, f: u8) -> Vec<Run> {
     let area = rings_area(rings);
     let mut r = spacing.max(0.6);
     // keep the point count bounded
@@ -1612,7 +1640,7 @@ pub fn stipple(rings: &[Ring], spacing: f64, max_len: f64, f: u8) -> Vec<Run> {
         return vec![];
     }
     let b = rings_bounds(rings);
-    let order = tsp_tour(&pts, rings, pt(b.min_x, b.min_y));
+    let order = tsp_tour(&pts, rings, start.unwrap_or(pt(b.min_x, b.min_y)));
     let mut runs = Vec::new();
     let mut run: Run = Vec::new();
     let mut last: Option<Point> = None;
@@ -1876,6 +1904,26 @@ pub fn fill_on(paths: &[SubPath], p: &FillParams, fabric: &crate::model::FabricP
     runs
 }
 
+/// The runs sewn backwards when their last stitch is nearer `start` than the
+/// first (without a start: when the first is nearer `end`).
+pub(crate) fn from_the_nearer_end(mut runs: Vec<Run>, start: Option<Point>, end: Option<Point>) -> Vec<Run> {
+    let first = runs.first().and_then(|r| r.first()).map(|x| x.0);
+    let last = runs.last().and_then(|r| r.last()).map(|x| x.0);
+    let (Some(a), Some(b)) = (first, last) else { return runs };
+    let flip = match (start, end) {
+        (Some(s), _) => s.dist(b) < s.dist(a),
+        (None, Some(e)) => e.dist(a) < e.dist(b),
+        _ => false,
+    };
+    if flip {
+        runs.reverse();
+        for r in runs.iter_mut() {
+            r.reverse();
+        }
+    }
+    runs
+}
+
 /// The point of `a`'s outline nearest `b` (shapely `nearest_points(a, b)[0]`).
 fn nearest_point_to(a: &[Ring], b: &[Ring]) -> Point {
     let near = |p: Point, rings: &[Ring]| -> (f64, Point) {
@@ -1969,6 +2017,9 @@ fn fill_part(rings: &[Ring], whole: &[Ring], original: &[Ring], p: &FillParams, 
     GAP_ROWS.with(|c| c.set(if method == FillMethod::Tatami { p.gap_fill_rows.div_ceil(2) * 2 } else { 0 }));
     PULL_PCT.with(|c| c.set(if method == FillMethod::Tatami { p.pull_comp_pct.clamp(0.0, 1.0) } else { 0.0 }));
     let random = if method == FillMethod::Meander || method == FillMethod::Cross { 0.0 } else { p.random_length };
+    // where a maze, stipple or sunburst begins: only a start point set by the
+    // user (designs without one sew as they always have)
+    let pin = top_start.filter(|_| START_PINNED.with(|c| c.get()));
     let top = super::running::with_line_random(random, p.seed, || match method {
         FillMethod::Tatami if p.carve != crate::model::CarvePattern::None && p.gradient.is_none() => {
             // the pattern in the row frame, centred on the shape
@@ -2035,9 +2086,9 @@ fn fill_part(rings: &[Ring], whole: &[Ring], original: &[Ring], p: &FillParams, 
         ),
         FillMethod::Contour => contour_ex(&rings, spacing, p.max_stitch_length, false, false, p.clockwise, top_start, 0),
         FillMethod::Spiral => contour_ex(&rings, spacing, p.max_stitch_length, true, p.contour_double, p.clockwise, top_start, 0),
-        FillMethod::Radial => radial(&rings, p.center, spacing, p.max_stitch_length, 0),
-        FillMethod::Hilbert => hilbert(&rings, spacing, p.max_stitch_length, 0),
-        FillMethod::Stipple => stipple(&rings, spacing, p.max_stitch_length, 0),
+        FillMethod::Radial => radial(&rings, p.center, spacing, p.max_stitch_length, pin, 0),
+        FillMethod::Hilbert => hilbert(&rings, spacing, p.max_stitch_length, pin, 0),
+        FillMethod::Stipple => stipple(&rings, spacing, p.max_stitch_length, pin, 0),
         FillMethod::Meander => super::inkfills::meander_ex(
             &rings,
             p.meander_pattern,
@@ -2107,6 +2158,9 @@ fn fill_part(rings: &[Ring], whole: &[Ring], original: &[Ring], p: &FillParams, 
     PULL_PCT.with(|c| c.set(0.0));
     NO_UNDERPATH.with(|c| c.set(false));
     GAP_ROWS.with(|c| c.set(0));
+    // a maze, stipple or sunburst is one line that does not look at the
+    // start: sewn backwards when that begins nearer the start (or the end point)
+    let top = if matches!(method, FillMethod::Hilbert | FillMethod::Stipple | FillMethod::Radial) { from_the_nearer_end(top, pin, end) } else { top };
     // running-style fills: the path repeated and bean-stitched (Ink/Stitch)
     let top: Vec<Run> = if matches!(method, FillMethod::Meander | FillMethod::Circular | FillMethod::Contour | FillMethod::Spiral) && (p.repeats > 1 || p.bean_repeats > 0) {
         top.into_iter()
@@ -2574,7 +2628,10 @@ mod travel_tests {
         let shape = vec![SubPath::polyline(&circle, true)];
         // the needle comes in at the left, halfway down (from what was sewn before)
         let rows_in_order = |p: &FillParams| -> Vec<f64> {
+            // (where the needle comes in, not a start pin)
+            START_PINNED.with(|c| c.set(false));
             let runs = fill(&shape, p, 0.0, 1.0, false, 1.0, Some(pt(5.0, 20.0)), None);
+            START_PINNED.with(|c| c.set(true));
             let mut ys: Vec<f64> = Vec::new();
             for w in runs.iter().flatten().collect::<Vec<_>>().windows(2) {
                 let (a, b) = (w[0], w[1]);

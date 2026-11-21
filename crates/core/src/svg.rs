@@ -1277,6 +1277,7 @@ impl<'a> Ctx<'a> {
             end: None,
             lock: ink_lock(ink, &mut self.warnings),
             color_sort_index: ink.get("color_sort_index").and_then(|v| v.trim().parse::<f64>().ok()).filter(|v| v.is_finite() && *v >= 0.0).map(|v| v as u32),
+            link: None,
         };
         self.doc.objects.push(obj);
     }

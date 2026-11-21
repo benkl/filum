@@ -21,6 +21,37 @@ use crate::model::{FabricProfile, Object, StitchParams};
 
 pub type Run = Vec<(Point, u8)>;
 
+/// A closed ring (its first point not repeated at the end) begun at its point
+/// nearest `t`: a new vertex there, unless a vertex is that close already.
+fn ring_from(mut ring: Vec<Point>, t: Point) -> Vec<Point> {
+    let n = ring.len();
+    if n < 2 {
+        return ring;
+    }
+    let mut best = (f64::INFINITY, 0usize, t);
+    for i in 0..n {
+        let (a, b) = (ring[i], ring[(i + 1) % n]);
+        let ab = b - a;
+        let l2 = ab.length_sq();
+        let s = if l2 < 1e-18 { 0.0 } else { ((t - a).dot(ab) / l2).clamp(0.0, 1.0) };
+        let q = a + ab * s;
+        if q.dist(t) < best.0 {
+            best = (q.dist(t), i, q);
+        }
+    }
+    let (_, i, q) = best;
+    let k = if q.dist(ring[i]) < 0.05 {
+        i
+    } else if q.dist(ring[(i + 1) % n]) < 0.05 {
+        (i + 1) % n
+    } else {
+        ring.insert(i + 1, q);
+        i + 1
+    };
+    ring.rotate_left(k);
+    ring
+}
+
 /// Orient one running-stitch polyline for the object's start/end points
 /// (Ink/Stitch "starting point" / "ending point" commands).
 fn orient_polyline(mut pts: Vec<Point>, closed: bool, start: Option<Point>, end: Option<Point>) -> Vec<Point> {
@@ -28,15 +59,23 @@ fn orient_polyline(mut pts: Vec<Point>, closed: bool, start: Option<Point>, end:
         return pts;
     }
     if closed {
-        // begin at the vertex nearest the start (or opposite the end)
+        // a pin (start, else end): begin right at the point of the outline
+        // nearest it; only where the previous object ended: at the corner
+        // nearest that
         let target = start.or(end);
         if let Some(t) = target {
             let mut ring = pts.clone();
             if ring.len() > 2 && ring[0].dist(*ring.last().unwrap()) < 1e-9 {
                 ring.pop();
             }
-            let k = (0..ring.len()).min_by(|a, b| ring[*a].dist(t).partial_cmp(&ring[*b].dist(t)).unwrap()).unwrap_or(0);
-            ring.rotate_left(k);
+            let pinned = start.is_none() || fill::START_PINNED.with(|c| c.get());
+            let mut ring = if pinned {
+                ring_from(ring, t)
+            } else {
+                let k = (0..ring.len()).min_by(|a, b| ring[*a].dist(t).partial_cmp(&ring[*b].dist(t)).unwrap()).unwrap_or(0);
+                ring.rotate_left(k);
+                ring
+            };
             let first = ring[0];
             ring.push(first);
             pts = ring;
@@ -192,10 +231,12 @@ fn generate_plain(obj: &Object, fabric: &FabricProfile) -> Vec<Run> {
         StitchParams::Running(p) if p.ripple.is_some() => {
             // ripples: the whole object at once (two rails make a satin ripple)
             let beans = p.beans();
-            ripple::ripple_stitches(&obj.paths, p.ripple.as_ref().unwrap(), p)
+            let runs: Vec<Run> = ripple::ripple_stitches(&obj.paths, p.ripple.as_ref().unwrap(), p)
                 .into_iter()
                 .map(|s| running::bean_stitch_pattern(&s, &beans).into_iter().map(|q| (q, 0u8)).collect())
-                .collect()
+                .collect();
+            // a pin nearer where the ripple ends: sewn the other way round
+            fill::from_the_nearer_end(runs, start.filter(|_| fill::START_PINNED.with(|c| c.get())), end)
         }
         StitchParams::Running(p) => {
             let n = obj.paths.len();
@@ -225,6 +266,22 @@ fn generate_plain(obj: &Object, fabric: &FabricProfile) -> Vec<Run> {
         }
         StitchParams::Satin(p) => {
             let mut p = p.clone();
+            // only a pin begins a satin partway along (where the previous
+            // object ended just picks the nearer end)
+            let pin = start.filter(|_| fill::START_PINNED.with(|c| c.get()));
+            // a closed centre line begins at the point nearest the pin
+            let usable: Vec<&crate::model::SubPath> = obj.paths.iter().filter(|s| s.nodes.len() >= 2).collect();
+            if let ([ring], Some(t)) = (usable.as_slice(), pin.or(end)) {
+                if ring.closed {
+                    let mut pts = ring.flatten(0.05);
+                    if pts.len() > 2 && pts[0].dist(*pts.last().unwrap()) < 1e-9 {
+                        pts.pop();
+                    }
+                    let paths = vec![crate::model::SubPath::polyline(&ring_from(pts, t), true)];
+                    // started at the start pin, it can still end at an end pin
+                    return satin::satin_between(&paths, &p, fabric, None, if pin.is_some() { end } else { None });
+                }
+            }
             if start.is_some() || end.is_some() {
                 if let Some(geo) = satin::satin_geometry(&obj.paths, &p) {
                     let ends = (|| {
@@ -246,7 +303,7 @@ fn generate_plain(obj: &Object, fabric: &FabricProfile) -> Vec<Run> {
                     }
                 }
             }
-            satin::satin_on(&obj.paths, &p, fabric)
+            satin::satin_between(&obj.paths, &p, fabric, pin, end)
         }
         StitchParams::Applique(p) => applique::applique(&obj.paths, p, fabric.pull_comp, fabric.density_scale),
         StitchParams::Fill(p) => fill::fill_on(&obj.paths, p, fabric, start, end),
@@ -282,6 +339,7 @@ mod tests {
             end,
             lock: None,
             color_sort_index: None,
+            link: None,
         }
     }
 
@@ -316,6 +374,57 @@ mod tests {
         assert!(a.dist(pt(20.0, 20.0)) < 2.0, "start {a:?}");
         assert!(b.dist(pt(1.0, 1.0)) < 0.5, "end {b:?}");
     }
+
+    #[test]
+    fn every_fill_starts_at_a_start_point_alone() {
+        // a pin in the bottom right corner, nothing else: one-way tatami turns
+        // round, a maze is mirrored, a stipple tours from it, a sunburst's
+        // first ray points at it (cross stitch: the nearest row, left to right)
+        use FillMethod::*;
+        let sq = vec![SubPath::polyline(&[pt(0.0, 0.0), pt(20.0, 0.0), pt(20.0, 20.0), pt(0.0, 20.0)], true)];
+        for m in [Tatami, Contour, Spiral, Radial, Hilbert, Stipple, Meander, Guided, Circular, Flow, Curved] {
+            for under in [false, true] {
+                let st = StitchParams::Fill(FillParams { method: m, underlay: under, ..Default::default() });
+                let (a, _) = first_last(&generate(&obj(sq.clone(), st, Some([19.0, 19.0]), None), &Fabric::Cotton.profile()));
+                assert!(a.dist(pt(19.0, 19.0)) < 2.5, "{m:?}, underlay {under}: starts at {a:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn satin_starts_and_ends_partway_along() {
+        let fab = Fabric::Cotton.profile();
+        let line = vec![SubPath::polyline(&[pt(0.0, 0.0), pt(30.0, 0.0), pt(30.0, 20.0)], false)];
+        let rails = vec![SubPath::polyline(&[pt(0.0, 0.0), pt(30.0, 0.0)], false), SubPath::polyline(&[pt(0.0, 4.0), pt(30.0, 4.0)], false)];
+        for method in [SatinMethod::Satin, SatinMethod::EStitch, SatinMethod::SStitch, SatinMethod::Zigzag] {
+            let st = StitchParams::Satin(SatinParams { method, ..Default::default() });
+            // the needle comes in at the pin and runs to the column's nearer end
+            let runs = generate(&obj(line.clone(), st.clone(), Some([15.0, 0.0]), None), &fab);
+            let (a, _) = first_last(&runs);
+            assert!(a.dist(pt(15.0, 0.0)) < 0.5, "{method:?}: starts at {a:?}");
+            // the cover ends at the end pin
+            let (_, b) = first_last(&generate(&obj(line.clone(), st.clone(), None, Some([15.0, 0.0])), &fab));
+            assert!(b.dist(pt(15.0, 0.0)) < 2.0, "{method:?}: ends at {b:?}");
+            // every bit of the column is still covered: as many cover stitches
+            let cover = |r: &[Run]| r.iter().flatten().filter(|x| x.1 == 0).count();
+            assert_eq!(cover(&runs), cover(&generate(&obj(line.clone(), st.clone(), None, None), &fab)), "{method:?}");
+        }
+        let st = StitchParams::Satin(SatinParams::default());
+        let (a, b) = first_last(&generate(&obj(rails, st.clone(), Some([10.0, 2.0]), Some([20.0, 3.0])), &fab));
+        assert!(a.dist(pt(10.0, 2.0)) < 0.5 && b.dist(pt(20.0, 2.0)) < 2.5, "two sides: {a:?} → {b:?}");
+        // a closed satin begins at the pin
+        let ring = vec![SubPath::polyline(&[pt(0.0, 0.0), pt(20.0, 0.0), pt(20.0, 20.0), pt(0.0, 20.0)], true)];
+        let (a, _) = first_last(&generate(&obj(ring, st, Some([20.0, 10.0]), None), &fab));
+        assert!(a.dist(pt(20.0, 10.0)) < 0.5, "closed: {a:?}");
+    }
+
+    #[test]
+    fn a_closed_line_starts_right_at_the_pin() {
+        let ring = vec![SubPath::polyline(&[pt(0.0, 0.0), pt(20.0, 0.0), pt(20.0, 20.0), pt(0.0, 20.0)], true)];
+        let st = StitchParams::Running(RunningParams::default());
+        let (a, b) = first_last(&generate(&obj(ring, st, Some([21.0, 10.0]), None), &Fabric::Cotton.profile()));
+        assert!(a.dist(pt(20.0, 10.0)) < 1e-6 && b.dist(pt(20.0, 10.0)) < 1e-6, "{a:?} … {b:?}");
+    }
 }
 
 #[cfg(test)]
@@ -346,6 +455,7 @@ mod pattern_tests {
             end: None,
             lock: None,
             color_sort_index: None,
+            link: None,
         }
     }
     fn pts(o: &Object) -> Vec<Point> {

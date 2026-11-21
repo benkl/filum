@@ -169,6 +169,16 @@ function hintsFor(s: ReturnType<typeof useStore.getState>): Hint[] {
             [["LMB", "other"], "Pick another satin"],
           ]
         : [[["LMB"], "Choose a satin column"]];
+    case "split":
+      return s.splitDraft.id
+        ? [
+            [["Drag", "across"], "Cut line"],
+            [["Alt", "Drag"], "Direction line"],
+            [["Enter"], "Make the satins"],
+            [["Backspace"], "Take back a line"],
+            [["Esc"], "Clear"],
+          ]
+        : [[["LMB"], "Choose a fill shape"]];
     case "builder":
       return sel
         ? [

@@ -1,6 +1,6 @@
-import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Info, OctagonAlert, Shapes, TriangleAlert, type LucideIcon, ChevronUp, Eye, EyeOff, GripVertical, ImagePlus, Lock, Move, Sparkles, Trash2, Type, Unlock, Search, X, FolderTree } from "lucide-react";
+import { CirclePause, Link2, Scissors, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Info, OctagonAlert, Shapes, TriangleAlert, type LucideIcon, ChevronUp, Eye, EyeOff, GripVertical, ImagePlus, Lock, Move, Sparkles, Trash2, Type, Unlock, Search, X, FolderTree } from "lucide-react";
 import { HiddenStitchingSection, ObjectHiddenSection } from "./HiddenStitching";
-import { DensityMap, Hoop, StitchFill, StitchRunning, StitchSatin } from "../icons/stitch";
+import { DensityMap, Hoop, Jump, StitchFill, StitchRunning, StitchSatin } from "../icons/stitch";
 import { CommandsSection } from "./CommandsSection";
 import { MachineSettings } from "./MachineSettings";
 import { FabricLookRows } from "./FabricLook";
@@ -28,6 +28,8 @@ import { liveGroups, within } from "../lib/groups";
 import { filterRows, groupByKind, groupByThread, groupTargets, KIND_FILTERS, moveToGroup, rangeIds, solo, ungroupAll, type KindFilter } from "../lib/layerTools";
 import { groupSelection, selectSimilar, ungroupSelection } from "../lib/arrange";
 import { Menu } from "./MenuBar";
+import { lastInOrder, linkMenu } from "./linkMenu";
+import { linkChoiceOf } from "../lib/links";
 import type { MenuItem } from "./menuModel";
 import {
   defaultDesignOptions,
@@ -120,6 +122,8 @@ interface LayerCtl {
   showGroup: (key: string, only?: boolean) => void;
   /** Right-click a row: its menu. */
   menu: (key: string, e: React.MouseEvent) => void;
+  /** The row's connection mark: the Trim / Jump / Sew menu of what follows it. */
+  linkMenu: (id: string, e: React.MouseEvent) => void;
   lockGroup: (key: string) => void;
   renameGroup: (group: string, name: string) => void;
   stepGroup: (key: string, dir: 1 | -1) => void;
@@ -143,6 +147,25 @@ export function FoldAllGroups() {
   return (
     <button className="icon-btn" title={label} aria-label={label} onClick={() => setGroupsFolded(groups, !allFolded)}>
       {allFolded ? <ChevronsUpDown size={14} /> : <ChevronsDownUp size={14} />}
+    </button>
+  );
+}
+
+/** What follows an object when chosen by hand (trim, jump, sew, stop): a mark that opens the menu. */
+function LinkMark({ o, ctl }: { o: DesignObject; ctl: LayerCtl }) {
+  const c = linkChoiceOf(o);
+  if (c === "auto" && !o.stopAfter) return null;
+  const [Icon, what] = o.stopAfter ? [CirclePause, "A stop"] : c === "trim" ? [Scissors, "A trim"] : c === "jump" ? [Jump, "A jump without a trim"] : [Link2, "Sewn through"];
+  return (
+    <button
+      className="mini link-mark manual"
+      title={`${what} after ${o.name} (chosen by hand) · click to change`}
+      onClick={(e) => {
+        e.stopPropagation();
+        ctl.linkMenu(o.id, e);
+      }}
+    >
+      <Icon size={13} />
     </button>
   );
 }
@@ -225,6 +248,7 @@ const LayerRow = memo(function LayerRow({
           o.name
         )}
       </span>
+      <LinkMark o={o} ctl={ctl} />
       <button
         className="mini"
         title={`${o.visible ? `Hide ${o.name}` : `Show ${o.name}`} · Alt-click: show only this`}
@@ -517,6 +541,7 @@ export function LayersPanel() {
             ],
           },
           "-",
+          ...(r.kind !== "group" && ids.length ? ([{ label: "After it", hint: "Automatic, trim, jump or sew to the next object", sub: linkMenu(lastInOrder(ids)!) }, "-"] as MenuItem[]) : []),
           { label: "Show only this", run: () => s().commit((d) => solo(d, ids)), hint: "Alt-click an eye does the same" },
           { label: "Show all", run: () => setAll(s().doc.objects.map((o) => o.id), () => ({ visible: true })), disabled: doc.objects.every((o) => o.visible) },
           { label: objs.every((o) => o.locked) ? "Unlock" : "Lock", run: () => setAll(ids, () => ({ locked: !objs.every((o) => o.locked) })) },
@@ -524,6 +549,10 @@ export function LayersPanel() {
           { label: "Delete", kbd: "Del", run: () => s().deleteSelection() },
         ];
         cur.current.setMenu({ x: e.clientX, y: e.clientY, items });
+      },
+      linkMenu: (id, e) => {
+        const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        cur.current.setMenu({ x: r.left, y: r.bottom + 2, items: linkMenu(id) });
       },
       lockGroup: (key) => {
         const r = row(key);
@@ -1039,7 +1068,7 @@ function StitchOptions({ o }: { o: DesignObject }) {
             <>
               <Row
                 label="Sewing order"
-                title="The order the rows are sewn in (the underlay too). One way: from the top row down, so the fabric is pushed one way only and never caught between rows sewn towards each other. Centre out: from the middle out to both sides. Ink/Stitch: least travel, ends where it started, so a shape is often sewn in two halves that meet in the middle."
+                title="The order the rows are sewn in (the underlay too). One way: from the top row down, so the fabric is pushed one way only and never caught between rows sewn towards each other (a start pin near the bottom turns it round). Centre out: from the middle out to both sides. Ink/Stitch: least travel, ends where it started, so a shape is often sewn in two halves that meet in the middle."
               >
                 <select
                   className="select"

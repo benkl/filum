@@ -9,8 +9,8 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
 use crate::geom::{point_in_ring, pt, Point, Rect, Ring};
-use crate::model::{thread_density_scale, Basting, CoverMode, DesignOptions, Document, Fabric, FillMethod, LockOverride, MachineSettings, Object, StitchParams, SubPath, Thread, Ties};
-use crate::plan::{flags, Stitch, StitchPlan};
+use crate::model::{thread_density_scale, Basting, CoverMode, DesignOptions, Document, Fabric, FillMethod, LockOverride, MachineSettings, Object, ObjectLink, StitchParams, SubPath, Thread, Ties};
+use crate::plan::{flags, Connection, ConnectionKind, Stitch, StitchPlan};
 use crate::region::{object_cover, outline, subtract_min, Cover};
 use crate::stitches::applique::is_stop;
 use crate::stitches::fill::fill_rings;
@@ -94,12 +94,19 @@ impl Engine {
     /// Runs of an object on the design's fabric, with its thread's weight
     /// (the thread's own, else the design's).
     fn runs_for(&mut self, obj: &Object, doc: &Document) -> Vec<Run> {
+        self.runs_from(obj, doc, true)
+    }
+
+    /// `pinned`: the object's start point is the user's own, not just where
+    /// the previous object ended.
+    fn runs_from(&mut self, obj: &Object, doc: &Document, pinned: bool) -> Vec<Run> {
         let (fabric, weight) = (doc.fabric, doc.thread(&obj.thread).and_then(|t| t.weight).unwrap_or(doc.options.thread_weight));
         crate::prof!("runs_for (incl. generate)");
+        let pinned = pinned || obj.start.is_none();
         let json = {
             crate::prof!("runs_for: json key");
             // everything stitches::generate reads, stitch patterns included
-            serde_json::to_string(&(&obj.paths, &obj.stitch, &obj.start, &obj.end, &obj.patterns)).unwrap_or_default()
+            serde_json::to_string(&(&obj.paths, &obj.stitch, &obj.start, &obj.end, &obj.patterns, pinned)).unwrap_or_default()
         };
         let knockdown = doc.options.knockdown;
         let k = key(&json, fabric, weight) ^ (knockdown as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
@@ -109,7 +116,9 @@ impl Engine {
         let mut profile = fabric.profile();
         profile.density_scale *= thread_density_scale(weight);
         profile.knockdown = knockdown;
+        stitches::fill::START_PINNED.with(|c| c.set(pinned));
         let r = stitches::generate(obj, &profile);
+        stitches::fill::START_PINNED.with(|c| c.set(true));
         if self.cache.len() > 4000 {
             self.cache.clear();
         }
@@ -261,6 +270,7 @@ impl Engine {
             let Some(obj) = self.stitched_in(doc, i, &mut scan) else { continue };
             // cut by what lies on top: with "keep underlay" the full underlay stays under it
             let keep_under = doc.options.keep_underlay && matches!(obj, Cow::Owned(_)) && matches!(obj.stitch, StitchParams::Fill(_));
+            let pinned = obj.start.is_some();
             let obj = match (obj.start, prev) {
                 (None, Some(p)) if starts_near(&obj.stitch) => {
                     let mut o = obj.into_owned();
@@ -269,10 +279,10 @@ impl Engine {
                 }
                 _ => obj,
             };
-            let mut runs: Vec<Run> = self.runs_for(&obj, doc).into_iter().filter(|r| !r.is_empty()).collect();
+            let mut runs: Vec<Run> = self.runs_from(&obj, doc, pinned).into_iter().filter(|r| !r.is_empty()).collect();
             if keep_under {
                 let full = Object { start: obj.start, ..doc.objects[i].clone() };
-                let (under, _) = split_underlay(self.runs_for(&full, doc));
+                let (under, _) = split_underlay(self.runs_from(&full, doc, pinned));
                 let (_, top) = split_underlay(runs);
                 runs = splice_underlay(&full, under, top);
             }
@@ -500,6 +510,9 @@ const VISIBLE_CONNECTION: f64 = 2.0;
 /// `COVERED_WITHIN` of.
 const VISIBLE_STRETCH: f64 = 1.0;
 const COVERED_WITHIN: f64 = 0.45;
+/// A connection sewn through by hand (`ObjectLink::Join`) is sewn in running
+/// stitches this long at most (mm).
+const JOIN_STITCH: f64 = 2.5;
 
 /// The stitches still to be sewn (every run of the design, in sewing
 /// order), indexed by grid cell on first use: does a connecting stitch end
@@ -598,6 +611,16 @@ struct Builder<'a> {
     /// The runs still to come, and the index among them of the run being sewn.
     ahead: Ahead<'a>,
     at: usize,
+    /// The current object's link to the next one, and that of the object sewn last.
+    link: Option<ObjectLink>,
+    last_link: Option<ObjectLink>,
+    /// Where the object sewn last ended (before any lock), and what was
+    /// already decided after it (a colour change, a trim or stop set by hand,
+    /// a forced lock) and whether by hand.
+    end_pos: Option<Point>,
+    pending: Option<(ConnectionKind, bool)>,
+    /// The connections between consecutive objects, for the plan.
+    links: Vec<Connection>,
 }
 
 impl Builder<'_> {
@@ -645,6 +668,18 @@ impl Builder<'_> {
         }
     }
 
+    /// Locked as before a trim, but no trim (`ObjectLink::Jump`): the jump
+    /// and the next object's start lock follow in `run`.
+    fn jump_cut(&mut self) {
+        if let Some(p) = self.pos {
+            if self.m.ties && !self.needs_tie_in {
+                let owner = self.last_obj;
+                self.tie_off(p, owner);
+            }
+        }
+        self.needs_tie_in = true;
+    }
+
     /// Tie off and trim (and stop the machine).
     fn cut(&mut self, o: u32, stop: bool, color_change: bool) {
         if let Some(p) = self.pos {
@@ -674,12 +709,44 @@ impl Builder<'_> {
         match self.pos {
             Some(p) => {
                 let gap = p.dist(start);
-                // a short connection to the next object is sewn through, unless
-                // it would show: nothing sewn later covers it
-                let shows = || gap > VISIBLE_CONNECTION && o != self.last_obj && o != u32::MAX && !self.last_min_jump_set;
-                if !self.needs_tie_in && (gap > self.last_min_jump || (shows() && self.ahead.visible(p, start, self.at))) {
-                    self.cut(o, false, false);
+                // a connection between two objects of the design (not within one, not the basting)
+                let between = o != self.last_obj && o != u32::MAX && self.last_obj != u32::MAX;
+                let from = self.end_pos.unwrap_or(p);
+                let (kind, manual) = match (self.needs_tie_in, if between { self.last_link } else { None }) {
+                    // a colour change, a trim or stop set by hand, a forced lock: already done
+                    (true, _) => self.pending.unwrap_or((ConnectionKind::Jump, false)),
+                    // sewn through by hand whatever the distance: running stitches, no locks
+                    (false, Some(ObjectLink::Join)) => {
+                        let n = (gap / JOIN_STITCH).ceil().max(1.0) as usize;
+                        for k in 1..n {
+                            self.out.push(Stitch::new(p + (start - p) * (k as f64 / n as f64), 0, self.last_obj));
+                        }
+                        (ConnectionKind::Sew, true)
+                    }
+                    // a jump by hand: locked, a jump, locked; no trim
+                    (false, Some(ObjectLink::Jump)) => {
+                        self.jump_cut();
+                        (ConnectionKind::Jump, true)
+                    }
+                    (false, None) => {
+                        // a short connection to the next object is sewn through, unless
+                        // it would show: nothing sewn later covers it
+                        let shows = gap > VISIBLE_CONNECTION && o != self.last_obj && o != u32::MAX && !self.last_min_jump_set;
+                        if gap > self.last_min_jump || (shows && self.ahead.visible(p, start, self.at)) {
+                            self.cut(o, false, false);
+                            (ConnectionKind::Trim, false)
+                        } else {
+                            (ConnectionKind::Sew, false)
+                        }
+                    }
+                };
+                if between {
+                    // a thread left on the fabric (sewn through or jumped): does it show?
+                    let stays = matches!(kind, ConnectionKind::Sew | ConnectionKind::Jump);
+                    let visible = stays && from.dist(start) > VISIBLE_STRETCH && self.ahead.visible(from, start, self.at);
+                    self.links.push(Connection { from: self.last_obj, to: o, kind, manual, visible, start: [from.x, from.y], end: [start.x, start.y] });
                 }
+                self.pending = None;
                 if self.needs_tie_in && gap > 1e-6 {
                     self.out.push(Stitch::new(start, flags::JUMP, o));
                 }
@@ -710,6 +777,8 @@ impl Builder<'_> {
             last = q;
         }
         self.pos = Some(last);
+        self.end_pos = Some(last);
+        self.last_link = self.link;
         self.last_obj = o;
         self.last_min_jump = self.min_jump;
         self.last_min_jump_set = self.min_jump_set;
@@ -782,6 +851,11 @@ fn assemble_basted(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[Run], 
         last_min_jump_set: false,
         ahead,
         at: 0,
+        link: None,
+        last_link: None,
+        end_pos: None,
+        pending: None,
+        links: Vec::new(),
     };
     let mut at = 0usize;
     let mut threads: Vec<Thread> = Vec::new();
@@ -832,6 +906,7 @@ fn assemble_basted(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[Run], 
             if cur_thread.is_some() || after_prefix {
                 // the tie-off and colour change end the prefix when it has its own colour
                 b.cut(if after_prefix { u32::MAX } else { o }, false, true);
+                b.pending = Some((ConnectionKind::ColorChange, false));
             }
             threads.push(doc.thread(&obj.thread).cloned().unwrap_or_else(|| fallback_thread(threads.len())));
             cur_thread = Some(obj.thread.as_str());
@@ -841,6 +916,7 @@ fn assemble_basted(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[Run], 
         b.min_stitch = obj.min_stitch.unwrap_or(doc.machine.min_stitch).max(0.0);
         b.min_jump = obj.min_jump.unwrap_or(doc.machine.trim_distance).max(0.0);
         b.min_jump_set = obj.min_jump.is_some();
+        b.link = obj.link;
         for run in runs {
             b.at = at;
             at += 1;
@@ -856,8 +932,10 @@ fn assemble_basted(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[Run], 
         let is_last = n + 1 == items.len();
         if (obj.trim_after || obj.stop_after) && !is_last {
             b.cut(o, obj.stop_after, false);
+            b.pending = Some((ConnectionKind::Trim, true));
         } else if obj.force_lock && !is_last {
             b.force_lock(o);
+            b.pending = Some((ConnectionKind::Jump, false));
         }
     }
     if let Some(p) = b.pos {
@@ -869,7 +947,7 @@ fn assemble_basted(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[Run], 
         b.out.push(Stitch::new(p, flags::TRIM, u32::MAX));
         b.out.push(Stitch::new(p, flags::END, u32::MAX));
     }
-    StitchPlan { stitches: b.out, threads, basting: basting_end.map(|e| (0, e)) }
+    StitchPlan { stitches: b.out, threads, basting: basting_end.map(|e| (0, e)), links: b.links }
 }
 
 #[cfg(test)]
@@ -900,6 +978,7 @@ mod tests {
             end: None,
             lock: None,
             color_sort_index: None,
+            link: None,
         }
     }
     fn square(x: f64, y: f64, s: f64) -> Vec<SubPath> {
@@ -1147,6 +1226,23 @@ mod tests {
     }
 
     #[test]
+    fn a_start_point_set_turns_a_one_way_fill_round() {
+        // the previous line ends low: the fill still sews from its top row down
+        let line = vec![SubPath::polyline(&[pt(0.0, 0.0), pt(10.0, 20.0)], false)];
+        let run = StitchParams::Running(RunningParams::default());
+        let fill = StitchParams::Fill(FillParams { underlay: false, ..Default::default() });
+        let first_of = |d: &Document| *Engine::new().plan(d).stitches.iter().find(|s| s.object == 1 && s.is_stitch()).unwrap();
+        let d = doc(vec![obj("a", line.clone(), run.clone()), obj("b", square(12.0, 0.0, 20.0), fill.clone())]);
+        let s = first_of(&d);
+        assert!(s.y < 2.0, "near the last object, top row first: {s:?}");
+        // a start pin at the bottom: it begins there
+        let mut b = obj("b", square(12.0, 0.0, 20.0), fill);
+        b.start = Some([30.0, 19.0]);
+        let s = first_of(&doc(vec![obj("a", line, run), b]));
+        assert!(s.y > 18.0 && s.x > 28.0, "starts at the pin: {s:?}");
+    }
+
+    #[test]
     fn knockdown_comes_first_in_its_own_colour() {
         let fill = StitchParams::Fill(FillParams { underlay: false, ..Default::default() });
         let mut d = doc(vec![obj("a", square(10.0, 10.0, 20.0), fill.clone()), obj("b", square(40.0, 10.0, 10.0), fill)]);
@@ -1257,6 +1353,7 @@ mod trim_tests {
             end: None,
             lock: None,
             color_sort_index: None,
+            link: None,
         }
     }
     fn thread(id: &str, color: &str) -> Thread {
@@ -1349,5 +1446,124 @@ mod trim_tests {
         // nothing follows it in the prefix: its tie-off and trim are still its own
         assert!(p.stitches[a..b].iter().any(|s| s.is(flags::TRIM)), "the basting ends cut");
         assert!(!p.stitches[b..].iter().take_while(|s| !s.is_stitch()).any(|s| s.is(flags::TRIM)), "no second trim after it");
+    }
+}
+
+/// The object's `link` to the next one (Trim / Jump / Sew chosen by hand)
+/// and the connections the plan reports to the editor.
+#[cfg(test)]
+mod link_tests {
+    use super::*;
+    use crate::geom::pt;
+    use crate::model::*;
+    use crate::Engine;
+
+    fn line(id: &str, thread: &str, a: [f64; 2], b: [f64; 2]) -> Object {
+        let mut o: Object = serde_json::from_value(serde_json::json!({ "id": id, "name": id, "thread": thread, "paths": [], "stitch": { "type": "running" } })).unwrap();
+        o.paths = vec![SubPath::polyline(&[pt(a[0], a[1]), pt(b[0], b[1])], false)];
+        o
+    }
+    fn fill(id: &str, x: f64, y: f64, s: f64) -> Object {
+        let mut o = line(id, "t", [0.0, 0.0], [1.0, 0.0]);
+        o.paths = vec![SubPath::polyline(&[pt(x, y), pt(x + s, y), pt(x + s, y + s), pt(x, y + s)], true)];
+        o.stitch = StitchParams::Fill(FillParams { underlay: false, ..Default::default() });
+        o
+    }
+    fn doc(objects: Vec<Object>) -> Document {
+        let th = |id: &str, c: &str| Thread { id: id.into(), name: id.into(), color: c.into(), brand: "".into(), code: "".into(), weight: None };
+        Document { threads: vec![th("t", "#000000"), th("u", "#cc1219")], objects, ..Default::default() }
+    }
+    /// Two lines 10 mm apart on one row: a ends at (30, 0), b starts at (40, 0).
+    fn pair(link: Option<ObjectLink>, b_thread: &str) -> Document {
+        let mut a = line("a", "t", [0.0, 0.0], [30.0, 0.0]);
+        a.link = link;
+        doc(vec![a, line("b", b_thread, [40.0, 0.0], [70.0, 0.0])])
+    }
+    fn count(plan: &StitchPlan, f: u8) -> usize {
+        plan.stitches.iter().filter(|s| s.is(f)).count()
+    }
+    /// The records from a's last stitch at (30, 0) to b's first at (40, 0).
+    fn between(plan: &StitchPlan) -> Vec<Stitch> {
+        let s = &plan.stitches;
+        let i = s.iter().rposition(|x| x.object == 0 && x.is_stitch() && (x.x - 30.0).abs() < 1e-6).unwrap();
+        let j = s.iter().position(|x| x.object == 1 && x.is_stitch() && (x.x - 40.0).abs() < 1e-6).unwrap();
+        s[i..=j].to_vec()
+    }
+
+    #[test]
+    fn link_is_absent_unless_chosen() {
+        let o = line("a", "t", [0.0, 0.0], [1.0, 0.0]);
+        assert_eq!(o.link, None);
+        assert!(serde_json::to_value(&o).unwrap().get("link").is_none(), "absent stays absent");
+        for (s, l) in [("join", ObjectLink::Join), ("jump", ObjectLink::Jump)] {
+            let j: Object = serde_json::from_value(serde_json::json!({ "id": "x", "name": "x", "thread": "t", "paths": [], "link": s })).unwrap();
+            assert_eq!(j.link, Some(l));
+        }
+    }
+
+    #[test]
+    fn automatic_trims_a_long_gap() {
+        let plan = Engine::new().plan(&pair(None, "t"));
+        assert_eq!(count(&plan, flags::TRIM), 2, "a trim between the two and the final one");
+    }
+
+    #[test]
+    fn join_sews_through_whatever_the_distance() {
+        let plan = Engine::new().plan(&pair(Some(ObjectLink::Join), "t"));
+        assert_eq!(count(&plan, flags::TRIM), 1, "only the final trim");
+        let mid = between(&plan);
+        assert!(mid.iter().all(|s| s.flags == 0), "no jump, trim or lock stitches between: {mid:?}");
+        assert!(mid.windows(2).all(|w| w[0].pos().dist(w[1].pos()) <= JOIN_STITCH + 1e-9), "running stitches of 2.5 mm at most");
+        assert!(mid.len() >= 5, "10 mm in stitches of 2.5 mm: {}", mid.len());
+    }
+
+    #[test]
+    fn jump_skips_the_trim_and_keeps_the_locks() {
+        let auto = Engine::new().plan(&pair(None, "t"));
+        let plan = Engine::new().plan(&pair(Some(ObjectLink::Jump), "t"));
+        assert_eq!(count(&plan, flags::TRIM), 1, "no trim after a, only the final one");
+        assert!(plan.stitches.iter().any(|s| s.is(flags::JUMP) && (s.x - 40.0).abs() < 1e-6), "a jump to b's start");
+        assert_eq!(count(&plan, flags::TIE), count(&auto, flags::TIE), "the locks of a trim: a's tie-off, b's tie-in");
+    }
+
+    #[test]
+    fn a_colour_change_wins_over_link() {
+        for link in [ObjectLink::Join, ObjectLink::Jump] {
+            let plan = Engine::new().plan(&pair(Some(link), "u"));
+            assert_eq!(count(&plan, flags::COLOR_CHANGE), 1, "{link:?}: the colour changes");
+            assert!(between(&plan).iter().any(|s| s.is(flags::JUMP)), "{link:?}: nothing sewn between the colours");
+            assert_eq!(plan.links[0].kind, ConnectionKind::ColorChange);
+        }
+    }
+
+    #[test]
+    fn trim_after_wins_over_link() {
+        let mut d = pair(Some(ObjectLink::Join), "t");
+        d.objects[0].trim_after = true;
+        let plan = Engine::new().plan(&d);
+        assert_eq!(count(&plan, flags::TRIM), 2);
+        assert_eq!((plan.links[0].kind, plan.links[0].manual), (ConnectionKind::Trim, true));
+    }
+
+    #[test]
+    fn the_plan_reports_each_connection() {
+        let kind = |d: &Document| {
+            let p = Engine::new().plan(d);
+            assert_eq!(p.links.len(), 1, "one connection between two objects");
+            (p.links[0].kind, p.links[0].manual, p.links[0].visible, p.links[0].from, p.links[0].to)
+        };
+        assert_eq!(kind(&pair(None, "t")), (ConnectionKind::Trim, false, false, 0, 1), "automatic: a trim (nothing stays)");
+        assert_eq!(kind(&pair(Some(ObjectLink::Join), "t")), (ConnectionKind::Sew, true, true, 0, 1), "sewn by hand, and it shows (nothing covers it)");
+        assert_eq!(kind(&pair(Some(ObjectLink::Jump), "t")), (ConnectionKind::Jump, true, true, 0, 1));
+        // a short gap is sewn through: automatic, and too short to show
+        let near = doc(vec![line("a", "t", [0.0, 0.0], [30.0, 0.0]), line("b", "t", [30.8, 0.0], [60.0, 0.0])]);
+        assert_eq!(kind(&near), (ConnectionKind::Sew, false, false, 0, 1));
+        // sewn by hand under a fill sewn later: it doesn't show
+        let mut a = line("a", "t", [0.0, 0.0], [30.0, 0.0]);
+        a.link = Some(ObjectLink::Join);
+        let covered = Engine::new().plan(&doc(vec![a, line("b", "t", [40.0, 0.0], [70.0, 0.0]), fill("c", 28.0, -3.0, 14.0)]));
+        assert!(!covered.links[0].visible, "covered by c: {:?}", covered.links[0]);
+        let p = &covered.links[0];
+        assert!((p.start[0] - 30.0).abs() < 1e-6 && (p.end[0] - 40.0).abs() < 1e-6, "from a's end to b's start: {p:?}");
     }
 }

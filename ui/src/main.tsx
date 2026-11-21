@@ -8,11 +8,16 @@ import { engine } from "./engine/client";
 import { openDroppedFile, openLaunchFiles } from "./lib/actions";
 import { setFabricDefaults } from "./lib/geometry";
 import { calibratedDefaults } from "./lib/calibration";
+import { newObjectDefaults } from "./lib/fabricPresets";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { isTauri } from "./lib/platform";
 
-// New objects start from the design fabric's calibrated numbers (Calibrate fabric…).
-setFabricDefaults(() => calibratedDefaults(useStore.getState().doc.fabric));
+// New objects start from the design's fabric preset, if one is on, and the
+// fabric's calibrated numbers on top (Calibrate fabric…).
+setFabricDefaults(() => {
+  const doc = useStore.getState().doc;
+  return newObjectDefaults(doc, calibratedDefaults(doc.fabric));
+});
 
 // Restore the last session (when autosave is on), or open the sample design
 // on first launch. A restored design with changes not in a file stays unsaved.

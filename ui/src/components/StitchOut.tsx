@@ -337,12 +337,19 @@ export function StitchOutPanel() {
     return () => body.removeEventListener("wheel", wheel);
   });
 
-  // keep the block being sewn in view, and the needle when zoomed in
+  // keep the block being sewn in view, and the needle when zoomed in. Short
+  // blocks one after another (an imported machine file): the list jumps
+  // instead of starting a new glide every few frames
+  const lastScroll = useRef(0);
   useEffect(() => {
     const body = bodyRef.current;
     if (!body || !open) return;
     const top = RULER + ROW * cur;
-    if (top < body.scrollTop + RULER || top + ROW > body.scrollTop + body.clientHeight) body.scrollTo({ top: Math.max(0, top - RULER - ROW), behavior: playing ? "smooth" : "auto" });
+    if (top < body.scrollTop + RULER || top + ROW > body.scrollTop + body.clientHeight) {
+      const now = performance.now();
+      body.scrollTo({ top: Math.max(0, top - RULER - ROW), behavior: playing && now - lastScroll.current > 600 ? "smooth" : "auto" });
+      lastScroll.current = now;
+    }
   }, [cur, open]);
   useEffect(() => {
     const body = bodyRef.current;

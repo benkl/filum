@@ -28,6 +28,8 @@ From top to bottom, the window has:
 
 Zoom with the mouse wheel or <kbd>+</kbd> / <kbd>−</kbd> (it zooms at the cursor). Pan with <kbd>Space</kbd>+drag or the middle mouse button. <kbd>0</kbd> fits the hoop and <kbd>Shift</kbd>+<kbd>0</kbd> fits the design.
 
+**1×** in the bottom bar (and **View → Actual size**) shows the design at the size it will be sewn, once you've calibrated the screen. Browsers assume 96 dots per inch, which few screens are. **View → Calibrate the screen…** shows a ruler: hold a real ruler (or a bank card) against the screen and stretch the one on screen until they match. The calibration is kept for this computer, and it still holds when you zoom the interface. It comes from the [NOVAstitch Designer](https://github.com/effepol/NOVAstitch-designer) fork.
+
 ![A close-up of the realistic view](images/realistic-closeup.webp)
 
 The **View** menu has more: jump stitches, underlay, a grid, smart guides, and a **Density map** (<kbd>Shift</kbd>+<kbd>D</kbd>) that shows where stitches pile up too thickly.

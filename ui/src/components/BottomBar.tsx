@@ -1,6 +1,7 @@
 import { Focus, Video } from "lucide-react";
 import { Hoop, Spool, StitchOut } from "../icons/stitch";
 import { fit } from "../lib/actions";
+import { pxPerMm, validCalibration } from "../lib/screen";
 import { closePlayer, play, recordVideo, usePlayback } from "./StitchOut";
 import { useStore } from "../store";
 import { fmtTime } from "./ui";
@@ -17,6 +18,7 @@ export function BottomBar() {
   const colorFocus = useStore((s) => s.colorFocus);
   const stitchColors = useStore((s) => s.stitchColors);
   const set = useStore((s) => s.set);
+  const screenCal = useStore((s) => s.prefs.screenPxPerMm);
   const total = plan?.flags.length ?? 0;
   usePlayback();
 
@@ -34,7 +36,8 @@ export function BottomBar() {
   }
   for (const t of doc.threads) if (!sewOrder.some((x) => x.t.id === t.id) && doc.objects.some((o) => o.thread === t.id)) sewOrder.push({ t, n: 0 });
   const zooms = [0.5, 1, 3, 6];
-  const actual = 96 / 25.4;
+  const actual = pxPerMm(screenCal);
+  const calibrated = validCalibration(screenCal);
   return (
     <div className="bottombar">
       <div className="swatches">
@@ -91,7 +94,7 @@ export function BottomBar() {
           key={z}
           className="btn sm ghost bb-zoom"
           style={Math.abs(view.scale / actual - z) < 0.02 ? { color: "var(--accent-text)", fontWeight: "var(--fw-semibold)" } : undefined}
-          title={z === 1 ? "Zoom 1× (actual size)" : `Zoom ${z}×`}
+          title={z === 1 ? (calibrated ? "Zoom 1× (actual size)" : "Zoom 1×: actual size once the screen is calibrated (View ▸ Calibrate the screen…); now it assumes 96 dpi") : `Zoom ${z}×`}
           onClick={() => fit(z)}
         >
           {z}×

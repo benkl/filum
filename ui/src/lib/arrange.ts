@@ -11,6 +11,7 @@ import { chainOf, commonGroup, groupsOf, objectsIn, parentOf, parentsOf, selecte
 import { defaultApplique, defaultFill, defaultRunning, defaultSatin, normAngle, objectBounds, rotateAbout, scaleAbout, transformObject, translateMat, uid, unionBoxes, type Box } from "./geometry";
 import { freshCopies, placeCopies, threadsOf } from "./copies";
 import { layerSetOf, oneLayerEach, pastedStitchDoc, plainGroupOf, plainLayerStitch } from "./fillLayers";
+import { gridDoc, type GridOptions } from "./grid";
 
 type Mat = [number, number, number, number, number, number];
 
@@ -187,6 +188,16 @@ export function repeatSelection(opt: RepeatOptions): number {
   }
   s.addObjects(created, undefined, parents, names);
   s.select([...sel.map((o) => o.id), ...created.map((o) => o.id)]);
+  return created.length;
+}
+
+/** Copies of the selection in rows and columns (see grid.ts); one undo step. */
+export function gridSelection(opt: GridOptions, shift: Vec2 = [0, 0]): number {
+  const s = store();
+  const { doc, created } = gridDoc(s.doc, s.selection, opt, shift);
+  if (!created.length) return 0;
+  s.commit(() => doc);
+  s.select([...s.selection, ...created.map((o) => o.id)]);
   return created.length;
 }
 

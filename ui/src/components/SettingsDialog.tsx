@@ -14,6 +14,7 @@ import { MATCH_PRESETS } from "../lib/threadMatch";
 import { DEFAULT_TOOL_OPTIONS, useStore } from "../store";
 import { Dialog, Num, Row, Toggle } from "./ui";
 import { safeSetItem } from "../lib/storage";
+import { dpiOf, pxPerMm, validCalibration } from "../lib/screen";
 
 type Tab = "appearance" | "canvas" | "export" | "threads" | "digitizer" | "downloads" | "files" | "keys";
 const TABS: { id: Tab; label: string; icon: ReactNode }[] = [
@@ -139,6 +140,16 @@ function CanvasPrefs() {
         </Row>
         <Row label="Snap to points" title="Pen and node tool: new and moved points snap to existing points (hold Ctrl to ignore)">
           <Toggle on={p.snapPoints} onChange={(v) => s.setPrefs({ snapPoints: v })} />
+        </Row>
+      </Section>
+      <Section title="Screen" hint="View ▸ Actual size and the 1× button show the design at the size it is sewn at once the screen is calibrated.">
+        <Row label="Actual size" title="Browsers assume 96 dpi, which few screens are">
+          <span className="dz-inline">
+            <span className="stat">{validCalibration(p.screenPxPerMm) ? `Calibrated: ${dpiOf(pxPerMm(p.screenPxPerMm))} dpi` : "Not calibrated (96 dpi)"}</span>
+            <button className="btn sm" onClick={() => s.setDialog("screen")}>
+              Calibrate…
+            </button>
+          </span>
         </Row>
       </Section>
       <Section title="Arrow keys" hint="Shift moves by the larger step.">
