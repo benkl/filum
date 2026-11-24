@@ -391,7 +391,7 @@ export function buildMenus(): Record<string, MenuItem[]> {
       {
         label: "Show",
         sub: [
-          toggle("Jump stitches", s.showJumps, () => s.set({ showJumps: !s.showJumps })),
+          toggle("Jump stitches", s.showJumps, () => s.set({ showJumps: !s.showJumps }), undefined, "The jumps between objects (dashed) and where the machine cuts; click a jump to choose Trim, Jump or Sew"),
           toggle("Underlay", s.showUnderlay, () => s.set({ showUnderlay: !s.showUnderlay })),
           toggle("Grid", s.showGrid, () => s.set({ showGrid: !s.showGrid })),
           toggle("Fabric in the hoop", s.fabricAll, () => s.set({ fabricAll: !s.fabricAll }), undefined, "The fabric colour inside the hoop in the vector and stitch views (off: the hoop is an outline only)"),

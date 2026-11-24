@@ -10,7 +10,13 @@ import { layerFixes } from "./fillLayers";
 import { copiedParents, objectsIn, type GroupDoc } from "./groups";
 
 /** Every thread an object refers to (its own and its lettering's). */
-export const threadsOf = (o: DesignObject): string[] => [o.thread, ...(o.text ? [o.text.thread, o.text.borderThread, ...(o.text.palette ?? [])] : [])];
+/** A layered 3D's inner-layer thread. */
+const baseThreadOf = (o: DesignObject): string | undefined => (o.stitch?.type === "satin" ? o.stitch.layered?.baseThread : undefined);
+
+export const threadsOf = (o: DesignObject): string[] => {
+  const base = baseThreadOf(o);
+  return [o.thread, ...(base ? [base] : []), ...(o.text ? [o.text.thread, o.text.borderThread, ...(o.text.palette ?? [])] : [])];
+};
 
 /** The object with its thread references passed through `f`. */
 export function remapThreads(o: DesignObject, f: (id: string) => string): DesignObject {
@@ -18,6 +24,7 @@ export function remapThreads(o: DesignObject, f: (id: string) => string): Design
   return {
     ...o,
     thread: f(o.thread),
+    ...(o.stitch?.type === "satin" && o.stitch.layered?.baseThread ? { stitch: { ...o.stitch, layered: { ...o.stitch.layered, baseThread: f(o.stitch.layered.baseThread) } } } : {}),
     ...(o.text ? { text: { ...o.text, thread: f(o.text.thread), borderThread: f(o.text.borderThread), ...(o.text.palette ? { palette: o.text.palette.map(f) } : {}) } } : {}),
   };
 }

@@ -82,13 +82,17 @@ pub fn applique(paths: &[SubPath], p: &AppliqueParams, extra_pull: f64, density:
     let mut runs: Vec<Run> = Vec::new();
     let last = |runs: &Vec<Run>| runs.last().and_then(|r| r.last()).map(|x| x.0);
 
-    // 1. placement line
+    // 1. placement line, inside the edge (free edge: 5 mm inside)
+    let inset = if p.free_edge { crate::model::APPLIQUE_FREE_EDGE_INSET } else { within(p.placement_inset, 0.0, MAX_WIDTH, 0.0) };
+    let placed = if inset > 1e-6 { oriented(offset_rings(&rings, -inset, res)) } else { rings.clone() };
+    let placed = if placed.is_empty() { rings.clone() } else { placed };
+    let tackdown = if p.free_edge { TackdownKind::None } else { p.tackdown };
     if p.placement {
-        for r in &rings {
+        for r in &placed {
             let s = running_stitch(&closed(r), p.placement_length.max(0.5), 0.1);
             runs.push(s.into_iter().map(|q| (q, 0u8)).collect());
         }
-        if p.stops && (p.tackdown != TackdownKind::None || p.cover != CoverKind::None) {
+        if p.stops && (tackdown != TackdownKind::None || p.cover != CoverKind::None) {
             if let Some(at) = last(&runs) {
                 runs.push(stop_here(at));
             }
@@ -98,7 +102,7 @@ pub fn applique(paths: &[SubPath], p: &AppliqueParams, extra_pull: f64, density:
     // 2. tack-down, a little inside the edge
     let tack = if p.tackdown_inset > 1e-6 { oriented(offset_rings(&rings, -within(p.tackdown_inset, 0.0, MAX_WIDTH, 0.0), res)) } else { rings.clone() };
     let tack = if tack.is_empty() { rings.clone() } else { tack };
-    match p.tackdown {
+    match tackdown {
         TackdownKind::None => {}
         TackdownKind::Run => {
             for r in &tack {
@@ -108,7 +112,7 @@ pub fn applique(paths: &[SubPath], p: &AppliqueParams, extra_pull: f64, density:
         }
         TackdownKind::Zigzag | TackdownKind::EStitch => {
             let sp = SatinParams {
-                method: if p.tackdown == TackdownKind::Zigzag { SatinMethod::Zigzag } else { SatinMethod::EStitch },
+                method: if tackdown == TackdownKind::Zigzag { SatinMethod::Zigzag } else { SatinMethod::EStitch },
                 width: within(p.tackdown_width, 0.3, MAX_WIDTH, 1.6),
                 spacing: within(p.tackdown_spacing, 0.3, MAX_WIDTH, 1.2),
                 pull_comp: 0.0,
@@ -120,7 +124,7 @@ pub fn applique(paths: &[SubPath], p: &AppliqueParams, extra_pull: f64, density:
             runs.extend(column(&tack, sp, 0.0, 1.0, &rings, p.flip));
         }
     }
-    if p.tackdown != TackdownKind::None && p.stops && p.cover != CoverKind::None {
+    if tackdown != TackdownKind::None && p.stops && p.cover != CoverKind::None {
         if let Some(at) = last(&runs) {
             runs.push(stop_here(at));
         }
@@ -159,13 +163,18 @@ mod tests {
     use super::*;
     use crate::geom::pt;
 
+    /// An appliqué from a file without the new fields (the earlier values).
+    fn filum() -> AppliqueParams {
+        serde_json::from_str("{}").unwrap()
+    }
+
     fn square() -> Vec<SubPath> {
         vec![SubPath::polyline(&[pt(0.0, 0.0), pt(30.0, 0.0), pt(30.0, 30.0), pt(0.0, 30.0)], true)]
     }
 
     #[test]
     fn three_steps_with_two_stops() {
-        let runs = applique(&square(), &AppliqueParams::default(), 0.0, 1.0);
+        let runs = applique(&square(), &filum(), 0.0, 1.0);
         let stops = runs.iter().filter(|r| is_stop(r)).count();
         assert_eq!(stops, 2);
         // placement first, cover last; cover stitches straddle the edge
@@ -189,5 +198,74 @@ mod tests {
         let base = runs[0].iter().find(|x| x.1 & flags::UNDERLAY == 0).unwrap().0;
         let r = [vec![pt(0.0, 0.0), pt(30.0, 0.0), pt(30.0, 30.0), pt(0.0, 30.0)]];
         assert!(!point_in_rings(base, &r), "baseline {base:?} outside");
+    }
+
+    /// Distance of a point to the square's edge (positive inside).
+    fn inside_by(q: Point) -> f64 {
+        let r = [vec![pt(0.0, 0.0), pt(30.0, 0.0), pt(30.0, 30.0), pt(0.0, 30.0)]];
+        let d = crate::geom::dist_to_boundary(&r, q);
+        if point_in_rings(q, &r) { d } else { -d }
+    }
+
+    /// The runs between the stops: one group per step.
+    fn steps(runs: &[Run]) -> Vec<Vec<&Run>> {
+        let mut out = vec![vec![]];
+        for r in runs {
+            if is_stop(r) {
+                out.push(vec![]);
+            } else {
+                out.last_mut().unwrap().push(r);
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn new_applique_follows_punch() {
+        // placement 1.25 mm inside, straight-stitch tack-down 2 mm inside the
+        // edge, 4.5 mm satin cover on the edge that hides the tack-down
+        let p = AppliqueParams::default();
+        assert_eq!(p.tackdown, TackdownKind::Run);
+        let runs = applique(&square(), &p, 0.0, 1.0);
+        let s = steps(&runs);
+        assert_eq!(s.len(), 3, "placement, tack-down, cover");
+        for x in s[0].iter().flat_map(|r| r.iter()) {
+            assert!((inside_by(x.0) - 1.25).abs() < 0.05, "placement {:?} at {}", x.0, inside_by(x.0));
+        }
+        for x in s[1].iter().flat_map(|r| r.iter()) {
+            assert!(inside_by(x.0) >= 2.0 - 0.05, "tack-down {:?} at {}", x.0, inside_by(x.0));
+        }
+        let cover: Vec<f64> = s[2].iter().flat_map(|r| r.iter()).filter(|x| x.1 & flags::UNDERLAY == 0).map(|x| inside_by(x.0)).collect();
+        let (lo, hi) = cover.iter().fold((f64::MAX, f64::MIN), |(a, b), v| (a.min(*v), b.max(*v)));
+        // (outside, the corners reach further: √2 · 2.25)
+        assert!((hi - 2.25).abs() < 0.1 && lo <= -2.2, "cover from {lo} to {hi}");
+        assert!(hi > 2.0, "the cover hides the tack-down");
+    }
+
+    #[test]
+    fn free_edge() {
+        // placement 5 mm inside, stop (spray glue and fabric), cover; no tack-down
+        let p = AppliqueParams { free_edge: true, ..Default::default() };
+        let runs = applique(&square(), &p, 0.0, 1.0);
+        let s = steps(&runs);
+        assert_eq!(s.len(), 2, "placement, stop, cover: {}", s.len());
+        for x in s[0].iter().flat_map(|r| r.iter()) {
+            assert!((inside_by(x.0) - 5.0).abs() < 0.05, "placement {:?} at {}", x.0, inside_by(x.0));
+        }
+        assert!(s[1].iter().flat_map(|r| r.iter()).any(|x| inside_by(x.0) < -1.0), "the cover straddles the edge");
+    }
+
+    #[test]
+    fn files_without_the_new_fields_read_as_before() {
+        // an appliqué without placementInset / freeEdge (and without the fields
+        // whose defaults changed) sews as it did before
+        let p: AppliqueParams = serde_json::from_str("{}").unwrap();
+        assert_eq!(p.placement_inset, 0.0);
+        assert!(!p.free_edge);
+        assert_eq!(p.tackdown, TackdownKind::Zigzag);
+        assert_eq!(p.tackdown_inset, 0.6);
+        assert_eq!(p.cover_width, 3.0);
+        let runs = applique(&square(), &p, 0.0, 1.0);
+        assert!(runs[0].iter().all(|x| inside_by(x.0).abs() < 1e-6), "placement on the edge");
     }
 }

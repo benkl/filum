@@ -42,15 +42,19 @@ const baseFill = (): FillParams => ({
   ...INK_TATAMI,
 });
 
+/** A new appliqué follows the Punch book: placement 1.25 mm inside, a straight-stitch
+ *  tack-down 2 mm inside the edge, a 4.5 mm satin cover over it (the core's defaults). */
 export const defaultApplique = (): AppliqueParams => ({
   placement: true,
   placementLength: 2,
-  tackdown: "zigzag",
+  placementInset: 1.25,
+  freeEdge: false,
+  tackdown: "run",
   tackdownWidth: 1.6,
-  tackdownInset: 0.6,
+  tackdownInset: 2,
   tackdownSpacing: 1.2,
   cover: "satin",
-  coverWidth: 3,
+  coverWidth: 4.5,
   coverSpacing: 0.4,
   coverOffset: 0,
   coverUnderlay: true,

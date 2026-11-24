@@ -535,8 +535,12 @@ export class StitchGL {
     // geometry of the current colour block
     let segs: number[] = [];
     let segRec: number[] = [];
-    let jumps: number[] = [];
-    let jumpRec: number[] = [];
+    // the cut jumps of every block: one pass on top of all the stitching
+    const jumps: number[] = [];
+    const jumpRec: number[] = [];
+    // stitch view: the block's jump threads left on the fabric, dashed in its colour
+    let floats: number[] = [];
+    let floatRec: number[] = [];
     let dots: number[] = [];
     let dotRec: number[] = [];
     const realistic = mode === "realistic";
@@ -544,7 +548,7 @@ export class StitchGL {
     const perChunk = 2 + 2 + 2;
     const total = chunks.length * perChunk + 2;
     // realistic view: depth slots — per colour block k the shadow (first record + 3k),
-    // every stitch (its record + 3k + 1) and the jumps (last record + 3k + 2)
+    // every stitch (its record + 3k + 1); the jumps take the last slot, over everything
     const blocks = chunks.length ? chunks[chunks.length - 1].block + 1 : 0;
     const depthDen = flags.length + 3 * blocks + 4;
     const slotDepth = (slot: number) => 1 - (slot + 1) / (depthDen + 1);
@@ -570,8 +574,8 @@ export class StitchGL {
       if (ci === 0 || chunks[ci - 1].block !== c.block) {
         segs = [];
         segRec = [];
-        jumps = [];
-        jumpRec = [];
+        floats = [];
+        floatRec = [];
         dots = [];
         dotRec = [];
         blockStart = c.start;
@@ -595,8 +599,13 @@ export class StitchGL {
         }
         if (f & FLAG.JUMP && uncut?.[i]) {
           // a jump the machine doesn't cut stays on the fabric: a thread
-          segs.push(x, y, nx, ny);
-          segRec.push(i);
+          if (realistic) {
+            segs.push(x, y, nx, ny);
+            segRec.push(i);
+          } else {
+            floats.push(x, y, nx, ny);
+            floatRec.push(i);
+          }
           pen = true;
           x = nx;
           y = ny;
@@ -650,13 +659,14 @@ export class StitchGL {
           sl.push(slots[j]);
         }
         emit(g, rc, e, sl);
-        pass(jumps, jumpRec, 0, 0.5, 0, 0, dotColor, theme.dark ? 0.5 : 0.45, 3.6, 1, slotDepth(c.end + 3 * k + 2));
       } else {
+        if (floats.length) pass(floats, floatRec, 0.06, 0.55, 0, 0, col, 1, 3.6);
         pass(segs, segRec, 0.06, 0.55, 0, 0, col, 1);
         pass(dots, dotRec, 0, 0.8, 0, 0, dotColor, theme.dark ? 0.55 : 0.45, 0, 2);
-        pass(jumps, jumpRec, 0, 0.5, 0, 0, dotColor, theme.dark ? 0.5 : 0.45, 3.6, 1);
       }
     }
+    // the jumps over everything: a later colour never hides where the needle travels
+    if (jumps.length) pass(jumps, jumpRec, 0, 0.5, 0, 0, dotColor, theme.dark ? 0.5 : 0.45, 3.6, 1, realistic ? slotDepth(depthDen - 1) : undefined);
 
     const instBuf = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, instBuf);

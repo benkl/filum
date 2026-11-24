@@ -55,9 +55,9 @@ A trim command asks the machine to cut; whether it does depends on its thread cu
 - **Cuts longer jumps only**: Brother and Baby Lock home machines cut a jump only when it is longer than their *jump stitch trimming* length (5 mm by default, 5 to 50 mm). Their machine presets set this for you.
 - **None: snip by hand**: machines without a cutter.
 
-The jumps your machine won't cut stay on the fabric, so Filum draws them as thread in every view, in the stitch-out and in exported pictures. The export dialog counts them, and the job sheet lists them under *Snip by hand*. When you export a PES with the cutter left at *Cuts every trim*, the export dialog still tells you how many jumps a Brother machine would leave uncut at its default 5 mm.
+The jumps your machine won't cut stay on the fabric, and so does a jump without a trim (**Jump** after an object, or one in an imported design) unless the machine cuts long jumps by itself. Filum draws these jump threads as thread: dashed in the thread's colour in the stitch view, and as real thread in the realistic view, the stitch-out and exported pictures. **Finished piece** (<kbd>4</kbd>) shows the piece with them snipped off. The export dialog counts them, and the job sheet lists them under *Snip by hand*. When you export a PES with the cutter left at *Cuts every trim*, the export dialog still tells you how many jumps a Brother machine would leave uncut at its default 5 mm.
 
-Turn on **View → Show → Jump stitches** to check the trims: jumps show as dashed lines, a small triangle marks every cut, and a ring marks where the jump lands. Marks in amber are trims your machine leaves uncut.
+Turn on **View → Show → Jump stitches** to check the trims: the jumps the machine cuts show as dashed lines over all the stitching, a small triangle marks every cut, and a ring marks where the jump lands. Marks in amber are trims your machine leaves uncut. The vector view shows every jump this way too.
 
 ## Stitch processing
 
@@ -91,9 +91,11 @@ Each object has its own **Selection → Hidden stitching** section: **Hides** (A
 
 Select a shape and choose **Stitch → Make appliqué** (or the **Appliqué** stitch type). The machine then sews it in three steps, with stops in between:
 
-1. **Placement line**: shows where to lay the fabric patch.
-2. **Tack-down**: holds the patch in place after you've laid it.
-3. **Cover**: a satin or blanket stitch over the raw edge.
+1. **Placement line**: shows where to lay the fabric patch. It runs 1.25 mm inside the edge, so the patch covers it.
+2. **Tack-down**: a running stitch 2 mm inside the edge that holds the patch in place after you've laid it.
+3. **Cover**: a 4.5 mm satin (or blanket stitch) over the raw edge, wide enough to hide the tack-down.
+
+These starting values follow the Punch digitizing book. Appliqués made in earlier versions keep the values they had. Switch on **Free edge** for a patch you glue on instead: the placement line moves 5 mm inside, there is no tack-down, and the machine stops once for the glue and the fabric before the cover.
 
 The *Machine stops* row controls where the machine pauses so you can place and trim the fabric. **Path → Outlines & offsets…** is handy for making appliqué and patch borders around any selection.
 

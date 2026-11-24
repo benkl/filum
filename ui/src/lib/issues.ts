@@ -10,6 +10,20 @@ import { ovalNorm, threadWeightInfo } from "./materials";
 import { shapeProblems } from "./shapeCheck";
 import { lineOverlaps } from "./lineOverlaps";
 import { withLinkChoice } from "./links";
+import { satinRails } from "./multicolorSatin";
+
+/** A layered 3D narrower than this has no room for its layers (mm; Punch). */
+export const LAYERED3D_MIN_WIDTH = 6;
+
+/** A satin's mean width: its width with one centre line, else between its two rails. */
+function satinWidth(o: DesignObject): number | null {
+  if (o.stitch.type !== "satin") return null;
+  if (o.paths.filter((p) => p.nodes.length >= 2).length === 1) return o.stitch.width;
+  const rails = satinRails(o);
+  if (!rails) return null;
+  const [a, b] = rails;
+  return a.length ? a.reduce((s, p, i) => s + Math.hypot(p[0] - b[i][0], p[1] - b[i][1]), 0) / a.length : null;
+}
 
 export interface Issue {
   id: string;
@@ -250,6 +264,20 @@ export function computeIssues(doc: StitchDocument, plan: PlanData | null): Issue
     if (lg && lg.len > 8 && st.type !== "satin") {
       add({ level: "warning", title: "Long stitches", detail: `Contains a ${lg.len.toFixed(1)} mm stitch that may snag.`, at: lg.at });
     }
+  });
+  // 3D: foam goes last (anything sewn after it flattens it), layers need width
+  const sewn = doc.objects.filter((o) => o.visible && o.stitch.type !== "none");
+  const lastFlat = sewn.reduce((k, o, i) => (o.stitch.type === "satin" && o.stitch.foam ? k : i), -1);
+  sewn.forEach((o, i) => {
+    if (o.stitch.type !== "satin") return;
+    const b = objectBoundsCached(o);
+    if (!b) return;
+    const at: Vec2 = [b.x + b.w / 2, b.y + b.h / 2];
+    if (o.stitch.foam && i < lastFlat)
+      out.push({ id: `foamLast:${o.id}`, objId: o.id, level: "warning", title: "3D foam goes last", detail: `${o.name} is sewn over foam, but other objects are sewn after it: they would run over the foam and flatten it. Move it to the end of the sewing order.`, at });
+    const w = o.stitch.layered ? satinWidth(o) : null;
+    if (w != null && w < LAYERED3D_MIN_WIDTH)
+      out.push({ id: `layeredThin:${o.id}`, objId: o.id, level: "warning", title: "Layered 3D under 6 mm", detail: `The column is ${w.toFixed(1)} mm wide: under ${LAYERED3D_MIN_WIDTH} mm the layers have no room to rise. Widen it or use a plain satin.`, at });
   });
   // a connection sewn through by hand that nothing sewn later covers
   for (const c of plan?.links ?? []) {

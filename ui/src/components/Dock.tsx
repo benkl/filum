@@ -47,6 +47,7 @@ import { HoopShapeRow, MaterialSection } from "./MaterialPanel";
 import { HOOPS, hoopIndex, hoopOf } from "../lib/hoops";
 import { fitHoopToDesign } from "../lib/actions";
 import { Num, PatternInput, Row, Section, Slider, Toggle } from "./ui";
+import { Satin3dSection } from "./Satin3dSection";
 import { beansToPasses, formatPattern, parsePattern, passesToBeans } from "../lib/patterns";
 import { defaultRippleGuide, guidePair, isRipple, useAsRippleGuide } from "../lib/rippleGuide";
 import { clonesOf, unlinkClone } from "../lib/clones";
@@ -1421,7 +1422,9 @@ function StitchOptions({ o }: { o: DesignObject }) {
               <MulticolorSatin o={o} />
             </Section>
           )}
+          <Satin3dSection o={o} st={st} up={up} />
           <Section title="Underlay">
+            {(st.foam || st.layered) && <p className="hint">{st.foam ? "Over foam the underlay is a contour (3D above)." : "The layers' core has its own underlay (3D above)."}</p>}
             <Presets
               items={[
                 ["Auto", { underlayAuto: true }, "Chosen by the column's width and the fabric"],
@@ -1596,41 +1599,55 @@ function StitchOptions({ o }: { o: DesignObject }) {
       {st.type === "applique" && (
         <>
           <p className="hint" style={{ margin: "2px 0 8px" }}>
-            Sews the placement line, stops so you can lay the fabric, tacks it down, stops so you can trim it, then covers the edge.
+            {st.freeEdge
+              ? "Sews the placement line, stops so you can glue the fabric down, then covers the edge."
+              : "Sews the placement line, stops so you can lay the fabric, tacks it down, stops so you can trim it, then covers the edge."}
           </p>
+          <Row label="Free edge" title="No tack-down: the placement line 5 mm inside, one stop to glue the fabric on, then the cover (Punch)">
+            <Toggle on={!!st.freeEdge} onChange={(v) => up({ freeEdge: v })} />
+          </Row>
           <Section title="1 · Placement line" extra={<Toggle on={st.placement} onChange={(v) => up({ placement: v })} />}>
             {st.placement && (
-              <Row label="Stitch length">
-                <Slider min={1} max={4} step={0.1} value={st.placementLength} unit="mm" {...sl("placementLength")} />
-              </Row>
-            )}
-          </Section>
-          <Section title="2 · Tack-down">
-            <Row label="Stitch">
-              <select className="select" style={{ width: "100%" }} value={st.tackdown} onChange={(e) => up({ tackdown: e.target.value })}>
-                <option value="zigzag">Zig-zag</option>
-                <option value="eStitch">E-stitch</option>
-                <option value="run">Running stitch</option>
-                <option value="none">None</option>
-              </select>
-            </Row>
-            {st.tackdown !== "none" && (
-              <Row label="Inset" title="Distance inside the edge">
-                <Slider min={0} max={3} step={0.05} value={st.tackdownInset} unit="mm" {...sl("tackdownInset")} />
-              </Row>
-            )}
-            {(st.tackdown === "zigzag" || st.tackdown === "eStitch") && (
               <>
-                <Row label="Width">
-                  <Slider min={0.5} max={4} step={0.1} value={st.tackdownWidth} unit="mm" {...sl("tackdownWidth")} />
+                <Row label="Stitch length">
+                  <Slider min={1} max={4} step={0.1} value={st.placementLength} unit="mm" {...sl("placementLength")} />
                 </Row>
-                <Row label="Spacing">
-                  <Slider min={0.4} max={4} step={0.1} value={st.tackdownSpacing} unit="mm" {...sl("tackdownSpacing")} />
-                </Row>
+                {!st.freeEdge && (
+                  <Row label="Inset" title="Distance of the placement line inside the edge (Punch: 1–1.5 mm), so the fabric laid on it covers it">
+                    <Slider min={0} max={3} step={0.05} value={st.placementInset ?? 0} unit="mm" onChange={(v) => up({ placementInset: v })} />
+                  </Row>
+                )}
               </>
             )}
           </Section>
-          <Section title="3 · Cover">
+          {!st.freeEdge && (
+            <Section title="2 · Tack-down">
+              <Row label="Stitch">
+                <select className="select" style={{ width: "100%" }} value={st.tackdown} onChange={(e) => up({ tackdown: e.target.value })}>
+                  <option value="zigzag">Zig-zag</option>
+                  <option value="eStitch">E-stitch</option>
+                  <option value="run">Running stitch</option>
+                  <option value="none">None</option>
+                </select>
+              </Row>
+              {st.tackdown !== "none" && (
+                <Row label="Inset" title="Distance inside the edge">
+                  <Slider min={0} max={3} step={0.05} value={st.tackdownInset} unit="mm" {...sl("tackdownInset")} />
+                </Row>
+              )}
+              {(st.tackdown === "zigzag" || st.tackdown === "eStitch") && (
+                <>
+                  <Row label="Width">
+                    <Slider min={0.5} max={4} step={0.1} value={st.tackdownWidth} unit="mm" {...sl("tackdownWidth")} />
+                  </Row>
+                  <Row label="Spacing">
+                    <Slider min={0.4} max={4} step={0.1} value={st.tackdownSpacing} unit="mm" {...sl("tackdownSpacing")} />
+                  </Row>
+                </>
+              )}
+            </Section>
+          )}
+          <Section title={st.freeEdge ? "2 · Cover" : "3 · Cover"}>
             <Row label="Stitch">
               <select className="select" style={{ width: "100%" }} value={st.cover} onChange={(e) => up({ cover: e.target.value })}>
                 <option value="satin">Satin</option>

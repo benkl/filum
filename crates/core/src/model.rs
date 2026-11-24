@@ -403,6 +403,9 @@ pub struct SatinParams {
     pub short_stitch_inset: f64,
     pub center_walk: bool,
     pub contour_underlay: bool,
+    /// Contour underlay passes, each the first side forward and the second back
+    /// (a file without it reads 1; foam takes 2).
+    pub contour_underlay_repeats: u32,
     pub contour_inset: f64,
     pub zigzag_underlay: bool,
     pub zigzag_underlay_spacing: f64,
@@ -471,6 +474,12 @@ pub struct SatinParams {
     /// The second rail's own values where Ink/Stitch gives two ("0.2 0.5").
     #[serde(skip_serializing_if = "Option::is_none")]
     pub second_rail: Option<SecondRail>,
+    /// Sewn over 3D foam (absent: a normal satin).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub foam: Option<FoamOptions>,
+    /// Layered 3D: inner layers under the column (absent: a normal satin).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub layered: Option<LayeredOptions>,
 }
 
 impl Default for SatinParams {
@@ -486,6 +495,7 @@ impl Default for SatinParams {
             short_stitch_inset: 0.15,
             center_walk: true,
             contour_underlay: false,
+            contour_underlay_repeats: 1,
             contour_inset: 0.4,
             zigzag_underlay: false,
             zigzag_underlay_spacing: 3.0,
@@ -514,6 +524,8 @@ impl Default for SatinParams {
             multi: false,
             reverse: false,
             second_rail: None,
+            foam: None,
+            layered: None,
         }
     }
 }
@@ -1216,19 +1228,128 @@ pub enum CoverKind {
     EStitch,
 }
 
+/// A satin sewn over 3D foam (the satin's `foam` block; from the NOVAstitch
+/// Designer fork, after the Punch book). The column is sewn over a foam sheet:
+/// no fill underlay, only a straight-stitch contour (and a centre walk on wide
+/// columns), denser stitches, caps on the open ends, and a machine stop before
+/// it to lay the foam.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct FoamOptions {
+    /// Straight-stitch contour passes: 1 or 2 (more is refused).
+    #[serde(deserialize_with = "foam_contour_passes")]
+    pub contour_passes: u32,
+    /// The satin's spacing is divided by this (denser over foam).
+    pub density_factor: f64,
+    /// Caps on the open ends of the columns.
+    pub caps: bool,
+}
+
+/// Most contour passes over foam.
+pub const FOAM_MAX_CONTOUR_PASSES: u32 = 2;
+/// Foam satin density: "40–50 % heavier" (Punch), read as density. To check
+/// at a stitch-out: 0.40 → 0.28 mm.
+pub const FOAM_DENSITY_FACTOR: f64 = 1.45;
+/// From this column width on, a centre walk joins the contour (Punch: "wide").
+pub const FOAM_WIDE: f64 = 4.0;
+
+fn foam_contour_passes<'de, D: serde::Deserializer<'de>>(d: D) -> Result<u32, D::Error> {
+    let n = u32::deserialize(d)?;
+    if (1..=FOAM_MAX_CONTOUR_PASSES).contains(&n) {
+        Ok(n)
+    } else {
+        Err(serde::de::Error::custom(format!("contourPasses {n}: foam takes 1 or {FOAM_MAX_CONTOUR_PASSES} contour passes")))
+    }
+}
+
+impl Default for FoamOptions {
+    fn default() -> Self {
+        FoamOptions { contour_passes: 1, density_factor: FOAM_DENSITY_FACTOR, caps: true }
+    }
+}
+
+/// Layered 3D (the satin's `layered` block; from the NOVAstitch Designer fork,
+/// after the Punch book). Growing inner layers under the column: a core (two
+/// underlay layers and a contour), wider layers, and the column itself on top.
+/// The edges are staggered: no needle point of a layer within 0.3 mm of one of
+/// the layer before. The inner layers can be sewn in another thread
+/// (`base_thread`), a special one (metallic) only on top.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct LayeredOptions {
+    /// Inner layers: 2 to 4 (5 or more is refused).
+    #[serde(deserialize_with = "layered3d_layers")]
+    pub layers: u32,
+    /// Spacing of the core's zig-zag underlay (mm; wider = higher).
+    pub underlay_zigzag_spacing: f64,
+    /// How much narrower each inner layer is than the next (mm, both sides together).
+    pub shrink_per_layer: f64,
+    /// Thread id of the inner layers (none: the object's thread).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub base_thread: Option<String>,
+}
+
+/// Inner layers of a layered 3D: 2 by default, 4 at most.
+pub const LAYERED3D_MIN_LAYERS: u32 = 2;
+pub const LAYERED3D_MAX_LAYERS: u32 = 4;
+/// Each inner layer this much narrower than the next, both sides together:
+/// 0.3 mm a side (the fork's value, to tune at a stitch-out; Punch gives none).
+pub const LAYERED3D_SHRINK: f64 = 0.6;
+/// No needle point of a layer this close to one of the layer before (mm).
+pub const LAYERED3D_MIN_GAP: f64 = 0.3;
+/// Below this width a layered 3D has no room for its layers (mm).
+pub const LAYERED3D_MIN_WIDTH: f64 = 6.0;
+
+fn layered3d_layers<'de, D: serde::Deserializer<'de>>(d: D) -> Result<u32, D::Error> {
+    let n = u32::deserialize(d)?;
+    if (LAYERED3D_MIN_LAYERS..=LAYERED3D_MAX_LAYERS).contains(&n) {
+        Ok(n)
+    } else {
+        Err(serde::de::Error::custom(format!("layers {n}: layered 3D takes {LAYERED3D_MIN_LAYERS} to {LAYERED3D_MAX_LAYERS} layers")))
+    }
+}
+
+impl Default for LayeredOptions {
+    fn default() -> Self {
+        LayeredOptions {
+            layers: LAYERED3D_MIN_LAYERS,
+            // the satin's own zig-zag underlay spacing
+            underlay_zigzag_spacing: SatinParams::default().zigzag_underlay_spacing,
+            shrink_per_layer: LAYERED3D_SHRINK,
+            base_thread: None,
+        }
+    }
+}
+
 /// Automatic appliqué: placement line → stop (lay the fabric)
 /// → tack-down → stop (trim the fabric) → cover stitch along the edge.
+///
+/// A new appliqué follows the Punch book (from the NOVAstitch Designer fork):
+/// its placement line 1.25 mm inside the shape, a straight-stitch tack-down
+/// 2 mm inside the edge and a 4.5 mm satin cover that hides it. A file without
+/// these fields keeps the earlier values (placement on the edge, zig-zag
+/// tack-down 0.6 mm inside, 3 mm cover): the field defaults below are those.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct AppliqueParams {
     pub placement: bool,
     pub placement_length: f64,
+    /// Distance of the placement line inside the edge (mm).
+    #[serde(default)]
+    pub placement_inset: f64,
+    /// Free-edge appliqué: placement line 5 mm inside, no tack-down, one stop
+    /// for the spray glue and the fabric, then the cover.
+    #[serde(default)]
+    pub free_edge: bool,
+    #[serde(default = "earlier_tackdown")]
     pub tackdown: TackdownKind,
     pub tackdown_width: f64,
     /// Distance of the tack-down centre inside the edge (mm).
+    #[serde(default = "earlier_tackdown_inset")]
     pub tackdown_inset: f64,
     pub tackdown_spacing: f64,
     pub cover: CoverKind,
+    #[serde(default = "earlier_cover_width")]
     pub cover_width: f64,
     pub cover_spacing: f64,
     /// Shift of the cover stitch centre outwards (mm, negative = inwards).
@@ -1241,17 +1362,41 @@ pub struct AppliqueParams {
     pub stops: bool,
 }
 
+/// The earlier values, for files written before the Punch defaults.
+fn earlier_tackdown() -> TackdownKind {
+    TackdownKind::Zigzag
+}
+fn earlier_tackdown_inset() -> f64 {
+    0.6
+}
+fn earlier_cover_width() -> f64 {
+    3.0
+}
+
+/// Punch: the tack-down line sits this far inside the edge (its outer side at
+/// least 2 mm from the edge; a straight stitch).
+pub const APPLIQUE_TACKDOWN_INSET: f64 = 2.0;
+/// The cover, centred on the edge, reaches 2.25 mm inside: over the tack-down
+/// with 0.25 mm to spare.
+pub const APPLIQUE_COVER_WIDTH: f64 = 4.5;
+/// Placement line inside the edge (Punch: 1–1.5 mm).
+pub const APPLIQUE_PLACEMENT_INSET: f64 = 1.25;
+/// Free-edge appliqué: placement line this far inside (Punch).
+pub const APPLIQUE_FREE_EDGE_INSET: f64 = 5.0;
+
 impl Default for AppliqueParams {
     fn default() -> Self {
         AppliqueParams {
             placement: true,
             placement_length: 2.0,
-            tackdown: TackdownKind::Zigzag,
+            placement_inset: APPLIQUE_PLACEMENT_INSET,
+            free_edge: false,
+            tackdown: TackdownKind::Run,
             tackdown_width: 1.6,
-            tackdown_inset: 0.6,
+            tackdown_inset: APPLIQUE_TACKDOWN_INSET,
             tackdown_spacing: 1.2,
             cover: CoverKind::Satin,
-            cover_width: 3.0,
+            cover_width: APPLIQUE_COVER_WIDTH,
             cover_spacing: 0.4,
             cover_offset: 0.0,
             cover_underlay: true,

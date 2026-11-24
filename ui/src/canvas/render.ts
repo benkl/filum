@@ -137,7 +137,8 @@ interface Chunk {
   x: number; // needle position entering the chunk
   y: number;
   path: Path2D;
-  jumps: Path2D;
+  /** Jump threads left on the fabric (dashed in the stitch view, thread in the realistic one). */
+  floats: Path2D;
   dots: Float32Array; // penetration coordinates (for zoomed-in stitch view)
   /** Bounding box of everything the chunk draws (mm), for viewport culling. */
   bx0: number;
@@ -148,7 +149,7 @@ interface Chunk {
 
 interface Traced {
   path: Path2D;
-  jumps: Path2D;
+  floats: Path2D;
   dots: number[];
   pen: boolean;
   x: number;
@@ -163,7 +164,7 @@ function trace(plan: PlanData, start: number, end: number, pen: boolean, x: numb
   const uncut = plan.uncut?.mask;
   const hide = plan.hide;
   const path = new Path2D();
-  const jumps = new Path2D();
+  const floats = new Path2D();
   const dots: number[] = [];
   let bx0 = Infinity;
   let by0 = Infinity;
@@ -194,8 +195,10 @@ function trace(plan: PlanData, start: number, end: number, pen: boolean, x: numb
       continue;
     }
     if (f & FLAG.JUMP && uncut?.[i]) {
-      if (!pen) path.moveTo(x, y);
-      path.lineTo(nx, ny);
+      // a jump thread left on the fabric
+      floats.moveTo(x, y);
+      floats.lineTo(nx, ny);
+      path.moveTo(nx, ny);
       inc(x, y);
       inc(nx, ny);
       pen = true;
@@ -204,10 +207,7 @@ function trace(plan: PlanData, start: number, end: number, pen: boolean, x: numb
       continue;
     }
     if (f & FLAG.JUMP) {
-      jumps.moveTo(x, y);
-      jumps.lineTo(nx, ny);
-      inc(x, y);
-      inc(nx, ny);
+      // cut jumps are drawn on top of all the stitching (paintJumps)
       pen = false;
       x = nx;
       y = ny;
@@ -227,7 +227,7 @@ function trace(plan: PlanData, start: number, end: number, pen: boolean, x: numb
     x = nx;
     y = ny;
   }
-  return { path, jumps, dots, pen, x, y, bbox: [bx0, by0, bx1, by1] };
+  return { path, floats, dots, pen, x, y, bbox: [bx0, by0, bx1, by1] };
 }
 
 // one entry per plan object (the editor and dialog previews keep their own)
@@ -258,7 +258,7 @@ export function getChunks(plan: PlanData, showUnderlay: boolean): Chunk[] {
       x,
       y,
       path: t.path,
-      jumps: t.jumps,
+      floats: t.floats,
       dots: new Float32Array(t.dots),
       bx0: t.bbox[0],
       by0: t.bbox[1],
@@ -297,7 +297,7 @@ function paintStitches(
   color: string,
   weight: number | undefined,
   path: Path2D,
-  jumps: Path2D,
+  floats: Path2D,
   dots: ArrayLike<number>,
   r: RenderInput,
   vp: { x0: number; y0: number; x1: number; y1: number },
@@ -308,6 +308,10 @@ function paintStitches(
   if (r.mode === "stitch") {
     ctx.strokeStyle = color;
     ctx.lineWidth = Math.max(0.12, 1.1 / scale);
+    // jump threads first, dashed in the thread's colour: a thread lying across, not a stitch
+    ctx.setLineDash([3.6 / scale, 3.6 / scale]);
+    ctx.stroke(floats);
+    ctx.setLineDash([]);
     ctx.stroke(path);
     if (scale > 14 && dots.length) {
       ctx.fillStyle = r.theme.dark ? "rgba(255,255,255,.55)" : "rgba(0,0,0,.45)";
@@ -320,7 +324,9 @@ function paintStitches(
       }
     }
   } else {
-    // realistic: soft shadow, dark rim, body, specular highlight
+    // realistic: soft shadow, dark rim, body, specular highlight; jump threads as thread
+    path = new Path2D(path);
+    path.addPath(floats);
     // the thread's own weight, else the design's
     const THREAD_W = weight ? threadWidth(weight as ThreadWeight) : r.doc ? threadWidth(r.doc.options?.threadWeight) : THREAD_W0;
     // the thread ends at the needle hole: no rounded end or corner reaching past it
@@ -347,14 +353,54 @@ function paintStitches(
     ctx.stroke(path);
     ctx.restore();
   }
-  if (r.showJumps) {
-    ctx.save();
-    ctx.setLineDash([3.6 / scale, 3.6 / scale]);
-    ctx.lineWidth = 1 / scale;
-    ctx.strokeStyle = r.theme.dark ? "rgba(255,255,255,.5)" : "rgba(0,0,0,.45)";
-    ctx.stroke(jumps);
-    ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
+// Jumps
+
+const jumpCache = new WeakMap<PlanData, { cutOnly: boolean; segs: number[] }>();
+
+/** The jumps as [record, x0, y0, x1, y1]: every one, or (`cutOnly`) those the
+ *  machine cuts, where trace() lifts the pen (a jump thread left on the fabric
+ *  is drawn with the stitches). */
+function jumpSegments(plan: PlanData, cutOnly: boolean): number[] {
+  const hit = jumpCache.get(plan);
+  if (hit && hit.cutOnly === cutOnly) return hit.segs;
+  const { flags, coords } = plan;
+  const uncut = plan.uncut?.mask;
+  const segs: number[] = [];
+  let x = 0;
+  let y = 0;
+  for (let i = 0; i < flags.length; i++) {
+    const f = flags[i];
+    const nx = coords[2 * i];
+    const ny = coords[2 * i + 1];
+    if (f & (FLAG.COLOR_CHANGE | FLAG.TRIM | FLAG.STOP | FLAG.END) && !plan.hide?.[i]) continue;
+    if (f & FLAG.JUMP && !(cutOnly && uncut?.[i]) && !plan.hide?.[i]) segs.push(i, x, y, nx, ny);
+    x = nx;
+    y = ny;
   }
+  jumpCache.set(plan, { cutOnly, segs });
+  return segs;
+}
+
+/** The jumps sewn so far, dashed, over all the stitching: a later colour never
+ *  hides where the needle travels (the WebGL view draws them the same way). The
+ *  stitch views draw the jump threads left on the fabric themselves (`cutOnly`). */
+function paintJumps(ctx: CanvasRenderingContext2D, plan: PlanData, limit: number, scale: number, dark: boolean, cutOnly: boolean) {
+  const segs = jumpSegments(plan, cutOnly);
+  if (!segs.length) return;
+  ctx.save();
+  ctx.setLineDash([3.6 / scale, 3.6 / scale]);
+  ctx.lineWidth = 1 / scale;
+  ctx.strokeStyle = dark ? "rgba(255,255,255,.5)" : "rgba(0,0,0,.45)";
+  ctx.beginPath();
+  for (let k = 0; k < segs.length && segs[k] < limit; k += 5) {
+    ctx.moveTo(segs[k + 1], segs[k + 2]);
+    ctx.lineTo(segs[k + 3], segs[k + 4]);
+  }
+  ctx.stroke();
+  ctx.restore();
 }
 
 // ---------------------------------------------------------------------------
@@ -740,19 +786,19 @@ function paintChunks(ctx: CanvasRenderingContext2D, r: RenderInput, chunks: Chun
     const color = chunks[k].color;
     const weight = chunks[k].weight;
     const path = new Path2D();
-    const jumps = new Path2D();
+    const floats = new Path2D();
     const dots: number[] = [];
     let any = false;
     for (; k < to && chunks[k].block === block; k++) {
       const c = chunks[k];
       if (!hits(area, c.bx0, c.by0, c.bx1, c.by1)) continue;
       path.addPath(c.path);
-      jumps.addPath(c.jumps);
+      floats.addPath(c.floats);
       for (let i = 0; i < c.dots.length; i++) dots.push(c.dots[i]);
       any = true;
       painted++;
     }
-    if (any) paintStitches(ctx, color, weight, path, jumps, dots, r, area);
+    if (any) paintStitches(ctx, color, weight, path, floats, dots, r, area);
   }
   return painted;
 }
@@ -906,7 +952,7 @@ export class Renderer {
     while (back.chunks < done && performance.now() - t0 < this.budgetMs) {
       const c = chunks[back.chunks++];
       if (hits(area, c.bx0, c.by0, c.bx1, c.by1)) {
-        paintStitches(back.ctx, c.color, c.weight, c.path, c.jumps, c.dots, r, area);
+        paintStitches(back.ctx, c.color, c.weight, c.path, c.floats, c.dots, r, area);
         this.stats.chunksPainted++;
       }
     }
@@ -950,7 +996,8 @@ export class Renderer {
     const key = this.contentKey(r);
     const stitched = r.mode !== "vector" && !!r.plan && !r.glStitches;
     const chunks = stitched ? getChunks(r.plan!, r.showUnderlay) : [];
-    const total = r.plan && r.mode !== "vector" ? r.plan.flags.length : 0;
+    // the vector view sews nothing, but its overlays (the jumps) cover the whole plan
+    const total = r.plan ? r.plan.flags.length : 0;
     const limit = r.animIndex == null ? total : Math.max(0, Math.min(total, r.animIndex));
     let done = 0;
     {
@@ -1005,7 +1052,7 @@ export class Renderer {
     if (stitched && done < chunks.length && limit > chunks[done].start) {
       const c = chunks[done];
       const t = trace(r.plan!, c.start, limit, c.penIn, c.x, c.y, r.showUnderlay, r.mode === "stitch" && r.view.scale > 14);
-      paintStitches(ctx, c.color, c.weight, t.path, t.jumps, t.dots, r, mmRectOf(r, 0, 0, pw, ph));
+      paintStitches(ctx, c.color, c.weight, t.path, t.floats, t.dots, r, mmRectOf(r, 0, 0, pw, ph));
       resetState(ctx);
     }
     if (overlayCtx) {
@@ -1027,8 +1074,11 @@ export class Renderer {
     // what hidden-stitch removal takes out: the part of each cut object that isn't stitched, hatched
     if (r.hiddenShapes?.length) paintHidden(ctx, doc, r.hiddenShapes, scale, theme.dark);
 
-    // with the jump stitches shown: where the machine cuts, and where each jump lands
-    if (plan && mode !== "vector" && r.showJumps) paintTrimMarks(ctx, plan, limit, scale, theme.dark);
+    // with the jump stitches shown, in every view: the jumps (WebGL draws its own), where the machine cuts, and where each jump lands
+    if (plan && r.showJumps) {
+      if (!r.glStitches) paintJumps(ctx, plan, limit, scale, theme.dark, mode !== "vector");
+      paintTrimMarks(ctx, plan, limit, scale, theme.dark);
+    }
 
     // needle marker while animating
     if (plan && mode !== "vector" && r.animIndex != null && limit > 0) {
@@ -1218,7 +1268,7 @@ export function renderPlanPreview(
   } as unknown as RenderInput;
   ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * view.ox, dpr * view.oy);
   const vp = { x0: -Infinity, y0: -Infinity, x1: Infinity, y1: Infinity };
-  for (const c of getChunks(plan, opts.showUnderlay ?? true)) paintStitches(ctx, c.color, c.weight, c.path, c.jumps, c.dots, r, vp);
+  for (const c of getChunks(plan, opts.showUnderlay ?? true)) paintStitches(ctx, c.color, c.weight, c.path, c.floats, c.dots, r, vp);
   resetState(ctx);
 }
 

@@ -902,14 +902,16 @@ fn assemble_basted(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[Run], 
         // a colour change only when the spool changes (threads fitted or
         // merged onto the same spool are sewn as one colour)
         let after_prefix = std::mem::replace(&mut first_object, false) && own_prefix;
-        if after_prefix || cur_thread.map_or(true, |c| !doc.same_spool(c, &obj.thread)) {
+        // a layered 3D starts in its base thread
+        let first_thread = crate::stitches::layered3d::start_thread(obj, doc);
+        if after_prefix || cur_thread.map_or(true, |c| !doc.same_spool(c, first_thread)) {
             if cur_thread.is_some() || after_prefix {
                 // the tie-off and colour change end the prefix when it has its own colour
                 b.cut(if after_prefix { u32::MAX } else { o }, false, true);
                 b.pending = Some((ConnectionKind::ColorChange, false));
             }
-            threads.push(doc.thread(&obj.thread).cloned().unwrap_or_else(|| fallback_thread(threads.len())));
-            cur_thread = Some(obj.thread.as_str());
+            threads.push(doc.thread(first_thread).cloned().unwrap_or_else(|| fallback_thread(threads.len())));
+            cur_thread = Some(first_thread);
         }
         b.ties = object_ties(obj);
         b.lock = obj.lock.unwrap_or_default();
@@ -920,6 +922,16 @@ fn assemble_basted(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[Run], 
         for run in runs {
             b.at = at;
             at += 1;
+            if crate::stitches::layered3d::is_thread_switch(run) {
+                // a layered 3D's top layer in the object's own thread
+                if cur_thread.map_or(true, |c| !doc.same_spool(c, &obj.thread)) {
+                    b.cut(o, false, true);
+                    b.pending = Some((ConnectionKind::ColorChange, false));
+                    threads.push(doc.thread(&obj.thread).cloned().unwrap_or_else(|| fallback_thread(threads.len())));
+                    cur_thread = Some(obj.thread.as_str());
+                }
+                continue;
+            }
             if is_stop(run) {
                 // stop inside the object (appliqué steps)
                 if b.pos.is_some() {

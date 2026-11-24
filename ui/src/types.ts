@@ -152,6 +152,31 @@ export interface SatinParams {
     randomWider?: number;
     randomNarrower?: number;
   };
+  /** Sewn over 3D foam (absent: a normal satin). */
+  foam?: FoamOptions;
+  /** Layered 3D: inner layers under the column (absent: a normal satin). */
+  layered?: LayeredOptions;
+}
+
+/** A satin over 3D foam (Punch): a stop to lay the foam, a contour, a denser satin, caps on the open ends. */
+export interface FoamOptions {
+  /** Straight-stitch contour passes: 1 or 2. */
+  contourPasses: number;
+  /** The satin's spacing is divided by this (1.45). */
+  densityFactor: number;
+  /** Caps on the open ends. */
+  caps: boolean;
+}
+
+/** Layered 3D (Punch): 2 to 4 growing inner layers under the column, edges staggered. */
+export interface LayeredOptions {
+  layers: number;
+  /** Spacing of the core's zig-zag underlay (mm). */
+  underlayZigzagSpacing: number;
+  /** How much narrower each inner layer is than the next (mm, both sides). */
+  shrinkPerLayer: number;
+  /** Thread of the inner layers (none: the object's). */
+  baseThread?: string;
 }
 
 export type FillMethod = "tatami" | "contour" | "spiral" | "radial" | "hilbert" | "stipple" | "meander" | "guided" | "circular" | "flow" | "curved" | "cross" | "tartan";
@@ -356,6 +381,10 @@ export type CoverKind = "none" | "satin" | "eStitch";
 export interface AppliqueParams {
   placement: boolean;
   placementLength: number;
+  /** Placement line inside the edge (mm; missing: on the edge). */
+  placementInset?: number;
+  /** Free edge: placement 5 mm inside, no tack-down, one stop for glue and fabric, then the cover. */
+  freeEdge?: boolean;
   tackdown: TackdownKind;
   tackdownWidth: number;
   tackdownInset: number;

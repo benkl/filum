@@ -1103,6 +1103,9 @@ fn ink_satin(ink: &Ink) -> SatinParams {
         swap_rails: ink.b("swap_satin_rails", false),
         reverse: false,
         second_rail: (rail != SecondRail::default()).then_some(rail),
+        contour_underlay_repeats: 1,
+        foam: None,
+        layered: None,
         multi: false,
     }
 }

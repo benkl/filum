@@ -8,8 +8,10 @@ pub mod fields;
 pub mod travel;
 pub mod underlay;
 pub mod fill;
+pub mod foam;
 pub mod gradient;
 pub mod inkfills;
+pub mod layered3d;
 pub mod meander_tiles;
 pub mod ripple;
 pub mod running;
@@ -264,6 +266,9 @@ fn generate_plain(obj: &Object, fabric: &FabricProfile) -> Vec<Run> {
                 })
                 .collect()
         }
+        // a satin with its foam block is sewn over 3D foam, one with its layered block in layers
+        StitchParams::Satin(p) if p.foam.is_some() => foam::foam(&obj.paths, p, fabric),
+        StitchParams::Satin(p) if p.layered.is_some() => layered3d::layered3d(&obj.paths, p, fabric),
         StitchParams::Satin(p) => {
             let mut p = p.clone();
             // only a pin begins a satin partway along (where the previous

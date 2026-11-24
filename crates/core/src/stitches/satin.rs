@@ -625,14 +625,15 @@ fn underlay(geo: &SatinGeometry, p: &SatinParams, which: super::underlay::SatinU
         let pairs = plot_pairs(geo, 0.5, off, None);
         let left: Vec<Point> = pairs.iter().map(|x| x.0).collect();
         let right: Vec<Point> = pairs.iter().rev().map(|x| x.1).collect();
-        for q in running_stitch(&left, len, 0.1) {
-            push(run, q, u);
-        }
-        for q in running_stitch(&right, len, 0.1) {
-            push(run, q, u);
-        }
-        if let Some(f) = left.first() {
-            push(run, *f, u);
+        let (l, r) = (running_stitch(&left, len, 0.1), running_stitch(&right, len, 0.1));
+        // each pass ends where it began
+        for _ in 0..p.contour_underlay_repeats.max(1) {
+            for q in l.iter().chain(&r) {
+                push(run, *q, u);
+            }
+            if let Some(f) = left.first() {
+                push(run, *f, u);
+            }
         }
     }
     if which.zigzag {
