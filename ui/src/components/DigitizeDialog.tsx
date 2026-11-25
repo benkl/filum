@@ -276,7 +276,12 @@ function PreviewCanvas({ draw, w, h }: { draw: (ctx: CanvasRenderingContext2D, d
   return <canvas ref={ref} style={{ width: w, height: h }} />;
 }
 
-export function DigitizeDialog({ onClose }: { onClose: () => void }) {
+/**
+ * The digitizer dialog's state and actions: the picture, the settings and
+ * their previews, colours, regions, the result and adding it. The dialog
+ * and each of its panes take what they need from this one object.
+ */
+function useDigitize(onClose: () => void) {
   const doc = useStore((s) => s.doc);
   const fabricColor = useStore((s) => s.fabricColor);
   const [img, setImg] = useState<Img | null>(() => {
@@ -880,6 +885,14 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
   const pw = Math.max(200, box.w);
   const ph = Math.max(160, box.h);
 
+  return { doc, fabricColor, img, setImg, settings, setSettings, output, setOutputState, cross, setCrossState, setCross, widthMm, setWidthMm, fixedColors, setFixedColors, skipColors, setSkipColors, lineColors, setLineColors, fillColors, setFillColors, edgeColors, setEdgeColors, colorOrder, setColorOrder, regionEdits, setRegionEdits, overrides, setOverrides, chart, setChart, chartEntries, setChartEntries, preview, setPreview, traced, setTraced, plan, setPlan, tab, setTab, stitchLook, setStitchLook, busy, setBusy, error, setError, pickRole, setPickRole, eyedropper, placement, setPlacement, preset, bmp, setBmp, sam, setSam, samMode, setSamMode, samPts, setSamPts, curMask, setCurMask, masks, setMasks, edgeMap, setEdgeMap, edgeKind, setEdgeKind, textLines, setTextLines, textPick, setTextPick, boxRef, box, imgRef, runId, picRef, mounted, set, paneState, setPaneState, panes, pane, setPane, setOutput, direction, wantMap, textMask, segMasks, startSam, samClick, useMask, runOcr, opts, crossed, result, recoloured, previewDoc, planRun, loadBytes, pick, pasteFromClipboard, onDrop, colors, aspect, heightMm, isColour, roleOf, setRole, toggleColour, hasEdge, toggleEdge, moveThread, nearestSkipTarget, editColour, removeColour, lockPalette, toggleRegion, removedShare, resetColours, extra, chooseExtra, outlineColourRow, paneChanges, resetPane, onOriginalClick, fitHoop, counts, stats, tooBig, add, pw, ph };
+}
+
+type Digitize = ReturnType<typeof useDigitize>;
+
+export function DigitizeDialog({ onClose }: { onClose: () => void }) {
+  const v = useDigitize(onClose);
+  const { doc, fabricColor, img, setSettings, output, cross, widthMm, regionEdits, overrides, preview, plan, tab, setTab, stitchLook, setStitchLook, busy, error, pickRole, setPickRole, eyedropper, placement, setPlacement, bmp, sam, samMode, samPts, curMask, masks, edgeMap, edgeKind, boxRef, imgRef, panes, pane, setPane, wantMap, samClick, crossed, result, previewDoc, pick, pasteFromClipboard, onDrop, heightMm, toggleRegion, removedShare, paneChanges, resetPane, onOriginalClick, counts, stats, tooBig, add, pw, ph } = v;
   return (
     <Dialog
       live
@@ -924,661 +937,19 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="dz-pane" key={pane}>
-            {pane === "style" && (
-              <>
-                <Group
-                  title="Output"
-                  hint={
-                    output === "cross"
-                      ? "The picture's colours on a grid of crosses — every colour setting (palette, thread chart, background, left-out areas, AI masks) applies."
-                      : settings.photoZigzag
-                        ? "One colour, rows of zigzags: wider and denser where the picture is darker, nothing where it is light."
-                        : "Traced shapes: fills, satin columns and lines."
-                  }
-                >
-                  <Seg
-                    full
-                    value={output === "cross" ? "cross" : settings.photoZigzag ? "zigzag" : "shapes"}
-                    onChange={(v) => {
-                      if (v === "cross") {
-                        setOutput("cross");
-                        setSettings((s) => ({ ...s, ...CROSS_PRESET }));
-                      } else {
-                        setOutput("shapes");
-                        set({ photoZigzag: v === "zigzag" });
-                      }
-                    }}
-                    options={[
-                      ["shapes", "Shapes"],
-                      ["zigzag", "Zig-zag photo"],
-                      ["cross", "Cross stitch"],
-                    ]}
-                  />
-                </Group>
-                {output === "shapes" && !settings.photoZigzag && (
-                  <Group title="Preset" hint={DIGITIZE_PRESETS.find((p) => p.id === preset)?.hint ?? "Custom settings — pick a preset to start from"}>
-                    <div className="dz-presets">
-                      {DIGITIZE_PRESETS.map((p) => (
-                        <button
-                          key={p.id}
-                          className={preset === p.id ? "on" : ""}
-                          title={p.hint}
-                          aria-pressed={preset === p.id}
-                          // a preset starts from the defaults: nothing leaks from the last one
-                          onClick={() => setSettings((s) => presetSettings(p.id, { outlineColor: s.outlineColor }))}
-                        >
-                          {PRESET_ICONS[p.id]}
-                          <span>{p.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </Group>
-                )}
-                {output === "shapes" && !settings.photoZigzag && (
-                  <Group title="Look" hint="Each control moves several settings of the tabs together; it shows Custom once those are changed by hand.">
-                    <Row label="Outlines" title="Lines of the picture: none, as wide as drawn, or one even satin width (clean logo outlines, sewn as one network; below 1 mm a triple running stitch)">
-                      <Seg<Outlines>
-                        full
-                        value={outlinesOf(settings)}
-                        onChange={(v) => set(outlinesPatch(v, settings.outlineLineMm || OUTLINE_DEFAULT_MM))}
-                        options={[
-                          ["off", "None"],
-                          ["drawn", "As drawn"],
-                          ["even", "Even"],
-                        ]}
-                      />
-                    </Row>
-                    {outlinesOf(settings) === "even" && (
-                      <Row label="Outline width" title="Every dark line becomes a satin of this width (below 1 mm: a triple running stitch)">
-                        <Slider min={0.5} max={4} step={0.1} unit="mm" value={settings.outlineLineMm} onChange={(v) => set({ outlineLineMm: v })} />
-                      </Row>
-                    )}
-                    <Row label="Detail" title="Bold: fewer, simpler shapes. Fine: small shapes and close tracing (more stitches, more trims)">
-                      <Seg<Detail | "custom">
-                        full
-                        value={detailOf(settings) ?? "custom"}
-                        onChange={(v) => v !== "custom" && set(DETAIL[v])}
-                        options={[
-                          ["bold", "Bold"],
-                          ["normal", "Normal"],
-                          ["fine", "Fine"],
-                          ...(detailOf(settings) ? [] : [["custom", "Custom"] as ["custom", string]]),
-                        ]}
-                      />
-                    </Row>
-                    <Row label="Background" title="The background colour: left out around the design and in plain holes (letter counters), left out only around it (every enclosed area stitched: a logo's white faces), or stitched everywhere">
-                      <Seg<Backdrop>
-                        full
-                        value={backdropOf(settings)}
-                        onChange={(v) => set(backdropPatch(v))}
-                        options={[
-                          ["fabric", "Left out"],
-                          ["enclosed", "Enclosed"],
-                          ["all", "Stitched"],
-                        ]}
-                      />
-                    </Row>
-                    <Row label="Border" title="An outline around the whole design (patches, stickers)">
-                      <Seg
-                        full
-                        value={settings.outline}
-                        onChange={(v) => set({ outline: v })}
-                        options={[
-                          ["none", "None"],
-                          ["running", "Running"],
-                          ["satin", "Satin"],
-                        ]}
-                      />
-                    </Row>
-                    {settings.outline === "satin" && (
-                      <Row label="Border width">
-                        <Slider min={0.8} max={6} step={0.1} unit="mm" value={settings.outlineWidthMm} onChange={(v) => set({ outlineWidthMm: v })} />
-                      </Row>
-                    )}
-                  </Group>
-                )}
-                {output === "shapes" && settings.photoZigzag && (
-                  <Group title="Zig-zag photo">
-                    <Row label="Row spacing" title="Distance between the rows — wider: lighter, more graphic">
-                      <Slider min={0.5} max={3} step={0.1} unit="mm" value={settings.photoSpacing} onChange={(v) => set({ photoSpacing: v })} />
-                    </Row>
-                    <Row label="Angle" title="Direction of the rows">
-                      <Slider min={-90} max={90} step={5} digits={0} unit="°" value={settings.photoAngle} onChange={(v) => set({ photoAngle: v })} />
-                    </Row>
-                    <Row label="Contrast" title="Higher: darker darks, lighter lights">
-                      <Slider min={0.5} max={3} step={0.1} value={settings.photoContrast} onChange={(v) => set({ photoContrast: v })} />
-                    </Row>
-                    <Row label="Leave light" title="Parts lighter than this stay empty (the fabric shows)">
-                      <Slider min={0} max={60} step={1} digits={0} unit="%" value={Math.round(settings.photoMin * 100)} onChange={(v) => set({ photoMin: v / 100 })} />
-                    </Row>
-                  </Group>
-                )}
-                <Group
-                  title="Size"
-                  extra={
-                    preview && (
-                      <span className={`badge ${tooBig ? "warn" : ""}`} title={tooBig ? `Larger than the ${doc.hoop.name} hoop` : `Fits the ${doc.hoop.name} hoop`}>
-                        {tooBig ? "larger than hoop" : "fits hoop"}
-                      </span>
-                    )
-                  }
-                >
-                  <div className="dz-size">
-                    <label>
-                      <span>W</span>
-                      <Num value={widthMm} unit="mm" step={5} min={10} max={1000} digits={1} onChange={setWidthMm} />
-                    </label>
-                    <label>
-                      <span>H</span>
-                      <Num value={heightMm} unit="mm" step={5} min={10} max={1000} digits={1} onChange={(v) => setWidthMm(v / Math.max(aspect, 1e-6))} />
-                    </label>
-                    <button className="btn sm" onClick={fitHoop} disabled={!preview} title={`Scale to 90 % of the ${doc.hoop.name} hoop`}>
-                      <Maximize2 size={12} /> Fit hoop
-                    </button>
-                  </div>
-                </Group>
-              </>
-            )}
+            {pane === "style" && <StylePane v={v} />}
 
-            {pane === "colours" && (
-              <>
-                <Group title="Palette">
-                  <Row label="Colours">
-                    {fixedColors.length ? (
-                      <span className="badge" title="The palette is locked: regions stay where they are">
-                        <Lock size={11} /> Locked · {fixedColors.length}
-                      </span>
-                    ) : (
-                      <Slider min={2} max={16} step={1} digits={0} value={settings.colors} onChange={(v) => set({ colors: v })} />
-                    )}
-                  </Row>
-                  <Row label="Merge similar" title="Merge colours closer than this (CIEDE2000; 0 = off)">
-                    <Slider min={0} max={12} step={0.5} digits={1} unit="ΔE" value={settings.mergeDeltaE} onChange={(v) => set({ mergeDeltaE: v })} />
-                  </Row>
-                  <Row label="Thread chart" title="Snap colours to real threads">
-                    <ChartSelect value={chart} onChange={setChart} none="Exact colours" />
-                  </Row>
-                </Group>
-                <Group
-                  title="Background & left-out areas"
-                  hint={
-                    settings.backgroundScope === "outside"
-                      ? "The border colour is left out where it reaches the edge of the picture, and in plain holes (letter counters, the inside of rings and outlines). Small enclosed areas (highlights) and ones with shapes on them (a badge face) are stitched."
-                      : settings.backgroundScope === "border"
-                        ? "The border colour is left out only where it reaches the edge of the picture: every area enclosed by the design is stitched (a logo's white faces inside its outlines)."
-                        : "The border colour is left out everywhere, also inside shapes (letter counters, holes)."
-                  }
-                >
-                  <Row label="Background" title="Leave out the colour that dominates the image border">
-                    <Toggle on={settings.removeBackground} onChange={(v) => set({ removeBackground: v })} />
-                  </Row>
-                  {/* the three choices need the panel's full width */}
-                  <Seg
-                    full
-                    disabled={!settings.removeBackground}
-                    value={settings.backgroundScope}
-                    onChange={(v) => set({ backgroundScope: v })}
-                    options={[
-                      ["border", "At the edge"],
-                      ["outside", "Outside & holes"],
-                      ["everywhere", "Everywhere"],
-                    ]}
-                  />
-                  <div className="dz-removed">
-                    <span>
-                      <b>{(removedShare * 100).toFixed(removedShare < 0.1 ? 1 : 0)}%</b> of the picture left out
-                      {regionEdits.length > 0 && <span className="stat"> · {regionEdits.length} area{regionEdits.length === 1 ? "" : "s"} edited</span>}
-                    </span>
-                    <div className="dz-inline">
-                      <button className={`btn sm ${tab === "colours" ? "primary" : ""}`} disabled={!preview} onClick={() => setTab("colours")} title="Show what is left out — click areas to stitch them or leave them out">
-                        <Eye size={12} /> Review
-                      </button>
-                      {regionEdits.length > 0 && (
-                        <button className="btn sm ghost" onClick={() => setRegionEdits([])} title="Forget the areas you clicked">
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </Group>
-                <Group
-                  title={`Colours${colors.length ? ` · ${colors.filter((c) => !c.background).length} stitched` : ""}`}
-                  extra={
-                    <span className="dz-head-actions">
-                      <button className="icon-btn" title={fixedColors.length ? "Unlock palette (re-quantise)" : "Lock this palette"} onClick={fixedColors.length ? () => (setFixedColors([]), setOverrides({})) : lockPalette} disabled={!colors.length}>
-                        {fixedColors.length ? <Lock size={13} /> : <Unlock size={13} />}
-                      </button>
-                      <button className="icon-btn" title="Reset colour edits" onClick={resetColours}>
-                        <RotateCcw size={13} />
-                      </button>
-                    </span>
-                  }
-                >
-                  <div className="dz-pick">
-                    <span className="dz-pick-label">
-                      <Pipette size={12} /> Pick on picture
-                    </span>
-                    <div className="seg" role="group" aria-label="Pick a colour on the picture as">
-                      {ROLES.filter((r) => r.id !== "auto").map((r) => (
-                        <button
-                          key={r.id}
-                          className={pickRole === r.id ? "on" : ""}
-                          disabled={!img}
-                          title={`Click colours in the picture (or in Review) to make them: ${r.label.toLowerCase()} — click again to stop`}
-                          onClick={() => {
-                            const next = pickRole === r.id ? null : (r.id as Exclude<Role, "auto">);
-                            setPickRole(next);
-                            if (next && tab !== "original" && tab !== "colours") setTab("original");
-                          }}
-                        >
-                          {r.icon} {r.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="dz-colours">
-                    {colors.map((c, i) => (
-                      <div key={i} className={`dz-colour ${c.background ? "off" : ""}`}>
-                        <input type="color" value={overrides[c.hex] ?? c.hex} onChange={(e) => editColour(i, e.target.value)} title="Choose the thread colour for this region" />
-                        <span className="dz-cname" title={c.code ? `${c.name} ${c.code}` : c.name}>
-                          {overrides[c.hex] ? overrides[c.hex].toUpperCase() : c.name}
-                          {c.code && <span className="stat"> {c.code}</span>}
-                          {c.background && c.coverage - (c.removed ?? 0) > 0.0005 && <span className="stat"> · partly stitched</span>}
-                          {roleOf(c) === "auto" && (c.lines ?? 0) > 0.5 * Math.max(1e-9, c.coverage - (c.removed ?? 0)) && <span className="dz-auto"> lines</span>}
-                        </span>
-                        <span
-                          className="dz-cover"
-                          title={`${((c.coverage - (c.removed ?? 0)) * 100).toFixed(1)} % of the picture stitched${c.removed ? `, ${(c.removed * 100).toFixed(1)} % left out` : ""}`}
-                        >
-                          <i style={{ width: `${Math.min(100, c.coverage * 100)}%` }} className="all" />
-                          <i style={{ width: `${Math.min(100, Math.max(0, c.coverage - (c.removed ?? 0)) * 100)}%` }} />
-                          <b>{(c.coverage * 100).toFixed(c.coverage < 0.1 ? 1 : 0)}%</b>
-                        </span>
-                        <div className="dz-role" role="group" aria-label={`${c.name}: sew as`}>
-                          {ROLES.map((r) => (
-                            <button key={r.id} className={roleOf(c) === r.id ? "on" : ""} title={`${r.label} — ${r.hint}`} onClick={() => setRole(c, r.id)}>
-                              {r.icon}
-                            </button>
-                          ))}
-                        </div>
-                        <div className="dz-role" role="group">
-                          <button
-                            className={hasEdge(c) ? "on" : ""}
-                            disabled={c.background}
-                            aria-pressed={hasEdge(c)}
-                            aria-label={`${c.name}: satin edge`}
-                            title="Satin edge — a satin in this colour's thread where its shapes meet the background (as wide as the border's satin)"
-                            onClick={() => toggleEdge(c)}
-                          >
-                            <StitchSatin size={12} />
-                          </button>
-                        </div>
-                        {fixedColors.length > 2 ? (
-                          <button className="mini" onClick={() => removeColour(i)} title="Merge into the nearest remaining colour">
-                            ×
-                          </button>
-                        ) : (
-                          <span />
-                        )}
-                      </div>
-                    ))}
-                    {!colors.length && <div className="hint">Colours appear here after loading an image.</div>}
-                  </div>
-                </Group>
-                {output === "shapes" && (result?.threads.length ?? 0) > 1 && (
-                  <Group
-                    title="Sew order"
-                    hint="First sewn first: a later colour lies on top. Each colour's fills, lines and edges are sewn together."
-                    extra={
-                      colorOrder.length ? (
-                        <button className="btn sm ghost" onClick={() => setColorOrder([])} title="Back to the digitizer's order (largest colour first)">
-                          <RotateCcw size={12} /> Auto
-                        </button>
-                      ) : undefined
-                    }
-                  >
-                    <ol className="dz-order" aria-label="Sew order">
-                      {(recoloured ?? result)!.threads.map((t, i, all) => (
-                        <li key={t.id}>
-                          <span className="dz-order-n">{i + 1}</span>
-                          <i className="dz-order-sw" style={{ background: t.color }} />
-                          <span className="dz-cname" title={t.name}>
-                            {t.name}
-                          </span>
-                          <button className="mini" disabled={i === 0} onClick={() => moveThread(i, -1)} aria-label={`Sew ${t.name} earlier`} title="Sew earlier (underneath)">
-                            ↑
-                          </button>
-                          <button className="mini" disabled={i === all.length - 1} onClick={() => moveThread(i, 1)} aria-label={`Sew ${t.name} later`} title="Sew later (on top)">
-                            ↓
-                          </button>
-                        </li>
-                      ))}
-                    </ol>
-                  </Group>
-                )}
-              </>
-            )}
+            {pane === "colours" && <ColoursPane v={v} />}
 
-            {pane === "shapes" && (
-              <>
-                <Group title="Picture">
-                  <Row label="Resolution" title="Working resolution — more is slower but keeps finer shapes">
-                    <Slider min={200} max={1600} step={20} digits={0} unit="px" value={settings.maxPixels} onChange={(v) => set({ maxPixels: v })} />
-                  </Row>
-                  <Row label="Denoise" title="Edge-preserving smoothing before colours are reduced (photos, JPEG noise)">
-                    <Slider min={0} max={4} step={1} digits={0} value={settings.denoise} onChange={(v) => set({ denoise: v })} />
-                  </Row>
-                  <Row label="Pixel art" title="Depixelize sprites and icons into smooth shapes (Kopf & Lischinski)">
-                    <Seg value={settings.pixelArt} onChange={(v) => set({ pixelArt: v })} options={[["auto", "Auto"], ["on", "On"], ["off", "Off"]]} />
-                  </Row>
-                </Group>
-                <Group title="Tracing">
-                  <Row label="Seamless" title="Neighbouring shapes share one traced boundary (no gaps, no overlaps); corners stay sharp, pixel steps become smooth curves">
-                    <Toggle on={settings.seamless} onChange={(v) => set({ seamless: v })} />
-                  </Row>
-                  {settings.seamless && (
-                    <Row label="Corners over" title="Boundary turns sharper than this stay corners">
-                      <Slider min={20} max={120} step={5} digits={0} unit="°" value={settings.cornerAngle} onChange={(v) => set({ cornerAngle: v })} />
-                    </Row>
-                  )}
-                  <Row label="Gradients" title="Smooth colour ramps become dithered gradient fills instead of bands">
-                    <Toggle on={settings.gradients} onChange={(v) => set({ gradients: v })} />
-                  </Row>
-                  {settings.gradients && (
-                    <Row label="Gradient rows" title="Straight rows, or streamlines that follow the picture (the colours share them and interleave) — uses the flow settings under Stitches">
-                      <Seg
-                        value={settings.gradientFlow ? "flow" : "straight"}
-                        onChange={(v) => set({ gradientFlow: v === "flow" })}
-                        options={[
-                          ["straight", "Straight"],
-                          ["flow", "Flow"],
-                        ]}
-                      />
-                    </Row>
-                  )}
-                </Group>
-                <Group title="Cleanup">
-                  <Row label="Smoothing" title="Majority-filter passes that remove noise">
-                    <Slider min={0} max={6} step={1} digits={0} value={settings.smoothing} onChange={(v) => set({ smoothing: v })} />
-                  </Row>
-                  <Row label="Min. region" title="Smaller specks merge into their neighbour">
-                    <Slider min={0} max={10} step={0.25} unit="mm²" value={settings.minRegionMm2} onChange={(v) => set({ minRegionMm2: v })} />
-                  </Row>
-                  <Row label="Simplify" title="Contour simplification tolerance">
-                    <Slider min={0.02} max={0.5} step={0.01} unit="mm" value={settings.simplifyMm} onChange={(v) => set({ simplifyMm: v })} />
-                  </Row>
-                  <Row label="Overlap" title="Grow fills so neighbouring colours don't gap after pull">
-                    <Slider min={0} max={0.8} step={0.05} unit="mm" value={settings.overlapMm} onChange={(v) => set({ overlapMm: v })} />
-                  </Row>
-                </Group>
-              </>
-            )}
+            {pane === "shapes" && <ShapesPane v={v} />}
 
-            {pane === "lines" && (
-              <>
-                <Group
-                  title="Lines in the picture"
-                  hint="Outlines, ink strokes and narrow shapes become stitched lines along their centre — through junctions, small gaps bridged — and the fills continue under them, so nothing gapes."
-                  extra={<Toggle on={settings.lineNetworks} onChange={(v) => set({ lineNetworks: v })} />}
-                >
-                  {settings.lineNetworks && (
-                    <>
-                      <Row label="Ink lines" title="Dark lines found on the picture itself, even where the colour reduction merged them into a neighbour (0 = off)">
-                        <Slider min={0} max={100} step={5} digits={0} unit="%" value={settings.inkSensitivity} onChange={(v) => set({ inkSensitivity: v })} />
-                      </Row>
-                      <Row label="Max. width" title="Lines up to this width become stitched lines; wider shapes stay fills">
-                        <Slider min={0.5} max={8} step={0.1} digits={1} unit="mm" value={settings.lineMaxWidthMm} onChange={(v) => set({ lineMaxWidthMm: v })} />
-                      </Row>
-                      <Row label="Bridge gaps" title="Join line ends that point at each other (or at another line) across a gap up to this size">
-                        <Slider min={0} max={4} step={0.1} digits={1} unit="mm" value={settings.lineGapMm} onChange={(v) => set({ lineGapMm: v })} />
-                      </Row>
-                      <Row label="Min. length" title="Shorter lines and side branches (corners, specks) are left out">
-                        <Slider min={0.5} max={10} step={0.5} digits={1} unit="mm" value={settings.lineMinMm} onChange={(v) => set({ lineMinMm: v })} />
-                      </Row>
-                      <Row label="Through junctions" title="A line continues through a junction when it bends less than this — fewer, longer lines (0: every junction ends the lines)">
-                        <Slider min={0} max={60} step={5} digits={0} unit="°" value={settings.lineContinuity} onChange={(v) => set({ lineContinuity: v })} />
-                      </Row>
-                      <Row label="Outline width" title="Dark lines (outlines, ink) as satin of one even width — 0: as wide as drawn">
-                        <span className="dz-inline">
-                          <Toggle on={settings.outlineLineMm > 0} onChange={(v) => set({ outlineLineMm: v ? OUTLINE_DEFAULT_MM : 0 })} />
-                          {settings.outlineLineMm > 0 && <Num value={settings.outlineLineMm} unit="mm" step={0.1} min={0.5} max={4} digits={1} onChange={(v) => set({ outlineLineMm: v })} />}
-                        </span>
-                      </Row>
-                      {settings.outlineLineMm <= 0 && (
-                        <Row label="Follow width" title="Satin lines get wider and narrower like the drawn line">
-                          <Toggle on={settings.lineTaper} onChange={(v) => set({ lineTaper: v })} />
-                        </Row>
-                      )}
-                      <Row label="One network" title="Lines that meet are sewn in one go: each walks out under a running path its column covers on the way back — no trims between them">
-                        <Toggle on={settings.routeLines} onChange={(v) => set({ routeLines: v })} />
-                      </Row>
-                      <Row label="Sub-pixel" title="Line centres follow the drawn line (its darkness profile), not the pixel grid — thin, smoothed lines stay straight and smooth">
-                        <Toggle on={settings.lineSubpixel} onChange={(v) => set({ lineSubpixel: v })} />
-                      </Row>
-                      <Row label="Thin lines" title="Lines narrower than the hairline width">
-                        <Seg
-                          value={settings.thinTriple ? "triple" : "running"}
-                          onChange={(v) => set({ thinTriple: v === "triple" })}
-                          options={[
-                            ["running", "Running"],
-                            ["triple", "Triple"],
-                          ]}
-                        />
-                      </Row>
-                    </>
-                  )}
-                </Group>
-                <Group title="Stitch types" hint="Lines narrower than the hairline width are running stitch, wider ones satin.">
-                  <Row label="Satin strokes" title="Narrow, elongated regions become satin columns along their medial axis">
-                    <span className="dz-inline">
-                      <Toggle on={settings.allowSatin} onChange={(v) => set({ allowSatin: v })} />
-                      {settings.allowSatin && (
-                        <>
-                          <span className="stat">up to</span>
-                          <Num value={settings.satinMaxWidthMm} unit="mm" step={0.5} min={1} max={12} onChange={(v) => set({ satinMaxWidthMm: v })} />
-                        </>
-                      )}
-                    </span>
-                  </Row>
-                  <Row label="Hairlines" title="Very thin lines become running stitch">
-                    <span className="dz-inline">
-                      <Toggle on={settings.allowRunning} onChange={(v) => set({ allowRunning: v })} />
-                      {settings.allowRunning && (
-                        <>
-                          <span className="stat">up to</span>
-                          <Num value={settings.runningMaxWidthMm} unit="mm" step={0.1} min={0.2} max={3} onChange={(v) => set({ runningMaxWidthMm: v })} />
-                        </>
-                      )}
-                    </span>
-                  </Row>
-                </Group>
-                <Group title="Extra lines" hint={EXTRA.find((x) => x[0] === extra)?.[3]}>
-                  <div className="dz-sources" role="radiogroup" aria-label="Extra lines">
-                    {EXTRA.map(([id, icon, label, hint]) => (
-                      <button key={id} role="radio" aria-checked={extra === id} className={extra === id ? "on" : ""} title={hint} onClick={() => chooseExtra(id)}>
-                        {icon}
-                        <span>{label}</span>
-                      </button>
-                    ))}
-                  </div>
-                  {extra === "colour" && (
-                    <>
-                      {!settings.seamless && <p className="dz-hint warn">Colour edges need seamless tracing — turn it on under Shapes.</p>}
-                      <Row label="Contrast" title="Only edges between colours at least this different (CIEDE2000) — higher: fewer lines">
-                        <Slider min={5} max={80} step={1} digits={0} unit="ΔE" value={settings.edgeContrast} onChange={(v) => set({ edgeContrast: v })} />
-                      </Row>
-                      <Row label="Stitch">
-                        <Seg
-                          value={settings.edgeOutlines === "satin" ? "satin" : "running"}
-                          onChange={(v) => set({ edgeOutlines: v })}
-                          options={[
-                            ["running", "Running"],
-                            ["satin", "Satin"],
-                          ]}
-                        />
-                      </Row>
-                      {settings.edgeOutlines === "satin" && (
-                        <Row label="Width" title="Satin width (the border uses it too)">
-                          <Slider min={0.8} max={6} step={0.1} unit="mm" value={settings.outlineWidthMm} onChange={(v) => set({ outlineWidthMm: v })} />
-                        </Row>
-                      )}
-                      {outlineColourRow}
-                    </>
-                  )}
-                  {extra !== "none" && extra !== "colour" && (
-                    <Row label="Amount" title="More lines, and fainter ones, with higher values">
-                      <Slider min={0} max={1} step={0.05} value={settings.lineStrength} onChange={(v) => set({ lineStrength: v })} />
-                    </Row>
-                  )}
-                  {extra !== "none" && <p className="dz-hint">One line per place: the lines in the picture come first, then the border, then these.</p>}
-                </Group>
-              </>
-            )}
+            {pane === "lines" && <LinesPane v={v} />}
 
-            {pane === "cross" && (
-              <>
-                <Group title="Cells" hint="One cross per cell; the cells line up with the canvas grid, so crosses of different colours meet exactly.">
-                  <Row label="Cell" title="Size of one cross (Ink/Stitch pattern size)">
-                    <span className="dz-inline">
-                      <Num value={cross.cell} step={0.1} min={0.8} max={12} unit="mm" onChange={(v) => setCross({ cell: v })} />
-                      {!cross.square && <Num value={cross.cellY} step={0.1} min={0.8} max={12} unit="mm" onChange={(v) => setCross({ cellY: v })} />}
-                      <Toggle on={cross.square} onChange={(v) => setCross({ square: v, cellY: cross.cell })} title="Square cells" />
-                    </span>
-                  </Row>
-                  <Row label="Coverage" title="How much of a cell must be stitched to get a cross">
-                    <Slider min={10} max={100} step={5} digits={0} unit="%" value={Math.round(cross.coverage * 100)} onChange={(v) => setCross({ coverage: v / 100 })} />
-                  </Row>
-                  {crossed && (
-                    <p className="dz-hint">
-                      {crossed.cols} × {crossed.rows} cells · <b>{crossed.crosses.toLocaleString()}</b> crosses in {crossed.threads.length} colour{crossed.threads.length === 1 ? "" : "s"}
-                    </p>
-                  )}
-                </Group>
-                <Group title="Stitches" hint={CROSS_KINDS.find((k) => k[0] === cross.kind)?.[2]}>
-                  <Seg full value={cross.kind} options={CROSS_KINDS} onChange={(k) => setCross({ kind: k })} />
-                  <Row label="Grid on the cells" title="After adding, show the canvas grid at the cell size">
-                    <Toggle on={cross.grid} onChange={(v) => setCross({ grid: v })} />
-                  </Row>
-                </Group>
-              </>
-            )}
+            {pane === "cross" && <CrossPane v={v} />}
 
-            {pane === "stitches" && (
-              <>
-                <Group title="Fill" hint={FILL_METHODS.find((m) => m.id === settings.fillMethod)?.hint}>
-                  <div className="dz-methods">
-                    {FILL_METHODS.map((m) => (
-                      <button
-                        key={m.id}
-                        className={settings.fillMethod === m.id ? "on" : ""}
-                        title={m.hint}
-                        onClick={() => {
-                          const d = fillMethodDefaults(m.id);
-                          set({ fillMethod: d.method!, rowSpacing: d.rowSpacing ?? settings.rowSpacing, underlay: d.underlay ?? settings.underlay });
-                        }}
-                      >
-                        <m.icon size={15} />
-                        {m.label}
-                      </button>
-                    ))}
-                  </div>
-                  <Row label="Density" title="Row spacing — smaller is denser">
-                    <Slider min={0.15} max={settings.fillMethod === "hilbert" || settings.fillMethod === "stipple" || settings.fillMethod === "meander" ? 3 : 1} step={0.01} unit="mm" value={settings.rowSpacing} onChange={(v) => set({ rowSpacing: v })} />
-                  </Row>
-                  <Row label="Underlay" title="A light foundation layer under each fill">
-                    <Toggle on={settings.underlay} onChange={(v) => set({ underlay: v })} />
-                  </Row>
-                </Group>
-                {settings.fillMethod === "flow" && (
-                  <Group title="Flow" hint="Lower strength straightens the rows towards the base direction.">
-                    <Row label="Strength" title="How much rows follow the picture (100 %) instead of the base direction (0 %)">
-                      <Slider min={0} max={100} step={5} digits={0} unit="%" value={Math.round(settings.flowStrength * 100)} onChange={(v) => set({ flowStrength: v / 100 })} />
-                    </Row>
-                    <Row label="Detail" title="Field cells across each shape — more follow smaller features, fewer give long sweeping rows">
-                      <Slider min={8} max={100} step={2} digits={0} value={settings.flowDetail} onChange={(v) => set({ flowDetail: v })} />
-                    </Row>
-                    <Row label="Smoothing" title="Smoothing passes of the picture's edge flow — more give calmer curves">
-                      <Slider min={1} max={8} step={1} digits={0} value={settings.flowSmoothing} onChange={(v) => set({ flowSmoothing: v })} />
-                    </Row>
-                  </Group>
-                )}
-                {DIRECTED.includes(settings.fillMethod) && (
-                  <Group
-                    title={settings.fillMethod === "flow" ? "Base direction" : "Direction"}
-                    hint={settings.fillMethod === "flow" ? "Where the picture has no clear flow, and at lower strength, rows lean this way." : DIRECTIONS.find((d) => d[0] === direction)?.[2]}
-                  >
-                    <Seg
-                      full
-                      value={direction}
-                      onChange={(v) => (v === "fixed" ? set({ fillAngle: settings.fillAngle ?? 45 }) : set({ fillAngle: null, fillDirection: v }))}
-                      options={DIRECTIONS.map(([id, label]) => [id, label])}
-                    />
-                    {direction === "fixed" && (
-                      <Row label="Angle">
-                        <Slider min={-90} max={90} step={5} digits={0} unit="°" value={settings.fillAngle ?? 45} onChange={(v) => set({ fillAngle: v })} />
-                      </Row>
-                    )}
-                  </Group>
-                )}
-              </>
-            )}
+            {pane === "stitches" && <StitchesPane v={v} />}
 
-            {pane === "ai" && (
-              <>
-                <p className="dz-hint">
-                  <span className="badge">on-device</span> The models are bundled with Filum and run on this computer.
-                </p>
-                <Group title="Objects" hint="MobileSAM: click an object in the picture, then decide what happens to it.">
-                  <button className={`btn sm ${samMode ? "primary" : ""}`} style={{ width: "100%" }} disabled={!bmp} onClick={() => (samMode ? setSamMode(false) : startSam())}>
-                    <MousePointerClick size={13} /> {samMode ? "Done selecting" : "Select objects"}
-                  </button>
-                  {samMode && (
-                    <>
-                      <p className="dz-hint">Click to add · Alt- or right-click to exclude a part.</p>
-                      <div className="dz-mask-actions">
-                        {MASK_MODES.map(([mode, label, hint]) => (
-                          <button key={mode} className={`btn sm ${mode}`} disabled={!curMask} onClick={() => useMask(mode)} title={hint}>
-                            {label}
-                          </button>
-                        ))}
-                        <button className="btn sm ghost" disabled={!samPts.length} onClick={() => (setSamPts([]), setCurMask(null))}>
-                          Clear
-                        </button>
-                      </div>
-                    </>
-                  )}
-                  {masks.length > 0 && (
-                    <div className="dz-masks">
-                      {masks.map((m, i) => (
-                        <span key={i} className={`chip ${m.mode}`} title={MASK_MODES.find((x) => x[0] === m.mode)?.[2]}>
-                          {MASK_MODES.find((x) => x[0] === m.mode)?.[1]} {i + 1}
-                          <button className="mini" onClick={() => setMasks(masks.filter((_, k) => k !== i))} title="Delete">
-                            <Trash2 size={11} />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </Group>
-                <Group title="Text" hint="Tesseract: ticked lines are erased from the picture and added as real lettering.">
-                  <button className="btn sm" style={{ width: "100%" }} disabled={!img || !!busy} onClick={runOcr}>
-                    <ScanText size={13} /> {textLines ? "Find text again" : "Find text"}
-                  </button>
-                  {textLines && textLines.length > 0 && (
-                    <div className="dz-text">
-                      {textLines.map((l, i) => (
-                        <label key={i} className="dz-textline" title={`${Math.round(l.confidence)}% confident`}>
-                          <input type="checkbox" checked={!!textPick[i]} onChange={(e) => setTextPick(textPick.map((v, k) => (k === i ? e.target.checked : v)))} />
-                          <span>{l.text}</span>
-                          <i className="stat">{Math.round(l.confidence)}%</i>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                  {textLines && !textLines.length && <p className="dz-hint">No text found.</p>}
-                </Group>
-              </>
-            )}
+            {pane === "ai" && <AiPane v={v} />}
           </div>
 
           <div className="dz-side-foot">
@@ -1724,6 +1095,690 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
         </div>
       </div>
     </Dialog>
+  );
+}
+
+/** The style pane. */
+function StylePane({ v }: { v: Digitize }) {
+  const { doc, settings, setSettings, output, widthMm, setWidthMm, preview, preset, set, setOutput, aspect, heightMm, fitHoop, tooBig } = v;
+  return (
+        <>
+          <Group
+            title="Output"
+            hint={
+              output === "cross"
+                ? "The picture's colours on a grid of crosses — every colour setting (palette, thread chart, background, left-out areas, AI masks) applies."
+                : settings.photoZigzag
+                  ? "One colour, rows of zigzags: wider and denser where the picture is darker, nothing where it is light."
+                  : "Traced shapes: fills, satin columns and lines."
+            }
+          >
+            <Seg
+              full
+              value={output === "cross" ? "cross" : settings.photoZigzag ? "zigzag" : "shapes"}
+              onChange={(v) => {
+                if (v === "cross") {
+                  setOutput("cross");
+                  setSettings((s) => ({ ...s, ...CROSS_PRESET }));
+                } else {
+                  setOutput("shapes");
+                  set({ photoZigzag: v === "zigzag" });
+                }
+              }}
+              options={[
+                ["shapes", "Shapes"],
+                ["zigzag", "Zig-zag photo"],
+                ["cross", "Cross stitch"],
+              ]}
+            />
+          </Group>
+          {output === "shapes" && !settings.photoZigzag && (
+            <Group title="Preset" hint={DIGITIZE_PRESETS.find((p) => p.id === preset)?.hint ?? "Custom settings — pick a preset to start from"}>
+              <div className="dz-presets">
+                {DIGITIZE_PRESETS.map((p) => (
+                  <button
+                    key={p.id}
+                    className={preset === p.id ? "on" : ""}
+                    title={p.hint}
+                    aria-pressed={preset === p.id}
+                    // a preset starts from the defaults: nothing leaks from the last one
+                    onClick={() => setSettings((s) => presetSettings(p.id, { outlineColor: s.outlineColor }))}
+                  >
+                    {PRESET_ICONS[p.id]}
+                    <span>{p.label}</span>
+                  </button>
+                ))}
+              </div>
+            </Group>
+          )}
+          {output === "shapes" && !settings.photoZigzag && (
+            <Group title="Look" hint="Each control moves several settings of the tabs together; it shows Custom once those are changed by hand.">
+              <Row label="Outlines" title="Lines of the picture: none, as wide as drawn, or one even satin width (clean logo outlines, sewn as one network; below 1 mm a triple running stitch)">
+                <Seg<Outlines>
+                  full
+                  value={outlinesOf(settings)}
+                  onChange={(v) => set(outlinesPatch(v, settings.outlineLineMm || OUTLINE_DEFAULT_MM))}
+                  options={[
+                    ["off", "None"],
+                    ["drawn", "As drawn"],
+                    ["even", "Even"],
+                  ]}
+                />
+              </Row>
+              {outlinesOf(settings) === "even" && (
+                <Row label="Outline width" title="Every dark line becomes a satin of this width (below 1 mm: a triple running stitch)">
+                  <Slider min={0.5} max={4} step={0.1} unit="mm" value={settings.outlineLineMm} onChange={(v) => set({ outlineLineMm: v })} />
+                </Row>
+              )}
+              <Row label="Detail" title="Bold: fewer, simpler shapes. Fine: small shapes and close tracing (more stitches, more trims)">
+                <Seg<Detail | "custom">
+                  full
+                  value={detailOf(settings) ?? "custom"}
+                  onChange={(v) => v !== "custom" && set(DETAIL[v])}
+                  options={[
+                    ["bold", "Bold"],
+                    ["normal", "Normal"],
+                    ["fine", "Fine"],
+                    ...(detailOf(settings) ? [] : [["custom", "Custom"] as ["custom", string]]),
+                  ]}
+                />
+              </Row>
+              <Row label="Background" title="The background colour: left out around the design and in plain holes (letter counters), left out only around it (every enclosed area stitched: a logo's white faces), or stitched everywhere">
+                <Seg<Backdrop>
+                  full
+                  value={backdropOf(settings)}
+                  onChange={(v) => set(backdropPatch(v))}
+                  options={[
+                    ["fabric", "Left out"],
+                    ["enclosed", "Enclosed"],
+                    ["all", "Stitched"],
+                  ]}
+                />
+              </Row>
+              <Row label="Border" title="An outline around the whole design (patches, stickers)">
+                <Seg
+                  full
+                  value={settings.outline}
+                  onChange={(v) => set({ outline: v })}
+                  options={[
+                    ["none", "None"],
+                    ["running", "Running"],
+                    ["satin", "Satin"],
+                  ]}
+                />
+              </Row>
+              {settings.outline === "satin" && (
+                <Row label="Border width">
+                  <Slider min={0.8} max={6} step={0.1} unit="mm" value={settings.outlineWidthMm} onChange={(v) => set({ outlineWidthMm: v })} />
+                </Row>
+              )}
+            </Group>
+          )}
+          {output === "shapes" && settings.photoZigzag && (
+            <Group title="Zig-zag photo">
+              <Row label="Row spacing" title="Distance between the rows — wider: lighter, more graphic">
+                <Slider min={0.5} max={3} step={0.1} unit="mm" value={settings.photoSpacing} onChange={(v) => set({ photoSpacing: v })} />
+              </Row>
+              <Row label="Angle" title="Direction of the rows">
+                <Slider min={-90} max={90} step={5} digits={0} unit="°" value={settings.photoAngle} onChange={(v) => set({ photoAngle: v })} />
+              </Row>
+              <Row label="Contrast" title="Higher: darker darks, lighter lights">
+                <Slider min={0.5} max={3} step={0.1} value={settings.photoContrast} onChange={(v) => set({ photoContrast: v })} />
+              </Row>
+              <Row label="Leave light" title="Parts lighter than this stay empty (the fabric shows)">
+                <Slider min={0} max={60} step={1} digits={0} unit="%" value={Math.round(settings.photoMin * 100)} onChange={(v) => set({ photoMin: v / 100 })} />
+              </Row>
+            </Group>
+          )}
+          <Group
+            title="Size"
+            extra={
+              preview && (
+                <span className={`badge ${tooBig ? "warn" : ""}`} title={tooBig ? `Larger than the ${doc.hoop.name} hoop` : `Fits the ${doc.hoop.name} hoop`}>
+                  {tooBig ? "larger than hoop" : "fits hoop"}
+                </span>
+              )
+            }
+          >
+            <div className="dz-size">
+              <label>
+                <span>W</span>
+                <Num value={widthMm} unit="mm" step={5} min={10} max={1000} digits={1} onChange={setWidthMm} />
+              </label>
+              <label>
+                <span>H</span>
+                <Num value={heightMm} unit="mm" step={5} min={10} max={1000} digits={1} onChange={(v) => setWidthMm(v / Math.max(aspect, 1e-6))} />
+              </label>
+              <button className="btn sm" onClick={fitHoop} disabled={!preview} title={`Scale to 90 % of the ${doc.hoop.name} hoop`}>
+                <Maximize2 size={12} /> Fit hoop
+              </button>
+            </div>
+          </Group>
+        </>
+  );
+}
+
+/** The colours pane. */
+function ColoursPane({ v }: { v: Digitize }) {
+  const { img, settings, output, fixedColors, setFixedColors, colorOrder, setColorOrder, regionEdits, setRegionEdits, overrides, setOverrides, chart, setChart, preview, tab, setTab, pickRole, setPickRole, set, result, recoloured, colors, roleOf, setRole, hasEdge, toggleEdge, moveThread, editColour, removeColour, lockPalette, removedShare, resetColours } = v;
+  return (
+        <>
+          <Group title="Palette">
+            <Row label="Colours">
+              {fixedColors.length ? (
+                <span className="badge" title="The palette is locked: regions stay where they are">
+                  <Lock size={11} /> Locked · {fixedColors.length}
+                </span>
+              ) : (
+                <Slider min={2} max={16} step={1} digits={0} value={settings.colors} onChange={(v) => set({ colors: v })} />
+              )}
+            </Row>
+            <Row label="Merge similar" title="Merge colours closer than this (CIEDE2000; 0 = off)">
+              <Slider min={0} max={12} step={0.5} digits={1} unit="ΔE" value={settings.mergeDeltaE} onChange={(v) => set({ mergeDeltaE: v })} />
+            </Row>
+            <Row label="Thread chart" title="Snap colours to real threads">
+              <ChartSelect value={chart} onChange={setChart} none="Exact colours" />
+            </Row>
+          </Group>
+          <Group
+            title="Background & left-out areas"
+            hint={
+              settings.backgroundScope === "outside"
+                ? "The border colour is left out where it reaches the edge of the picture, and in plain holes (letter counters, the inside of rings and outlines). Small enclosed areas (highlights) and ones with shapes on them (a badge face) are stitched."
+                : settings.backgroundScope === "border"
+                  ? "The border colour is left out only where it reaches the edge of the picture: every area enclosed by the design is stitched (a logo's white faces inside its outlines)."
+                  : "The border colour is left out everywhere, also inside shapes (letter counters, holes)."
+            }
+          >
+            <Row label="Background" title="Leave out the colour that dominates the image border">
+              <Toggle on={settings.removeBackground} onChange={(v) => set({ removeBackground: v })} />
+            </Row>
+            {/* the three choices need the panel's full width */}
+            <Seg
+              full
+              disabled={!settings.removeBackground}
+              value={settings.backgroundScope}
+              onChange={(v) => set({ backgroundScope: v })}
+              options={[
+                ["border", "At the edge"],
+                ["outside", "Outside & holes"],
+                ["everywhere", "Everywhere"],
+              ]}
+            />
+            <div className="dz-removed">
+              <span>
+                <b>{(removedShare * 100).toFixed(removedShare < 0.1 ? 1 : 0)}%</b> of the picture left out
+                {regionEdits.length > 0 && <span className="stat"> · {regionEdits.length} area{regionEdits.length === 1 ? "" : "s"} edited</span>}
+              </span>
+              <div className="dz-inline">
+                <button className={`btn sm ${tab === "colours" ? "primary" : ""}`} disabled={!preview} onClick={() => setTab("colours")} title="Show what is left out — click areas to stitch them or leave them out">
+                  <Eye size={12} /> Review
+                </button>
+                {regionEdits.length > 0 && (
+                  <button className="btn sm ghost" onClick={() => setRegionEdits([])} title="Forget the areas you clicked">
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+          </Group>
+          <Group
+            title={`Colours${colors.length ? ` · ${colors.filter((c) => !c.background).length} stitched` : ""}`}
+            extra={
+              <span className="dz-head-actions">
+                <button className="icon-btn" title={fixedColors.length ? "Unlock palette (re-quantise)" : "Lock this palette"} onClick={fixedColors.length ? () => (setFixedColors([]), setOverrides({})) : lockPalette} disabled={!colors.length}>
+                  {fixedColors.length ? <Lock size={13} /> : <Unlock size={13} />}
+                </button>
+                <button className="icon-btn" title="Reset colour edits" onClick={resetColours}>
+                  <RotateCcw size={13} />
+                </button>
+              </span>
+            }
+          >
+            <div className="dz-pick">
+              <span className="dz-pick-label">
+                <Pipette size={12} /> Pick on picture
+              </span>
+              <div className="seg" role="group" aria-label="Pick a colour on the picture as">
+                {ROLES.filter((r) => r.id !== "auto").map((r) => (
+                  <button
+                    key={r.id}
+                    className={pickRole === r.id ? "on" : ""}
+                    disabled={!img}
+                    title={`Click colours in the picture (or in Review) to make them: ${r.label.toLowerCase()} — click again to stop`}
+                    onClick={() => {
+                      const next = pickRole === r.id ? null : (r.id as Exclude<Role, "auto">);
+                      setPickRole(next);
+                      if (next && tab !== "original" && tab !== "colours") setTab("original");
+                    }}
+                  >
+                    {r.icon} {r.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="dz-colours">
+              {colors.map((c, i) => (
+                <div key={i} className={`dz-colour ${c.background ? "off" : ""}`}>
+                  <input type="color" value={overrides[c.hex] ?? c.hex} onChange={(e) => editColour(i, e.target.value)} title="Choose the thread colour for this region" />
+                  <span className="dz-cname" title={c.code ? `${c.name} ${c.code}` : c.name}>
+                    {overrides[c.hex] ? overrides[c.hex].toUpperCase() : c.name}
+                    {c.code && <span className="stat"> {c.code}</span>}
+                    {c.background && c.coverage - (c.removed ?? 0) > 0.0005 && <span className="stat"> · partly stitched</span>}
+                    {roleOf(c) === "auto" && (c.lines ?? 0) > 0.5 * Math.max(1e-9, c.coverage - (c.removed ?? 0)) && <span className="dz-auto"> lines</span>}
+                  </span>
+                  <span
+                    className="dz-cover"
+                    title={`${((c.coverage - (c.removed ?? 0)) * 100).toFixed(1)} % of the picture stitched${c.removed ? `, ${(c.removed * 100).toFixed(1)} % left out` : ""}`}
+                  >
+                    <i style={{ width: `${Math.min(100, c.coverage * 100)}%` }} className="all" />
+                    <i style={{ width: `${Math.min(100, Math.max(0, c.coverage - (c.removed ?? 0)) * 100)}%` }} />
+                    <b>{(c.coverage * 100).toFixed(c.coverage < 0.1 ? 1 : 0)}%</b>
+                  </span>
+                  <div className="dz-role" role="group" aria-label={`${c.name}: sew as`}>
+                    {ROLES.map((r) => (
+                      <button key={r.id} className={roleOf(c) === r.id ? "on" : ""} title={`${r.label} — ${r.hint}`} onClick={() => setRole(c, r.id)}>
+                        {r.icon}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="dz-role" role="group">
+                    <button
+                      className={hasEdge(c) ? "on" : ""}
+                      disabled={c.background}
+                      aria-pressed={hasEdge(c)}
+                      aria-label={`${c.name}: satin edge`}
+                      title="Satin edge — a satin in this colour's thread where its shapes meet the background (as wide as the border's satin)"
+                      onClick={() => toggleEdge(c)}
+                    >
+                      <StitchSatin size={12} />
+                    </button>
+                  </div>
+                  {fixedColors.length > 2 ? (
+                    <button className="mini" onClick={() => removeColour(i)} title="Merge into the nearest remaining colour">
+                      ×
+                    </button>
+                  ) : (
+                    <span />
+                  )}
+                </div>
+              ))}
+              {!colors.length && <div className="hint">Colours appear here after loading an image.</div>}
+            </div>
+          </Group>
+          {output === "shapes" && (result?.threads.length ?? 0) > 1 && (
+            <Group
+              title="Sew order"
+              hint="First sewn first: a later colour lies on top. Each colour's fills, lines and edges are sewn together."
+              extra={
+                colorOrder.length ? (
+                  <button className="btn sm ghost" onClick={() => setColorOrder([])} title="Back to the digitizer's order (largest colour first)">
+                    <RotateCcw size={12} /> Auto
+                  </button>
+                ) : undefined
+              }
+            >
+              <ol className="dz-order" aria-label="Sew order">
+                {(recoloured ?? result)!.threads.map((t, i, all) => (
+                  <li key={t.id}>
+                    <span className="dz-order-n">{i + 1}</span>
+                    <i className="dz-order-sw" style={{ background: t.color }} />
+                    <span className="dz-cname" title={t.name}>
+                      {t.name}
+                    </span>
+                    <button className="mini" disabled={i === 0} onClick={() => moveThread(i, -1)} aria-label={`Sew ${t.name} earlier`} title="Sew earlier (underneath)">
+                      ↑
+                    </button>
+                    <button className="mini" disabled={i === all.length - 1} onClick={() => moveThread(i, 1)} aria-label={`Sew ${t.name} later`} title="Sew later (on top)">
+                      ↓
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            </Group>
+          )}
+        </>
+  );
+}
+
+/** The shapes pane. */
+function ShapesPane({ v }: { v: Digitize }) {
+  const { settings, set } = v;
+  return (
+        <>
+          <Group title="Picture">
+            <Row label="Resolution" title="Working resolution — more is slower but keeps finer shapes">
+              <Slider min={200} max={1600} step={20} digits={0} unit="px" value={settings.maxPixels} onChange={(v) => set({ maxPixels: v })} />
+            </Row>
+            <Row label="Denoise" title="Edge-preserving smoothing before colours are reduced (photos, JPEG noise)">
+              <Slider min={0} max={4} step={1} digits={0} value={settings.denoise} onChange={(v) => set({ denoise: v })} />
+            </Row>
+            <Row label="Pixel art" title="Depixelize sprites and icons into smooth shapes (Kopf & Lischinski)">
+              <Seg value={settings.pixelArt} onChange={(v) => set({ pixelArt: v })} options={[["auto", "Auto"], ["on", "On"], ["off", "Off"]]} />
+            </Row>
+          </Group>
+          <Group title="Tracing">
+            <Row label="Seamless" title="Neighbouring shapes share one traced boundary (no gaps, no overlaps); corners stay sharp, pixel steps become smooth curves">
+              <Toggle on={settings.seamless} onChange={(v) => set({ seamless: v })} />
+            </Row>
+            {settings.seamless && (
+              <Row label="Corners over" title="Boundary turns sharper than this stay corners">
+                <Slider min={20} max={120} step={5} digits={0} unit="°" value={settings.cornerAngle} onChange={(v) => set({ cornerAngle: v })} />
+              </Row>
+            )}
+            <Row label="Gradients" title="Smooth colour ramps become dithered gradient fills instead of bands">
+              <Toggle on={settings.gradients} onChange={(v) => set({ gradients: v })} />
+            </Row>
+            {settings.gradients && (
+              <Row label="Gradient rows" title="Straight rows, or streamlines that follow the picture (the colours share them and interleave) — uses the flow settings under Stitches">
+                <Seg
+                  value={settings.gradientFlow ? "flow" : "straight"}
+                  onChange={(v) => set({ gradientFlow: v === "flow" })}
+                  options={[
+                    ["straight", "Straight"],
+                    ["flow", "Flow"],
+                  ]}
+                />
+              </Row>
+            )}
+          </Group>
+          <Group title="Cleanup">
+            <Row label="Smoothing" title="Majority-filter passes that remove noise">
+              <Slider min={0} max={6} step={1} digits={0} value={settings.smoothing} onChange={(v) => set({ smoothing: v })} />
+            </Row>
+            <Row label="Min. region" title="Smaller specks merge into their neighbour">
+              <Slider min={0} max={10} step={0.25} unit="mm²" value={settings.minRegionMm2} onChange={(v) => set({ minRegionMm2: v })} />
+            </Row>
+            <Row label="Simplify" title="Contour simplification tolerance">
+              <Slider min={0.02} max={0.5} step={0.01} unit="mm" value={settings.simplifyMm} onChange={(v) => set({ simplifyMm: v })} />
+            </Row>
+            <Row label="Overlap" title="Grow fills so neighbouring colours don't gap after pull">
+              <Slider min={0} max={0.8} step={0.05} unit="mm" value={settings.overlapMm} onChange={(v) => set({ overlapMm: v })} />
+            </Row>
+          </Group>
+        </>
+  );
+}
+
+/** The lines pane. */
+function LinesPane({ v }: { v: Digitize }) {
+  const { settings, set, extra, chooseExtra, outlineColourRow } = v;
+  return (
+        <>
+          <Group
+            title="Lines in the picture"
+            hint="Outlines, ink strokes and narrow shapes become stitched lines along their centre — through junctions, small gaps bridged — and the fills continue under them, so nothing gapes."
+            extra={<Toggle on={settings.lineNetworks} onChange={(v) => set({ lineNetworks: v })} />}
+          >
+            {settings.lineNetworks && (
+              <>
+                <Row label="Ink lines" title="Dark lines found on the picture itself, even where the colour reduction merged them into a neighbour (0 = off)">
+                  <Slider min={0} max={100} step={5} digits={0} unit="%" value={settings.inkSensitivity} onChange={(v) => set({ inkSensitivity: v })} />
+                </Row>
+                <Row label="Max. width" title="Lines up to this width become stitched lines; wider shapes stay fills">
+                  <Slider min={0.5} max={8} step={0.1} digits={1} unit="mm" value={settings.lineMaxWidthMm} onChange={(v) => set({ lineMaxWidthMm: v })} />
+                </Row>
+                <Row label="Bridge gaps" title="Join line ends that point at each other (or at another line) across a gap up to this size">
+                  <Slider min={0} max={4} step={0.1} digits={1} unit="mm" value={settings.lineGapMm} onChange={(v) => set({ lineGapMm: v })} />
+                </Row>
+                <Row label="Min. length" title="Shorter lines and side branches (corners, specks) are left out">
+                  <Slider min={0.5} max={10} step={0.5} digits={1} unit="mm" value={settings.lineMinMm} onChange={(v) => set({ lineMinMm: v })} />
+                </Row>
+                <Row label="Through junctions" title="A line continues through a junction when it bends less than this — fewer, longer lines (0: every junction ends the lines)">
+                  <Slider min={0} max={60} step={5} digits={0} unit="°" value={settings.lineContinuity} onChange={(v) => set({ lineContinuity: v })} />
+                </Row>
+                <Row label="Outline width" title="Dark lines (outlines, ink) as satin of one even width — 0: as wide as drawn">
+                  <span className="dz-inline">
+                    <Toggle on={settings.outlineLineMm > 0} onChange={(v) => set({ outlineLineMm: v ? OUTLINE_DEFAULT_MM : 0 })} />
+                    {settings.outlineLineMm > 0 && <Num value={settings.outlineLineMm} unit="mm" step={0.1} min={0.5} max={4} digits={1} onChange={(v) => set({ outlineLineMm: v })} />}
+                  </span>
+                </Row>
+                {settings.outlineLineMm <= 0 && (
+                  <Row label="Follow width" title="Satin lines get wider and narrower like the drawn line">
+                    <Toggle on={settings.lineTaper} onChange={(v) => set({ lineTaper: v })} />
+                  </Row>
+                )}
+                <Row label="One network" title="Lines that meet are sewn in one go: each walks out under a running path its column covers on the way back — no trims between them">
+                  <Toggle on={settings.routeLines} onChange={(v) => set({ routeLines: v })} />
+                </Row>
+                <Row label="Sub-pixel" title="Line centres follow the drawn line (its darkness profile), not the pixel grid — thin, smoothed lines stay straight and smooth">
+                  <Toggle on={settings.lineSubpixel} onChange={(v) => set({ lineSubpixel: v })} />
+                </Row>
+                <Row label="Thin lines" title="Lines narrower than the hairline width">
+                  <Seg
+                    value={settings.thinTriple ? "triple" : "running"}
+                    onChange={(v) => set({ thinTriple: v === "triple" })}
+                    options={[
+                      ["running", "Running"],
+                      ["triple", "Triple"],
+                    ]}
+                  />
+                </Row>
+              </>
+            )}
+          </Group>
+          <Group title="Stitch types" hint="Lines narrower than the hairline width are running stitch, wider ones satin.">
+            <Row label="Satin strokes" title="Narrow, elongated regions become satin columns along their medial axis">
+              <span className="dz-inline">
+                <Toggle on={settings.allowSatin} onChange={(v) => set({ allowSatin: v })} />
+                {settings.allowSatin && (
+                  <>
+                    <span className="stat">up to</span>
+                    <Num value={settings.satinMaxWidthMm} unit="mm" step={0.5} min={1} max={12} onChange={(v) => set({ satinMaxWidthMm: v })} />
+                  </>
+                )}
+              </span>
+            </Row>
+            <Row label="Hairlines" title="Very thin lines become running stitch">
+              <span className="dz-inline">
+                <Toggle on={settings.allowRunning} onChange={(v) => set({ allowRunning: v })} />
+                {settings.allowRunning && (
+                  <>
+                    <span className="stat">up to</span>
+                    <Num value={settings.runningMaxWidthMm} unit="mm" step={0.1} min={0.2} max={3} onChange={(v) => set({ runningMaxWidthMm: v })} />
+                  </>
+                )}
+              </span>
+            </Row>
+          </Group>
+          <Group title="Extra lines" hint={EXTRA.find((x) => x[0] === extra)?.[3]}>
+            <div className="dz-sources" role="radiogroup" aria-label="Extra lines">
+              {EXTRA.map(([id, icon, label, hint]) => (
+                <button key={id} role="radio" aria-checked={extra === id} className={extra === id ? "on" : ""} title={hint} onClick={() => chooseExtra(id)}>
+                  {icon}
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
+            {extra === "colour" && (
+              <>
+                {!settings.seamless && <p className="dz-hint warn">Colour edges need seamless tracing — turn it on under Shapes.</p>}
+                <Row label="Contrast" title="Only edges between colours at least this different (CIEDE2000) — higher: fewer lines">
+                  <Slider min={5} max={80} step={1} digits={0} unit="ΔE" value={settings.edgeContrast} onChange={(v) => set({ edgeContrast: v })} />
+                </Row>
+                <Row label="Stitch">
+                  <Seg
+                    value={settings.edgeOutlines === "satin" ? "satin" : "running"}
+                    onChange={(v) => set({ edgeOutlines: v })}
+                    options={[
+                      ["running", "Running"],
+                      ["satin", "Satin"],
+                    ]}
+                  />
+                </Row>
+                {settings.edgeOutlines === "satin" && (
+                  <Row label="Width" title="Satin width (the border uses it too)">
+                    <Slider min={0.8} max={6} step={0.1} unit="mm" value={settings.outlineWidthMm} onChange={(v) => set({ outlineWidthMm: v })} />
+                  </Row>
+                )}
+                {outlineColourRow}
+              </>
+            )}
+            {extra !== "none" && extra !== "colour" && (
+              <Row label="Amount" title="More lines, and fainter ones, with higher values">
+                <Slider min={0} max={1} step={0.05} value={settings.lineStrength} onChange={(v) => set({ lineStrength: v })} />
+              </Row>
+            )}
+            {extra !== "none" && <p className="dz-hint">One line per place: the lines in the picture come first, then the border, then these.</p>}
+          </Group>
+        </>
+  );
+}
+
+/** The cross pane. */
+function CrossPane({ v }: { v: Digitize }) {
+  const { cross, setCross, crossed } = v;
+  return (
+        <>
+          <Group title="Cells" hint="One cross per cell; the cells line up with the canvas grid, so crosses of different colours meet exactly.">
+            <Row label="Cell" title="Size of one cross (Ink/Stitch pattern size)">
+              <span className="dz-inline">
+                <Num value={cross.cell} step={0.1} min={0.8} max={12} unit="mm" onChange={(v) => setCross({ cell: v })} />
+                {!cross.square && <Num value={cross.cellY} step={0.1} min={0.8} max={12} unit="mm" onChange={(v) => setCross({ cellY: v })} />}
+                <Toggle on={cross.square} onChange={(v) => setCross({ square: v, cellY: cross.cell })} title="Square cells" />
+              </span>
+            </Row>
+            <Row label="Coverage" title="How much of a cell must be stitched to get a cross">
+              <Slider min={10} max={100} step={5} digits={0} unit="%" value={Math.round(cross.coverage * 100)} onChange={(v) => setCross({ coverage: v / 100 })} />
+            </Row>
+            {crossed && (
+              <p className="dz-hint">
+                {crossed.cols} × {crossed.rows} cells · <b>{crossed.crosses.toLocaleString()}</b> crosses in {crossed.threads.length} colour{crossed.threads.length === 1 ? "" : "s"}
+              </p>
+            )}
+          </Group>
+          <Group title="Stitches" hint={CROSS_KINDS.find((k) => k[0] === cross.kind)?.[2]}>
+            <Seg full value={cross.kind} options={CROSS_KINDS} onChange={(k) => setCross({ kind: k })} />
+            <Row label="Grid on the cells" title="After adding, show the canvas grid at the cell size">
+              <Toggle on={cross.grid} onChange={(v) => setCross({ grid: v })} />
+            </Row>
+          </Group>
+        </>
+  );
+}
+
+/** The stitches pane. */
+function StitchesPane({ v }: { v: Digitize }) {
+  const { settings, set, direction } = v;
+  return (
+        <>
+          <Group title="Fill" hint={FILL_METHODS.find((m) => m.id === settings.fillMethod)?.hint}>
+            <div className="dz-methods">
+              {FILL_METHODS.map((m) => (
+                <button
+                  key={m.id}
+                  className={settings.fillMethod === m.id ? "on" : ""}
+                  title={m.hint}
+                  onClick={() => {
+                    const d = fillMethodDefaults(m.id);
+                    set({ fillMethod: d.method!, rowSpacing: d.rowSpacing ?? settings.rowSpacing, underlay: d.underlay ?? settings.underlay });
+                  }}
+                >
+                  <m.icon size={15} />
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            <Row label="Density" title="Row spacing — smaller is denser">
+              <Slider min={0.15} max={settings.fillMethod === "hilbert" || settings.fillMethod === "stipple" || settings.fillMethod === "meander" ? 3 : 1} step={0.01} unit="mm" value={settings.rowSpacing} onChange={(v) => set({ rowSpacing: v })} />
+            </Row>
+            <Row label="Underlay" title="A light foundation layer under each fill">
+              <Toggle on={settings.underlay} onChange={(v) => set({ underlay: v })} />
+            </Row>
+          </Group>
+          {settings.fillMethod === "flow" && (
+            <Group title="Flow" hint="Lower strength straightens the rows towards the base direction.">
+              <Row label="Strength" title="How much rows follow the picture (100 %) instead of the base direction (0 %)">
+                <Slider min={0} max={100} step={5} digits={0} unit="%" value={Math.round(settings.flowStrength * 100)} onChange={(v) => set({ flowStrength: v / 100 })} />
+              </Row>
+              <Row label="Detail" title="Field cells across each shape — more follow smaller features, fewer give long sweeping rows">
+                <Slider min={8} max={100} step={2} digits={0} value={settings.flowDetail} onChange={(v) => set({ flowDetail: v })} />
+              </Row>
+              <Row label="Smoothing" title="Smoothing passes of the picture's edge flow — more give calmer curves">
+                <Slider min={1} max={8} step={1} digits={0} value={settings.flowSmoothing} onChange={(v) => set({ flowSmoothing: v })} />
+              </Row>
+            </Group>
+          )}
+          {DIRECTED.includes(settings.fillMethod) && (
+            <Group
+              title={settings.fillMethod === "flow" ? "Base direction" : "Direction"}
+              hint={settings.fillMethod === "flow" ? "Where the picture has no clear flow, and at lower strength, rows lean this way." : DIRECTIONS.find((d) => d[0] === direction)?.[2]}
+            >
+              <Seg
+                full
+                value={direction}
+                onChange={(v) => (v === "fixed" ? set({ fillAngle: settings.fillAngle ?? 45 }) : set({ fillAngle: null, fillDirection: v }))}
+                options={DIRECTIONS.map(([id, label]) => [id, label])}
+              />
+              {direction === "fixed" && (
+                <Row label="Angle">
+                  <Slider min={-90} max={90} step={5} digits={0} unit="°" value={settings.fillAngle ?? 45} onChange={(v) => set({ fillAngle: v })} />
+                </Row>
+              )}
+            </Group>
+          )}
+        </>
+  );
+}
+
+/** The ai pane. */
+function AiPane({ v }: { v: Digitize }) {
+  const { img, busy, bmp, samMode, setSamMode, samPts, setSamPts, curMask, setCurMask, masks, setMasks, textLines, textPick, setTextPick, startSam, useMask, runOcr } = v;
+  return (
+        <>
+          <p className="dz-hint">
+            <span className="badge">on-device</span> The models are bundled with Filum and run on this computer.
+          </p>
+          <Group title="Objects" hint="MobileSAM: click an object in the picture, then decide what happens to it.">
+            <button className={`btn sm ${samMode ? "primary" : ""}`} style={{ width: "100%" }} disabled={!bmp} onClick={() => (samMode ? setSamMode(false) : startSam())}>
+              <MousePointerClick size={13} /> {samMode ? "Done selecting" : "Select objects"}
+            </button>
+            {samMode && (
+              <>
+                <p className="dz-hint">Click to add · Alt- or right-click to exclude a part.</p>
+                <div className="dz-mask-actions">
+                  {MASK_MODES.map(([mode, label, hint]) => (
+                    <button key={mode} className={`btn sm ${mode}`} disabled={!curMask} onClick={() => useMask(mode)} title={hint}>
+                      {label}
+                    </button>
+                  ))}
+                  <button className="btn sm ghost" disabled={!samPts.length} onClick={() => (setSamPts([]), setCurMask(null))}>
+                    Clear
+                  </button>
+                </div>
+              </>
+            )}
+            {masks.length > 0 && (
+              <div className="dz-masks">
+                {masks.map((m, i) => (
+                  <span key={i} className={`chip ${m.mode}`} title={MASK_MODES.find((x) => x[0] === m.mode)?.[2]}>
+                    {MASK_MODES.find((x) => x[0] === m.mode)?.[1]} {i + 1}
+                    <button className="mini" onClick={() => setMasks(masks.filter((_, k) => k !== i))} title="Delete">
+                      <Trash2 size={11} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </Group>
+          <Group title="Text" hint="Tesseract: ticked lines are erased from the picture and added as real lettering.">
+            <button className="btn sm" style={{ width: "100%" }} disabled={!img || !!busy} onClick={runOcr}>
+              <ScanText size={13} /> {textLines ? "Find text again" : "Find text"}
+            </button>
+            {textLines && textLines.length > 0 && (
+              <div className="dz-text">
+                {textLines.map((l, i) => (
+                  <label key={i} className="dz-textline" title={`${Math.round(l.confidence)}% confident`}>
+                    <input type="checkbox" checked={!!textPick[i]} onChange={(e) => setTextPick(textPick.map((v, k) => (k === i ? e.target.checked : v)))} />
+                    <span>{l.text}</span>
+                    <i className="stat">{Math.round(l.confidence)}%</i>
+                  </label>
+                ))}
+              </div>
+            )}
+            {textLines && !textLines.length && <p className="dz-hint">No text found.</p>}
+          </Group>
+        </>
   );
 }
 
