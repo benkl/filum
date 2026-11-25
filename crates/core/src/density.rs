@@ -522,7 +522,7 @@ mod tests {
         }
     }
     fn doc(objects: Vec<Object>) -> Document {
-        Document { threads: vec![Thread { id: "t".into(), name: "x".into(), color: "#000000".into(), brand: "".into(), code: "".into(), weight: None }], objects, ..Default::default() }
+        Document { threads: vec![Thread { id: "t".into(), name: "x".into(), color: "#000000".into(), brand: "".into(), code: "".into(), weight: None, min_stitch: None }], objects, ..Default::default() }
     }
     fn field(d: &Document) -> DensityField {
         let plan = crate::Engine::new().plan(d);

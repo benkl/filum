@@ -226,7 +226,7 @@ fn suite(dir: &PathBuf, only: Option<&str>) -> Result<Vec<Case>, String> {
 
 fn thread(i: usize) -> Thread {
     let c = ["#c8102e", "#1f4e9c", "#f2b300", "#2e8b57", "#6b3fa0", "#e87722"][i % 6];
-    Thread { id: format!("t{i}"), name: format!("T{i}"), color: c.into(), brand: String::new(), code: String::new(), weight: None }
+    Thread { id: format!("t{i}"), name: format!("T{i}"), color: c.into(), brand: String::new(), code: String::new(), weight: None, min_stitch: None }
 }
 
 fn object(id: String, thread: usize, paths: Vec<SubPath>, stitch: StitchParams) -> Object {

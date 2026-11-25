@@ -21,8 +21,8 @@ fn obj(id: &str, thread: &str, paths: Vec<SubPath>, stitch: StitchParams) -> Obj
 fn sample() -> Document {
     let mut d = Document::default();
     d.threads = vec![
-        Thread { id: "a".into(), name: "Red".into(), color: "#c8102e".into(), brand: String::new(), code: String::new(), weight: None },
-        Thread { id: "b".into(), name: "Navy".into(), color: "#1f2a56".into(), brand: String::new(), code: String::new(), weight: None },
+        Thread { id: "a".into(), name: "Red".into(), color: "#c8102e".into(), brand: String::new(), code: String::new(), weight: None, min_stitch: None },
+        Thread { id: "b".into(), name: "Navy".into(), color: "#1f2a56".into(), brand: String::new(), code: String::new(), weight: None, min_stitch: None },
     ];
     d.objects = vec![
         obj("fill", "a", vec![circle(50.0, 50.0, 20.0), circle(50.0, 50.0, 8.0)], StitchParams::Fill(FillParams::default())),

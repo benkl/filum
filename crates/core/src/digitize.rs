@@ -1058,7 +1058,7 @@ fn ensure_thread(threads: &mut Vec<Thread>, rgb: [u8; 3], name: String, code: St
         return t.id.clone();
     }
     let id = format!("t{}", threads.len() + 1);
-    threads.push(Thread { id: id.clone(), name, color: hex, brand, code, weight: None });
+    threads.push(Thread { id: id.clone(), name, color: hex, brand, code, weight: None, min_stitch: None });
     id
 }
 

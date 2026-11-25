@@ -63,6 +63,9 @@ import { ChartBrowser, lastChart, setLastChart, threadTitle, useChart } from "./
 import { Dialog, Num } from "./ui";
 import { safeSetItem } from "../lib/storage";
 
+/** A thread's own shortest stitch to choose from (mm): 1 mm is the usual safe minimum, 2–3 mm metallics. */
+const THREAD_MIN_STITCHES = [1, 1.5, 2, 2.5, 3];
+
 const fmtK = (n: number) => (n >= 10000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString());
 
 /**
@@ -194,7 +197,37 @@ function ThreadRow({
         />
       </button>
       <div className="tm-main">
-        <input className="input tm-name" defaultValue={t.name} key={t.name} onBlur={(e) => e.target.value !== t.name && updateThread(t.id, { name: e.target.value })} />
+        <div className="tm-head">
+          <input className="input tm-name" defaultValue={t.name} key={t.name} onBlur={(e) => e.target.value !== t.name && updateThread(t.id, { name: e.target.value })} />
+          <select
+            className="input tm-weight"
+            value={t.weight ?? ""}
+            title="Thread weight — a heavier or finer thread than the design's gets its own spacing and counts by its thickness in the density map"
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => updateThread(t.id, { weight: e.target.value ? Number(e.target.value) : undefined })}
+          >
+            <option value="">wt</option>
+            {THREAD_WEIGHTS.map((w) => (
+              <option key={w.weight} value={w.weight}>
+                {w.weight}
+              </option>
+            ))}
+          </select>
+          <select
+            className="input tm-min"
+            value={t.minStitch ?? ""}
+            title="Shortest stitch for this thread, in mm: shorter ones are left out. Metallics fray and break on short stitches: about 2 mm for smooth ones, 3 mm for twisted ones, as a starting point to check on a test stitch-out. Empty: the machine's"
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => updateThread(t.id, { minStitch: e.target.value ? Number(e.target.value) : undefined })}
+          >
+            <option value="">min</option>
+            {THREAD_MIN_STITCHES.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="tm-meta">
           <input
             className="input mono tm-hex"
@@ -210,20 +243,6 @@ function ThreadRow({
           />
           <input className="input tm-brand" placeholder="Brand" defaultValue={t.brand} key={`b${t.brand}`} onBlur={(e) => e.target.value !== t.brand && updateThread(t.id, { brand: e.target.value })} />
           <input className="input tm-code" placeholder="Code" defaultValue={t.code} key={`c${t.code}`} onBlur={(e) => e.target.value !== t.code && updateThread(t.id, { code: e.target.value })} />
-          <select
-            className="input tm-weight"
-            value={t.weight ?? ""}
-            title="Thread weight — a heavier or finer thread than the design's gets its own spacing and counts by its thickness in the density map"
-            onClick={(e) => e.stopPropagation()}
-            onChange={(e) => updateThread(t.id, { weight: e.target.value ? Number(e.target.value) : undefined })}
-          >
-            <option value="">wt</option>
-            {THREAD_WEIGHTS.map((w) => (
-              <option key={w.weight} value={w.weight}>
-                {w.weight}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
       <div className="tm-usage">

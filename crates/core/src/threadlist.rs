@@ -246,6 +246,7 @@ pub fn apply_thread_list(doc: &Document, engine: &mut Engine, entries: &[ThreadL
             brand: e.brand.clone(),
             code: e.code.clone(),
             weight: t.weight,
+            min_stitch: t.min_stitch,
         }
     };
     let same = |a: &Thread, b: &Thread| a.color.eq_ignore_ascii_case(&b.color) && a.name == b.name && a.code == b.code && a.brand == b.brand;
@@ -268,7 +269,7 @@ pub fn apply_thread_list(doc: &Document, engine: &mut Engine, entries: &[ThreadL
         let Some(old) = doc.threads.iter().find(|t| t.id == tid) else {
             // an object without a known thread gets a new one
             let id = next_id();
-            let blank = Thread { id: id.clone(), name: String::new(), color: String::new(), brand: String::new(), code: String::new(), weight: None };
+            let blank = Thread { id: id.clone(), name: String::new(), color: String::new(), brand: String::new(), code: String::new(), weight: None, min_stitch: None };
             new_threads.push(spec(&blank, e));
             out.objects[i].thread = id;
             continue;
@@ -310,7 +311,7 @@ mod tests {
     use crate::geom::pt;
 
     fn thread(id: &str, color: &str) -> Thread {
-        Thread { id: id.into(), name: id.into(), color: color.into(), brand: String::new(), code: String::new(), weight: None }
+        Thread { id: id.into(), name: id.into(), color: color.into(), brand: String::new(), code: String::new(), weight: None, min_stitch: None }
     }
 
     fn line_object(id: &str, thread: &str, y: f64) -> Object {

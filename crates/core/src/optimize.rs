@@ -558,7 +558,7 @@ mod tests {
     }
 
     fn thread(id: &str, color: &str) -> Thread {
-        Thread { id: id.into(), name: id.into(), color: color.into(), brand: "".into(), code: "".into(), weight: None }
+        Thread { id: id.into(), name: id.into(), color: color.into(), brand: "".into(), code: "".into(), weight: None, min_stitch: None }
     }
 
     /// A satin column along a centre line from (x, y), 20 mm long.

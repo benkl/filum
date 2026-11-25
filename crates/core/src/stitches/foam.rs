@@ -161,7 +161,7 @@ mod tests {
     }
     fn doc(objects: Vec<Object>) -> Document {
         Document {
-            threads: vec![Thread { id: "t".into(), name: "x".into(), color: "#000000".into(), brand: "".into(), code: "".into(), weight: None }],
+            threads: vec![Thread { id: "t".into(), name: "x".into(), color: "#000000".into(), brand: "".into(), code: "".into(), weight: None, min_stitch: None }],
             objects,
             ..Default::default()
         }

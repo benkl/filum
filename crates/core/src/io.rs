@@ -79,6 +79,7 @@ pub fn pattern_to_plan(p: &fmts::Pattern) -> StitchPlan {
                 brand: t.brand.clone(),
                 code: t.code.clone(),
                 weight: None,
+                min_stitch: None,
             })
             .collect(),
         basting: None,
@@ -111,6 +112,7 @@ pub fn plan_to_document(plan: &StitchPlan, name: &str) -> Document {
             brand: String::new(),
             code: String::new(),
             weight: None,
+            min_stitch: None,
         });
         let tid = if doc.threads.iter().any(|x| x.id == t.id) {
             format!("t{}", doc.threads.len() + 1)
@@ -340,7 +342,7 @@ mod origin_tests {
     fn exports_repeats_and_thread_lists() {
         use crate::model::{Object, StitchParams, SubPath};
         let mut doc = Document::default();
-        doc.threads = vec![Thread { id: "a".into(), name: "Red".into(), color: "#ff0000".into(), brand: "Madeira".into(), code: "1147".into(), weight: None }];
+        doc.threads = vec![Thread { id: "a".into(), name: "Red".into(), color: "#ff0000".into(), brand: "Madeira".into(), code: "1147".into(), weight: None, min_stitch: None }];
         doc.objects = vec![Object {
             id: "o".into(),
             name: "o".into(),

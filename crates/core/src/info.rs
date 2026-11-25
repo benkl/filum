@@ -166,7 +166,7 @@ fn tally(plan: &StitchPlan, want: impl Fn(u32) -> bool) -> Tally {
 /// plan assembly drops them).
 fn small_removed(engine: &mut Engine, doc: &Document, i: usize) -> usize {
     // the object's own minimum wins, as in the assembly
-    let min = doc.objects[i].min_stitch.unwrap_or(doc.machine.min_stitch).max(0.0);
+    let min = doc.min_stitch_of(&doc.objects[i]);
     let mut n = 0;
     for run in engine.object_runs(doc, i) {
         let Some(&(first, _)) = run.first() else { continue };
@@ -281,7 +281,7 @@ mod tests {
 
     #[test]
     fn counts_per_object_and_total() {
-        let t = |id: &str, c: &str| Thread { id: id.into(), name: id.into(), color: c.into(), brand: String::new(), code: String::new(), weight: None };
+        let t = |id: &str, c: &str| Thread { id: id.into(), name: id.into(), color: c.into(), brand: String::new(), code: String::new(), weight: None, min_stitch: None };
         let mut doc = Document {
             threads: vec![t("a", "#ff0000"), t("b", "#00ff00")],
             objects: vec![
@@ -312,7 +312,7 @@ mod tests {
 
     #[test]
     fn small_stitches_follow_the_objects_own_minimum() {
-        let t = Thread { id: "a".into(), name: "a".into(), color: "#ff0000".into(), brand: String::new(), code: String::new(), weight: None };
+        let t = Thread { id: "a".into(), name: "a".into(), color: "#ff0000".into(), brand: String::new(), code: String::new(), weight: None, min_stitch: None };
         let mut o = obj("o1", "a", &[pt(0.0, 0.0), pt(2.0, 0.0), pt(2.1, 0.0), pt(6.0, 0.0)]);
         o.min_stitch = Some(0.0);
         let mut doc = Document { threads: vec![t], objects: vec![o], ..Document::default() };

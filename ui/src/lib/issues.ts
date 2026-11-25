@@ -132,7 +132,9 @@ export function qualityIssues(doc: StitchDocument, plan: PlanData | null): Issue
       most === h.travel
         ? `Most are ${o.name}'s travel stitches: it travels through this narrow part again and again, on the same holes.`
         : most === h.ties
-          ? "Most are lock stitches: objects start or end here. Move a start or end point away."
+          ? Math.max(objectBoundsCached(o)?.w ?? 0, objectBoundsCached(o)?.h ?? 0) < 5
+            ? `Most are lock stitches: ${o.name} is too small to keep its lock-in and lock-off apart. A smaller lock shape (Design ▸ Stitch-out) puts fewer holes here.`
+            : "Most are lock stitches: objects start or end here. Move a start or end point away."
           : `Most are ${o.name}'s ${most === h.underlay ? "underlay" : "rows"}, meeting here. A wider spacing or another angle spreads them.`;
     out.push({
       id: `holes:${o.id}`,

@@ -95,7 +95,7 @@ The hot spots barely move: they are rows, lock stitches and travel together, a l
 - **Done:** in a running stitch the filter (`assemble.rs`, `loose_turn`) also drops a short stitch at a turn when leaving it out cuts the corner by 0.25 mm at most (the running stitch's own tolerance, about half a thread). A 0.3 mm staircase loses three quarters of its short stitches under a 0.6 mm minimum; a real corner stays. Fills (the step to the next row), satins (their edge), bean stitch and manual stitch keep every turn. It only acts above Ink/Stitch's 0.1 mm minimum, so a design on Ink/Stitch's defaults sews as before.
 - **Done:** the *Many short stitches* issue suggests a minimum of 0.3–0.5 mm when the running stitch's is under 0.3 mm.
 - **Dropped:** a mode (*Always / On export / Off*). The preview has to be what the machine sews; a minimum of 0 is *Off*.
-- **Deferred:** a minimum per thread for metallics and thick threads (1.5–2 mm). Threads don't record their material yet.
+- **Done:** a minimum stitch per thread (`Thread::min_stitch`, *min* in the Thread colours dialog): an object's own minimum wins, then its thread's, then the machine's. No maker publishes one figure; digitizing guides give about 2 mm for smooth metallics and 3 mm for twisted ones, and the dialog says so as a starting point to test, rather than setting it by itself.
 
 ### Phase 4: the digitizer stitches what it can sew *(done)*
 
@@ -107,7 +107,8 @@ The hot spots barely move: they are rows, lock stitches and travel together, a l
 - **Done: hidden travel instead of trims (branching).** A gap to the next object longer than the trim distance and up to 12 mm that what is sewn later covers all along (every millimetre within 0.45 mm of a later stitch, the plan's own visibility test) is sewn through in running stitches of 2.5 mm, flagged as travel, instead of tied off, trimmed and tied in. A design option (*Hide travel*, on); off trims as Ink/Stitch does. Koi: 77 → 65 trims, 27:33 → 25:26 sewing time. Digitizer suite: fewer trims on three pictures (12 → 10, 11 → 8, 13 → 11), colour difference unchanged.
 - **Done: centre out.** An Optimise step: the thread and the next object are chosen nearest the middle of the design first (weighed against the way there when *Shortest way* is on); on caps the distance from the bottom counts instead of the vertical one (bottom up). On by default on caps and fabrics that stretch (knit, piqué, fleece, towel), in the editor and in `filum optimize`.
 - **Reconsidered: automatic end points in the plan.** They would change every design against Ink/Stitch. End points stay what Ink/Stitch makes them, commands on the object, and Optimise sets them when asked (its *End points* step, checked against the real plan).
-- **Open: lock stitches.** The Koi's worst spot (31 per mm²) is two small objects that both start and end at the same tip, their locks on top of each other. Next: when an object's start, chosen near where the last one ended, lands on earlier lock stitches and the connection is cut anyway (colour change, trim, stop), start it a little further along.
+- **Done: lock stitches off each other (part of *Avoid holes*).** Only the assembled plan knows where the thread is cut, so the plan is made, then every object that starts near the last end after a cut (trim, colour change, locked jump) and ties in on an earlier object's lock stitches, or ties off on them before another cut, gets the nearest start on its outline clear of them, preferably one that also keeps its own lock-in and lock-off apart, and the plan is made again (only when something moved). Koi: needle drops in spots over cotton's limit 507 → 494, trims 65 → 64, 11 s shorter.
+- **What stays:** the Koi's worst spot (31 per mm²) is a 3 mm spiral (Red 6) whose end falls next to its start wherever it begins, beside another small shape: no start keeps those locks apart. The Issues panel now says so for a small object and points to a smaller lock shape.
 
 ---
 
@@ -117,16 +118,17 @@ The hot spots barely move: they are rows, lock stitches and travel together, a l
 |---|---|
 | 1. Stitch-quality report | done: `quality.rs`, Issues panel, `filum info` |
 | 2. Travel avoids its holes | done: `stitches/holes.rs`, *Avoid holes*; hot spots still open |
-| 3. Small-stitch filter | running stitch turns done; per-thread minimum deferred |
+| 3. Small-stitch filter | done: running stitch turns, minimum per thread |
 | 4. Digitizer and Simplify for stitching | done: digitizer measured clean; *Simplify for stitching* |
-| 5. Optimiser | hidden travel and centre out done; lock stitches open |
+| 5. Optimiser | done: hidden travel, centre out, lock stitches off each other |
 
 ## 5. The Koi, start to now
 
 | | Ink/Stitch's way | Now (defaults) |
 |---|---|---|
-| Needle drops | 10,225 | 9,715 |
-| Trims | 77 | 65 |
-| Sewing time (700 spm) | 28:10 | 25:26 |
-| Drops on an earlier hole of the same object | 1,400 | 718 |
-| Worst hot spot | 32 per mm² | 31 per mm² |
+| Needle drops | 10,225 | 9,702 |
+| Trims | 77 | 64 |
+| Sewing time (700 spm) | 28:10 | 25:15 |
+| Drops on an earlier hole of the same object | 1,400 | 724 |
+| Needle drops in spots over cotton's limit | 753 | 494 |
+| Worst hot spot | 32 per mm² | 31 per mm² (a 3 mm spiral's own locks) |

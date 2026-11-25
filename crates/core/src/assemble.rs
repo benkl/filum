@@ -265,6 +265,25 @@ impl Engine {
 
     pub fn plan(&mut self, doc: &Document) -> StitchPlan {
         crate::prof!("plan");
+        let items = self.plan_items(doc, &HashMap::new());
+        let plan = self.assemble_items(doc, &items);
+        // lock stitches piled on another object's (Avoid holes; not in Ink/Stitch): the objects whose
+        // tie-in after a cut lands on earlier lock stitches start somewhere clear, and the plan is
+        // made again (nothing to do in most designs)
+        if !(doc.options.avoid_holes && doc.machine.ties) {
+            return plan;
+        }
+        let moved = self.clear_lock_starts(doc, &plan, &items);
+        if moved.is_empty() {
+            return plan;
+        }
+        let items = self.plan_items(doc, &moved);
+        self.assemble_items(doc, &items)
+    }
+
+    /// Every visible object's runs, in order. `starts`: where objects that
+    /// begin near the last end begin instead.
+    fn plan_items(&mut self, doc: &Document, starts: &HashMap<usize, [f64; 2]>) -> Vec<(usize, Vec<Run>)> {
         let mut items: Vec<(usize, Vec<Run>)> = Vec::new();
         // where the previous object ended: an object without a start point
         // begins as near to it as it can (Ink/Stitch passes every element the
@@ -283,7 +302,7 @@ impl Engine {
             let obj = match (obj.start, prev) {
                 (None, Some(p)) if starts_near(&obj.stitch) => {
                     let mut o = obj.into_owned();
-                    o.start = Some([(p.x * 2.0).round() / 2.0, (p.y * 2.0).round() / 2.0]);
+                    o.start = Some(starts.get(&i).copied().unwrap_or([(p.x * 2.0).round() / 2.0, (p.y * 2.0).round() / 2.0]));
                     Cow::Owned(o)
                 }
                 _ => obj,
@@ -302,17 +321,111 @@ impl Engine {
                 items.push((i, runs));
             }
         }
+        items
+    }
+
+    /// The plan of these runs, after the basting and knockdown.
+    fn assemble_items(&mut self, doc: &Document, items: &[(usize, Vec<Run>)]) -> StitchPlan {
         // first the basting (holding fabric and stabiliser), then the
         // knockdown (flattening the nap) — both in the knockdown's colour
         // when there is one
         crate::prof!("plan: basting/knockdown/assemble");
-        let mut prefix = basting_runs(doc, &items);
+        let mut prefix = basting_runs(doc, items);
         let basting = prefix.iter().filter(|r| !r.is_empty()).count();
-        let knock = knockdown_runs(doc, &items);
+        let knock = knockdown_runs(doc, items);
         let thread = (!knock.is_empty()).then(|| knockdown_thread(doc));
         prefix.extend(knock);
-        assemble_basted(doc, &items, &prefix, thread, basting)
+        assemble_basted(doc, items, &prefix, thread, basting)
     }
+
+    /// The objects that start near where the last one ended after a cut
+    /// (trim, colour change, locked jump) and so lock on the lock stitches of
+    /// an object sewn before, or end on them, cut again: a clear start for
+    /// each (a fill ends where its start leads).
+    fn clear_lock_starts(&mut self, doc: &Document, plan: &StitchPlan, items: &[(usize, Vec<Run>)]) -> HashMap<usize, [f64; 2]> {
+        let mut rank = vec![usize::MAX; doc.objects.len()];
+        for (r, (i, _)) in items.iter().enumerate() {
+            rank[*i] = r;
+        }
+        let ties: Vec<(Point, usize)> = plan.stitches.iter().filter(|s| s.is(flags::TIE) && (s.object as usize) < rank.len()).map(|s| (s.pos(), s.object as usize)).collect();
+        // is the thread cut after each object (the last one is tied off and trimmed)?
+        let mut cut_after = vec![false; doc.objects.len()];
+        if let Some((last, _)) = items.last() {
+            cut_after[*last] = true;
+        }
+        for c in &plan.links {
+            if c.kind != ConnectionKind::Sew {
+                if let Some(x) = cut_after.get_mut(c.from as usize) {
+                    *x = true;
+                }
+            }
+        }
+        let mut moved = HashMap::new();
+        for c in &plan.links {
+            let to = c.to as usize;
+            let Some(o) = doc.objects.get(to) else { continue };
+            if c.kind == ConnectionKind::Sew || o.start.is_some() || !starts_near(&o.stitch) || o.ties == Ties::None {
+                continue;
+            }
+            let earlier: Vec<Point> = ties.iter().filter(|(_, k)| *k != to && rank[*k] < rank[to]).map(|(p, _)| *p).collect();
+            let Some(runs) = items.get(rank[to]).map(|(_, r)| r) else { continue };
+            let (Some(first), Some(last)) = (runs.first().and_then(|r| r.first()), runs.last().and_then(|r| r.last())) else { continue };
+            let end_cut = cut_after[to];
+            if clear(&earlier, first.0, last.0, end_cut, true) {
+                continue;
+            }
+            // already off the earlier locks: only a start that also parts its own two is worth it
+            let loose = clear(&earlier, first.0, last.0, end_cut, false);
+            if let Some(start) = self.clear_start(doc, o, Point::from_arr(c.start), &earlier, end_cut, !loose) {
+                moved.insert(to, start);
+            }
+        }
+        moved
+    }
+
+    /// The start (snapped as the plan snaps it) at the point of the object's
+    /// outline nearest `p` that lies clear of the lock stitches `locks`, when
+    /// its stitches then begin (and, with `end_cut`, end) clear of them and
+    /// its two locks apart; with `settle`, one clear of them only will do.
+    fn clear_start(&mut self, doc: &Document, obj: &Object, p: Point, locks: &[Point], end_cut: bool, settle: bool) -> Option<[f64; 2]> {
+        let mut cands: Vec<Point> = Vec::new();
+        for sp in &obj.paths {
+            let pts = sp.flatten(0.1);
+            for w in pts.windows(2) {
+                let n = (w[0].dist(w[1]).ceil() as usize).clamp(1, 1000);
+                cands.extend((0..n).map(|k| w[0] + (w[1] - w[0]) * (k as f64 / n as f64)));
+            }
+        }
+        cands.retain(|c| !locks.iter().any(|q| q.dist(*c) < LOCK_ROOM + 0.5));
+        cands.sort_by(|a, b| a.dist(p).total_cmp(&b.dist(p)));
+        // nearest first, every few millimetres along the outline; the locks apart if it can be
+        let mut tried: Vec<Point> = Vec::new();
+        let mut fallback = None;
+        for c in cands {
+            if tried.len() >= 6 {
+                break;
+            }
+            if tried.iter().any(|t| t.dist(c) < 2.0) {
+                continue;
+            }
+            tried.push(c);
+            let start = [(c.x * 2.0).round() / 2.0, (c.y * 2.0).round() / 2.0];
+            let o = Object { start: Some(start), ..obj.clone() };
+            let runs = self.runs_from(&o, doc, false);
+            let first = runs.iter().find_map(|r| r.first()).map(|s| s.0);
+            let last = runs.iter().rev().find_map(|r| r.last()).map(|s| s.0);
+            if let (Some(f), Some(l)) = (first, last) {
+                if clear(locks, f, l, end_cut, true) {
+                    return Some(start);
+                }
+                if settle && fallback.is_none() && clear(locks, f, l, end_cut, false) {
+                    fallback = Some(start);
+                }
+            }
+        }
+        fallback
+    }
+
 }
 
 /// What hidden-stitch removal asks of every object on top of a fill, worked
@@ -421,6 +534,22 @@ fn splice_underlay(full: &Object, mut under: Vec<Run>, mut top: Vec<Run>) -> Vec
     under.into_iter().chain(top).collect()
 }
 
+/// Lock stitches closer than this to another object's pile up on its holes (mm).
+const LOCK_ROOM: f64 = 1.0;
+
+/// Does `p` lie on any of the lock stitches `locks`?
+fn on_locks(locks: &[Point], p: Point) -> bool {
+    locks.iter().any(|q| q.dist(p) < LOCK_ROOM)
+}
+
+/// An object tied in at `first` (and, with `end_cut`, off at `last`) keeps
+/// its locks off the earlier ones, and with `apart` its two locks apart too
+/// (not always possible: a closed line ends where it began, a small shape has
+/// no room).
+fn clear(locks: &[Point], first: Point, last: Point, end_cut: bool, apart: bool) -> bool {
+    !on_locks(locks, first) && !(end_cut && (on_locks(locks, last) || apart && first.dist(last) < LOCK_ROOM))
+}
+
 /// Stitch types that start where they are told (running, satins, fills).
 pub(crate) fn starts_near(st: &StitchParams) -> bool {
     matches!(st, StitchParams::Running(_) | StitchParams::Satin(_) | StitchParams::Fill(_))
@@ -430,7 +559,7 @@ pub(crate) fn starts_near(st: &StitchParams) -> bool {
 fn knockdown_thread(doc: &Document) -> Thread {
     let c = doc.options.knockdown_color.trim();
     let color = if c.starts_with('#') && c.len() == 7 { c.to_string() } else { "#f4f1ea".to_string() };
-    Thread { id: "knockdown".into(), name: "Knockdown".into(), color, brand: String::new(), code: String::new(), weight: None }
+    Thread { id: "knockdown".into(), name: "Knockdown".into(), color, brand: String::new(), code: String::new(), weight: None, min_stitch: None }
 }
 
 /// Knockdown (laydown stitch): a light net over the area of the whole
@@ -593,7 +722,7 @@ fn seg_dist(p: Point, a: Point, b: Point) -> f64 {
 }
 
 fn fallback_thread(i: usize) -> Thread {
-    Thread { id: format!("auto{i}"), name: "Black".into(), color: "#1c1c1c".into(), brand: String::new(), code: String::new(), weight: None }
+    Thread { id: format!("auto{i}"), name: "Black".into(), color: "#1c1c1c".into(), brand: String::new(), code: String::new(), weight: None, min_stitch: None }
 }
 
 /// Machine-level stitch list under construction.
@@ -963,7 +1092,7 @@ fn assemble_basted(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[Run], 
         }
         b.ties = object_ties(obj);
         b.lock = obj.lock.unwrap_or_default();
-        b.min_stitch = obj.min_stitch.unwrap_or(doc.machine.min_stitch).max(0.0);
+        b.min_stitch = doc.min_stitch_of(obj);
         b.loose_turns = matches!(&obj.stitch, StitchParams::Running(p) if p.beans().iter().all(|r| *r == 0));
         b.min_jump = obj.min_jump.unwrap_or(doc.machine.trim_distance).max(0.0);
         b.min_jump_set = obj.min_jump.is_some();
@@ -1047,7 +1176,7 @@ mod tests {
     }
     fn doc(objects: Vec<Object>) -> Document {
         Document {
-            threads: vec![Thread { id: "t".into(), name: "x".into(), color: "#000000".into(), brand: "".into(), code: "".into(), weight: None }],
+            threads: vec![Thread { id: "t".into(), name: "x".into(), color: "#000000".into(), brand: "".into(), code: "".into(), weight: None, min_stitch: None }],
             objects,
             ..Default::default()
         }
@@ -1058,7 +1187,7 @@ mod tests {
 
     #[test]
     fn threads_on_the_same_spool_need_no_colour_change() {
-        let th = |id: &str, color: &str, code: &str| Thread { id: id.into(), name: id.into(), color: color.into(), brand: "Madeira".into(), code: code.into(), weight: None };
+        let th = |id: &str, color: &str, code: &str| Thread { id: id.into(), name: id.into(), color: color.into(), brand: "Madeira".into(), code: code.into(), weight: None, min_stitch: None };
         let fill = StitchParams::Fill(FillParams { underlay: false, ..Default::default() });
         let mk = |a: &str, b: &str| {
             let mut d = doc(vec![Object { thread: "a".into(), ..obj("1", square(0.0, 0.0, 10.0), fill.clone()) }, Object { thread: "b".into(), ..obj("2", square(20.0, 0.0, 10.0), fill.clone()) }]);
@@ -1386,6 +1515,20 @@ mod tests {
     }
 
     #[test]
+    fn a_thread_sets_its_own_minimum_stitch() {
+        let run = StitchParams::Running(RunningParams { length: 1.0, ..Default::default() });
+        let mut d = doc(vec![obj("a", vec![SubPath::polyline(&[pt(0.0, 0.0), pt(20.0, 0.0)], false)], run)]);
+        let n = |d: &Document| Engine::new().plan(d).stitches.iter().filter(|s| s.is_stitch() && !s.is(flags::TIE)).count();
+        let all = n(&d);
+        // a metallic: no stitch under 2 mm
+        d.threads[0].min_stitch = Some(2.0);
+        assert!(n(&d) <= all / 2 + 1, "{} of {all}", n(&d));
+        // the object's own minimum wins
+        d.objects[0].min_stitch = Some(0.1);
+        assert_eq!(n(&d), all);
+    }
+
+    #[test]
     fn a_running_stitch_loses_its_pixel_steps_under_the_minimum() {
         // a 0.3 mm pixel staircase along a 30° line: every step is a corner the running stitch keeps
         let mut st = vec![pt(0.0, 0.0)];
@@ -1446,7 +1589,7 @@ mod trim_tests {
         }
     }
     fn thread(id: &str, color: &str) -> Thread {
-        Thread { id: id.into(), name: id.into(), color: color.into(), brand: "".into(), code: "".into(), weight: None }
+        Thread { id: id.into(), name: id.into(), color: color.into(), brand: "".into(), code: "".into(), weight: None, min_stitch: None }
     }
     fn plan(objects: Vec<Object>) -> StitchPlan {
         let d = Document { threads: vec![thread("a", "#000000"), thread("b", "#ff0000")], objects, ..Default::default() };
@@ -1454,6 +1597,26 @@ mod trim_tests {
     }
     fn trims(p: &StitchPlan) -> usize {
         p.stitches.iter().filter(|s| s.is(flags::TRIM)).count()
+    }
+
+    #[test]
+    fn a_start_after_a_cut_keeps_off_earlier_lock_stitches() {
+        // a red line, a blue line, then a red loop whose nearest point to the blue end lies 0.6 mm from the red line's lock-in
+        let objs = || {
+            let mut f = line("f", "a", &[(0.3, -0.5), (8.0, -0.5), (8.0, -8.0), (0.3, -8.0)]);
+            f.paths[0].closed = true;
+            vec![line("1", "a", &[(0.0, 0.0), (10.0, 0.0)]), line("2", "b", &[(10.0, 5.0), (0.0, 5.0)]), f]
+        };
+        let first_of_fill = |avoid: bool| {
+            let mut d = Document { threads: vec![thread("a", "#000000"), thread("b", "#ff0000")], objects: objs(), ..Default::default() };
+            d.options.avoid_holes = avoid;
+            let p = crate::Engine::new().plan(&d);
+            let s = p.stitches.iter().find(|s| s.object == 2 && s.is_stitch()).unwrap().pos();
+            let ties: Vec<Point> = p.stitches.iter().filter(|s| s.object == 0 && s.is(flags::TIE)).map(|s| s.pos()).collect();
+            ties.iter().map(|t| t.dist(s)).fold(f64::INFINITY, f64::min)
+        };
+        assert!(first_of_fill(false) < LOCK_ROOM, "{}", first_of_fill(false));
+        assert!(first_of_fill(true) >= LOCK_ROOM, "{}", first_of_fill(true));
     }
 
     #[test]
@@ -1589,7 +1752,7 @@ mod link_tests {
         o
     }
     fn doc(objects: Vec<Object>) -> Document {
-        let th = |id: &str, c: &str| Thread { id: id.into(), name: id.into(), color: c.into(), brand: "".into(), code: "".into(), weight: None };
+        let th = |id: &str, c: &str| Thread { id: id.into(), name: id.into(), color: c.into(), brand: "".into(), code: "".into(), weight: None, min_stitch: None };
         Document { threads: vec![th("t", "#000000"), th("u", "#cc1219")], objects, ..Default::default() }
     }
     /// Two lines 10 mm apart on one row: a ends at (30, 0), b starts at (40, 0).

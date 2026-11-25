@@ -43,7 +43,7 @@ fn line(pts: &[(f64, f64)]) -> Vec<SubPath> {
 }
 
 fn thread(id: &str, color: &str) -> Thread {
-    Thread { id: id.into(), name: id.into(), color: color.into(), brand: String::new(), code: String::new(), weight: None }
+    Thread { id: id.into(), name: id.into(), color: color.into(), brand: String::new(), code: String::new(), weight: None, min_stitch: None }
 }
 
 fn doc(objects: Vec<Object>) -> Document {

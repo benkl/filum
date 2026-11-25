@@ -468,6 +468,8 @@ export interface Thread {
   code: string;
   /** Weight number (No. 40 …) when it differs from the design's thread weight. */
   weight?: number;
+  /** Shortest stitch for this thread (mm; absent: the machine's): metallics and thick threads. An object's own wins. */
+  minStitch?: number;
 }
 
 export type Fabric = "cotton" | "polyester" | "denim" | "knit" | "sheer" | "felt" | "towel" | "cap" | "fleece" | "pique" | "leather" | "canvas" | "silk";

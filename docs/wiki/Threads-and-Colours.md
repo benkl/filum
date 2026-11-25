@@ -6,7 +6,9 @@ Open it with **Threads → Thread colours…**, the spool button in the bottom b
 
 ![The Thread colours dialog](images/threads.webp)
 
-On the left are the threads your design uses, in sew order, with each one's stitch count and length. On the right are two tabs:
+On the left are the threads your design uses, in sew order, with each one's stitch count and length. Each thread can have its own **weight** (when it is finer or heavier than the design's thread) and its own shortest stitch, **min**: stitches shorter than that are left out in that thread. Metallics fray and break on short stitches; about 2 mm for smooth metallics and 3 mm for twisted ones is a starting point to check on a test stitch-out. Empty uses the machine's minimum, and an object's own minimum (its *Commands*) wins over the thread's.
+
+On the right are two tabs:
 
 - **Thread charts**: 75 charts from Ink/Stitch, covering Madeira, Isacord, Brother, Janome, Gunold, Robison-Anton and more, plus Madeira Cotona charts. Search by name or code, or pick a colour to replace the selected thread. **164 more charts** from the Embroidery Nerds thread database are an optional download. Their author hasn't published a licence, so Filum can't include them, but **Preferences → Downloads** fetches them from the author's repository in one click. Until then the chart menu shows a reminder.
 - **My threads**: the spools you actually own. Add them from any chart, or add all of the design's threads in one click. You can export them as a `.gpl` palette.

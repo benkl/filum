@@ -1624,6 +1624,18 @@ pub struct Thread {
     /// weight: sizes the thread in the density model.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub weight: Option<u32>,
+    /// Shortest stitch for this thread (mm; none: the machine's): metallics
+    /// and thick threads fray and break on short stitches. An object's own
+    /// minimum wins over it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_stitch: Option<f64>,
+}
+
+impl Document {
+    /// An object's shortest stitch (mm): its own, else its thread's, else the machine's.
+    pub fn min_stitch_of(&self, obj: &Object) -> f64 {
+        obj.min_stitch.or_else(|| self.thread(&obj.thread).and_then(|t| t.min_stitch)).unwrap_or(self.machine.min_stitch).max(0.0)
+    }
 }
 
 impl Thread {
@@ -2099,7 +2111,7 @@ impl Document {
         }
         let id = format!("t{}", self.threads.len() + 1);
         let name = name.map(|s| s.to_string()).unwrap_or_else(|| crate::threads::nearest_name(color));
-        self.threads.push(Thread { id: id.clone(), name, color: hex, brand: String::new(), code: String::new(), weight: None });
+        self.threads.push(Thread { id: id.clone(), name, color: hex, brand: String::new(), code: String::new(), weight: None, min_stitch: None });
         id
     }
 

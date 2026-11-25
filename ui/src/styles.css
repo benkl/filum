@@ -4131,9 +4131,20 @@ kbd {
   gap: var(--sp-1);
   min-width: 0;
 }
+.tm-head {
+  display: flex;
+  gap: var(--sp-1);
+}
 .tm-name {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   font-weight: var(--fw-semibold);
+}
+.tm-head .input.tm-weight,
+.tm-head .input.tm-min {
+  height: auto;
+  font-size: var(--fs-sm);
+  padding: 0 var(--sp-1);
 }
 .tm-meta {
   display: flex;
@@ -4156,6 +4167,10 @@ kbd {
   flex: 1;
 }
 .tm-weight {
+  width: 46px;
+  flex: none;
+}
+.tm-min {
   width: 46px;
   flex: none;
 }
