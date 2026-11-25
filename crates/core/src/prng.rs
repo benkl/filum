@@ -28,3 +28,27 @@ impl Stream {
         uniform(self.seed, self.stream, self.i)
     }
 }
+
+/// Xorshift64: a quick stream of random numbers from a non-zero seed, for
+/// sampling where only determinism matters (Poisson disks, meander walks,
+/// colour clustering).
+pub struct Xorshift64(pub u64);
+
+impl Xorshift64 {
+    pub fn next_u64(&mut self) -> u64 {
+        let mut x = self.0;
+        x ^= x << 13;
+        x ^= x >> 7;
+        x ^= x << 17;
+        self.0 = x;
+        x
+    }
+    /// A number in [0, 1).
+    pub fn unit(&mut self) -> f64 {
+        (self.next_u64() >> 11) as f64 / (1u64 << 53) as f64
+    }
+    /// A whole number below `n` (0 when n is 0).
+    pub fn below(&mut self, n: usize) -> usize {
+        (self.next_u64() % n.max(1) as u64) as usize
+    }
+}

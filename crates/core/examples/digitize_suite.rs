@@ -34,7 +34,7 @@ use serde::Serialize;
 use filum_core::density::{density_field, DensityOptions};
 use filum_core::digitize::{decode_image, digitize_rgba, DigitizeOptions};
 use filum_core::plan::{flags, StitchPlan};
-use filum_core::threads::{delta_e, rgb_to_lab};
+use filum_core::threads::{delta_e76 as delta_e, rgb_to_lab};
 use filum_core::{io, Document, Engine, StitchParams};
 
 const PX_MM: f64 = 8.0;

@@ -24,6 +24,24 @@ use crate::model::{FabricProfile, Object, StitchParams};
 
 pub type Run = Vec<(Point, u8)>;
 
+/// Adds a needle point to a run, unless the run is already there (within 1e-6 mm).
+pub(crate) fn push(run: &mut Run, p: Point, f: u8) {
+    if let Some(&(last, _)) = run.last() {
+        if last.dist(p) < 1e-6 {
+            return;
+        }
+    }
+    run.push((p, f));
+}
+
+/// Sews on from where the run is (the first point of `path`) along `path`, in
+/// running stitches of at most `len` mm, each flagged `f`.
+pub(crate) fn sew_along(run: &mut Run, path: &[Point], len: f64, f: u8) {
+    for q in running::running_stitch(path, len, 0.1).into_iter().skip(1) {
+        push(run, q, f);
+    }
+}
+
 /// A closed ring (its first point not repeated at the end) begun at its point
 /// nearest `t`: a new vertex there, unless a vertex is that close already.
 fn ring_from(mut ring: Vec<Point>, t: Point) -> Vec<Point> {
@@ -33,11 +51,7 @@ fn ring_from(mut ring: Vec<Point>, t: Point) -> Vec<Point> {
     }
     let mut best = (f64::INFINITY, 0usize, t);
     for i in 0..n {
-        let (a, b) = (ring[i], ring[(i + 1) % n]);
-        let ab = b - a;
-        let l2 = ab.length_sq();
-        let s = if l2 < 1e-18 { 0.0 } else { ((t - a).dot(ab) / l2).clamp(0.0, 1.0) };
-        let q = a + ab * s;
+        let q = crate::geom::seg_project(t, ring[i], ring[(i + 1) % n]).1;
         if q.dist(t) < best.0 {
             best = (q.dist(t), i, q);
         }
@@ -85,16 +99,20 @@ fn orient_polyline(mut pts: Vec<Point>, closed: bool, start: Option<Point>, end:
         }
         return pts;
     }
-    let (a, b) = (pts[0], *pts.last().unwrap());
-    let flip = match (start, end) {
-        (Some(s), _) => s.dist(b) < s.dist(a),
-        (None, Some(e)) => e.dist(a) < e.dist(b),
-        _ => false,
-    };
-    if flip {
+    if flip_for(start, end, pts[0], *pts.last().unwrap()) {
         pts.reverse();
     }
     pts
+}
+
+/// Whether a line from `first` to `last` is better sewn backwards: it then
+/// begins nearer the start point, or (without one) ends nearer the end point.
+pub(crate) fn flip_for(start: Option<Point>, end: Option<Point>, first: Point, last: Point) -> bool {
+    match (start, end) {
+        (Some(s), _) => s.dist(last) < s.dist(first),
+        (None, Some(e)) => e.dist(first) < e.dist(last),
+        _ => false,
+    }
 }
 
 /// Generate the runs for one object.

@@ -10,7 +10,7 @@ pub mod gradients;
 pub mod strokes;
 
 /// CIEDE2000 colour difference of two Lab colours.
-pub fn delta_e(a: [f64; 3], b: [f64; 3]) -> f64 {
+pub fn delta_e2000(a: [f64; 3], b: [f64; 3]) -> f64 {
     let (l1, a1, b1) = (a[0], a[1], a[2]);
     let (l2, a2, b2) = (b[0], b[1], b[2]);
     let rad = std::f64::consts::PI / 180.0;
@@ -113,9 +113,9 @@ mod tests {
     #[test]
     fn ciede2000_reference_pairs() {
         // Sharma et al. test data
-        let d = delta_e([50.0, 2.6772, -79.7751], [50.0, 0.0, -82.7485]);
+        let d = delta_e2000([50.0, 2.6772, -79.7751], [50.0, 0.0, -82.7485]);
         assert!((d - 2.0425).abs() < 1e-3, "{d}");
-        let d = delta_e([50.0, -1.3802, -84.2814], [50.0, 0.0, -82.7485]);
+        let d = delta_e2000([50.0, -1.3802, -84.2814], [50.0, 0.0, -82.7485]);
         assert!((d - 1.0).abs() < 1e-3, "{d}");
     }
 

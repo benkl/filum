@@ -9,7 +9,7 @@
 
 use crate::clip;
 use crate::geom::{point_in_ring, rings_bounds, signed_area, Point, Rect, Ring};
-use crate::model::{Object, StitchParams, SubPath};
+use crate::model::{Object, StitchParams};
 use crate::stitches::{fill::fill_rings, satin::satin_geometry};
 
 /// Area an object puts thread on.
@@ -69,8 +69,7 @@ pub fn object_cover(obj: &Object) -> Vec<Cover> {
             out
         }
         StitchParams::Satin(p) => {
-            let subpaths: Vec<SubPath> = if p.multi { obj.paths.clone() } else { vec![] };
-            let groups: Vec<Vec<SubPath>> = if p.multi { subpaths.into_iter().map(|s| vec![s]).collect() } else { vec![obj.paths.clone()] };
+            let groups = crate::stitches::satin::columns(&obj.paths, p);
             let mut polys = Vec::new();
             for g in groups {
                 let single = crate::model::SatinParams { multi: false, ..p.clone() };

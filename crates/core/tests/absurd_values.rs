@@ -142,7 +142,7 @@ fn the_trim_after_an_arrow_lock_is_at_the_needle() {
 #[test]
 fn outlines_with_absurd_offsets_do_not_exhaust_memory() {
     for offset in [1e300, f64::INFINITY, f64::NAN, -1e300] {
-        let rings = filum_core::geom::offset_rings(&[vec![filum_core::geom::pt(0.0, 0.0), filum_core::geom::pt(10.0, 0.0), filum_core::geom::pt(10.0, 10.0)]], offset, 0.1);
+        let rings = filum_core::geom::offset_rings(&[vec![filum_core::geom::pt(0.0, 0.0), filum_core::geom::pt(10.0, 0.0), filum_core::geom::pt(10.0, 10.0)]], offset);
         assert!(rings.iter().flatten().all(|q| q.x.is_finite() && q.y.is_finite()), "{offset}");
     }
 }

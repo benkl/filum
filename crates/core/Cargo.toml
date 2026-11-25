@@ -23,4 +23,4 @@ clipper2-rust = "1.2.0"
 
 [dev-dependencies]
 # TypeScript types of the document and plan data for the editor (tests/engine_types.rs)
-ts-rs = { version = "12", features = ["serde-json-impl"] }
+ts-rs = { version = "12", features = ["serde-json-impl", "no-serde-warnings"] }

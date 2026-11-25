@@ -96,6 +96,17 @@ fn cases() -> Vec<(String, Object)> {
         ("fill-gradient-spacing", json!({ "type": "fill", "endRowSpacing": 1.2 })),
         ("fill-angle-pull", json!({ "type": "fill", "angle": 35, "pullCompensation": 0.3 })),
         ("fill-guided-line", json!({ "type": "fill", "method": "guided", "guide": line(&[(0.0, 5.0), (17.0, 18.0), (34.0, 30.0)]) })),
+        // the tatami settings sewn around one fill (fill.rs): each on its own
+        ("fill-ink-route", json!({ "type": "fill", "tatamiRoute": "inkStitch" })),
+        ("fill-skip-last", json!({ "type": "fill", "skipLast": true })),
+        ("fill-centre-out", json!({ "type": "fill", "centerOut": true })),
+        ("fill-gap-rows", json!({ "type": "fill", "tatamiRoute": "inkStitch", "gapFillRows": 2 })),
+        ("fill-pull-pct", json!({ "type": "fill", "pullCompPct": 0.1 })),
+        ("fill-no-underpath", json!({ "type": "fill", "tatamiRoute": "inkStitch", "underpath": false })),
+        ("fill-underlay-skip-last", json!({ "type": "fill", "underlaySkipLast": true })),
+        ("fill-carve", json!({ "type": "fill", "carve": "diamonds", "carveSize": 4.0 })),
+        ("fill-guided-no-underpath", json!({ "type": "fill", "method": "guided", "underpath": false, "skipLast": true, "guide": line(&[(0.0, 5.0), (17.0, 18.0), (34.0, 30.0)]) })),
+        ("fill-tartan-settings", json!({ "type": "fill", "method": "tartan", "underpath": false, "skipLast": true, "pullCompPct": 0.1 })),
     ];
     for (name, st) in more_fills {
         out.push((name.into(), object(name, "a", blob(), st)));

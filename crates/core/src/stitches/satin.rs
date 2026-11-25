@@ -15,7 +15,7 @@ use crate::model::{SatinMethod, SatinParams, SubPath};
 use crate::plan::flags;
 
 use super::running::running_stitch;
-use super::Run;
+use super::{push, sew_along, Run};
 
 const FLATTEN_TOL: f64 = 0.05;
 
@@ -351,6 +351,21 @@ impl Processor<'_> {
     }
 }
 
+/// The columns a satin object sews: with `multi` every sub-path its own,
+/// else all of them together (rails and rungs).
+pub fn columns(paths: &[SubPath], p: &SatinParams) -> Vec<Vec<SubPath>> {
+    if p.multi && paths.len() > 1 {
+        paths.iter().map(|s| vec![s.clone()]).collect()
+    } else {
+        vec![paths.to_vec()]
+    }
+}
+
+/// A column's mean width from its pairs of rail points (0 without any).
+pub fn mean_width(pairs: &[(Point, Point)]) -> f64 {
+    pairs.iter().map(|(a, b)| a.dist(*b)).sum::<f64>() / pairs.len().max(1) as f64
+}
+
 /// Port of Ink/Stitch `plot_points_on_rails`. `offset` grows (+) or shrinks (−)
 /// each pair: absolute mm per side plus a proportion of the local width.
 pub fn plot_points_on_rails(geo: &SatinGeometry, spacing: f64, offset_mm: f64, offset_prop: f64) -> Vec<(Point, Point)> {
@@ -588,14 +603,6 @@ fn shape_pairs(pairs: Vec<(Point, Point)>, p: &SatinParams) -> Vec<(Point, Point
     pairs
 }
 
-fn push(run: &mut Run, p: Point, f: u8) {
-    if let Some(&(last, _)) = run.last() {
-        if last.dist(p) < 1e-6 {
-            return;
-        }
-    }
-    run.push((p, f));
-}
 
 fn underlay(geo: &SatinGeometry, p: &SatinParams, which: super::underlay::SatinUnderlay, run: &mut Run, density: f64) {
     let u = flags::UNDERLAY;
@@ -673,9 +680,7 @@ pub fn satin_on(paths: &[SubPath], p: &SatinParams, fabric: &crate::model::Fabri
     let mut run: Run = Vec::new();
     // auto underlay: by the column's mean width
     let which = if p.underlay_auto {
-        let pairs = plot_points_on_rails(&geo, 1.0, 0.0, 0.0);
-        let w = pairs.iter().map(|(a, b)| a.dist(*b)).sum::<f64>() / pairs.len().max(1) as f64;
-        super::underlay::satin_underlay(w, p, fabric)
+        super::underlay::satin_underlay(mean_width(&plot_points_on_rails(&geo, 1.0, 0.0, 0.0)), p, fabric)
     } else {
         super::underlay::satin_underlay(0.0, p, fabric)
     };
@@ -750,9 +755,7 @@ pub fn satin_between(paths: &[SubPath], p: &SatinParams, fabric: &crate::model::
                     push(run, x.0, x.1);
                 }
                 let from = at(top[k - 1].0);
-                for q in running_stitch(&along(from, t1), len, 0.1).into_iter().skip(1) {
-                    push(run, q, flags::TRAVEL);
-                }
+                sew_along(run, &along(from, t1), len, flags::TRAVEL);
                 for x in top[k..].iter().rev() {
                     push(run, x.0, x.1);
                 }

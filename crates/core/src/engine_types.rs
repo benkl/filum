@@ -83,7 +83,7 @@ fn generated() -> String {
         decl::<crate::quality::NarrowFill>(&cfg),
         decl::<crate::quality::StitchQuality>(&cfg),
         decl::<crate::density::ThreadSpec>(&cfg),
-        decl::<crate::density::FabricLimits>(&cfg),
+        decl::<crate::model::FabricLimits>(&cfg),
         decl::<crate::density::DensityClass>(&cfg),
         decl::<crate::density::Hotspot>(&cfg),
         decl::<crate::density::DensityStats>(&cfg),

@@ -245,7 +245,7 @@ pub fn machine_colors(doc: &Document, engine: &mut Engine, format: &str, opts: &
             name: m.thread.name.clone(),
             code: m.thread.code.clone(),
             brand: m.thread.brand.clone(),
-            delta_e: m.shown.as_ref().map(|s| crate::vision::delta_e(lab(m.thread.rgb), lab(s.rgb))),
+            delta_e: m.shown.as_ref().map(|s| crate::vision::delta_e2000(lab(m.thread.rgb), lab(s.rgb))),
             shown: m.shown.map(|s| ShownColor { color: crate::model::hex_color(s.rgb), name: s.name, code: s.code, brand: s.brand, slot: m.slot }),
             exact: m.exact,
         })

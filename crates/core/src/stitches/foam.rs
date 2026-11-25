@@ -33,7 +33,7 @@ struct Column {
 
 impl Column {
     fn width(&self) -> f64 {
-        self.pairs.iter().map(|(a, b)| a.dist(*b)).sum::<f64>() / self.pairs.len().max(1) as f64
+        super::satin::mean_width(&self.pairs)
     }
     /// The column's outline as a ring.
     fn ring(&self) -> Ring {
@@ -94,7 +94,7 @@ fn foam_satin(satin: &SatinParams, f: &FoamOptions, width: f64) -> SatinParams {
 pub fn foam(paths: &[SubPath], p: &SatinParams, fabric: &FabricProfile) -> Vec<Run> {
     let f = p.foam.unwrap_or_default();
     // the columns: every sub-path its own (multi), else the whole object
-    let groups: Vec<Vec<SubPath>> = if p.multi && paths.len() > 1 { paths.iter().map(|s| vec![s.clone()]).collect() } else { vec![paths.to_vec()] };
+    let groups = super::satin::columns(paths, p);
     let single = SatinParams { multi: false, foam: None, layered: None, ..p.clone() };
     let columns: Vec<(Vec<SubPath>, Column)> = groups
         .into_iter()

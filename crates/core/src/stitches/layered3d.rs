@@ -44,13 +44,13 @@ pub fn start_thread<'a>(obj: &'a Object, doc: &Document) -> &'a str {
 
 /// The column's (narrowest, for several sub-paths) mean width.
 fn width(paths: &[SubPath], p: &SatinParams) -> f64 {
-    let groups: Vec<Vec<SubPath>> = if p.multi && paths.len() > 1 { paths.iter().map(|s| vec![s.clone()]).collect() } else { vec![paths.to_vec()] };
+    let groups = super::satin::columns(paths, p);
     let single = SatinParams { multi: false, ..p.clone() };
     groups
         .iter()
         .filter_map(|g| {
             let pairs = plot_points_on_rails(&satin_geometry(g, &single)?, 0.5, 0.0, 0.0);
-            (!pairs.is_empty()).then(|| pairs.iter().map(|(a, b)| a.dist(*b)).sum::<f64>() / pairs.len() as f64)
+            (!pairs.is_empty()).then(|| super::satin::mean_width(&pairs))
         })
         .fold(f64::INFINITY, f64::min)
 }

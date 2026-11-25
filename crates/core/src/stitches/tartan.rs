@@ -199,18 +199,7 @@ fn bands(sett: &[Stripe], color: &str, lo: f64, hi: f64) -> (Vec<(f64, f64)>, Ve
 
 /// Where a horizontal line at `y` lies inside the rings (even-odd).
 fn scan(rings: &[Ring], y: f64) -> Vec<(f64, f64)> {
-    let mut xs = Vec::new();
-    for r in rings {
-        let n = r.len();
-        for i in 0..n {
-            let (a, b) = (r[i], r[(i + 1) % n]);
-            if (a.y <= y && b.y > y) || (b.y <= y && a.y > y) {
-                xs.push(a.x + (y - a.y) / (b.y - a.y) * (b.x - a.x));
-            }
-        }
-    }
-    xs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    xs.chunks(2).filter(|c| c.len() == 2 && c[1] - c[0] > 1e-6).map(|c| (c[0], c[1])).collect()
+    crate::geom::scanline_spans(rings, y, 1e-6)
 }
 
 fn intersect(a: &[(f64, f64)], b: &[(f64, f64)]) -> Vec<(f64, f64)> {

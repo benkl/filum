@@ -22,12 +22,7 @@ struct Line {
     src: usize,
 }
 
-fn seg_project(p: Point, a: Point, b: Point) -> (f64, Point) {
-    let d = b - a;
-    let l2 = d.dot(d);
-    let t = if l2 < 1e-12 { 0.0 } else { ((p - a).dot(d) / l2).clamp(0.0, 1.0) };
-    (t, a + d * t)
-}
+use crate::geom::seg_project;
 
 fn seg_cross(a: Point, b: Point, c: Point, d: Point) -> Option<(f64, f64)> {
     let r = b - a;

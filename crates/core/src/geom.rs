@@ -242,11 +242,7 @@ pub fn substring(pts: &[Point], cum: &[f64], d0: f64, d1: f64) -> Vec<Point> {
 pub fn project(pts: &[Point], cum: &[f64], p: Point) -> (f64, f64) {
     let mut best = (0.0, f64::INFINITY);
     for i in 1..pts.len() {
-        let (a, b) = (pts[i - 1], pts[i]);
-        let ab = b - a;
-        let l2 = ab.length_sq();
-        let t = if l2 < 1e-18 { 0.0 } else { ((p - a).dot(ab) / l2).clamp(0.0, 1.0) };
-        let q = a + ab * t;
+        let (t, q) = seg_project(p, pts[i - 1], pts[i]);
         let d = q.dist(p);
         if d < best.1 {
             best = (cum[i - 1] + t * (cum[i] - cum[i - 1]), d);
@@ -443,6 +439,11 @@ pub fn rings_bounds(rings: &[Ring]) -> Rect {
 /// Intersect a horizontal line y with the region, returning sorted
 /// inside-intervals [x0,x1] (even-odd rule).
 pub fn scanline(rings: &[Ring], y: f64) -> Vec<(f64, f64)> {
+    scanline_spans(rings, y, 1e-9)
+}
+
+/// `scanline` keeping only spans longer than `min_span` (mm).
+pub fn scanline_spans(rings: &[Ring], y: f64, min_span: f64) -> Vec<(f64, f64)> {
     let mut xs: Vec<f64> = Vec::new();
     for ring in rings {
         let n = ring.len();
@@ -456,8 +457,8 @@ pub fn scanline(rings: &[Ring], y: f64) -> Vec<(f64, f64)> {
             }
         }
     }
-    xs.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    xs.chunks_exact(2).map(|c| (c[0], c[1])).filter(|(a, b)| b - a > 1e-9).collect()
+    xs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    xs.chunks_exact(2).map(|c| (c[0], c[1])).filter(|(a, b)| b - a > min_span).collect()
 }
 
 /// Do two segments properly intersect (excluding shared endpoints)?
@@ -666,24 +667,35 @@ pub fn dist_to_boundary(rings: &[Ring], p: Point) -> f64 {
     for ring in rings {
         let n = ring.len();
         for i in 0..n {
-            let a = ring[i];
-            let b = ring[(i + 1) % n];
-            let ab = b - a;
-            let l2 = ab.length_sq();
-            let t = if l2 < 1e-18 { 0.0 } else { ((p - a).dot(ab) / l2).clamp(0.0, 1.0) };
-            best = best.min((a + ab * t).dist(p));
+            best = best.min(seg_dist(p, ring[i], ring[(i + 1) % n]));
         }
     }
     best
 }
 
-/// Distance from a point to the segment a–b (as `dist_to_boundary` measures it).
+/// Where `p` projects onto the segment a–b: its parameter t (0 at a, 1 at
+/// b) and the point. A segment of no length (under 1e-9 mm) projects to a.
 #[inline]
-fn seg_dist(p: Point, a: Point, b: Point) -> f64 {
+pub fn seg_project(p: Point, a: Point, b: Point) -> (f64, Point) {
     let ab = b - a;
     let l2 = ab.length_sq();
     let t = if l2 < 1e-18 { 0.0 } else { ((p - a).dot(ab) / l2).clamp(0.0, 1.0) };
-    (a + ab * t).dist(p)
+    (t, a + ab * t)
+}
+
+/// A ring as a closed polyline: its first point again at the end.
+pub fn closed(r: &[Point]) -> Vec<Point> {
+    let mut v = r.to_vec();
+    if let Some(&f) = r.first() {
+        v.push(f);
+    }
+    v
+}
+
+/// Distance from a point to the segment a–b.
+#[inline]
+pub fn seg_dist(p: Point, a: Point, b: Point) -> f64 {
+    seg_project(p, a, b).1.dist(p)
 }
 
 /// `dist_to_boundary` for many points of one region: the outline's segments
@@ -946,8 +958,8 @@ pub(crate) fn chaikin_ring(ring: &[Point], max_cut: f64) -> Ring {
 }
 
 /// Offset region by `delta` (negative = inset) with round corners. Returns
-/// even-odd rings. Exact (Clipper2); `_resolution` is kept for compatibility.
-pub fn offset_rings(rings: &[Ring], delta: f64, _resolution: f64) -> Vec<Ring> {
+/// even-odd rings. Exact (Clipper2).
+pub fn offset_rings(rings: &[Ring], delta: f64) -> Vec<Ring> {
     if delta.abs() < 1e-9 {
         return rings.to_vec();
     }
@@ -1076,7 +1088,7 @@ mod tests {
 
     #[test]
     fn inset_square() {
-        let r = offset_rings(&[square(10.0)], -1.0, 0.05);
+        let r = offset_rings(&[square(10.0)], -1.0);
         assert_eq!(r.len(), 1);
         let a = signed_area(&r[0]).abs();
         assert!((a - 64.0).abs() < 2.0, "area {a}");

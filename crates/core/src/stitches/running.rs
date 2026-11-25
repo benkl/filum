@@ -155,43 +155,7 @@ fn take_stitch(start: Point, points: &[Point], idx: usize, len: f64, tol: f64) -
 
 /// Split a polyline into even-length stitches. Includes the end point, not the start.
 pub fn stitch_curve_evenly(points: &[Point], length: f64, tol: f64) -> Vec<Point> {
-    if points.len() < 2 {
-        return vec![];
-    }
-    let n = points.len();
-    let mut dist_left = vec![0.0; n];
-    for j in (0..n - 1).rev() {
-        dist_left[j] = dist_left[j + 1] + points[j].dist(points[j + 1]);
-    }
-    let mut i = Some(1usize);
-    let mut last = points[0];
-    let mut out = Vec::new();
-    let mut guard = 0;
-    while let Some(ii) = i {
-        if ii >= n || guard > 1_000_000 {
-            break;
-        }
-        guard += 1;
-        let d = last.dist(points[ii]) + dist_left[ii];
-        if d <= 1e-9 {
-            break;
-        }
-        let stitch_len = d / (d / length).ceil() + 1e-6;
-        let (s, ni) = take_stitch(last, points, ii, stitch_len, tol);
-        i = ni;
-        if let Some(s) = s {
-            if s.dist(last) > 1e-9 {
-                out.push(s);
-                last = s;
-            }
-        }
-    }
-    if let Some(l) = points.last() {
-        if out.last().map_or(true, |o| o.dist(*l) > 1e-6) {
-            out.push(*l);
-        }
-    }
-    out
+    stitch_curve_pattern(points, &[length], tol, 0).0
 }
 
 /// Split a path at sharp corners (> 45°) so corners are stitched exactly.
@@ -243,20 +207,7 @@ pub fn running_stitch(points: &[Point], length: f64, tol: f64) -> Vec<Point> {
 
 /// Bean stitch: repeat every stitch back and forth `repeats` extra times.
 pub fn bean_stitch(stitches: &[Point], repeats: u32) -> Vec<Point> {
-    if repeats == 0 || stitches.len() < 2 {
-        return stitches.to_vec();
-    }
-    let mut out = vec![stitches[0]];
-    for w in stitches.windows(2) {
-        out.push(w[1]);
-        for k in 0..repeats {
-            out.push(if k % 2 == 0 { w[0] } else { w[1] });
-        }
-        if repeats % 2 == 1 {
-            out.push(w[1]);
-        }
-    }
-    out
+    bean_stitch_pattern(stitches, &[repeats])
 }
 
 /// Traverse a running stitch path `repeats` times (there and back).
@@ -464,9 +415,6 @@ pub fn running_stitch_with(points: &[Point], len: &StitchLength, tol: f64, strea
 pub fn bean_stitch_pattern(stitches: &[Point], pattern: &[u32]) -> Vec<Point> {
     if pattern.is_empty() || pattern.iter().all(|r| *r == 0) || stitches.len() < 2 {
         return stitches.to_vec();
-    }
-    if pattern.len() == 1 {
-        return bean_stitch(stitches, pattern[0]);
     }
     let mut out = vec![stitches[0]];
     for (i, w) in stitches.windows(2).enumerate() {

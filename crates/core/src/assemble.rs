@@ -588,7 +588,7 @@ fn knockdown_runs(doc: &Document, items: &[(usize, Vec<Run>)]) -> Vec<Run> {
     let mut runs: Vec<Run> = Vec::new();
     for k in 0..o.knockdown_layers.clamp(1, 2) {
         let from = runs.last().and_then(|r| r.last()).map(|x| x.0);
-        runs.extend(crate::stitches::fill::tatami(&rings, o.knockdown_angle + 90.0 * k as f64, spacing, 0.0, false, len, 2, 0.0, 3.0, from, None, None, 0));
+        runs.extend(crate::stitches::fill::tatami(&rings, o.knockdown_angle + 90.0 * k as f64, spacing, 0.0, false, len, 2, 0.0, 3.0, from, None, None, &Default::default(), 0));
     }
     crate::stitches::fill::chain(&rings, runs, 3.0, 0)
 }
@@ -714,12 +714,7 @@ impl Ahead<'_> {
     }
 }
 
-fn seg_dist(p: Point, a: Point, b: Point) -> f64 {
-    let d = b - a;
-    let l2 = d.length_sq();
-    let t = if l2 < 1e-12 { 0.0 } else { ((p - a).dot(d) / l2).clamp(0.0, 1.0) };
-    (a + d * t).dist(p)
-}
+use crate::geom::seg_dist;
 
 fn fallback_thread(i: usize) -> Thread {
     Thread::new(format!("auto{i}"), "Black", "#1c1c1c")

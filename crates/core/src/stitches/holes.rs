@@ -32,15 +32,10 @@ const SLIDES: [f64; 4] = [0.2, 0.3, 0.45, 0.6];
 /// A slid point leaves stitches at least this long (mm).
 const MIN_STITCH: f64 = 0.3;
 
-fn seg_dist(p: Point, a: Point, b: Point) -> f64 {
-    let (dx, dy) = (b.x - a.x, b.y - a.y);
-    let l2 = dx * dx + dy * dy;
-    let t = if l2 < 1e-12 { 0.0 } else { (((p.x - a.x) * dx + (p.y - a.y) * dy) / l2).clamp(0.0, 1.0) };
-    (a.x + dx * t - p.x).hypot(a.y + dy * t - p.y)
-}
+use crate::geom::seg_dist;
 
 fn lerp(a: Point, b: Point, t: f64) -> Point {
-    Point { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }
+    a.lerp(b, t)
 }
 
 /// The needle holes made so far.

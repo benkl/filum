@@ -20,7 +20,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::clip;
-use crate::geom::{polyline_length, pt, signed_area, simplify, trace_contours, Point, Ring};
+use crate::geom::{chaikin_ring, polyline_length, pt, signed_area, simplify, simplify_ring, trace_contours, Point, Ring};
 use crate::model::{
     hex_color, DitherMethod, FillMethod, FillParams, FlowField, GradientKind, GradientParams, GradientStop, Node, Object, RunningParams, SatinParams, StitchParams, SubPath, Thread,
 };
@@ -515,7 +515,7 @@ fn merge_close_colors(q: &mut Quant, thr: f64) {
     };
     for a in 0..n {
         for b in a + 1..n {
-            if vision::delta_e(labs[a], labs[b]) < thr {
+            if vision::delta_e2000(labs[a], labs[b]) < thr {
                 let (ra, rb) = (find(&to, a), find(&to, b));
                 if ra != rb {
                     // the bigger colour survives
@@ -1019,7 +1019,7 @@ fn grow_under_neighbours(regions: &mut [Region], region_comp: &[usize], ordered:
             let paths: Vec<SubPath> = if opts.seamless {
                 rings.iter().map(|r| clip::fit_ring(r, 0.02, 35.0)).filter(|sp| sp.nodes.len() >= 3).collect()
             } else {
-                rings.iter().map(|r| SubPath::polyline(&round_pts(&simplify_closed(r, 0.02)), true)).filter(|sp| sp.nodes.len() >= 3).collect()
+                rings.iter().map(|r| SubPath::polyline(&round_pts(&simplify_ring(r, 0.02)), true)).filter(|sp| sp.nodes.len() >= 3).collect()
             };
             (!paths.is_empty()).then_some(paths)
         })
@@ -1046,7 +1046,7 @@ fn snap_rgb(rgb: [u8; 3], opts: &DigitizeOptions) -> ([u8; 3], String, String, S
     let e = opts
         .palette
         .iter()
-        .min_by(|a, b| vision::delta_e(l, rgb_to_lab(a.rgb)).partial_cmp(&vision::delta_e(l, rgb_to_lab(b.rgb))).unwrap())
+        .min_by(|a, b| vision::delta_e2000(l, rgb_to_lab(a.rgb)).partial_cmp(&vision::delta_e2000(l, rgb_to_lab(b.rgb))).unwrap())
         .unwrap();
     (e.rgb, e.name.clone(), e.code.clone(), opts.palette_brand.clone())
 }
@@ -1367,7 +1367,7 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
             // drifts with blur and compression)
             let dark = |c: [u8; 3]| rgb_to_lab(c)[0] < 40.0;
             let rgb = match ls.label {
-                None => keyed.iter().map(|(c, _)| *c).find(|c| crate::threads::delta_e(*c, rgb) < if dark(*c) && dark(rgb) { 20.0 } else { 12.0 }).unwrap_or(rgb),
+                None => keyed.iter().map(|(c, _)| *c).find(|c| crate::threads::delta_e76(*c, rgb) < if dark(*c) && dark(rgb) { 20.0 } else { 12.0 }).unwrap_or(rgb),
                 Some(_) => rgb,
             };
             keyed.push((rgb, ls));
@@ -1463,7 +1463,7 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
             StitchParams::Fill(_) => {
                 let inky = threads.iter().find(|t| t.id == o.thread).is_some_and(|t| {
                     let lab = rgb_to_lab(t.rgb());
-                    lab[0] <= 45.0 || vision::delta_e(lab, rgb_to_lab(opts.outline_color)) <= 15.0
+                    lab[0] <= 45.0 || vision::delta_e2000(lab, rgb_to_lab(opts.outline_color)) <= 15.0
                 });
                 if inky {
                     let rings: Vec<Ring> = o.paths.iter().map(|sp| sp.flatten(0.05)).filter(|r| r.len() >= 3).collect();
@@ -1577,7 +1577,7 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
                 continue;
             }
             let contrast = match (colour_lab(c.left), colour_lab(c.right)) {
-                (Some(a), Some(b)) => vision::delta_e(a, b),
+                (Some(a), Some(b)) => vision::delta_e2000(a, b),
                 _ => 100.0,
             };
             if contrast < opts.edge_contrast {
@@ -1724,7 +1724,7 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
             let mut lines = Vec::new();
             for st in &found {
                 let pts: Vec<Point> = st.pts.iter().map(|p| *p * s).collect();
-                let pts = if st.closed { simplify_closed(&chaikin_closed(&pts), ctx.tol) } else { simplify(&smooth_open(&pts, 2), ctx.tol) };
+                let pts = if st.closed { simplify_ring(&chaikin_ring(&pts, f64::INFINITY), ctx.tol) } else { simplify(&smooth_open(&pts, 2), ctx.tol) };
                 if pts.len() >= 2 && polyline_length(&pts) >= 1.5 {
                     let mut flat = pts.clone();
                     if st.closed {
@@ -1906,9 +1906,9 @@ fn apply_color_order(threads: Vec<Thread>, objects: Vec<Object>, order: &[[u8; 3
         let lab = rgb_to_lab(*c);
         let best = (0..threads.len())
             .filter(|&i| rank[i] == usize::MAX)
-            .min_by(|&a, &b| vision::delta_e(labs[a], lab).partial_cmp(&vision::delta_e(labs[b], lab)).unwrap());
+            .min_by(|&a, &b| vision::delta_e2000(labs[a], lab).partial_cmp(&vision::delta_e2000(labs[b], lab)).unwrap());
         if let Some(i) = best {
-            if vision::delta_e(labs[i], lab) < 12.0 {
+            if vision::delta_e2000(labs[i], lab) < 12.0 {
                 rank[i] = r;
             }
         }
@@ -2770,7 +2770,7 @@ fn find_lines(
         let col = [ls[ls.len() / 2] as f64, sa / n, sb / n];
         let label = (0..ncolors)
             .filter(|&l| !background[l])
-            .map(|l| (l, vision::delta_e(col, rgb_to_lab(colors_rgb(l)))))
+            .map(|l| (l, vision::delta_e2000(col, rgb_to_lab(colors_rgb(l)))))
             .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
             .filter(|(_, d)| *d <= 12.0)
             .map(|(l, _)| l);
@@ -2794,7 +2794,7 @@ fn find_lines(
             .iter()
             .map(|&l| (l, rgb_to_lab(colors_rgb(l))))
             .filter(|(_, c)| c[0] < 40.0)
-            .map(|(l, c)| (l, vision::delta_e(lab_ls, c)))
+            .map(|(l, c)| (l, vision::delta_e2000(lab_ls, c)))
             .filter(|(_, d)| *d <= 20.0)
             .min_by(|a, b| a.1.total_cmp(&b.1))
             .map(|(l, _)| l);
@@ -3079,7 +3079,7 @@ fn stroke_object(st: &strokes::Stroke, reverse: bool, s: f64, ctx: &Ctx, fixed: 
     let tol = if small { ctx.tol.min(0.05) } else { ctx.tol };
     let smooth = |pts: &[Point]| -> Vec<Point> {
         if st.closed {
-            simplify_closed(&chaikin_closed(pts), tol)
+            simplify_ring(&chaikin_ring(pts, f64::INFINITY), tol)
         } else {
             simplify(&smooth_open(pts, 2), tol)
         }
@@ -3383,7 +3383,7 @@ fn silhouette_rings(mask: &[bool], w: usize, h: usize, s: f64, opts: &DigitizeOp
         if depth % 2 == 1 {
             continue;
         }
-        let ring = simplify_closed(&chaikin_closed(r), tol);
+        let ring = simplify_ring(&chaikin_ring(r, f64::INFINITY), tol);
         if ring.len() >= 3 {
             out.push(ring);
         }
@@ -3479,24 +3479,7 @@ fn downscale(rgba: &[u8], w: usize, h: usize, max_px: usize) -> (Vec<[u8; 4]>, u
 const SEED: u64 = 0x2545_F491_4F6C_DD1D;
 
 /// xorshift64 — tiny, fast, and identical on every platform.
-struct Rng(u64);
-
-impl Rng {
-    fn next_u64(&mut self) -> u64 {
-        let mut x = self.0;
-        x ^= x << 13;
-        x ^= x >> 7;
-        x ^= x << 17;
-        self.0 = x;
-        x
-    }
-    fn unit(&mut self) -> f64 {
-        (self.next_u64() >> 11) as f64 * (1.0 / (1u64 << 53) as f64)
-    }
-    fn below(&mut self, n: usize) -> usize {
-        (self.next_u64() % n.max(1) as u64) as usize
-    }
-}
+use crate::prng::Xorshift64 as Rng;
 
 /// sRGB → linear lookup table (same formula as [`crate::threads::rgb_to_lab`]).
 fn srgb_lut() -> Vec<f64> {
@@ -3755,10 +3738,10 @@ fn split_background(q: &mut Quant, lab: &Img, w: usize, h: usize, s: f64, opts: 
         // knocked-out letter tinted by JPEG ringing): a face or a sun has an inside of
         // some size
         let Some((m, n)) = mean(pix) else { continue };
-        if (n as f64) < (20.0 / (s * s)).max(16.0) || vision::delta_e(m, border) <= thr {
+        if (n as f64) < (20.0 / (s * s)).max(16.0) || vision::delta_e2000(m, border) <= thr {
             continue;
         }
-        let at = shades.iter().position(|(s, c)| vision::delta_e(s.map(|v| v / *c as f64), m) <= thr.max(5.0));
+        let at = shades.iter().position(|(s, c)| vision::delta_e2000(s.map(|v| v / *c as f64), m) <= thr.max(5.0));
         let si = match at {
             Some(i) => i,
             None => {
@@ -3781,7 +3764,7 @@ fn split_background(q: &mut Quant, lab: &Img, w: usize, h: usize, s: f64, opts: 
     let old_t = n as u8;
     for (sum, c) in &shades {
         let m = sum.map(|v| v / *c as f64);
-        let near = (0..q.colors.len()).filter(|&l| l != bg).find(|&l| vision::delta_e(rgb_to_lab(q.colors[l]), m) <= thr);
+        let near = (0..q.colors.len()).filter(|&l| l != bg).find(|&l| vision::delta_e2000(rgb_to_lab(q.colors[l]), m) <= thr);
         if let Some(l) = near {
             label_of.push(l as u8);
             continue;
@@ -3789,7 +3772,7 @@ fn split_background(q: &mut Quant, lab: &Img, w: usize, h: usize, s: f64, opts: 
         let (rgb, pidx) = if pal_lab.is_empty() {
             (lab_to_rgb(m), None)
         } else {
-            let e = (0..pal_lab.len()).min_by(|&a, &b| vision::delta_e(pal_lab[a], m).total_cmp(&vision::delta_e(pal_lab[b], m))).unwrap();
+            let e = (0..pal_lab.len()).min_by(|&a, &b| vision::delta_e2000(pal_lab[a], m).total_cmp(&vision::delta_e2000(pal_lab[b], m))).unwrap();
             (opts.palette[e].rgb, Some(e))
         };
         // the chart maps it onto the background's own thread: nothing to split
@@ -3860,7 +3843,7 @@ fn quantize(px: &[[u8; 4]], w: usize, h: usize, opts: &DigitizeOptions) -> Quant
                 opts.palette.iter().position(|e| e.rgb == *rgb).or_else(|| {
                     pal_lab
                         .iter()
-                        .map(|pl| vision::delta_e(*lab, *pl))
+                        .map(|pl| vision::delta_e2000(*lab, *pl))
                         .enumerate()
                         .filter(|&(_, d)| d <= SAME_THREAD_DE)
                         .min_by(|a, b| a.1.total_cmp(&b.1))
@@ -4241,31 +4224,6 @@ fn round_pts(pts: &[Point]) -> Vec<Point> {
     pts.iter().map(|p| pt(r3(p.x), r3(p.y))).collect()
 }
 
-fn chaikin_closed(ring: &[Point]) -> Ring {
-    let n = ring.len();
-    if n < 3 {
-        return ring.to_vec();
-    }
-    let mut out = Vec::with_capacity(n * 2);
-    for i in 0..n {
-        let (a, b) = (ring[i], ring[(i + 1) % n]);
-        out.push(a.lerp(b, 0.25));
-        out.push(a.lerp(b, 0.75));
-    }
-    out
-}
-
-fn simplify_closed(ring: &[Point], tol: f64) -> Ring {
-    if ring.len() < 4 {
-        return ring.to_vec();
-    }
-    let mut closed = ring.to_vec();
-    closed.push(ring[0]);
-    let mut s = simplify(&closed, tol);
-    s.pop();
-    s
-}
-
 /// Moving average with the window shrinking at the ends (endpoints fixed).
 fn smooth_open(pts: &[Point], radius: usize) -> Vec<Point> {
     let n = pts.len();
@@ -4314,7 +4272,7 @@ fn process_region(ctx: &Ctx, c: &Comp, pix: &[u32], w: usize) -> Option<Region> 
         .iter()
         .map(|r| {
             let mm: Vec<Point> = r.iter().map(|p| to_mm(*p)).collect();
-            simplify_closed(&chaikin_closed(&mm), ctx.tol)
+            simplify_ring(&chaikin_ring(&mm, f64::INFINITY), ctx.tol)
         })
         .filter(|r| r.len() >= 3 && signed_area(r).abs() > min_area)
         .collect();
@@ -4338,7 +4296,7 @@ fn process_region(ctx: &Ctx, c: &Comp, pix: &[u32], w: usize) -> Option<Region> 
                 .into_iter()
                 .max_by(|a, b| signed_area(a).abs().partial_cmp(&signed_area(b).abs()).unwrap())?;
             let mm: Vec<Point> = ring.iter().map(|p| to_mm(*p)).collect();
-            let r = simplify_closed(&chaikin_closed(&mm), ctx.tol);
+            let r = simplify_ring(&chaikin_ring(&mm, f64::INFINITY), ctx.tol);
             // a crumb (a few anti-aliased pixels) rather than a hairline
             if r.len() < 3 || polyline_length(&r) < opts.line_min_mm.min(2.0) {
                 return None;

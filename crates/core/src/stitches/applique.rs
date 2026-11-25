@@ -13,7 +13,7 @@ use super::fill::fill_rings;
 use super::running::running_stitch;
 use super::satin::satin;
 use super::Run;
-use crate::geom::{offset_rings, point_in_ring, point_in_rings, rings_bounds, signed_area, Point, Ring};
+use crate::geom::{offset_rings, point_in_ring, point_in_rings, signed_area, Point, Ring};
 use crate::model::{AppliqueParams, CoverKind, SatinMethod, SatinParams, SubPath, TackdownKind};
 use crate::plan::flags;
 
@@ -42,11 +42,7 @@ fn oriented(rings: Vec<Ring>) -> Vec<Ring> {
         .collect()
 }
 
-fn closed(r: &Ring) -> Vec<Point> {
-    let mut v = r.clone();
-    v.push(r[0]);
-    v
-}
+use crate::geom::closed;
 
 fn as_paths(rings: &[Ring]) -> Vec<SubPath> {
     rings.iter().map(|r| SubPath::polyline(r, true)).collect()
@@ -77,14 +73,12 @@ pub fn applique(paths: &[SubPath], p: &AppliqueParams, extra_pull: f64, density:
         return vec![];
     }
     let rings = oriented(rings);
-    let b = rings_bounds(&rings);
-    let res = (b.width().max(b.height()) / 1500.0).clamp(0.03, 0.15);
     let mut runs: Vec<Run> = Vec::new();
     let last = |runs: &Vec<Run>| runs.last().and_then(|r| r.last()).map(|x| x.0);
 
     // 1. placement line, inside the edge (free edge: 5 mm inside)
     let inset = if p.free_edge { crate::model::APPLIQUE_FREE_EDGE_INSET } else { within(p.placement_inset, 0.0, MAX_WIDTH, 0.0) };
-    let placed = if inset > 1e-6 { oriented(offset_rings(&rings, -inset, res)) } else { rings.clone() };
+    let placed = if inset > 1e-6 { oriented(offset_rings(&rings, -inset)) } else { rings.clone() };
     let placed = if placed.is_empty() { rings.clone() } else { placed };
     let tackdown = if p.free_edge { TackdownKind::None } else { p.tackdown };
     if p.placement {
@@ -100,7 +94,7 @@ pub fn applique(paths: &[SubPath], p: &AppliqueParams, extra_pull: f64, density:
     }
 
     // 2. tack-down, a little inside the edge
-    let tack = if p.tackdown_inset > 1e-6 { oriented(offset_rings(&rings, -within(p.tackdown_inset, 0.0, MAX_WIDTH, 0.0), res)) } else { rings.clone() };
+    let tack = if p.tackdown_inset > 1e-6 { oriented(offset_rings(&rings, -within(p.tackdown_inset, 0.0, MAX_WIDTH, 0.0))) } else { rings.clone() };
     let tack = if tack.is_empty() { rings.clone() } else { tack };
     match tackdown {
         TackdownKind::None => {}
@@ -132,7 +126,7 @@ pub fn applique(paths: &[SubPath], p: &AppliqueParams, extra_pull: f64, density:
 
     // 3. cover stitch over the raw edge
     if p.cover != CoverKind::None {
-        let cover = if p.cover_offset.abs() > 1e-6 { oriented(offset_rings(&rings, within(p.cover_offset, -MAX_WIDTH, MAX_WIDTH, 0.0), res)) } else { rings.clone() };
+        let cover = if p.cover_offset.abs() > 1e-6 { oriented(offset_rings(&rings, within(p.cover_offset, -MAX_WIDTH, MAX_WIDTH, 0.0))) } else { rings.clone() };
         let cover = if cover.is_empty() { rings.clone() } else { cover };
         let sp = SatinParams {
             method: if p.cover == CoverKind::Satin { SatinMethod::Satin } else { SatinMethod::EStitch },

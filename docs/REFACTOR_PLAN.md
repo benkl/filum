@@ -47,16 +47,16 @@ Each removes copies without changing behaviour.
 
 ## Phase 4 — engine helpers (guarded by the plan hashes)
 
-- [ ] **Geometry**: one public `seg_project` / `seg_dist` in `geom.rs` (eight copies); `simplify_closed` and `chaikin_closed` in digitize call the `geom` versions; tartan's scanline uses `geom::scanline`.
-- [ ] **`raster.rs`**: the distance transform, ring rasterisation, Zhang–Suen thinning and the 4/8-neighbour iterators, out of `digitize.rs`, `geom.rs`, `convert.rs` and `density.rs`.
-- [ ] **Run building** in `stitches/mod.rs`: `push`, `sew_along`, `route_along` (about 19 hand-written copies), `closed`, `roll_to_vertex`, `flip_for`.
-- [ ] **Running stitch**: even and bean stitching as one-value cases of the pattern versions.
-- [ ] **Satin columns**: `columns`, `mean_width`, `centre_line` in `satin.rs` for satin, foam, layered 3D, ripple and convert.
-- [ ] **Tatami options**: a `TatamiOpts` struct replaces the nine thread-local settings and the 13–14 argument lists.
-- [ ] **Random numbers**: one `Xorshift64` in `prng.rs`.
-- [ ] **Colour**: `color.rs` with `rgb_to_lab`, `de76`, `de2000` (two different functions are both called `delta_e` today).
-- [ ] **SVG**: one table per enum for import and export; export split into fill, satin and running parts next to their import twins.
-- [ ] **Fabrics**: limits next to the profile in `model.rs`; the centre-out set derived or its difference documented.
+- [x] **Geometry**: `geom::seg_project` / `seg_dist` for eight copies; digitize's ring helpers are `geom::simplify_ring` / `chaikin_ring`; `geom::scanline_spans` for tartan's scanline; `geom::closed` for two copies.
+- [ ] **`raster.rs`**: not done. The two distance transforms differ in precision (`f32` in `geom.rs`, which automatic underlay's widths come from; `f64` in the digitizer), so merging them changes stitches; the helpers other modules borrow from `digitize.rs` are only used behind the same `digitize` feature, so moving them would only relocate code.
+- [x] **Run building** in `stitches/mod.rs`: `push` (three copies) and `sew_along` (eleven loops); `flip_for` for the start/end decision of lines and of fills. Tartan's and decor's loops push without the duplicate check and stay.
+- [x] **Running stitch**: even and bean stitching are the one-value cases of the pattern versions.
+- [x] **Satin columns**: `satin::columns` and `mean_width` for satin, foam, layered 3D and the region code (the centre lines differ in spacing and stay).
+- [x] **Tatami options**: `TatamiOpts`, passed explicitly, replaces seven thread-local settings that the fill set and reset by hand (and that guided rows, blended rows and the knockdown inherited silently). The start pin (set per object by assembly) and the random split (a scoped closure) stay. The plan hashes gained a case for each setting first, recorded before the change.
+- [x] **Random numbers**: `prng::Xorshift64` for three copies (the gradient's hash differs from `prng::uniform` by a constant and stays, so its patterns don't move).
+- [x] **Colour**: the two `delta_e`s are `threads::delta_e76` (RGB) and `vision::delta_e2000` (Lab). The digitizer's lookup-table conversion stays (speed).
+- [x] **SVG**: one name table per enum for six of them (guided strategy, satin method, rail reverse, ripple axis and guide position, locks), read and written through it, with a round-trip test. Fill method and cross kind map several values to one name and read prefixes: they stay. Splitting `export_svg` is left for Phase 5.
+- [x] **Fabrics**: `FabricLimits` and `Fabric::limits` next to the profile in `model.rs`; the centre-out set is `optimize::center_out_by_default`, read by the editor from the generated constants. Also: `offset_rings` lost its unused resolution argument (and the code computing it).
 
 ## Phase 5 — large files and the stylesheet
 
@@ -92,3 +92,5 @@ Each removes copies without changing behaviour.
 - Engine defaults as decided (phase 1).
 - `placeNear` and `Seg` for 43 groups (`Seg` takes on/off choices, no current choice, extra classes and a style).
 - Constants and types generated from the engine, the editor's types checked against them, the engine calls in one table.
+
+**Phase 4** (2026-11-25): the engine helpers above, every step with the plan hashes and a hash of the Koi's whole plan (with and without Avoid holes and Hide travel) bit-identical. Not done: `raster.rs` (see above), one spatial grid type (six grids whose queries differ in small ways), one stitch-path loop for tatami and circular (they keep different runs).

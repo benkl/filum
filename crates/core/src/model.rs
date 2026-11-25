@@ -1794,6 +1794,54 @@ pub enum Fabric {
     Silk,
 }
 
+/// What a fabric takes.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct FabricLimits {
+    /// The fabric's own weight (g/m²), typical for the kind.
+    pub gsm: f64,
+    /// Needle holes per mm²: heavy above `holes_heavy`, a risk above `holes_max`.
+    pub holes_heavy: f64,
+    pub holes_max: f64,
+    /// Thread layers: heavy above `layers_heavy`, a risk above `layers_max`.
+    pub layers_heavy: f64,
+    pub layers_max: f64,
+    /// Covering fills and satins below this many layers let the fabric show.
+    pub layers_min: f64,
+    /// Added weight relative to the fabric's: stiff above this.
+    pub stiff_ratio: f64,
+}
+
+impl Fabric {
+    /// Density limits of the fabric. Needle holes follow the common tiers for
+    /// ordinary wovens (10 / 17 points per mm²), tighter for fabrics a line of
+    /// holes tears (sheer, silk, leather, knits) and looser for heavy ones;
+    /// layers: a default fill with its underlay is about 1.3, two stacked 2.6,
+    /// three about 4 — heavy
+    /// from about two fills, a risk from three on ordinary wovens; pile
+    /// (towel, fleece) needs more cover to keep the loops down. Stiffness:
+    /// added weight against the fabric's (a default fill adds ≈ 170 g/m²).
+    pub fn limits(self) -> FabricLimits {
+        let l = |gsm, holes_heavy, holes_max, layers_heavy, layers_max, layers_min, stiff_ratio| FabricLimits { gsm, holes_heavy, holes_max, layers_heavy, layers_max, layers_min, stiff_ratio };
+        match self {
+            Fabric::Cotton => l(130.0, 10.0, 17.0, 2.4, 3.8, 0.6, 1.5),
+            Fabric::Polyester => l(110.0, 10.0, 17.0, 2.4, 3.8, 0.6, 1.5),
+            Fabric::Denim => l(400.0, 14.0, 25.0, 2.8, 4.4, 0.6, 0.8),
+            Fabric::Knit => l(160.0, 8.0, 14.0, 2.1, 3.2, 0.6, 1.2),
+            Fabric::Sheer => l(40.0, 5.0, 9.0, 1.6, 2.4, 0.5, 3.0),
+            Fabric::Felt => l(300.0, 12.0, 22.0, 2.8, 4.4, 0.5, 1.0),
+            Fabric::Towel => l(450.0, 12.0, 22.0, 2.8, 4.4, 0.8, 0.7),
+            Fabric::Cap => l(300.0, 14.0, 25.0, 3.0, 4.8, 0.6, 1.0),
+            Fabric::Fleece => l(250.0, 10.0, 18.0, 2.6, 4.0, 0.7, 1.0),
+            Fabric::Pique => l(200.0, 9.0, 16.0, 2.4, 3.8, 0.65, 1.0),
+            Fabric::Leather => l(600.0, 5.0, 9.0, 1.8, 2.8, 0.5, 0.5),
+            Fabric::Canvas => l(350.0, 14.0, 25.0, 2.8, 4.4, 0.6, 0.8),
+            Fabric::Silk => l(70.0, 6.0, 11.0, 1.7, 2.6, 0.6, 2.0),
+        }
+    }
+}
+
 /// Fabric-aware defaults: how a fabric modifies compensation, density and underlay.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]

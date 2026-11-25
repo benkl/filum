@@ -21,16 +21,8 @@ use crate::plan::flags;
 use super::fill::{tatami, travel_path};
 use super::meander_tiles::{Tile, SNAP};
 use super::running::running_stitch;
-use super::Run;
+use super::{push, sew_along, Run};
 
-fn push(run: &mut Run, p: Point, f: u8) {
-    if let Some(&(last, _)) = run.last() {
-        if last.dist(p) < 1e-6 {
-            return;
-        }
-    }
-    run.push((p, f));
-}
 
 /// Join pieces (in order) into runs, travelling inside the shape between them.
 fn join_pieces(rings: &[Ring], pieces: Vec<Vec<Point>>, stitch_len: f64, travel_len: f64, f: u8) -> Vec<Run> {
@@ -43,9 +35,7 @@ fn join_pieces(rings: &[Ring], pieces: Vec<Vec<Point>>, stitch_len: f64, travel_
         if let (Some(&(from, _)), Some(&to)) = (run.last(), piece.first()) {
             match travel_path(rings, from, to) {
                 Some(path) => {
-                    for q in running_stitch(&path, travel_len, 0.1).into_iter().skip(1) {
-                        push(&mut run, q, flags::TRAVEL);
-                    }
+                    sew_along(&mut run, &path, travel_len, flags::TRAVEL);
                 }
                 None => runs.push(std::mem::take(&mut run)),
             }
@@ -64,18 +54,7 @@ fn join_pieces(rings: &[Ring], pieces: Vec<Vec<Point>>, stitch_len: f64, travel_
 // ---------------------------------------------------------------------------
 // Meander
 
-struct Rng(u64);
-impl Rng {
-    fn next(&mut self) -> u64 {
-        self.0 ^= self.0 << 13;
-        self.0 ^= self.0 >> 7;
-        self.0 ^= self.0 << 17;
-        self.0
-    }
-    fn below(&mut self, n: usize) -> usize {
-        (self.next() % n.max(1) as u64) as usize
-    }
-}
+use crate::prng::Xorshift64 as Rng;
 
 /// Lattice nodes and edges (in the rotated frame) covering a box.
 fn lattice(pattern: MeanderPattern, b: Rect, s: f64) -> (Vec<Point>, Vec<(usize, usize)>) {
@@ -605,6 +584,7 @@ pub fn guided(
     travel_len: f64,
     start: Option<Point>,
     end: Option<Point>,
+    o: &super::fill::TatamiOpts,
     f: u8,
 ) -> Option<Vec<Run>> {
     let gd = Guide::new(guide)?;
@@ -621,7 +601,7 @@ pub fn guided(
         .collect();
     // short stitches keep the curved rows smooth after warping back
     let len = max_len.min(2.5);
-    let runs = tatami(&warped, 0.0, spacing, 0.0, false, len, staggers, pull, travel_len, start.map(|p| gd.warp(p)), end.map(|p| gd.warp(p)), None, f);
+    let runs = tatami(&warped, 0.0, spacing, 0.0, false, len, staggers, pull, travel_len, start.map(|p| gd.warp(p)), end.map(|p| gd.warp(p)), None, o, f);
     Some(runs.into_iter().map(|r| r.into_iter().map(|(p, fl)| (gd.unwarp(p), fl)).collect()).collect())
 }
 
@@ -1590,7 +1570,7 @@ mod tests {
     fn guided_rows_follow_the_guide() {
         let rings = vec![square(30.0)];
         let guide = default_guide(rings_bounds(&rings));
-        let runs = guided(&rings, &guide, 0.5, 3.0, 4, 0.0, 2.5, None, None, 0).unwrap();
+        let runs = guided(&rings, &guide, 0.5, 3.0, 4, 0.0, 2.5, None, None, &Default::default(), 0).unwrap();
         assert!(!runs.is_empty());
         assert!(inside_ratio(&runs, &rings) > 0.99);
         // stitches near the left edge run upwards-right like the guide's start

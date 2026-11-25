@@ -645,11 +645,8 @@ pub fn outline_pos(rings: &[Ring], p: Point) -> Option<OutlinePos> {
         let mut s = 0.0;
         for k in 0..n {
             let (a, b) = (ring[k], ring[(k + 1) % n]);
-            let e = b - a;
-            let l2 = e.length_sq();
-            let l = l2.sqrt();
-            let u = if l2 > 1e-18 { ((p - a).dot(e) / l2).clamp(0.0, 1.0) } else { 0.0 };
-            let q = a + e * u;
+            let l = (b - a).length_sq().sqrt();
+            let (u, q) = crate::geom::seg_project(p, a, b);
             let d = q.dist(p);
             if best.is_none_or(|(bd, _)| d < bd) {
                 best = Some((d, OutlinePos { ring: ri, edge: k, u, s: s + l * u, at: q }));
@@ -660,12 +657,7 @@ pub fn outline_pos(rings: &[Ring], p: Point) -> Option<OutlinePos> {
     best.map(|b| b.1)
 }
 
-fn dist_to_seg(p: Point, a: Point, b: Point) -> f64 {
-    let e = b - a;
-    let l2 = e.length_sq();
-    let t = if l2 > 1e-18 { ((p - a).dot(e) / l2).clamp(0.0, 1.0) } else { 0.0 };
-    (a + e * t).dist(p)
-}
+use crate::geom::seg_dist as dist_to_seg;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Kind {

@@ -141,7 +141,7 @@ fn srgb_encode(c: f64) -> u8 {
 }
 
 /// Perceptual colour distance (CIE76 ΔE; cheap and good enough for thread matching).
-pub fn delta_e(a: [u8; 3], b: [u8; 3]) -> f64 {
+pub fn delta_e76(a: [u8; 3], b: [u8; 3]) -> f64 {
     let (la, lb) = (rgb_to_lab(a), rgb_to_lab(b));
     ((la[0] - lb[0]).powi(2) + (la[1] - lb[1]).powi(2) + (la[2] - lb[2]).powi(2)).sqrt()
 }
@@ -149,7 +149,7 @@ pub fn delta_e(a: [u8; 3], b: [u8; 3]) -> f64 {
 pub fn nearest_in_palette(c: [u8; 3], palette: &[[u8; 3]]) -> usize {
     let mut best = (0usize, f64::INFINITY);
     for (i, p) in palette.iter().enumerate() {
-        let d = delta_e(c, *p);
+        let d = delta_e76(c, *p);
         if d < best.1 {
             best = (i, d);
         }

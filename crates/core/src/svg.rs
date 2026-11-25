@@ -893,6 +893,32 @@ fn push_random(attrs: &mut Vec<(String, String)>, pct: f64, seed: u32) {
     }
 }
 
+/// How an enum is named in Ink/Stitch's attributes: per value, the name the
+/// export writes, then other names the import also reads (older files, the
+/// spelled-out forms). Anything else reads as the first value, Ink/Stitch's
+/// default.
+type Names<T> = &'static [(T, &'static [&'static str])];
+
+fn read_name<T: Copy>(names: Names<T>, v: Option<&str>) -> T {
+    v.and_then(|v| names.iter().find(|(_, n)| n.contains(&v))).map_or(names[0].0, |(t, _)| *t)
+}
+
+fn name_of<T: PartialEq>(names: Names<T>, t: T) -> &'static str {
+    names.iter().find(|(x, _)| *x == t).map_or("", |(_, n)| n[0])
+}
+
+/// `guided_fill_strategy`: 0 copy, 1 parallel offset, 2 buffer.
+const GUIDED_STRATEGY: Names<GuidedStrategy> = &[(GuidedStrategy::Copy, &["0"]), (GuidedStrategy::Parallel, &["1", "parallel_offset"]), (GuidedStrategy::Buffer, &["2", "buffer"])];
+const SATIN_METHOD: Names<SatinMethod> = &[(SatinMethod::Satin, &["satin_column"]), (SatinMethod::EStitch, &["e_stitch"]), (SatinMethod::SStitch, &["s_stitch"]), (SatinMethod::Zigzag, &["zigzag"])];
+/// `reverse_rails` (automatic is left out of the export).
+const RAIL_REVERSE: Names<RailReverse> = &[(RailReverse::Automatic, &["automatic"]), (RailReverse::None, &["none"]), (RailReverse::First, &["first"]), (RailReverse::Second, &["second"]), (RailReverse::Both, &["both"])];
+/// Ripple `scale_axis`: 0 both, 1 x, 2 y, 3 none.
+const SCALE_AXIS: Names<RippleScaleAxis> = &[(RippleScaleAxis::Both, &["0"]), (RippleScaleAxis::X, &["1"]), (RippleScaleAxis::Y, &["2"]), (RippleScaleAxis::None, &["3"])];
+const GUIDE_POSITION: Names<RippleGuidePosition> = &[(RippleGuidePosition::LineCount, &["default"]), (RippleGuidePosition::Rungs, &["render_at_rungs"]), (RippleGuidePosition::Adaptive, &["adaptive"])];
+/// `ties` (read in lower case): 0 both, 1 before, 2 after, 3 neither.
+const TIES: Names<Ties> = &[(Ties::Both, &["0"]), (Ties::Start, &["1", "start", "before"]), (Ties::End, &["2", "end", "after"]), (Ties::None, &["3", "none", "neither", "false"])];
+
+
 fn ink_fill(ink: &Ink) -> FillParams {
     let method = match ink.get("fill_method").unwrap_or("tatami_fill") {
         "contour_fill" => {
@@ -1006,11 +1032,7 @@ fn ink_fill(ink: &Ink) -> FillParams {
         underlay_skip_last: ink.b("fill_underlay_skip_last", false),
         underpath: ink.b("underpath", true),
         gap_fill_rows: ink.u("gap_fill_rows", 0),
-        guided_strategy: match ink.get("guided_fill_strategy").map(str::trim) {
-            Some("parallel_offset" | "1") => GuidedStrategy::Parallel,
-            Some("buffer" | "2") => GuidedStrategy::Buffer,
-            _ => GuidedStrategy::Copy,
-        },
+        guided_strategy: read_name(GUIDED_STRATEGY, ink.get("guided_fill_strategy").map(str::trim)),
         cross_offset: {
             // "x y", or one value for both
             let v: Vec<f64> = ink.get("cross_offset_mm").map(|v| v.split_whitespace().filter_map(|x| x.parse().ok()).filter(|v: &f64| v.is_finite()).collect()).unwrap_or_default();
@@ -1050,12 +1072,7 @@ fn ink_satin(ink: &Ink) -> SatinParams {
         random_narrower: second(narrower, 0.01),
     };
     SatinParams {
-        method: match ink.get("satin_method").unwrap_or("satin_column") {
-            "e_stitch" => SatinMethod::EStitch,
-            "s_stitch" => SatinMethod::SStitch,
-            "zigzag" => SatinMethod::Zigzag,
-            _ => SatinMethod::Satin,
-        },
+        method: read_name(SATIN_METHOD, ink.get("satin_method")),
         spacing: ink.f("zigzag_spacing_mm", 0.4),
         width: 3.0,
         // Ink/Stitch adds these to each side, ours are the total
@@ -1085,13 +1102,7 @@ fn ink_satin(ink: &Ink) -> SatinParams {
         split_jitter: (ink.f("random_split_jitter_percent", 0.0) / 100.0).clamp(0.0, 1.0),
         split_random_phase: ink.b("random_split_phase", false),
         split_min_length: ink.f("min_random_split_length_mm", 0.0).max(0.0),
-        reverse_rails: match ink.get("reverse_rails").unwrap_or("automatic") {
-            "none" => RailReverse::None,
-            "first" => RailReverse::First,
-            "second" => RailReverse::Second,
-            "both" => RailReverse::Both,
-            _ => RailReverse::Automatic,
-        },
+        reverse_rails: read_name(RAIL_REVERSE, ink.get("reverse_rails")),
         // Ink/Stitch split methods: default (0), simple (one stagger), staggered
         split_staggers: match ink.get("split_method") {
             Some("staggered") => ink.u("split_staggers", 4).max(1),
@@ -1137,12 +1148,7 @@ fn ink_running(ink: &Ink) -> RunningParams {
             join_point: matches!(ink.get("join_style"), Some("1") | Some("point")),
             grid_size: ink.f("grid_size_mm", 0.0).max(0.0),
             grid_first: ink.b("grid_first", false),
-            scale_axis: match ink.get("scale_axis") {
-                Some("1") => RippleScaleAxis::X,
-                Some("2") => RippleScaleAxis::Y,
-                Some("3") => RippleScaleAxis::None,
-                _ => RippleScaleAxis::Both,
-            },
+            scale_axis: read_name(SCALE_AXIS, ink.get("scale_axis")),
             // Ink/Stitch's defaults: from full size to nothing along the guide
             scale_start: ink.f("scale_start", 100.0),
             scale_end: ink.f("scale_end", 0.0),
@@ -1150,11 +1156,7 @@ fn ink_running(ink: &Ink) -> RunningParams {
             manual: ink.b("manual_pattern_placement", false),
             // without a guide Ink/Stitch fans an open line towards its target
             fan: true,
-            guide_position: match ink.get("satin_guide_pattern_position") {
-                Some("render_at_rungs") => RippleGuidePosition::Rungs,
-                Some("adaptive") => RippleGuidePosition::Adaptive,
-                _ => RippleGuidePosition::LineCount,
-            },
+            guide_position: read_name(GUIDE_POSITION, ink.get("satin_guide_pattern_position")),
             ..RippleParams::default()
         }),
         stem: None,
@@ -1261,15 +1263,9 @@ impl<'a> Ctx<'a> {
             stitch,
             trim_after: ink.b("trim_after", false),
             stop_after: ink.b("stop_after", false),
-            // Ink/Stitch "ties": both / start / end / none (also the old 0–3 values)
             // Ink/Stitch "ties": 0 both, 1 before, 2 after, 3 neither (also
             // the old True / False and names)
-            ties: match ink.get("ties").map(|v| v.trim().to_ascii_lowercase()).as_deref() {
-                Some("1" | "start" | "before") => Ties::Start,
-                Some("2" | "end" | "after") => Ties::End,
-                Some("3" | "none" | "neither" | "false") => Ties::None,
-                _ => Ties::Both,
-            },
+            ties: read_name(TIES, ink.get("ties").map(|v| v.trim().to_ascii_lowercase()).as_deref()),
             force_lock: ink.b("force_lock_stitches", false),
             min_stitch: ink.get("min_stitch_length_mm").and_then(|v| v.trim().parse().ok()),
             min_jump: ink.get("min_jump_stitch_length_mm").and_then(|v| v.trim().parse().ok()),
@@ -2140,13 +2136,7 @@ xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"{}mm\" height=\"{}mm\" view
                 if p.method == FillMethod::Guided {
                     attrs.push((
                         "guided_fill_strategy".into(),
-                        // Ink/Stitch: 0 copy, 1 parallel offset, 2 buffer
-                        match p.guided_strategy {
-                            GuidedStrategy::Copy => "0",
-                            GuidedStrategy::Parallel => "1",
-                            GuidedStrategy::Buffer => "2",
-                        }
-                        .into(),
+                        name_of(GUIDED_STRATEGY, p.guided_strategy).into(),
                     ));
                 }
             }
@@ -2169,13 +2159,7 @@ xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"{}mm\" height=\"{}mm\" view
                 attrs.push(("satin_column".into(), "True".into()));
                 attrs.push((
                     "satin_method".into(),
-                    match p.method {
-                        SatinMethod::Satin => "satin_column",
-                        SatinMethod::EStitch => "e_stitch",
-                        SatinMethod::SStitch => "s_stitch",
-                        SatinMethod::Zigzag => "zigzag",
-                    }
-                    .into(),
+                    name_of(SATIN_METHOD, p.method).into(),
                 ));
                 attrs.push(("zigzag_spacing_mm".into(), fmt(p.spacing)));
                 // per-rail values: "first second" where the second rail has its own
@@ -2240,13 +2224,7 @@ xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"{}mm\" height=\"{}mm\" view
                     }
                 }
                 if p.reverse_rails != RailReverse::Automatic {
-                    let v = match p.reverse_rails {
-                        RailReverse::None => "none",
-                        RailReverse::First => "first",
-                        RailReverse::Second => "second",
-                        _ => "both",
-                    };
-                    attrs.push(("reverse_rails".into(), v.into()));
+                    attrs.push(("reverse_rails".into(), name_of(RAIL_REVERSE, p.reverse_rails).into()));
                 }
                 if p.random_spacing > 0.0 || p.split_jitter > 0.0 || p.split_random_phase || random_width {
                     attrs.push(("random_seed".into(), p.random_seed.to_string()));
@@ -2277,23 +2255,12 @@ xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"{}mm\" height=\"{}mm\" view
                     attrs.push(("join_style".into(), if r.join_point { "1" } else { "0" }.into()));
                     attrs.push(("grid_size_mm".into(), fmt(r.grid_size)));
                     attrs.push(("grid_first".into(), b(r.grid_first).into()));
-                    let axis = match r.scale_axis {
-                        RippleScaleAxis::Both => "0",
-                        RippleScaleAxis::X => "1",
-                        RippleScaleAxis::Y => "2",
-                        RippleScaleAxis::None => "3",
-                    };
-                    attrs.push(("scale_axis".into(), axis.into()));
+                    attrs.push(("scale_axis".into(), name_of(SCALE_AXIS, r.scale_axis).into()));
                     attrs.push(("scale_start".into(), fmt(r.scale_start)));
                     attrs.push(("scale_end".into(), fmt(r.scale_end)));
                     attrs.push(("rotate_ripples".into(), b(r.rotate_ripples).into()));
                     attrs.push(("manual_pattern_placement".into(), b(r.manual).into()));
-                    let pos = match r.guide_position {
-                        RippleGuidePosition::LineCount => "default",
-                        RippleGuidePosition::Rungs => "render_at_rungs",
-                        RippleGuidePosition::Adaptive => "adaptive",
-                    };
-                    attrs.push(("satin_guide_pattern_position".into(), pos.into()));
+                    attrs.push(("satin_guide_pattern_position".into(), name_of(GUIDE_POSITION, r.guide_position).into()));
                     attrs.push(("reverse".into(), b(r.reverse).into()));
                 }
                 if let Some(z) = &p.zigzag {
@@ -2346,8 +2313,7 @@ xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"{}mm\" height=\"{}mm\" view
             attrs.push(("stop_after".into(), "True".into()));
         }
         if o.ties != Ties::Both {
-            // Ink/Stitch: 0 both, 1 before, 2 after, 3 neither
-            attrs.push(("ties".into(), match o.ties { Ties::Both => "0", Ties::Start => "1", Ties::End => "2", Ties::None => "3" }.into()));
+            attrs.push(("ties".into(), name_of(TIES, o.ties).into()));
         }
         if o.force_lock {
             attrs.push(("force_lock_stitches".into(), "True".into()));
@@ -2593,6 +2559,22 @@ fn manual_beans(ink: &Ink) -> Vec<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_ink_stitch_name_reads_back_as_written() {
+        fn check<T: Copy + PartialEq + std::fmt::Debug>(names: Names<T>) {
+            for (t, _) in names {
+                assert_eq!(read_name(names, Some(name_of(names, *t))), *t);
+            }
+            assert_eq!(read_name(names, Some("something else")), names[0].0, "unknown names read as the default");
+        }
+        check(GUIDED_STRATEGY);
+        check(SATIN_METHOD);
+        check(RAIL_REVERSE);
+        check(SCALE_AXIS);
+        check(GUIDE_POSITION);
+        check(TIES);
+    }
 
     const INK: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkstitch="http://inkstitch.org/namespace"
         width="100mm" height="50mm" viewBox="0 0 200 100"><metadata><inkstitch:inkstitch_svg_version>4</inkstitch:inkstitch_svg_version></metadata>
