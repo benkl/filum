@@ -61,7 +61,7 @@ Each removes copies without changing behaviour.
 ## Phase 5 — large files and the stylesheet
 
 - [ ] **Canvas.tsx** (2,800 lines): the pointer handling per tool in `canvas/tools/`, hit-testing and view fitting in their own modules.
-- [~] **Dock.tsx** (2,300 lines): split into `Dock.tsx` (the design and properties panels, 390 lines), `LayersPanel.tsx`, `IssuesPanel.tsx` and `StitchOptions.tsx`. To do: one component per stitch type inside `StitchOptions.tsx` (1,040 lines).
+- [x] **Dock.tsx** (2,300 lines): split into `Dock.tsx` (the design and properties panels, 390 lines), `LayersPanel.tsx`, `IssuesPanel.tsx` and `StitchOptions.tsx`. `StitchOptions` hands one bundle of edit helpers to one component per stitch type (fill, satin, zig-zag line, running, appliqué, manual); screenshots match.
 - [ ] **DigitizeDialog.tsx**: split by pane.
 - [~] **Stylesheet**: `styles.css` is the ordered list of 33 files in `styles/` (tokens first, then base and the areas in the order they had); the production build still ships one file. The design check reads them all and `output.css` (22 raw values there, now tokens) and catches `rgb()` colours (40, now tokens: swatch outlines and shading, scrims, the digitizer's marks). The 12 unused selectors (21 rules) and an undefined `var(--warn)` are gone. Screenshots of twelve views before and after match but for the swatch outlines' transparency (several near-equal values became one token). To do: shared base classes for popovers, small icon buttons, swatches and chips; an ellipsis utility.
 
@@ -95,4 +95,4 @@ Each removes copies without changing behaviour.
 
 **Phase 4** (2026-11-25): the engine helpers above, every step with the plan hashes and a hash of the Koi's whole plan (with and without Avoid holes and Hide travel) bit-identical. Not done: `raster.rs` (see above), one spatial grid type (six grids whose queries differ in small ways), one stitch-path loop for tatami and circular (they keep different runs).
 
-**Phase 5, first part** (2026-11-25): Dock split in four, the stylesheet split by area with the design check over every file. Still to do: the canvas's pointer handling per tool, the digitizer dialog by pane, the stitch options per stitch type, the shared base classes in the stylesheet, `export_svg` by stitch type.
+**Phase 5, first part** (2026-11-25): Dock split in four, the stylesheet split by area with the design check over every file. Then the stitch options per stitch type. Still to do: the canvas's pointer handling per tool, the digitizer dialog by pane, the shared base classes in the stylesheet, `export_svg` by stitch type.
