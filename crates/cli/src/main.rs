@@ -58,6 +58,12 @@ fn info(doc: &Document, engine: &mut Engine) -> Result<(), String> {
     out!("Trims       {}   Jumps {}", s.trims, s.jumps);
     out!("Thread      {:.1} m top + {:.1} m bobbin", s.thread_m, s.bobbin_m);
     out!("Run time    {}m {:02}s @ {} spm", (s.seconds / 60.0) as u32, (s.seconds % 60.0) as u32, m.spm);
+    let q = filum_core::quality::stitch_quality(doc, &plan);
+    out!("Quality     {} short stitches, {} needle drops on an earlier hole ({} of them travel)", q.short, q.rehits, q.travel_rehits);
+    match q.hot_spots.first() {
+        Some(h) => out!("            {}{} spots over {:.0} holes/mm², the worst {:.0} at ({:.1}, {:.1})", q.hot_spots.len(), if q.hot_spots.len() >= 20 { "+" } else { "" }, q.hole_limit, h.per_mm2, h.at[0], h.at[1]),
+        None => out!("            no spot over {:.0} holes/mm²", q.hole_limit),
+    }
     for (i, t) in plan.threads.iter().enumerate() {
         out!(
             "  {:>2}. {:<20} {}  {:>6} st  {:.1} m",
@@ -85,11 +91,11 @@ fn run(args: Vec<String>) -> Result<(), String> {
         }
         Some("optimize") if args.len() >= 3 => {
             let mut doc = load(&args[1])?;
-            let r = optimize::optimize_order(&doc, &mut engine);
-            optimize::apply_order(&mut doc, &r.order);
+            let r = optimize::optimize(&doc, &mut engine, &optimize::OptimizeOptions::for_fabric(doc.fabric));
+            optimize::apply(&mut doc, &r);
             out!(
-                "colour changes {} → {}, travel {:.0} → {:.0} mm",
-                r.color_changes_before, r.color_changes_after, r.travel_before_mm, r.travel_after_mm
+                "colour changes {} → {}, trims {} → {}, jumps {:.0} → {:.0} mm",
+                r.color_changes_before, r.color_changes_after, r.trims_before, r.trims_after, r.travel_before_mm, r.travel_after_mm
             );
             save(&doc, &mut engine, &args[2])?;
         }

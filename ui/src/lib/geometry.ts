@@ -78,6 +78,8 @@ export const defaultDesignOptions = (): DesignOptions => ({
   bastingMargin: 6,
   bastingLength: 5,
   threadWeight: 40,
+  avoidHoles: true,
+  hiddenTravel: true,
   knockdown: false,
   knockdownOffset: 2,
   knockdownSpacing: 2,

@@ -413,6 +413,22 @@ input[type="range"]:focus-visible {
   margin: var(--sp-1) var(--sp-1-5);
   background: var(--border);
 }
+/* a heading over a group of items, and a closing remark (a menu of toggles that stays open) */
+.menu-label {
+  padding: var(--sp-1-5) var(--sp-2) var(--sp-0-5);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+}
+.menu-note {
+  margin: var(--sp-1) var(--sp-2) var(--sp-0-5);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+}
+.optimize-menu {
+  width: 240px;
+}
 
 /* ---------------- title bar ---------------- */
 .titlebar {
@@ -528,6 +544,24 @@ input[type="range"]:focus-visible {
   height: var(--control-sm);
   padding: 0 var(--sp-2);
   font-size: var(--fs-sm);
+}
+/* a button and the arrow beside it that opens its menu */
+.split-btn {
+  display: inline-flex;
+  align-items: stretch;
+}
+.split-btn > .btn:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.split-btn > .split-caret {
+  padding: 0 var(--sp-1);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left-color: var(--border);
+}
+.split-btn > .split-caret.open {
+  background: var(--bg-2);
 }
 
 .icon-btn {

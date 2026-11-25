@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { syncGradientGeometry } from "../lib/gradient";
+import { nodeCount, simplifyForStitching } from "../lib/stitchSimplify";
 import { flattenSubPath } from "../lib/bezier";
 import { objectBounds, unionBoxes } from "../lib/geometry";
 import { applyEffect, DEFAULT_EFFECTS, WARPS, type Box, type EffectId, type EffectParams } from "../lib/shapeOps";
@@ -332,6 +333,28 @@ export function pathCommand(fn: (sp: SubPath) => SubPath, label: string) {
     return next;
   });
   s.toast(`${label}: ${ids.size} object${ids.size === 1 ? "" : "s"}`);
+}
+
+/**
+ * Simplify for stitching on the selection (or on `ids`), one undo step,
+ * saying how many nodes went. Lettering is left alone (its glyphs are drawn
+ * for stitching already).
+ */
+export function simplifySelectionForStitching(ids?: string[]) {
+  const s = useStore.getState();
+  const pick = new Set(ids ?? s.selection);
+  const objs = s.doc.objects.filter((o) => pick.has(o.id) && !o.text && !o.locked);
+  if (!objs.length) return s.toast("Select one or more shapes first");
+  const before = objs.reduce((n, o) => n + nodeCount(o.paths), 0);
+  const done = new Map(objs.map((o) => [o.id, o.paths.map((sp) => (sp.nodes.length >= 3 ? simplifyForStitching(sp) : sp))]));
+  const after = [...done.values()].reduce((n, p) => n + nodeCount(p), 0);
+  if (after === before) return s.toast("Already clean: nothing to simplify");
+  s.commit((d) => {
+    let next: StitchDocument = { ...d, objects: d.objects.map((o) => (done.has(o.id) ? { ...o, paths: done.get(o.id)! } : o)) };
+    for (const o of next.objects) if (done.has(o.id)) next = syncGradientGeometry(next, o);
+    return next;
+  });
+  s.toast(`Simplified for stitching: ${before} → ${after} nodes`, "success");
 }
 
 /** Guided fill: the selected open line becomes the guide of the selected fill (and is removed). */

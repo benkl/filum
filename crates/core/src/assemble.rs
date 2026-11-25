@@ -108,8 +108,8 @@ impl Engine {
             // everything stitches::generate reads, stitch patterns included
             serde_json::to_string(&(&obj.paths, &obj.stitch, &obj.start, &obj.end, &obj.patterns, pinned)).unwrap_or_default()
         };
-        let knockdown = doc.options.knockdown;
-        let k = key(&json, fabric, weight) ^ (knockdown as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        let (knockdown, avoid_holes) = (doc.options.knockdown, doc.options.avoid_holes);
+        let k = key(&json, fabric, weight) ^ (knockdown as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ (avoid_holes as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F);
         if let Some(r) = self.cache.get(&k) {
             return r.clone();
         }
@@ -117,8 +117,11 @@ impl Engine {
         profile.density_scale *= thread_density_scale(weight);
         profile.knockdown = knockdown;
         stitches::fill::START_PINNED.with(|c| c.set(pinned));
-        let r = stitches::generate(obj, &profile);
+        let mut r = stitches::generate(obj, &profile);
         stitches::fill::START_PINNED.with(|c| c.set(true));
+        if avoid_holes {
+            stitches::holes::avoid_own_holes(&mut r);
+        }
         if self.cache.len() > 4000 {
             self.cache.clear();
         }
@@ -151,6 +154,12 @@ impl Engine {
     /// Runs of one object as drawn (without design options).
     pub fn object_runs(&mut self, doc: &Document, index: usize) -> Vec<Run> {
         self.runs_for(&doc.objects[index], doc)
+    }
+
+    /// Runs of an object as the plan sews it: `obj.start` may be where the
+    /// previous object ended (`pinned` false) rather than the user's own pin.
+    pub fn runs_as_sewn(&mut self, doc: &Document, obj: &Object, pinned: bool) -> Vec<Run> {
+        self.runs_from(obj, doc, pinned).into_iter().filter(|r| !r.is_empty()).collect()
     }
 
     /// The object as it is stitched: with "remove overlaps" a fill loses the
@@ -413,7 +422,7 @@ fn splice_underlay(full: &Object, mut under: Vec<Run>, mut top: Vec<Run>) -> Vec
 }
 
 /// Stitch types that start where they are told (running, satins, fills).
-fn starts_near(st: &StitchParams) -> bool {
+pub(crate) fn starts_near(st: &StitchParams) -> bool {
     matches!(st, StitchParams::Running(_) | StitchParams::Satin(_) | StitchParams::Fill(_))
 }
 
@@ -513,6 +522,9 @@ const COVERED_WITHIN: f64 = 0.45;
 /// A connection sewn through by hand (`ObjectLink::Join`) is sewn in running
 /// stitches this long at most (mm).
 const JOIN_STITCH: f64 = 2.5;
+/// Hidden travel (`DesignOptions::hidden_travel`): a gap up to this long that
+/// what is sewn later covers all along is sewn through instead of trimmed (mm).
+const HIDDEN_TRAVEL: f64 = 12.0;
 
 /// The stitches still to be sewn (every run of the design, in sewing
 /// order), indexed by grid cell on first use: does a connecting stitch end
@@ -602,12 +614,17 @@ struct Builder<'a> {
     /// The current object's minimum stitch and jump (mm), and the jump
     /// limit of the object sewn last: a longer gap after it is locked and trimmed.
     min_stitch: f64,
+    /// A running stitch: a short stitch at a turn may go too, when the
+    /// stitch past it stays within half a thread of it (see `redundant`).
+    loose_turns: bool,
     min_jump: f64,
     last_min_jump: f64,
     /// The current object's and the last object's jump limit were set on the
     /// object (they win over the visible-connection trim).
     min_jump_set: bool,
     last_min_jump_set: bool,
+    /// Sew through a longer gap that later stitching covers (`DesignOptions::hidden_travel`).
+    hidden_travel: bool,
     /// The runs still to come, and the index among them of the run being sewn.
     ahead: Ahead<'a>,
     at: usize,
@@ -732,7 +749,22 @@ impl Builder<'_> {
                         // a short connection to the next object is sewn through, unless
                         // it would show: nothing sewn later covers it
                         let shows = gap > VISIBLE_CONNECTION && o != self.last_obj && o != u32::MAX && !self.last_min_jump_set;
-                        if gap > self.last_min_jump || (shows && self.ahead.visible(p, start, self.at)) {
+                        // a longer gap that what is sewn later covers all along: travel under it
+                        // (branching; not in Ink/Stitch, which trims there)
+                        let hidden = gap > self.last_min_jump
+                            && gap <= HIDDEN_TRAVEL
+                            && self.hidden_travel
+                            && !self.last_min_jump_set
+                            && o != u32::MAX
+                            && self.last_obj != u32::MAX
+                            && !self.ahead.visible(p, start, self.at);
+                        if hidden {
+                            let n = (gap / JOIN_STITCH).ceil().max(1.0) as usize;
+                            for k in 1..n {
+                                self.out.push(Stitch::new(p + (start - p) * (k as f64 / n as f64), flags::TRAVEL, self.last_obj));
+                            }
+                            (ConnectionKind::Sew, false)
+                        } else if gap > self.last_min_jump || (shows && self.ahead.visible(p, start, self.at)) {
                             self.cut(o, false, false);
                             (ConnectionKind::Trim, false)
                         } else {
@@ -770,7 +802,7 @@ impl Builder<'_> {
             // drop too-short stitches that change nothing, but always land
             // on the run's final point and keep every turn (a fill's step to
             // its next row)
-            if d < self.min_stitch && j + 1 < k && redundant(last, q, run[j + 1].0) {
+            if d < self.min_stitch && j + 1 < k && (redundant(last, q, run[j + 1].0) || self.loose_turns && f & flags::TIE == 0 && loose_turn(last, q, run[j + 1].0)) {
                 continue;
             }
             self.out.push(Stitch::new(q, f, o));
@@ -802,6 +834,20 @@ const ON_THE_WAY: f64 = 0.05;
 /// fabric showing between the rows.
 pub(crate) fn redundant(last: Point, q: Point, next: Point) -> bool {
     q.dist(last) <= DUPLICATE_STITCH || seg_dist(q, last, next) < ON_THE_WAY
+}
+
+/// How far a running stitch may cut a corner when a short stitch at a turn
+/// goes (mm): about its own tolerance and half a thread's width, so a fine
+/// jagged line loses its steps and a real corner stays (not in Ink/Stitch,
+/// which keeps every turn). Coarse steps are for Simplify for stitching.
+const LOOSE_TURN: f64 = 0.25;
+
+/// A running stitch's short stitch at a turn (a pixel step of a traced
+/// line) may go when the stitch on to `next` passes within half a thread of
+/// its end. Not for fills (the step to the next row) or satins (their edge):
+/// see [`redundant`].
+pub(crate) fn loose_turn(last: Point, q: Point, next: Point) -> bool {
+    seg_dist(q, last, next) < LOOSE_TURN
 }
 
 /// Where an object is locked: its `ties`, but manual stitch only when it
@@ -845,10 +891,12 @@ fn assemble_basted(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[Run], 
         prev_lock: LockOverride::default(),
         last_obj: u32::MAX,
         min_stitch: doc.machine.min_stitch,
+        loose_turns: false,
         min_jump: doc.machine.trim_distance,
         last_min_jump: doc.machine.trim_distance,
         min_jump_set: false,
         last_min_jump_set: false,
+        hidden_travel: doc.options.hidden_travel,
         ahead,
         at: 0,
         link: None,
@@ -916,6 +964,7 @@ fn assemble_basted(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[Run], 
         b.ties = object_ties(obj);
         b.lock = obj.lock.unwrap_or_default();
         b.min_stitch = obj.min_stitch.unwrap_or(doc.machine.min_stitch).max(0.0);
+        b.loose_turns = matches!(&obj.stitch, StitchParams::Running(p) if p.beans().iter().all(|r| *r == 0));
         b.min_jump = obj.min_jump.unwrap_or(doc.machine.trim_distance).max(0.0);
         b.min_jump_set = obj.min_jump.is_some();
         b.link = obj.link;
@@ -1335,6 +1384,34 @@ mod tests {
         d.objects[0].min_stitch = Some(1.5);
         assert!(n(&d) < all * 2 / 3, "1 mm stitches dropped below a 1.5 mm minimum: {} of {all}", n(&d));
     }
+
+    #[test]
+    fn a_running_stitch_loses_its_pixel_steps_under_the_minimum() {
+        // a 0.3 mm pixel staircase along a 30° line: every step is a corner the running stitch keeps
+        let mut st = vec![pt(0.0, 0.0)];
+        let (mut x, mut y) = (0.0, 0.0);
+        while x < 30.0 {
+            x += 0.3;
+            st.push(pt(x, y));
+            if y + 0.3 <= x * 0.577 {
+                y += 0.3;
+                st.push(pt(x, y));
+            }
+        }
+        let mut d = doc(vec![obj("a", vec![SubPath::polyline(&st, false)], StitchParams::Running(RunningParams::default()))]);
+        let short = |d: &Document| {
+            let s: Vec<Point> = Engine::new().plan(d).stitches.iter().filter(|s| s.is_stitch() && !s.is(flags::TIE)).map(|s| s.pos()).collect();
+            s.windows(2).filter(|w| w[0].dist(w[1]) < 0.6).count()
+        };
+        let before = short(&d);
+        assert!(before > 20, "{before}");
+        d.machine.min_stitch = 0.6;
+        assert!(short(&d) * 4 <= before, "{} short stitches left of {before}", short(&d));
+        // a real corner stays: an L of two 10 mm legs
+        let mut l = doc(vec![obj("l", vec![SubPath::polyline(&[pt(0.0, 0.0), pt(10.0, 0.0), pt(10.0, 10.0)], false)], StitchParams::Running(RunningParams::default()))]);
+        l.machine.min_stitch = 0.6;
+        assert!(Engine::new().plan(&l).stitches.iter().any(|s| s.pos().dist(pt(10.0, 0.0)) < 1e-6), "the corner of the L is sewn");
+    }
 }
 
 #[cfg(test)]
@@ -1377,6 +1454,36 @@ mod trim_tests {
     }
     fn trims(p: &StitchPlan) -> usize {
         p.stitches.iter().filter(|s| s.is(flags::TRIM)).count()
+    }
+
+    #[test]
+    fn a_gap_that_a_later_fill_covers_is_travelled_not_trimmed() {
+        // two lines 8 mm apart in one thread, then a fill in another thread over both and the gap
+        let cover = || {
+            let mut f = line("f", "b", &[(-2.0, 0.0), (32.0, 0.0), (32.0, 10.0), (-2.0, 10.0)]);
+            f.paths[0].closed = true;
+            f.stitch = StitchParams::Fill(FillParams::default());
+            f
+        };
+        let lines = || vec![line("1", "a", &[(0.0, 5.0), (10.0, 5.0)]), line("2", "a", &[(18.0, 5.0), (30.0, 5.0)])];
+        let with = |objs: Vec<Object>, hidden: bool| {
+            let mut d = Document { threads: vec![thread("a", "#000000"), thread("b", "#ff0000")], objects: objs, ..Default::default() };
+            d.options.hidden_travel = hidden;
+            crate::Engine::new().plan(&d)
+        };
+        let covered = with([lines(), vec![cover()]].concat(), true);
+        let trimmed = with([lines(), vec![cover()]].concat(), false);
+        assert_eq!(trims(&covered) + 1, trims(&trimmed), "the 8 mm gap under the fill is travelled");
+        let link = covered.links.iter().find(|c| c.from == 0).unwrap();
+        assert!(link.kind == ConnectionKind::Sew && !link.visible, "{link:?}");
+        // the travel's stitches are at most 2.5 mm and flagged as travel
+        let travel: Vec<&Stitch> = covered.stitches.iter().filter(|s| s.object == 0 && s.is(flags::TRAVEL)).collect();
+        assert!(!travel.is_empty() && travel.iter().all(|s| s.y == 5.0 && s.x > 10.0 && s.x < 18.0), "{travel:?}");
+        // nothing over the gap: trimmed as before
+        assert_eq!(trims(&with(lines(), true)), trims(&with(lines(), false)));
+        // longer than 12 mm: trimmed even under the fill
+        let far = vec![line("1", "a", &[(0.0, 5.0), (5.0, 5.0)]), line("2", "a", &[(20.0, 5.0), (30.0, 5.0)]), cover()];
+        assert_eq!(trims(&with(far.clone(), true)), trims(&with(far, false)));
     }
 
     #[test]

@@ -45,6 +45,7 @@ Under **Path**:
 - **Join** (<kbd>Ctrl</kbd>+<kbd>J</kbd>): one open path closes; several open paths become one, joined each time at their two nearest ends.
 - **Compound path → Make** (<kbd>Ctrl</kbd>+<kbd>8</kbd>): the paths of the selected shapes become one object with the style of the one sewn first. In a fill, the inner paths are holes. **Release** (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>8</kbd>) makes every path an object of its own again.
 - **Nodes → Average points** (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>J</kbd>, node tool): the selected points meet at their average point.
+- **Nodes → Simplify for stitching**: for traced, scanned and imported paths that step pixel by pixel. Every sharp turn of a path is a needle drop, so a jagged outline sews in rows of tiny stitches. This finds the real corners (measured over 1.5 mm of the path, so a pixel step doesn't count) and keeps them where they are, smooths out the steps between them, and fits curves that stay within 0.25 mm of the path. A clean path is left as it is. The **Many short stitches** issue offers the same as its fix. **Effects → Simplify** is the general tool: it keeps every turn sharper than its corner angle, pixel steps included.
 - **Outlines & offsets**, **Effects**, **Combine shapes** (unite, minus front, intersect, exclude, divide) and the **Shape builder** work on the selected shapes as before.
 
 ## Line stitches

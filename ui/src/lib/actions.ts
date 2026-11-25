@@ -9,6 +9,7 @@ import { pendingThreadList, THREAD_LIST_EXT } from "./threadList";
 import { freshCopies } from "./copies";
 import { checkDoc } from "./docCheck";
 import { projectBytes } from "./projectFile";
+import { optimizeSteps } from "./prefs";
 
 // every embroidery format the engine reads (crates/formats), extension aliases included
 export const MACHINE_EXT = [
@@ -211,21 +212,39 @@ export async function exportDesign(format: string, opts: ExportOptions = {}, fil
   }
 }
 
+/** Optimise the sewing order with the steps chosen in the flyout beside the button (Preferences keep them). */
 export async function optimizeOrder() {
   const s = useStore.getState();
   if (!s.doc.objects.length) return;
-  const r = await engine.optimize(s.doc);
-  // the order applied to the design as it is now: edits made meanwhile stay, new objects go last
+  const steps = optimizeSteps(s.prefs, s.doc.fabric);
+  const only = steps.selectionOnly && s.selection.length ? s.selection : undefined;
+  if (!steps.colors && !steps.travel && !steps.centerOut && !steps.foamLast && !steps.ends && !steps.links) return s.toast("Optimise: every step is switched off (the menu beside the button)", "info");
+  const r = await engine.optimize(s.doc, { colors: steps.colors, travel: steps.travel, foamLast: steps.foamLast, ends: steps.ends, links: steps.links, locked: steps.locked, centerOut: steps.centerOut, selection: only });
+  // applied to the design as it is now: edits made meanwhile stay, new objects go last
+  const ends = new Map(r.ends.map((e) => [e.id, e.end]));
+  const reset = new Set(r.linksReset);
   s.commit((d) => {
     const byId = new Map(d.objects.map((o) => [o.id, o]));
     const ordered = r.order.map((id) => byId.get(id)).filter((o): o is DesignObject => !!o);
     const placed = new Set(ordered.map((o) => o.id));
-    return { ...d, objects: [...ordered, ...d.objects.filter((o) => !placed.has(o.id))] };
+    const objects = [...ordered, ...d.objects.filter((o) => !placed.has(o.id))].map((o) => {
+      if (!ends.has(o.id) && !reset.has(o.id)) return o;
+      const out = { ...o };
+      const e = ends.get(o.id);
+      if (e) out.end = e;
+      if (reset.has(o.id)) delete out.link;
+      return out;
+    });
+    return { ...d, objects };
   });
-  s.toast(
-    `Optimised: colour changes ${r.colorChangesBefore} → ${r.colorChangesAfter}, travel ${Math.round(r.travelBeforeMm)} → ${Math.round(r.travelAfterMm)} mm`,
-    "success",
-  );
+  const parts = [
+    `colour changes ${r.colorChangesBefore} → ${r.colorChangesAfter}`,
+    `trims ${r.trimsBefore} → ${r.trimsAfter}`,
+    `jumps ${Math.round(r.travelBeforeMm)} → ${Math.round(r.travelAfterMm)} mm`,
+  ];
+  if (r.ends.length) parts.push(`${r.ends.length} end point${r.ends.length > 1 ? "s" : ""} moved`);
+  if (r.linksReset.length) parts.push(`${r.linksReset.length} connection${r.linksReset.length > 1 ? "s" : ""} back to Automatic`);
+  s.toast(`Optimised: ${parts.join(", ")}`, "success");
 }
 
 export function selectAll() {

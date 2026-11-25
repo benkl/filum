@@ -9,6 +9,7 @@ pub mod travel;
 pub mod underlay;
 pub mod fill;
 pub mod foam;
+pub mod holes;
 pub mod gradient;
 pub mod inkfills;
 pub mod layered3d;

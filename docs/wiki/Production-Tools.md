@@ -23,14 +23,14 @@ Pick the **thread** weight too (No. 75 down to No. 12). Filum then recommends a 
 The **Design** tab's *Machine* section has presets for Baby Lock, Bernina, Brother, Janome, Pfaff / Viking, Singer and commercial machines. **Stitch-out** sets:
 - tie-in / tie-off and the start and end locks
 - *Trim jumps over* (the length at which jumps are trimmed, see [Where Filum trims](#where-filum-trims))
-- the minimum and maximum stitch length
+- the minimum and maximum stitch length. A stitch shorter than the minimum is left out where the stitch on still runs along the path. In a running stitch that includes a short stitch at a turn, when leaving it out cuts the corner by 0.25 mm at most: a finely jagged line loses its steps, a real corner stays. Ink/Stitch's default minimum, 0.1 mm, leaves almost every stitch in; 0.3–0.5 mm suits machines that break thread on tiny stitches. Fills and satins keep their turns whatever the minimum: a fill's step to its next row and a satin's edge.
 
 **Time estimates** work out the sewing time from your machine's speed.
 
 ### Where Filum trims
 
 Filum follows the usual machine-embroidery conventions:
-- **Gaps longer than *Trim jumps over*** (3 mm to start) are tied off, trimmed, jumped and tied in again, in that order. You can change the length for the whole design, or for a single object under its stitch options.
+- **Gaps longer than *Trim jumps over*** (3 mm to start) are tied off, trimmed, jumped and tied in again, in that order. You can change the length for the whole design, or for a single object under its stitch options. With **Hide travel** on (see [Stitch processing](#stitch-processing)), a gap of up to 12 mm that later stitching covers all along is sewn across underneath instead.
 - **A shorter gap to the next object** is sewn straight across, as Ink/Stitch does, because a cut that short isn't worth a trim. The exception is a connecting stitch longer than 2 mm that nothing sewn later covers: that one would lie across the fabric, so it's trimmed as well (commercial digitizing software trims from 2 mm).
 - **A colour change** is tied off but not trimmed first: the machine cuts the thread itself when it changes colour.
 - **Stops** (appliqué steps) and the end of the design are tied off and trimmed.
@@ -64,6 +64,8 @@ Turn on **View → Show → Jump stitches** to check the trims: the jumps the ma
 Under **Design → Stitch processing**:
 
 - **Basting**, **Knockdown**: see below.
+- **Avoid holes** (on by default) keeps a fill's travel stitches off the needle holes the same fill made before. Travel runs through a narrow part of a shape again and again, and without it the needle goes down in the same holes each time, which tears the fabric and breaks needles. Travel stitches that would land on an old hole are left out where the stitch on stays on the route, or moved along the route by a fraction of a millimetre. Rows, underlay and satins don't change. Switch it off to sew stitch for stitch as Ink/Stitch.
+- **Hide travel** (on by default): a gap to the next object of up to 12 mm that what is sewn later covers all along is sewn straight across in running stitches of 2.5 mm, instead of being tied off, trimmed and tied in again. The travel ends up under the stitching, as the branching of commercial digitizing software does it: fewer trims and shorter sewing. Switch it off to trim there as Ink/Stitch does.
 
 ## Hidden stitching
 
@@ -101,7 +103,20 @@ The *Machine stops* row controls where the machine pauses so you can place and t
 
 ## Optimise
 
-Click **Optimise** in the title bar (or **Stitch → Optimise stitch order**). Filum reorders the objects to cut colour changes and travel, without changing which object ends up on top. A message tells you how the colour changes and the travel distance changed (for example "Optimised: colour changes 6 → 5, travel 131 → 202 mm").
+Click **Optimise** in the title bar (or **Stitch → Optimise stitch order**). Filum reorders the objects to cut colour changes and travel, without changing which object ends up on top. A message tells you how the colour changes, the trims and the length of the jumps changed (for example "Optimised: colour changes 13 → 11, trims 1 → 3, jumps 572 → 608 mm, 1 end point moved").
+
+The arrow beside **Optimise** opens what it may change. Every step can be switched off, and Filum remembers your choice for the next design:
+
+- **Group colours**: sews each thread's objects together, for fewer colour changes. Off: the colour blocks stay as they are, and only the order inside each block changes.
+- **Shortest way**: within a thread, the next object is the one the needle reaches soonest, for shorter jumps and fewer trims.
+- **Centre out**: the middle of the design first, then outwards, so the fabric is pushed towards the edges instead of bunching up; on caps also from the bottom up, brim first. It's on by default on caps and on fabrics that stretch (knit, piqué, fleece, towel).
+- **3D foam last**: moves satins over 3D foam as late as the stacking allows, because anything sewn after the foam flattens it.
+- **End points**: each object ends on the side towards the next one in its thread, when that saves more than 1 mm of travel.
+- **Reset moved connections**: a **Sew** or **Jump** you chose by hand goes back to **Automatic** when the object sewn next changes, so a connection doesn't stretch to an object it wasn't meant for. A **Trim** stays.
+- **Move locked objects**: off by default, so locked objects keep their place in the sewing order and the objects before and after them are optimised separately.
+- **Only the selection**: only the selected objects move, among their neighbours in the sewing order.
+
+A layered 3D satin starts in its inner thread, so Filum sews it after the other objects in that thread, and its top thread carries on from there. Colour changes cost far more time than a few centimetres of travel, so grouping colours can add a trim or a longer jump.
 
 Related commands:
 - **Stitch → Clean up tiny objects** removes leftovers too small to stitch.
@@ -139,6 +154,7 @@ For machines with cutwork needles, **Path → Cutwork segmentation** splits runn
 ## Before you export
 
 - **Issues** (left panel, or **Stitch → Troubleshoot…**) lists anything that could go wrong on the machine. Among them: lines lying on top of each other (a stroke imported twice, a piece drawn over another, a line running back over itself), which sew the thread twice and look heavier. The fix deletes a line that lies wholly on another, or cuts out just the doubled stretch.
+- Issues also reads the stitches themselves. **Needle holes pile up** marks a spot where the needle goes down more often than the fabric takes (17 times per mm² on cotton, fewer on silk, knits and leather), names the object and says whether its travel, its lock stitches or its rows cause it. **Many short stitches** marks a line or satin where at least a fifth of the stitches are under 0.5 mm: a path that turns at every point, as a traced or jagged outline does. Fills aren't counted there, because every fill steps a fraction of a millimetre from one row to the next.
 - The **Density map** (<kbd>Shift</kbd>+<kbd>D</kbd>) shows where stitches pile up.
 - **Animate** in the bottom bar opens the stitch-out player and plays the design stitch by stitch, so you can check the sew order and the jumps.
 

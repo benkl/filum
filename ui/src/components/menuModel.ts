@@ -59,7 +59,7 @@ import { CONVERSIONS, openConvert } from "./ConvertTools";
 import { openKnockdown } from "./KnockdownDialog";
 import { openRoute } from "./RouteDialog";
 import { runCutwork } from "./CutworkPanel";
-import { EFFECTS, lineAsFillGuide, openEffect, pathCommand } from "./ShapeEffects";
+import { EFFECTS, lineAsFillGuide, openEffect, pathCommand, simplifySelectionForStitching } from "./ShapeEffects";
 import { chooseThreadList } from "./ThreadListDialog";
 import { lastChart } from "./ThreadPicker";
 import { compoundSelection, joinSelection, releaseSelection } from "../lib/pathActions";
@@ -269,6 +269,7 @@ export function buildMenus(): Record<string, MenuItem[]> {
         icon: Spline,
         disabled: !hasSel,
         sub: [
+          { label: "Simplify for stitching", run: () => simplifySelectionForStitching(), disabled: !hasSel, hint: "Smooth out the pixel steps of traced and jagged paths, keep real corners: every sharp turn is a needle drop" },
           { label: "Make all corners sharp", run: () => pathCommand(sharpen, "Corners sharpened"), disabled: !hasSel },
           { label: "Average points", kbd: `${mod}Alt+J`, run: averageSelectedNodes, disabled: s.tool !== "node" || s.nodeSel.length < 2, hint: "Move the selected points onto their average point (node tool)" },
           { label: "Reverse path direction", run: () => pathCommand(reversePath, "Reversed"), disabled: !hasSel },
@@ -323,7 +324,7 @@ export function buildMenus(): Record<string, MenuItem[]> {
           { label: "Following the design", run: () => setOpts({ basting: "contour" }), checked: opts.basting === "contour" },
         ],
       },
-      { label: "Optimise stitch order", icon: SewOrder, run: optimizeOrder, hint: "Fewer colour changes, jumps and trims" },
+      { label: "Optimise stitch order", icon: SewOrder, run: optimizeOrder, hint: "Fewer colour changes, jumps and trims, with the steps chosen beside the Optimise button" },
       "-",
       toggle("Remove hidden stitching", !!opts.removeOverlaps, () => setOpts({ removeOverlaps: !opts.removeOverlaps }), undefined, "Leave out what lies under the objects on top"),
       toggle("Show hidden stitching", s.showHidden, () => s.set({ showHidden: !s.showHidden }), undefined, "Mark what is left out on the canvas (Design ▸ Hidden stitching)"),

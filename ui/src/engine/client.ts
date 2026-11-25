@@ -172,8 +172,9 @@ class EngineClient {
       });
   }
 
-  optimize(doc: StitchDocument) {
-    return this.call<OptimizeReport>("optimize", [engineJson(doc)]);
+  /** `opts`: crates/core/src/optimize.rs `OptimizeOptions` (absent fields: the defaults). */
+  optimize(doc: StitchDocument, opts: Record<string, unknown> = {}) {
+    return this.call<OptimizeReport>("optimize", [engineJson(doc), JSON.stringify(opts)]);
   }
   export(doc: StitchDocument, format: string, opts: ExportOptions = {}) {
     return this.call<Uint8Array>("export", [engineJson(doc), format, JSON.stringify(opts)]);

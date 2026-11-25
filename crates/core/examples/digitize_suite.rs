@@ -58,6 +58,10 @@ struct Metrics {
     jumps: usize,
     travel_mm: f64,
     short_stitches: usize,
+    /// Short stitches (quality.rs) in running stitch and satins: the paths' own turns.
+    short_lines: usize,
+    /// Needle drops on a hole the same object made before (quality.rs).
+    rehits: usize,
     long_satin: usize,
     long_stitches: usize,
     mean_len: f64,
@@ -176,8 +180,8 @@ fn main() -> Result<(), String> {
         }
         std::fs::write(out.join(format!("{name}.json")), serde_json::to_string_pretty(&m).unwrap()).map_err(|e| e.to_string())?;
         println!(
-            "{:<24} {:>6} st {:>5.0}/cm² {:>2} col {:>3} trims {:>3} jumps short {:>4} long {:>3}/{:<3} layers {:>4.1} ΔE {:>5.1} gap {:>5.1}% spill {:>5.1}% {:>5.2}s",
-            name, m.stitches, m.per_cm2, m.colors, m.trims, m.jumps, m.short_stitches, m.long_satin, m.long_stitches, m.max_layers, m.mean_de, m.gap_px, m.spill_px, m.seconds
+            "{:<24} {:>6} st {:>5.0}/cm² {:>2} col {:>3} trims {:>3} jumps short {:>4} (lines {:>4}) rehit {:>4} long {:>3}/{:<3} layers {:>4.1} ΔE {:>5.1} gap {:>5.1}% spill {:>5.1}% {:>5.2}s",
+            name, m.stitches, m.per_cm2, m.colors, m.trims, m.jumps, m.short_stitches, m.short_lines, m.rehits, m.long_satin, m.long_stitches, m.max_layers, m.mean_de, m.gap_px, m.spill_px, m.seconds
         );
         rows.push((m, references, note));
     }
@@ -285,6 +289,9 @@ fn measure(doc: &Document, plan: &StitchPlan) -> Metrics {
         }
     }
     m.mean_len = if n > 0 { total / n as f64 } else { 0.0 };
+    let q = filum_core::quality::stitch_quality(doc, plan);
+    m.short_lines = q.objects.iter().filter(|o| !matches!(doc.objects[o.index].stitch, StitchParams::Fill(_))).map(|o| o.short).sum();
+    m.rehits = q.rehits;
     let d = density_field(doc, plan, &DensityOptions::default());
     m.stitched_area_mm2 = d.stats.area;
     m.per_cm2 = if d.stats.area > 0.0 { m.stitches as f64 / d.stats.area * 100.0 } else { 0.0 };

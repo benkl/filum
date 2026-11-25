@@ -36,35 +36,36 @@ filum convert logo.dst logo.filum      # machine file → editable project
 
 ### info
 
-Prints the size, stitch count, colours, trims, jumps, thread use and running time:
+Prints the size, stitch count, colours, trims, jumps, thread use and running time, then the stitch quality: short stitches, needle drops on a hole the same object made before, and the spots where the needle goes down more often than the fabric takes (the same checks as **Issues** in the app):
 
 ```text
-$ filum info cactus.pes
+$ filum info cactus.svg
 Design      cactus
-Objects     7
-Size        60.4 × 68.6 mm
-Stitches    10394
-Colours     7 (6 changes)
-Trims       9   Jumps 9
-Thread      52.0 m top + 33.8 m bobbin
-Run time    15m 06s @ 800 spm
-   1. Beige                #efe3b9    4871 st  24.4 m
-   2. Leaf Green           #66ba49    1951 st  9.8 m
-   3. Tangerine            #fe9e32    1350 st  6.8 m
+Objects     14
+Size        211.7 × 211.7 mm
+Stitches    111958
+Colours     14 (13 changes)
+Trims       1   Jumps 14
+Thread      613.1 m top + 398.5 m bobbin
+Run time    142m 39s @ 800 spm
+Quality     2635 short stitches, 949 needle drops on an earlier hole (21 of them travel)
+            20+ spots over 17 holes/mm², the worst 29 at (113.2, 52.1)
+   1. Snow                 #ffffff   61610 st  337.5 m
+   2. Cream                #ffe3a3   28037 st  153.0 m
    …
 ```
 
-The thread names here are Brother's: by default a PES file stores its colours as entries of Brother's thread table, which every Brother machine reads (see *PES version* in [Export and print](Export-and-Print.md)).
+On a PES file the thread names are Brother's: by default a PES file stores its colours as entries of Brother's thread table, which every Brother machine reads (see *PES version* in [Export and print](Export-and-Print.md)).
 
 > **Where did my colours go?** Some formats, such as DST, store only the stitches and the colour changes, not the thread colours. `info` on a DST file shows placeholder colours. Use PES, JEF, VP3 or a `.filum` project to keep the real threads.
 
 ### optimize
 
-Reorders the objects for fewer colour changes and less travel, without changing which object sits on top, then saves the result:
+Reorders the objects for fewer colour changes and less travel, without changing which object sits on top, then saves the result. It takes every step that **Optimise** takes in the app by default, centre out on caps and stretchy fabrics included (see [Production tools](Production-Tools.md#optimise)):
 
 ```text
-$ filum optimize cactus.pes cactus-optimised.pes
-colour changes 6 → 5, travel 131 → 202 mm
+$ filum optimize cactus.svg cactus-optimised.pes
+colour changes 13 → 11, trims 1 → 3, jumps 572 → 608 mm
 ```
 
 Colour changes cost far more time than a few centimetres of travel, so the optimiser trades one for the other when it has to.

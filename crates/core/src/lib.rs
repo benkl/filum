@@ -24,6 +24,7 @@ pub mod optimize;
 pub mod outline_route;
 pub mod plan;
 pub mod prng;
+pub mod quality;
 pub mod region;
 pub mod stitch_outline;
 pub mod stitches;

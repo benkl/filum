@@ -1946,6 +1946,13 @@ pub struct DesignOptions {
     /// Thread weight of the top thread (No. 40 = the standard); scales
     /// satin and fill spacing (`thread_density_scale`).
     pub thread_weight: u32,
+    /// Travel stitches keep off the needle holes their object made before
+    /// (`stitches::holes`; not in Ink/Stitch). Off: stitch for stitch as Ink/Stitch.
+    pub avoid_holes: bool,
+    /// A gap to the next object up to 12 mm that what is sewn later covers
+    /// all along is sewn through instead of trimmed (branching; not in
+    /// Ink/Stitch). Off: trimmed as Ink/Stitch does.
+    pub hidden_travel: bool,
     /// Knockdown (laydown stitch): a light net sewn first under the
     /// whole design to flatten the nap of towels, fleece and fur, so the
     /// embroidery does not sink in.
@@ -1989,6 +1996,8 @@ impl Default for DesignOptions {
             basting_margin: 6.0,
             basting_length: 5.0,
             thread_weight: 40,
+            avoid_holes: true,
+            hidden_travel: true,
             knockdown: false,
             knockdown_offset: 2.0,
             knockdown_spacing: 2.0,

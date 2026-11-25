@@ -313,7 +313,7 @@ function fitCubic(pts: Vec2[], t1: Vec2, t2: Vec2, err: number, out: Cubic[]) {
 }
 
 /** Indices where the stroke turns sharply (kept as corners). */
-function cornerIndices(pts: Vec2[], angleDeg: number, reach: number): number[] {
+export function cornerIndices(pts: Vec2[], angleDeg: number, reach: number): number[] {
   const out: number[] = [];
   const cos = Math.cos((angleDeg * Math.PI) / 180);
   for (let i = 1; i < pts.length - 1; i++) {

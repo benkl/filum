@@ -119,10 +119,11 @@ impl StitchEngine {
         serde_json::to_string(&out).map_err(err)
     }
 
-    /// Optimise stitch order. Returns JSON `OptimizeReport`.
-    pub fn optimize(&mut self, doc_json: &str) -> Result<String, JsValue> {
+    /// Optimise stitch order with JSON `OptimizeOptions` (empty: the defaults). Returns JSON `OptimizeReport`.
+    pub fn optimize(&mut self, doc_json: &str, opts_json: &str) -> Result<String, JsValue> {
         let doc = parse_doc(doc_json)?;
-        let r = optimize::optimize_order(&doc, &mut self.engine);
+        let opts: optimize::OptimizeOptions = serde_json::from_str(if opts_json.trim().is_empty() { "{}" } else { opts_json }).map_err(err)?;
+        let r = optimize::optimize(&doc, &mut self.engine, &opts);
         serde_json::to_string(&r).map_err(err)
     }
 
@@ -145,7 +146,7 @@ impl StitchEngine {
 }
 
 /// A stitch plan as `{ coords: Float32Array(x,y,...), flags: Uint8Array, objects: Uint32Array, meta: string(JSON) }`
-/// where meta = `{ threads, stats, bounds }`.
+/// where meta = `{ threads, stats, bounds, basting, links, quality }`.
 fn plan_js(plan: &filum_core::StitchPlan, doc: &Document) -> JsValue {
     let n = plan.stitches.len();
     let mut coords = Vec::with_capacity(n * 2);
@@ -159,7 +160,8 @@ fn plan_js(plan: &filum_core::StitchPlan, doc: &Document) -> JsValue {
     }
     let m = &doc.machine;
     let stats = plan.stats(m.spm, m.trim_seconds, m.color_change_seconds);
-    let meta = serde_json::json!({ "threads": plan.threads, "stats": stats, "bounds": plan.bounds(), "basting": plan.basting, "links": plan.links });
+    let quality = filum_core::quality::stitch_quality(doc, plan);
+    let meta = serde_json::json!({ "threads": plan.threads, "stats": stats, "bounds": plan.bounds(), "basting": plan.basting, "links": plan.links, "quality": quality });
     let o = Object::new();
     set(&o, "coords", &Float32Array::from(&coords[..]).into());
     set(&o, "flags", &Uint8Array::from(&fl[..]).into());

@@ -535,6 +535,10 @@ export interface DesignOptions {
   bastingLength: number;
   /** Top thread weight (No. 40 = standard): scales satin and fill spacing. */
   threadWeight?: ThreadWeight;
+  /** Travel stitches keep off the needle holes their object made before (absent: on). Off: as Ink/Stitch. */
+  avoidHoles?: boolean;
+  /** A gap up to 12 mm that later stitching covers is sewn through, not trimmed (absent: on). Off: as Ink/Stitch. */
+  hiddenTravel?: boolean;
   /** Per-fabric starting values for new satins and fills (lib/fabricPresets.ts); none: Ink/Stitch's. */
   presetSet?: "filum" | "nova";
   /** Knockdown (laydown): a light net sewn first under the whole design to flatten pile. */
@@ -702,6 +706,21 @@ export interface PlanData {
   hide?: Uint8Array | null;
   /** What the plan does between consecutive objects (engine plan.links). */
   links?: Connection[];
+  /** Short stitches, holes hit again, hot spots (engine quality.rs). */
+  quality?: StitchQuality | null;
+}
+
+/** Stitch quality read from the plan (crates/core/src/quality.rs). */
+export interface StitchQuality {
+  drops: number;
+  short: number;
+  rehits: number;
+  travelRehits: number;
+  /** The fabric's needle holes per mm². */
+  holeLimit: number;
+  objects: { index: number; drops: number; short: number; under1mm: number; rehits: number; travelRehits: number }[];
+  /** Worst first. */
+  hotSpots: { at: Vec2; perMm2: number; objects: number[]; top: number; underlay: number; travel: number; ties: number }[];
 }
 
 /** A connection between two consecutive objects of the plan (engine `Connection`). */
@@ -819,12 +838,39 @@ export interface FormatInfo {
   machine: boolean;
 }
 
+/** What Optimise may change (crates/core/src/optimize.rs `OptimizeOptions`). */
+export interface OptimizeSteps {
+  /** Sew each thread's objects together: fewer colour changes. */
+  colors: boolean;
+  /** Within a thread, the object the needle reaches soonest next. */
+  travel: boolean;
+  /** 3D foam as late as the stacking allows. */
+  foamLast: boolean;
+  /** Each object ends towards the next one in its thread. */
+  ends: boolean;
+  /** A Sew or Jump set by hand goes back to Automatic when the next object changes. */
+  links: boolean;
+  /** Locked objects may move too. */
+  locked: boolean;
+  /** Only the selected objects move. */
+  selectionOnly: boolean;
+  /** The middle of the design first (on caps also bottom up). */
+  centerOut: boolean;
+}
+
 export interface OptimizeReport {
   order: string[];
   colorChangesBefore: number;
   colorChangesAfter: number;
+  trimsBefore: number;
+  trimsAfter: number;
+  /** The length of the jumps (mm). */
   travelBeforeMm: number;
   travelAfterMm: number;
+  /** End points moved towards the next object. */
+  ends: { id: string; end: Vec2 }[];
+  /** Objects whose Sew or Jump went back to Automatic. */
+  linksReset: string[];
 }
 
 export type OutlineKind = "none" | "running" | "satin";

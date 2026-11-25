@@ -1,5 +1,5 @@
 import { MoveHorizontal, Route, SlidersHorizontal } from "lucide-react";
-import { Digitize, Fabric as FabricIcon, Hoop, PullCompensation, RowSpacing, SewOrder, Spool, StitchAngle, StitchFill, StitchLength, StitchRunning, StitchSatin, Underlay } from "../icons/stitch";
+import { Digitize, Fabric as FabricIcon, Hoop, PullCompensation, RowSpacing, Spool, StitchAngle, StitchFill, StitchLength, StitchRunning, StitchSatin, Underlay } from "../icons/stitch";
 import { TOOL_ICONS } from "../icons/toolIcons";
 import { autoRouteSatins, autoRouteSelection } from "../lib/autoRoute";
 import { openRoute } from "./RouteDialog";
@@ -11,7 +11,8 @@ import { TextBar, useSelectedTextGroup } from "./Lettering";
 import { ConvertMenuButton } from "./ConvertTools";
 import { SplitToolBar } from "./SplitTool";
 import { ArrowLeftRight, Circle, CircleCheck, Import, Layers3 } from "lucide-react";
-import { fitHoopToDesign, importFile, optimizeOrder } from "../lib/actions";
+import { fitHoopToDesign, importFile } from "../lib/actions";
+import { OptimizeButton } from "./OptimizeMenu";
 import { normAngle } from "../lib/geometry";
 import { FABRICS } from "../lib/materials";
 import { HOOP_GROUPS, HOOPS, hoopIndex, hoopOf } from "../lib/hoops";
@@ -92,9 +93,7 @@ export function TitleBar() {
         </select>
       </label>
       <div className="spacer" />
-      <button className="btn ghost" onClick={optimizeOrder} title="Reorder to minimise colour changes and jumps (keeps stacking)">
-        <SewOrder size={14} /> Optimise
-      </button>
+      <OptimizeButton />
       <button className="btn primary" onClick={() => setDialog("export")}>
         Export
       </button>

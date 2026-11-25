@@ -834,6 +834,12 @@ function DesignOptionsSection() {
         </>
       )}
       <KnockdownRow o={o} set={set} />
+      <Row label="Avoid holes" title="Travel stitches keep off the needle holes their object made before: fewer drops in one spot, fewer torn fabrics and broken needles. Off: stitch for stitch as Ink/Stitch">
+        <Toggle on={o.avoidHoles ?? true} onChange={(v) => set({ avoidHoles: v })} />
+      </Row>
+      <Row label="Hide travel" title="A gap to the next object up to 12 mm that later stitching covers all along is sewn through instead of trimmed: fewer trims, shorter sewing. Off: trimmed as Ink/Stitch does">
+        <Toggle on={o.hiddenTravel ?? true} onChange={(v) => set({ hiddenTravel: v })} />
+      </Row>
     </Section>
   );
 }

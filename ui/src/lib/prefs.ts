@@ -1,5 +1,6 @@
 // User preferences that outlive a design: look, hints, nudging, autosave.
 // The view toggles (grid, guides, …) are remembered by the store itself.
+import type { Fabric, OptimizeSteps } from "../types";
 import { safeSetItem } from "./storage";
 
 export interface Prefs {
@@ -19,7 +20,22 @@ export interface Prefs {
   snapPoints: boolean;
   /** This screen's size: device pixels per mm, measured with a ruler (lib/screen). Absent: 96 dpi. */
   screenPxPerMm?: number;
+  /** What Optimise may change (the flyout beside the button); missing steps: their defaults. */
+  optimize?: Partial<OptimizeSteps>;
 }
+
+/** Optimise's steps when nothing is chosen: all but moving locked objects, keeping to the selection and centre out. */
+export const DEFAULT_OPTIMIZE: OptimizeSteps = { colors: true, travel: true, foamLast: true, ends: true, links: true, locked: false, selectionOnly: false, centerOut: false };
+
+/** Fabrics that are sewn centre out unless you choose otherwise: caps (bottom up too) and the ones that stretch. */
+export const CENTER_OUT_FABRICS: Fabric[] = ["cap", "knit", "fleece", "towel", "pique"];
+
+/** The steps Optimise takes on this fabric, with the defaults filled in. */
+export const optimizeSteps = (p: Pick<Prefs, "optimize">, fabric?: Fabric): OptimizeSteps => ({
+  ...DEFAULT_OPTIMIZE,
+  centerOut: !!fabric && CENTER_OUT_FABRICS.includes(fabric),
+  ...p.optimize,
+});
 
 /** The app colour (the icon's violet). */
 export const APP_COLOR = "#7c3aed";

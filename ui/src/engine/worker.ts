@@ -42,7 +42,7 @@ self.onmessage = async (e: MessageEvent<Req>) => {
           meta: string;
         };
         const meta = JSON.parse(r.meta);
-        result = { coords: r.coords, flags: r.flags, objects: r.objects, threads: meta.threads, stats: meta.stats, basting: meta.basting ?? null, links: meta.links ?? [] };
+        result = { coords: r.coords, flags: r.flags, objects: r.objects, threads: meta.threads, stats: meta.stats, basting: meta.basting ?? null, links: meta.links ?? [], quality: meta.quality ?? null };
         transfer.push(r.coords.buffer, r.flags.buffer, r.objects.buffer);
         break;
       }
@@ -68,7 +68,7 @@ self.onmessage = async (e: MessageEvent<Req>) => {
         result = JSON.parse(readThreadList(args[0] as Uint8Array, args[1] as string));
         break;
       case "optimize":
-        result = JSON.parse(eng.optimize(args[0] as string));
+        result = JSON.parse(eng.optimize(args[0] as string, (args[1] as string) ?? "{}"));
         break;
       case "export": {
         const bytes = eng.export(args[0] as string, args[1] as string, (args[2] as string) ?? "{}");

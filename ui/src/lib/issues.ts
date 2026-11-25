@@ -11,6 +11,7 @@ import { shapeProblems } from "./shapeCheck";
 import { lineOverlaps } from "./lineOverlaps";
 import { withLinkChoice } from "./links";
 import { satinRails } from "./multicolorSatin";
+import { simplifyForStitching } from "./stitchSimplify";
 
 /** A layered 3D narrower than this has no room for its layers (mm; Punch). */
 export const LAYERED3D_MIN_WIDTH = 6;
@@ -103,6 +104,65 @@ function shapeProblemsCached(o: DesignObject) {
   let r = shapeCache.get(o);
   if (!r) shapeCache.set(o, (r = shapeProblems(o)));
   return r;
+}
+
+/** A satin with this share of stitches under 0.5 mm, a running stitch with this share under 1 mm (and at least `SHORT_MIN`), turns too often. */
+const SHORT_SHARE = 0.2;
+const SHORT_LINE_SHARE = 0.3;
+const SHORT_MIN = 10;
+/** At most this many hot spots in the list (the worst of each object). */
+const MAX_HOT_ISSUES = 8;
+
+/**
+ * What the stitches themselves show (engine quality.rs): needle holes that
+ * pile up, and lines that turn so often their stitches are short. Fills are
+ * judged by their holes only: every fill steps 0.2-0.4 mm from row to row.
+ */
+export function qualityIssues(doc: StitchDocument, plan: PlanData | null): Issue[] {
+  const q = plan?.quality;
+  if (!q) return [];
+  const out: Issue[] = [];
+  const seen = new Set<number>();
+  for (const h of q.hotSpots) {
+    const o = doc.objects[h.objects[0]];
+    if (!o || seen.has(h.objects[0]) || out.length >= MAX_HOT_ISSUES) continue;
+    seen.add(h.objects[0]);
+    const most = Math.max(h.top, h.underlay, h.travel, h.ties);
+    const why =
+      most === h.travel
+        ? `Most are ${o.name}'s travel stitches: it travels through this narrow part again and again, on the same holes.`
+        : most === h.ties
+          ? "Most are lock stitches: objects start or end here. Move a start or end point away."
+          : `Most are ${o.name}'s ${most === h.underlay ? "underlay" : "rows"}, meeting here. A wider spacing or another angle spreads them.`;
+    out.push({
+      id: `holes:${o.id}`,
+      objId: o.id,
+      level: "warning",
+      title: "Needle holes pile up",
+      detail: `${Math.round(h.perMm2)} needle drops per mm² here; ${doc.fabric} takes ${Math.round(q.holeLimit)}. The fabric tears and needles break. ${why}`,
+      at: h.at,
+    });
+  }
+  for (const r of q.objects) {
+    const o = doc.objects[r.index];
+    if (!o || o.stitch.type === "fill") continue;
+    // a running stitch set under 1 mm has its own issue ("Very short running stitches")
+    const line = o.stitch.type === "running";
+    if (o.stitch.type === "running" && o.stitch.length < 1) continue;
+    const [n, under] = line ? [r.under1mm, "1 mm"] : [r.short, "0.5 mm"];
+    if (n < SHORT_MIN || n < r.drops * (line ? SHORT_LINE_SHARE : SHORT_SHARE)) continue;
+    const b = objectBoundsCached(o);
+    out.push({
+      id: `short:${o.id}`,
+      objId: o.id,
+      level: "info",
+      title: "Many short stitches",
+      detail: `${n} of ${r.drops} stitches are under ${under}: the path turns very often, as a traced or jagged outline does, and every sharp turn is a needle drop. Short stitches pile thread up and break it.${(o.minStitch ?? doc.machine.minStitch) < 0.3 && o.stitch.type === "running" ? ` The shortest stitch is ${o.minStitch ?? doc.machine.minStitch} mm: with Min. stitch at 0.3–0.5 mm (Design ▸ Stitch-out, or the object's Commands) its fine steps are left out too.` : ""}`,
+      at: b ? [b.x + b.w / 2, b.y + b.h / 2] : [0, 0],
+      ...(o.text ? {} : { fix: { label: "Simplify for stitching", apply: (x: DesignObject) => ({ ...x, paths: x.paths.map((sp) => (sp.nodes.length >= 3 ? simplifyForStitching(sp) : sp)) }) } }),
+    });
+  }
+  return out;
 }
 
 export function computeIssues(doc: StitchDocument, plan: PlanData | null): Issue[] {
@@ -294,6 +354,7 @@ export function computeIssues(doc: StitchDocument, plan: PlanData | null): Issue
       fix: { label: "Trim instead", apply: (x) => withLinkChoice(x, "trim") },
     });
   }
+  out.push(...qualityIssues(doc, plan));
   const total = plan?.stats.stitches ?? 0;
   if (total > 100000) out.push({ id: "big", objId: "", level: "info", title: "Very large design", detail: `${total.toLocaleString()} stitches.`, at: [hw / 2, hh / 2] });
   cache.set(doc, { plan, issues: out });
