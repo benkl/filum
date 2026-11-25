@@ -51,7 +51,12 @@ From digitizing guides and the manuals of commercial digitizing programs (Novemb
 - **Fewer trims.** Touching objects of one colour are sewn as one group, with the travel between them hidden under later stitching. Joining each object at the point closest to the next is common too, but has to be reapplied by hand after edits.
 - **Satin curves.** Stitches on the inside of tight curves are shortened. Filum's satins do this already (`satin.rs`, `inset_short_stitches`).
 
-Ink/Stitch is the reference for how stitches are made. Where it has nothing (stitch-quality checks, hole avoidance, sequencing beyond colour grouping) Filum adds it, and says so in the code.
+Ink/Stitch is the reference for how stitches are made: its file format, its stitch algorithms and what each setting means. Filum deviates from it only under four rules (decided 25 November 2026):
+
+1. **Measured:** better numbers on real designs (the Koi, the digitizer suite) with the same look (colour difference unchanged).
+2. **Reversible:** a switch back to Ink/Stitch's exact behaviour (a design option, or the *Ink/Stitch defaults* button).
+3. **Never silent:** a design's own settings are never rewritten; a new default applies to new objects, or comes as a fix in Issues. Files stay Ink/Stitch SVG: the export writes what a Filum-only setting comes to.
+4. **Documented:** "not in Ink/Stitch" in the code, explained in the wiki and here.
 
 ---
 
@@ -132,3 +137,34 @@ The hot spots barely move: they are rows, lock stitches and travel together, a l
 | Drops on an earlier hole of the same object | 1,400 | 724 |
 | Needle drops in spots over cotton's limit | 753 | 494 |
 | Worst hot spot | 32 per mm² | 31 per mm² (a 3 mm spiral's own locks) |
+
+## 6. The Koi's hot spots, checked one by one
+
+With every default on, 30 spots exceed cotton's 17 needle drops per mm². By cause:
+
+- **An underlay too heavy for a narrow fill: a design issue, reliably detected.** 27 of the Koi's 57 fills are narrower than 2.5 mm (0.5–2.3 mm: lines drawn as fills), and every one sews an underlay set by hand (Ink/Stitch's default) that can't sit under rows that short. They take part in most of the worst spots. The width is the one automatic underlay measures (twice the radius of the largest circle inside), so the check agrees with the fix. *Underlay in narrow fills* is now a warning, with *Automatic underlay* as the fix for all of them at once.
+- **A full underlay in a fill under 8 mm: an optimisation, offered.** Common and not wrong, but an edge run holds a shape that narrow. *Lighter underlay for narrow fills* is a suggestion (info) with the same fix.
+- **Lock stitches on a small shape: a design limit, explained.** A 3 mm spiral ends next to its start wherever it begins (phase 5).
+- **The edges of two fills meeting: neither.** Neighbouring fills meet and overlap at their borders on purpose; each ends its rows there, and a fill's travel runs along the same stretch of its edge several times. Hidden stitching measured worse (494 → 506 drops in over-dense spots, 4 more trims). Routing a fill's travel along an edge fewer times means changing the order of its sections, which Ink/Stitch defines: left as it is, and the warning says what happens there.
+
+| Koi | Now | Narrow-fill fix | Both fixes |
+|---|---|---|---|
+| Stitches | 9,702 | 9,204 | 8,029 |
+| Drops in spots over cotton's limit | 494 | 409 | 379 |
+| Worst spot | 31 per mm² | 25 per mm² | 27 per mm² |
+| Sewing time | 25:15 | 24:52 | 23:12 |
+
+## 7. Deviations decided under the rules
+
+- **New fills get automatic underlay** (`FILUM_NEW_FILL`, `ui/src/lib/inkDefaults.ts`). On the Koi, automatic underlay on its fills under 8 mm: 9,702 → 8,029 stitches, 494 → 379 drops in over-dense spots, 25:15 → 23:12. Only new fills: imported and existing ones keep theirs (Issues offers the change). The *Ink/Stitch defaults* button gives Ink/Stitch's underlay back. The SVG export writes for Ink/Stitch what the automatic underlay comes to on each shape and fabric: none, or the tatami angles; an edge run only is written as none, since Ink/Stitch has no edge-run underlay.
+- **Tried and not taken: changing how a fill travels along its edges.** Of the Koi's 2,762 travel stitches (28 % of all), 981 turn straight back: they are each row's step along the edge to the next row, which curved and flow fills sew as travel and every fill needs. Routing can't remove those. Measured on the Koi:
+
+  | Variant | Drops in over-dense spots | Stitches |
+  |---|---|---|
+  | As now (edge travel within 0.05 mm of the outline) | 494 | 9,702 |
+  | Edge travel within 0.1 mm | 473 | 9,670 |
+  | Edge travel within 0.2 mm | 470 | 9,648 |
+  | An outline stretch costs more each time it is travelled (×2) | 488 | 9,699 |
+  | … (×4) | 481 | 9,704 |
+
+  At most 5 % fewer, and a looser edge tolerance lets travel cut 0.1–0.2 mm across corners and holes (why it is 0.05 mm). Not enough to deviate from Ink/Stitch's routing; the shared-edge spots stay explained in Issues.

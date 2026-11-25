@@ -722,7 +722,9 @@ export interface StitchQuality {
   holeLimit: number;
   objects: { index: number; drops: number; short: number; under1mm: number; rehits: number; travelRehits: number }[];
   /** Worst first. */
-  hotSpots: { at: Vec2; perMm2: number; objects: number[]; top: number; underlay: number; travel: number; ties: number }[];
+  hotSpots: { at: Vec2; perMm2: number; objects: number[]; shares: number[]; top: number; underlay: number; travel: number; ties: number }[];
+  /** Visible fills narrower than 12 mm, with their width (mm): automatic underlay's sizes. */
+  narrowFills: { index: number; width: number }[];
 }
 
 /** A connection between two consecutive objects of the plan (engine `Connection`). */

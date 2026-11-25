@@ -43,6 +43,15 @@ export const INK_TATAMI = {
   travelLength: 2.5,
 };
 
+/**
+ * Where Filum's new fills differ from Ink/Stitch, measured on real designs
+ * (docs/STITCH_QUALITY_PLAN.md, section 6): automatic underlay, so a fill too
+ * narrow for an underlay gets none and a narrow one only an edge run (Ink/Stitch
+ * puts a full underlay under every fill). The "Ink/Stitch defaults" button still
+ * gives Ink/Stitch's own values, and the SVG export writes what it comes to.
+ */
+export const FILUM_NEW_FILL = { underlayAuto: true };
+
 /** Ink/Stitch's own values for the fill methods it shares with Filum (on top of tatami's). */
 export const INK_FILL_METHODS: Partial<Record<FillParams["method"], Partial<FillParams>>> = {
   tatami: {},

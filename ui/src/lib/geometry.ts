@@ -11,7 +11,7 @@ import type {
   Vec2,
   FlowField,
 } from "../types";
-import { INK_FILL_METHODS, INK_RUNNING, INK_SATIN, INK_TATAMI } from "./inkDefaults";
+import { FILUM_NEW_FILL, INK_FILL_METHODS, INK_RUNNING, INK_SATIN, INK_TATAMI } from "./inkDefaults";
 
 export const uid = (p = "o") => `${p}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
@@ -40,6 +40,7 @@ const baseFill = (): FillParams => ({
   angle: 0,
   center: [0.5, 0.5],
   ...INK_TATAMI,
+  ...FILUM_NEW_FILL,
 });
 
 /** A new appliqué follows the Punch book: placement 1.25 mm inside, a straight-stitch

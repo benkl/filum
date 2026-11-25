@@ -25,6 +25,13 @@ pub const SHORT_LINE_STITCH: f64 = 1.0;
 pub const SAME_HOLE: f64 = 0.15;
 /// Needle drops are counted within this radius for the hot spots (mm).
 pub const HOT_RADIUS: f64 = 0.5;
+/// A fill narrower than this gets no underlay from automatic underlay
+/// (`stitches::underlay`, ordinary fabrics): a set underlay can't sit under
+/// its rows and only adds holes along both edges (mm).
+pub const NARROW_FILL: f64 = 2.5;
+/// Up to this width automatic underlay sews an edge run only (mm; 8 on
+/// ordinary fabrics, 12 on delicate ones): the fills reported with their width.
+pub const EDGE_RUN_FILL: f64 = 12.0;
 /// Hot spots closer than this to a worse one are the same spot (mm).
 const HOT_SEPARATION: f64 = 2.0;
 /// At most this many hot spots are reported, worst first.
@@ -77,11 +84,22 @@ pub struct HotSpot {
     pub per_mm2: f64,
     /// The object with most drops there (index), then the others.
     pub objects: Vec<usize>,
+    /// Each one's drops there, in the same order.
+    pub shares: Vec<usize>,
     /// Drops there by kind.
     pub top: usize,
     pub underlay: usize,
     pub travel: usize,
     pub ties: usize,
+}
+
+/// A fill narrower than [`EDGE_RUN_FILL`].
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NarrowFill {
+    pub index: usize,
+    /// Twice the radius of the largest circle inside it (mm).
+    pub width: f64,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
@@ -98,6 +116,29 @@ pub struct StitchQuality {
     pub objects: Vec<ObjectQuality>,
     /// Worst first.
     pub hot_spots: Vec<HotSpot>,
+    /// Visible fills narrower than [`EDGE_RUN_FILL`], with their width.
+    pub narrow_fills: Vec<NarrowFill>,
+}
+
+/// The fills narrower than [`EDGE_RUN_FILL`]. Twice the area over the
+/// perimeter is a lower bound of the width (a strip's width, half a
+/// circle's), so only the fills under the limit by it are measured.
+fn narrow_fills(doc: &Document) -> Vec<NarrowFill> {
+    doc.objects
+        .iter()
+        .enumerate()
+        .filter(|(_, o)| o.visible && matches!(o.stitch, StitchParams::Fill(_)))
+        .filter_map(|(index, o)| {
+            let rings: Vec<Vec<crate::geom::Point>> = o.paths.iter().filter(|p| p.closed).map(|p| p.flatten(0.05)).filter(|r| r.len() >= 3).collect();
+            let area: f64 = rings.iter().map(|r| crate::geom::signed_area(r)).sum::<f64>().abs();
+            let perimeter: f64 = rings.iter().map(|r| crate::geom::polyline_length(r) + r[0].dist(r[r.len() - 1])).sum();
+            if perimeter <= 0.0 || 2.0 * area / perimeter >= EDGE_RUN_FILL {
+                return None;
+            }
+            let width = crate::stitches::underlay::shape_width(&rings);
+            (width > 0.0 && width < EDGE_RUN_FILL).then_some(NarrowFill { index, width })
+        })
+        .collect()
 }
 
 /// Does the object sew through its own holes on purpose (bean stitch)?
@@ -185,7 +226,7 @@ pub fn stitch_quality(doc: &Document, plan: &StitchPlan) -> StitchQuality {
             continue;
         }
         let mut by_obj: HashMap<usize, usize> = HashMap::new();
-        let mut h = HotSpot { at: [x, y], per_mm2: c as f64 / area, objects: vec![], top: 0, underlay: 0, travel: 0, ties: 0 };
+        let mut h = HotSpot { at: [x, y], per_mm2: c as f64 / area, objects: vec![], shares: vec![], top: 0, underlay: 0, travel: 0, ties: 0 };
         for j in within(x, y) {
             *by_obj.entry(drops[j].2).or_default() += 1;
             match drops[j].3 {
@@ -197,6 +238,7 @@ pub fn stitch_quality(doc: &Document, plan: &StitchPlan) -> StitchQuality {
         }
         let mut objs: Vec<(usize, usize)> = by_obj.into_iter().collect();
         objs.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+        h.shares = objs.iter().map(|(_, n)| *n).collect();
         h.objects = objs.into_iter().map(|(o, _)| o).collect();
         hot_spots.push(h);
         if hot_spots.len() >= MAX_HOT_SPOTS {
@@ -212,6 +254,7 @@ pub fn stitch_quality(doc: &Document, plan: &StitchPlan) -> StitchQuality {
         hole_limit: limit,
         objects: per.into_iter().filter(|o| o.under_1mm > 0 || o.rehits > 0).collect(),
         hot_spots,
+        narrow_fills: narrow_fills(doc),
     }
 }
 
@@ -281,5 +324,20 @@ mod tests {
         let h = &q.hot_spots[0];
         assert!(h.per_mm2 > 17.0 && h.objects[0] == 1 && h.travel == 20, "{h:?}");
         assert!((h.at[0] - 5.2).abs() < 0.5 && (h.at[1] - 5.0).abs() < 0.5);
+    }
+
+    #[test]
+    fn narrow_fills_are_found_by_their_width() {
+        let fill = || StitchParams::Fill(FillParams::default());
+        let mut d = doc(vec![fill(), fill(), fill()]);
+        let rect = |w: f64, h: f64| vec![SubPath::polyline(&[pt(0.0, 0.0), pt(w, 0.0), pt(w, h), pt(0.0, h)], true)];
+        // a 1.2 × 20 mm strip, a 2 mm square, a 20 mm square (wider than any fabric's edge-run width)
+        d.objects[0].paths = rect(20.0, 1.2);
+        d.objects[1].paths = rect(2.0, 2.0);
+        d.objects[2].paths = rect(20.0, 20.0);
+        let q = stitch_quality(&d, &plan(&[]));
+        let found: Vec<usize> = q.narrow_fills.iter().map(|n| n.index).collect();
+        assert_eq!(found, vec![0, 1], "{:?}", q.narrow_fills);
+        assert!((q.narrow_fills[0].width - 1.2).abs() < 0.2, "{:?}", q.narrow_fills[0]);
     }
 }

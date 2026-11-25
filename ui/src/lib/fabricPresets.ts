@@ -19,12 +19,12 @@
 // the preset's, and its expand is added to the preset's overlap.
 
 import type { Fabric, FillParams, SatinParams, StitchDocument, StitchParams } from "../types";
-import { INK_SATIN, INK_TATAMI } from "./inkDefaults";
+import { FILUM_NEW_FILL, INK_SATIN, INK_TATAMI } from "./inkDefaults";
 
 export type PresetSet = "filum" | "nova";
 
 export const PRESET_SETS: { id: PresetSet | "none"; label: string; hint: string }[] = [
-  { id: "none", label: "Ink/Stitch (no compensation)", hint: "Ink/Stitch's values: no pull compensation unless you calibrate the fabric" },
+  { id: "none", label: "Ink/Stitch (no compensation)", hint: "Ink/Stitch's values: no pull compensation unless you calibrate the fabric. New fills get automatic underlay (none in a fill too narrow for one)" },
   { id: "filum", label: "Filum", hint: "Filum's earlier values: centre-walk underlay, 0.4 mm rows, pull compensation by fabric" },
   { id: "nova", label: "NOVAstitch", hint: "The NOVAstitch Designer presets: pull compensation and fill overlap by fabric, contour underlay on satins" },
 ];
@@ -73,7 +73,7 @@ const FILL_KEYS = ["pullComp", "expand"] as const;
 const TATAMI_KEYS = ["rowSpacing", "maxStitchLength", "underlayInset", "underlayStitchLength", "underlayAuto"] as const;
 
 const INK: Record<string, unknown> = { ...INK_SATIN };
-const INK_FILL: Record<string, unknown> = { ...INK_TATAMI, expand: 0 };
+const INK_FILL: Record<string, unknown> = { ...INK_TATAMI, ...FILUM_NEW_FILL, expand: 0 };
 
 export const presetSetOf = (doc: Pick<StitchDocument, "options">): PresetSet | undefined => doc.options?.presetSet;
 

@@ -2014,11 +2014,21 @@ xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"{}mm\" height=\"{}mm\" view
                 attrs.push(("max_stitch_length_mm".into(), fmt(p.max_stitch_length)));
                 attrs.push(("staggers".into(), p.staggers.to_string()));
                 attrs.push(("pull_compensation_mm".into(), fmt(p.pull_comp)));
-                attrs.push(("fill_underlay".into(), b(p.underlay).into()));
+                // automatic underlay (not in Ink/Stitch): what it comes to on this shape and fabric. Ink/Stitch
+                // has no edge-run underlay, so a fill that gets only that is written without one
+                let auto = p.underlay_auto.then(|| {
+                    let rings: Vec<Vec<Point>> = o.paths.iter().filter(|s| s.closed).map(|s| s.flatten(0.05)).filter(|r| r.len() >= 3).collect();
+                    let mut profile = doc.fabric.profile();
+                    profile.knockdown = doc.options.knockdown;
+                    crate::stitches::underlay::fill_underlay(&rings, p, &profile).passes
+                });
+                attrs.push(("fill_underlay".into(), b(auto.as_ref().map_or(p.underlay, |a| !a.is_empty())).into()));
                 // Ink/Stitch takes a list of underlay angles: the cross-hatch as two
                 attrs.push((
                     "fill_underlay_angle".into(),
-                    if !p.underlay_angles.is_empty() {
+                    if let Some(a) = auto.as_ref().filter(|a| !a.is_empty()) {
+                        a.iter().map(|x| fmt(p.angle + x)).collect::<Vec<_>>().join(" ")
+                    } else if !p.underlay_angles.is_empty() {
                         p.underlay_angles.iter().map(|a| fmt(p.angle + a)).collect::<Vec<_>>().join(" ")
                     } else if p.underlay_cross {
                         format!("{} {}", fmt(p.angle + p.underlay_angle - 45.0), fmt(p.angle + p.underlay_angle + 45.0))
@@ -2650,6 +2660,30 @@ mod tests {
         assert!(out.contains("inkstitch:bean_stitch_repeats=\"1\""));
         assert!(out.contains("inkstitch:fill_method=\"cross_stitch\""));
         assert!(out.contains("inkstitch:cross_stitch_method=\"half_cross\""));
+    }
+
+    #[test]
+    fn automatic_underlay_is_written_as_what_it_comes_to() {
+        // a 1 mm strip and a 20 mm square, both with automatic underlay
+        let rect = |w: f64, h: f64| vec![SubPath::polyline(&[pt(0.0, 0.0), pt(w, 0.0), pt(w, h), pt(0.0, h)], true)];
+        let fill = || StitchParams::Fill(FillParams { underlay: true, underlay_auto: true, ..Default::default() });
+        let mut d = Document::default();
+        for (id, paths) in [("thin", rect(20.0, 1.0)), ("wide", rect(20.0, 20.0))] {
+            let mut o: Object = serde_json::from_str(&format!(r#"{{"id":"{id}","thread":"t","paths":[]}}"#)).unwrap();
+            o.paths = paths;
+            o.stitch = fill();
+            d.objects.push(o);
+        }
+        let out = export_svg(&d);
+        let attr = |id: &str| {
+            let line = out.lines().find(|l| l.contains(&format!("id=\"{id}\""))).unwrap();
+            line.split("inkstitch:fill_underlay=\"").nth(1).unwrap().split('"').next().unwrap().to_string()
+        };
+        assert_eq!(attr("thin"), "False", "no underlay fits a 1 mm fill");
+        assert_eq!(attr("wide"), "True");
+        // Filum keeps the setting itself
+        let back = import_svg(&out).unwrap().document;
+        assert!(back.objects.iter().all(|o| matches!(&o.stitch, StitchParams::Fill(f) if f.underlay_auto)));
     }
 
     #[test]

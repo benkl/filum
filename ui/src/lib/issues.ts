@@ -12,6 +12,7 @@ import { lineOverlaps } from "./lineOverlaps";
 import { withLinkChoice } from "./links";
 import { satinRails } from "./multicolorSatin";
 import { simplifyForStitching } from "./stitchSimplify";
+import { autoFillWidths } from "./underlay";
 
 /** A layered 3D narrower than this has no room for its layers (mm; Punch). */
 export const LAYERED3D_MIN_WIDTH = 6;
@@ -123,28 +124,46 @@ export function qualityIssues(doc: StitchDocument, plan: PlanData | null): Issue
   if (!q) return [];
   const out: Issue[] = [];
   const seen = new Set<number>();
+  // a fill there with an underlay too heavy for its width: that is the cause to fix first
+  const [none] = autoFillWidths(doc.fabric);
+  const thinWidth = new Map((q.narrowFills ?? []).filter((n) => n.width < none).map((n) => [n.index, n.width]));
+  const heavyUnderlay = (i: number) => {
+    const x = doc.objects[i];
+    return thinWidth.has(i) && x?.stitch.type === "fill" && x.stitch.underlay && !x.stitch.underlayAuto;
+  };
   for (const h of q.hotSpots) {
     const o = doc.objects[h.objects[0]];
     if (!o || seen.has(h.objects[0]) || out.length >= MAX_HOT_ISSUES) continue;
     seen.add(h.objects[0]);
     const most = Math.max(h.top, h.underlay, h.travel, h.ties);
-    const why =
-      most === h.travel
-        ? `Most are ${o.name}'s travel stitches: it travels through this narrow part again and again, on the same holes.`
-        : most === h.ties
-          ? Math.max(objectBoundsCached(o)?.w ?? 0, objectBoundsCached(o)?.h ?? 0) < 5
-            ? `Most are lock stitches: ${o.name} is too small to keep its lock-in and lock-off apart. A smaller lock shape (Design ▸ Stitch-out) puts fewer holes here.`
-            : "Most are lock stitches: objects start or end here. Move a start or end point away."
-          : `Most are ${o.name}'s ${most === h.underlay ? "underlay" : "rows"}, meeting here. A wider spacing or another angle spreads them.`;
+    const thin = h.objects.slice(0, 2).find(heavyUnderlay);
+    const other = h.objects.length > 1 && h.shares[1] >= 0.3 * h.shares.reduce((a, b) => a + b, 0) ? doc.objects[h.objects[1]] : undefined;
+    let why: string;
+    if (thin !== undefined) {
+      why = `${doc.objects[thin].name} is only ${thinWidth.get(thin)!.toFixed(1)} mm wide and sews an underlay that can't fit under its rows: automatic underlay leaves it out.`;
+    } else if (most === h.ties) {
+      why =
+        Math.max(objectBoundsCached(o)?.w ?? 0, objectBoundsCached(o)?.h ?? 0) < 5
+          ? `Most are lock stitches: ${o.name} is too small to keep its lock-in and lock-off apart. A smaller lock shape (Design ▸ Stitch-out) puts fewer holes here.`
+          : "Most are lock stitches: objects start or end here. Move a start or end point away.";
+    } else if (other) {
+      why = `The edges of ${o.name} and ${other.name} meet here: both end their rows along it${most === h.travel ? `, and ${o.name}'s travel runs along this stretch of its edge again and again` : ""}.`;
+    } else if (most === h.travel) {
+      why = `Most are ${o.name}'s travel stitches: it travels along this stretch again and again.`;
+    } else {
+      why = `Most are ${o.name}'s ${most === h.underlay ? "underlay" : "rows"}, meeting here. A wider spacing or another angle spreads them.`;
+    }
     out.push({
       id: `holes:${o.id}`,
-      objId: o.id,
+      objId: (thin !== undefined ? doc.objects[thin] : o).id,
       level: "warning",
       title: "Needle holes pile up",
       detail: `${Math.round(h.perMm2)} needle drops per mm² here; ${doc.fabric} takes ${Math.round(q.holeLimit)}. The fabric tears and needles break. ${why}`,
       at: h.at,
+      ...(thin !== undefined ? { fix: { label: "Automatic underlay", apply: (x: DesignObject) => (x.stitch.type === "fill" ? { ...x, stitch: { ...x.stitch, underlayAuto: true } } : x) } } : {}),
     });
   }
+  out.push(...underlayIssues(doc, q.narrowFills));
   for (const r of q.objects) {
     const o = doc.objects[r.index];
     if (!o || o.stitch.type === "fill") continue;
@@ -162,6 +181,65 @@ export function qualityIssues(doc: StitchDocument, plan: PlanData | null): Issue
       detail: `${n} of ${r.drops} stitches are under ${under}: the path turns very often, as a traced or jagged outline does, and every sharp turn is a needle drop. Short stitches pile thread up and break it.${(o.minStitch ?? doc.machine.minStitch) < 0.3 && o.stitch.type === "running" ? ` The shortest stitch is ${o.minStitch ?? doc.machine.minStitch} mm: with Min. stitch at 0.3–0.5 mm (Design ▸ Stitch-out, or the object's Commands) its fine steps are left out too.` : ""}`,
       at: b ? [b.x + b.w / 2, b.y + b.h / 2] : [0, 0],
       ...(o.text ? {} : { fix: { label: "Simplify for stitching", apply: (x: DesignObject) => ({ ...x, paths: x.paths.map((sp) => (sp.nodes.length >= 3 ? simplifyForStitching(sp) : sp)) }) } }),
+    });
+  }
+  return out;
+}
+
+/** The names of a few objects, then how many more. */
+const someNames = (xs: { o: DesignObject; width: number }[]) =>
+  xs
+    .slice(0, 3)
+    .map(({ o, width }) => `${o.name} ${width.toFixed(1)} mm`)
+    .join(", ") + (xs.length > 3 ? ` and ${xs.length - 3} more` : "");
+
+/**
+ * Fills whose underlay is set by hand but too heavy for their width
+ * (engine quality.rs measures it as automatic underlay does): under the
+ * first width of automatic underlay none fits under the rows, and it only
+ * adds needle holes along both edges (a warning); up to the second an edge
+ * run is enough (a suggestion). One issue each, for all such fills, with a
+ * fix for all of them: Automatic underlay.
+ */
+function underlayIssues(doc: StitchDocument, narrow: { index: number; width: number }[] | undefined): Issue[] {
+  const [none, edge] = autoFillWidths(doc.fabric);
+  const set = (narrow ?? [])
+    .map(({ index, width }) => ({ o: doc.objects[index], width }))
+    .filter(({ o }) => o?.stitch.type === "fill" && o.stitch.underlay && !o.stitch.underlayAuto && !o.locked)
+    .sort((a, b) => a.width - b.width);
+  const out: Issue[] = [];
+  const auto = (ids: Set<string>) => ({
+    apply: (x: DesignObject) => (x.stitch.type === "fill" ? { ...x, stitch: { ...x.stitch, underlayAuto: true } } : x),
+    scope: (x: DesignObject) => ids.has(x.id),
+  });
+  const at = (o: DesignObject): Vec2 => {
+    const b = objectBoundsCached(o);
+    return b ? [b.x + b.w / 2, b.y + b.h / 2] : [0, 0];
+  };
+  const thin = set.filter((x) => x.width < none);
+  if (thin.length) {
+    const one = thin.length === 1;
+    out.push({
+      id: `underlayThin:${thin[0].o.id}`,
+      objId: thin[0].o.id,
+      level: "warning",
+      title: one ? "Underlay in a narrow fill" : "Underlay in narrow fills",
+      detail: `${one ? "This fill is" : `${thin.length} fills are`} narrower than ${none} mm (${someNames(thin)}). An underlay can't sit under rows that short: it adds needle holes along both edges and stiffens the line. Automatic underlay leaves it out there.`,
+      at: at(thin[0].o),
+      fix: { label: one ? "Automatic underlay" : `Automatic underlay (${thin.length})`, ...auto(new Set(thin.map((x) => x.o.id))) },
+    });
+  }
+  const mid = set.filter((x) => x.width >= none && x.width < edge);
+  if (mid.length) {
+    const one = mid.length === 1;
+    out.push({
+      id: `underlayEdge:${mid[0].o.id}`,
+      objId: mid[0].o.id,
+      level: "info",
+      title: one ? "Lighter underlay for a narrow fill" : "Lighter underlay for narrow fills",
+      detail: `${one ? "This fill is" : `${mid.length} fills are`} narrower than ${edge} mm (${someNames(mid)}) and sew${one ? "s" : ""} a full underlay. An edge run holds a shape that narrow, with fewer stitches and needle holes: automatic underlay sews just that.`,
+      at: at(mid[0].o),
+      fix: { label: one ? "Automatic underlay" : `Automatic underlay (${mid.length})`, ...auto(new Set(mid.map((x) => x.o.id))) },
     });
   }
   return out;

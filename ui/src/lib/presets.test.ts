@@ -67,14 +67,16 @@ check(FABRICS.every((f) => f.backing && f.topping && f.needle), "every fabric ha
 check(FABRICS.filter((f) => f.confidence !== "agreed").every((f) => !!f.note), "disputed advice says why");
 check(threadWeightInfo(undefined).weight === 40 && threadWeightInfo(60).minText === 3, "thread weights: No. 40 default, No. 60 letters from 3 mm");
 
-// new objects start from Ink/Stitch's defaults
+// new objects start from Ink/Stitch's defaults; new fills differ in one measured point: automatic underlay
 const satin = { type: "satin", ...defaultSatin() } as StitchParams;
 check(holdsInkDefaults(satin), "a new satin holds Ink/Stitch's defaults");
 const fill = { type: "fill", ...defaultFill() } as StitchParams;
-check(holdsInkDefaults(fill) && (fill as { rowSpacing: number }).rowSpacing === 0.25, "a new fill holds Ink/Stitch's defaults (0.25 mm rows)");
-check(inkDefaults(fill)?.maxStitchLength === 4, "Ink/Stitch tatami: 4 mm stitches");
+check((fill as { underlayAuto?: boolean }).underlayAuto === true && !holdsInkDefaults(fill), "a new fill gets automatic underlay (not Ink/Stitch's)");
+const inkFill = { ...fill, underlayAuto: false } as StitchParams;
+check(holdsInkDefaults(inkFill) && (fill as { rowSpacing: number }).rowSpacing === 0.25, "otherwise a new fill holds Ink/Stitch's defaults (0.25 mm rows)");
+check(inkDefaults(fill)?.maxStitchLength === 4 && inkDefaults(fill)?.underlayAuto === false, "Ink/Stitch tatami: 4 mm stitches, underlay set by hand");
 for (const m of ["contour", "spiral", "guided", "circular", "meander", "cross"] as const)
-  check(holdsInkDefaults({ ...fill, ...fillMethodDefaults(m) } as StitchParams), `switching to ${m}: Ink/Stitch's values for it`);
+  check(holdsInkDefaults({ ...inkFill, ...fillMethodDefaults(m) } as StitchParams), `switching to ${m}: Ink/Stitch's values for it`);
 check(inkDefaults({ ...fill, method: "radial" } as StitchParams) === null, "no Ink/Stitch defaults for fills it lacks");
 const run = { type: "running", ...defaultRunning() } as StitchParams;
 check(holdsInkDefaults(run), "a new line holds Ink/Stitch's defaults");

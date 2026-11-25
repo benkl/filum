@@ -12,10 +12,15 @@ export const PILE: Fabric[] = ["towel", "fleece"];
 
 const mm = (v: number) => `${v} mm`;
 
+/** Automatic fill underlay on a fabric (crates/core/src/stitches/underlay.rs): none under the first width (mm), an edge run only under the second. */
+export function autoFillWidths(fabric: Fabric): [number, number] {
+  return DELICATE.includes(fabric) ? [3, 12] : STRETCH.includes(fabric) ? [2, 6] : [2.5, 8];
+}
+
 /** What auto underlay does to a fill on this fabric. */
 export function autoFillHint(fabric: Fabric, knockdown: boolean): string {
   if (knockdown) return "Knockdown is on: the net is the underlay, so shapes only get an edge run.";
-  const [tiny, narrow] = DELICATE.includes(fabric) ? [3, 12] : STRETCH.includes(fabric) ? [2, 6] : [2.5, 8];
+  const [tiny, narrow] = autoFillWidths(fabric);
   const big = STRETCH.includes(fabric) ? "edge run + cross-hatched tatami" : "edge run + tatami";
   return `None under ${mm(tiny)} wide, an edge run up to ${mm(narrow)}, then ${big}.`;
 }
