@@ -1990,298 +1990,13 @@ xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"{}mm\" height=\"{}mm\" view
         let style;
         match &o.stitch {
             StitchParams::Fill(p) => {
-                style = format!("fill:{color};stroke:none");
-                let method = match p.method {
-                    FillMethod::Contour | FillMethod::Spiral => "contour_fill",
-                    FillMethod::Stipple | FillMethod::Meander => "meander_fill",
-                    FillMethod::Circular => "circular_fill",
-                    FillMethod::Cross => "cross_stitch",
-                    FillMethod::Tartan => "tartan_fill",
-                    FillMethod::Flow | FillMethod::Curved => "tatami_fill",
-                    FillMethod::Guided => "guided_fill",
-                    _ => "tatami_fill",
-                };
-                attrs.push(("fill_method".into(), method.into()));
-                attrs.push(("angle".into(), fmt(p.angle)));
-                attrs.push(("row_spacing_mm".into(), fmt(p.row_spacing)));
-                if p.end_row_spacing > 0.0 {
-                    attrs.push(("end_row_spacing_mm".into(), fmt(p.end_row_spacing)));
-                }
-                attrs.push(("max_stitch_length_mm".into(), fmt(p.max_stitch_length)));
-                attrs.push(("staggers".into(), p.staggers.to_string()));
-                attrs.push(("pull_compensation_mm".into(), fmt(p.pull_comp)));
-                // automatic underlay (not in Ink/Stitch): what it comes to on this shape and fabric. Ink/Stitch
-                // has no edge-run underlay, so a fill that gets only that is written without one
-                let auto = p.underlay_auto.then(|| {
-                    let rings: Vec<Vec<Point>> = o.paths.iter().filter(|s| s.closed).map(|s| s.flatten(0.05)).filter(|r| r.len() >= 3).collect();
-                    let mut profile = doc.fabric.profile();
-                    profile.knockdown = doc.options.knockdown;
-                    crate::stitches::underlay::fill_underlay(&rings, p, &profile).passes
-                });
-                attrs.push(("fill_underlay".into(), b(auto.as_ref().map_or(p.underlay, |a| !a.is_empty())).into()));
-                // Ink/Stitch takes a list of underlay angles: the cross-hatch as two
-                attrs.push((
-                    "fill_underlay_angle".into(),
-                    if let Some(a) = auto.as_ref().filter(|a| !a.is_empty()) {
-                        a.iter().map(|x| fmt(p.angle + x)).collect::<Vec<_>>().join(" ")
-                    } else if !p.underlay_angles.is_empty() {
-                        p.underlay_angles.iter().map(|a| fmt(p.angle + a)).collect::<Vec<_>>().join(" ")
-                    } else if p.underlay_cross {
-                        format!("{} {}", fmt(p.angle + p.underlay_angle - 45.0), fmt(p.angle + p.underlay_angle + 45.0))
-                    } else {
-                        fmt(p.angle + p.underlay_angle)
-                    },
-                ));
-                attrs.push(("fill_underlay_row_spacing_mm".into(), fmt(p.underlay_spacing)));
-                attrs.push(("fill_underlay_inset_mm".into(), fmt(p.underlay_inset)));
-                attrs.push(("fill_underlay_max_stitch_length_mm".into(), fmt(p.underlay_stitch_length)));
-                let running = matches!(p.method, FillMethod::Meander | FillMethod::Circular);
-                attrs.push(("running_stitch_length_mm".into(), fmt(if running { p.max_stitch_length } else { p.travel_length })));
-                if p.method == FillMethod::Meander {
-                    if let Some(t) = &p.meander_tile {
-                        attrs.push(("meander_pattern".into(), t.clone()));
-                    }
-                    let sx = p.meander_scale / 2.5 * 100.0;
-                    let scale = if (p.meander_aspect - 1.0).abs() > 1e-6 { format!("{} {}", fmt(sx), fmt(sx * p.meander_aspect)) } else { fmt(sx) };
-                    attrs.push(("meander_scale_percent".into(), scale));
-                    if p.meander_zigzag > 0.0 {
-                        attrs.push(("zigzag_spacing_mm".into(), fmt(p.meander_zigzag)));
-                        attrs.push(("zigzag_width_mm".into(), fmt(p.meander_zigzag_width)));
-                    }
-                    if p.meander_clip {
-                        attrs.push(("clip".into(), "True".into()));
-                    }
-                    attrs.push(("meander_angle".into(), fmt(p.angle)));
-                    attrs.push(("smoothness_mm".into(), fmt(p.smoothness * 2.0)));
-                    attrs.push(("random_seed".into(), p.seed.to_string()));
-                }
-                if p.method != FillMethod::Meander {
-                    push_random(&mut attrs, p.random_length, p.seed);
-                }
-                if let (FillMethod::Tartan, Some(t)) = (p.method, &p.tartan) {
-                    let json = serde_json::json!({
-                        "palette": t.palette,
-                        "rotate": t.rotate,
-                        "offset_x": t.offset[0],
-                        "offset_y": t.offset[1],
-                        "symmetry": t.symmetry,
-                        "scale": t.scale,
-                        "min_stripe_width": t.min_stripe_width,
-                    });
-                    attrs.push(("tartan".into(), json.to_string()));
-                    attrs.push(("tartan_angle".into(), fmt(t.angle)));
-                    attrs.push(("rows_per_thread".into(), t.rows_per_thread.to_string()));
-                    if t.herringbone > 0.0 {
-                        attrs.push(("herringbone_width_mm".into(), fmt(t.herringbone)));
-                    }
-                }
-                if p.method == FillMethod::Cross {
-                    let size = if p.cross_size_y > 0.0 { format!("{} {}", fmt(p.cross_size), fmt(p.cross_size_y)) } else { fmt(p.cross_size) };
-                    attrs.push(("pattern_size_mm".into(), size));
-                    if p.angle != 0.0 {
-                        attrs.push(("cross_rotation".into(), fmt(-p.angle)));
-                    }
-                    attrs.push(("max_cross_stitch_length_mm".into(), fmt(p.cross_max_length)));
-                    attrs.push(("fill_coverage".into(), fmt(p.cross_coverage * 100.0)));
-                    let kind = match p.cross_kind {
-                        CrossKind::Cross => "simple_cross",
-                        CrossKind::Half => "half_cross",
-                        CrossKind::Upright if p.cross_dense => "dense_upright_cross",
-                        CrossKind::Upright => "upright_cross",
-                        CrossKind::Double => "double_cross",
-                        CrossKind::Smyrna => "smyrna_cross",
-                    };
-                    attrs.push(("cross_stitch_method".into(), if p.cross_flip { format!("{kind}_flipped") } else { kind.to_string() }));
-                    if p.cross_threads > 1 {
-                        attrs.push(("cross_thread_count".into(), p.cross_threads.to_string()));
-                    }
-                    attrs.push(("canvas_grid_origin".into(), b(p.cross_grid_canvas).into()));
-                    if p.cross_offset != [0.0, 0.0] {
-                        attrs.push(("cross_offset_mm".into(), format!("{} {}", fmt(p.cross_offset[0]), fmt(p.cross_offset[1]))));
-                    }
-                }
-                if p.expand != 0.0 {
-                    attrs.push(("expand_mm".into(), fmt(p.expand)));
-                }
-                if p.repeats > 1 {
-                    attrs.push(("repeats".into(), p.repeats.to_string()));
-                }
-                if p.bean_repeats > 0 {
-                    // ours counts passes (2 = triple), Ink/Stitch the back-and-forths (1 = triple)
-                    attrs.push(("bean_stitch_repeats".into(), p.bean_repeats.div_ceil(2).to_string()));
-                }
-                // Ink/Stitch dropdowns are indices: 0 inner to outer, 1 single spiral, 2 double spiral
-                match p.method {
-                    FillMethod::Contour => attrs.push(("contour_strategy".into(), "0".into())),
-                    FillMethod::Spiral => attrs.push(("contour_strategy".into(), if p.contour_double { "2" } else { "1" }.into())),
-                    _ => {}
-                }
-                // Ink/Stitch defaults to clockwise: always written
-                attrs.push(("clockwise".into(), b(p.clockwise).into()));
-                if p.pull_comp_pct > 0.0 {
-                    attrs.push(("pull_compensation_percent".into(), fmt(p.pull_comp_pct * 100.0)));
-                }
-                if p.skip_last {
-                    attrs.push(("skip_last".into(), "True".into()));
-                }
-                if p.underlay_skip_last {
-                    attrs.push(("fill_underlay_skip_last".into(), "True".into()));
-                }
-                if !p.underpath {
-                    attrs.push(("underpath".into(), "False".into()));
-                }
-                if p.gap_fill_rows > 0 {
-                    attrs.push(("gap_fill_rows".into(), p.gap_fill_rows.to_string()));
-                }
-                if p.method == FillMethod::Guided {
-                    attrs.push((
-                        "guided_fill_strategy".into(),
-                        name_of(GUIDED_STRATEGY, p.guided_strategy).into(),
-                    ));
-                }
+                style = fill_attrs(doc, o, p, &color, &mut attrs);
             }
             StitchParams::Satin(p) => {
-                style = format!("fill:none;stroke:{color};stroke-width:0.3");
-                if paths.len() == 1 {
-                    // Ink/Stitch needs two rails: expand the centre line
-                    let c = paths[0].flatten(0.05);
-                    let r0 = offset_polyline(&c, -p.width / 2.0);
-                    let r1 = offset_polyline(&c, p.width / 2.0);
-                    paths = vec![SubPath::polyline(&r0, false), SubPath::polyline(&r1, false)];
-                }
-                // direction guides are Ink/Stitch rungs: two-point sub-paths
-                // across both rails (lengthened a little so they cross them)
-                for g in &p.guides {
-                    let (a, b) = (Point::from_arr(g[0]), Point::from_arr(g[1]));
-                    let u = (b - a).unit() * 0.3;
-                    paths.push(SubPath::polyline(&[a - u, b + u], false));
-                }
-                attrs.push(("satin_column".into(), "True".into()));
-                attrs.push((
-                    "satin_method".into(),
-                    name_of(SATIN_METHOD, p.method).into(),
-                ));
-                attrs.push(("zigzag_spacing_mm".into(), fmt(p.spacing)));
-                // per-rail values: "first second" where the second rail has its own
-                let r = p.second_rail.unwrap_or_default();
-                let two = |a: f64, b: Option<f64>, scale: f64| match b {
-                    Some(b) if (b - a).abs() > 1e-9 => format!("{} {}", fmt(a * scale), fmt(b * scale)),
-                    _ => fmt(a * scale),
-                };
-                // Ink/Stitch adds them to each side
-                attrs.push(("pull_compensation_mm".into(), two(p.pull_comp, r.pull_comp, 0.5)));
-                attrs.push(("pull_compensation_percent".into(), two(p.pull_comp_pct, r.pull_comp_pct, 0.5)));
-                if p.max_stitch_length > 0.0 {
-                    attrs.push(("max_stitch_length_mm".into(), fmt(p.max_stitch_length)));
-                }
-                attrs.push(("short_stitch_inset".into(), fmt(p.short_stitch_inset * 100.0)));
-                attrs.push(("center_walk_underlay".into(), b(p.center_walk).into()));
-                attrs.push(("contour_underlay".into(), b(p.contour_underlay).into()));
-                attrs.push(("contour_underlay_inset_mm".into(), two(p.contour_inset, r.contour_inset, 1.0)));
-                attrs.push(("zigzag_underlay".into(), b(p.zigzag_underlay).into()));
-                attrs.push(("zigzag_underlay_spacing_mm".into(), fmt(p.zigzag_underlay_spacing)));
-                attrs.push(("zigzag_underlay_inset_mm".into(), two(p.zigzag_underlay_inset, r.zigzag_underlay_inset, 1.0)));
-                attrs.push(("center_walk_underlay_repeats".into(), p.center_walk_repeats.to_string()));
-                attrs.push(("center_walk_underlay_position".into(), fmt(p.center_walk_position * 100.0)));
-                attrs.push(("contour_underlay_stitch_length_mm".into(), fmt(p.underlay_stitch_length)));
-                attrs.push(("center_walk_underlay_stitch_length_mm".into(), fmt(p.underlay_stitch_length)));
-                let contour_pct = p.contour_inset_pct > 0.0 || r.contour_inset_pct.is_some_and(|v| v > 0.0);
-                if contour_pct {
-                    attrs.push(("contour_underlay_inset_percent".into(), two(p.contour_inset_pct, r.contour_inset_pct, 100.0)));
-                }
-                // written with a contour percentage too: Ink/Stitch's default is half of it
-                if contour_pct || p.zigzag_inset_pct > 0.0 || r.zigzag_inset_pct.is_some_and(|v| v > 0.0) {
-                    attrs.push(("zigzag_underlay_inset_percent".into(), two(p.zigzag_inset_pct, r.zigzag_inset_pct, 100.0)));
-                }
-                if p.short_stitch_distance != 0.25 {
-                    attrs.push(("short_stitch_distance_mm".into(), fmt(p.short_stitch_distance)));
-                }
-                if p.push_comp > 0.0 {
-                    attrs.push(("push_compensation_mm".into(), fmt(p.push_comp)));
-                }
-                let random_width = p.random_wider > 0.0 || p.random_narrower > 0.0 || r.random_wider.is_some_and(|v| v > 0.0) || r.random_narrower.is_some_and(|v| v > 0.0);
-                if random_width {
-                    attrs.push(("random_width_increase_percent".into(), two(p.random_wider, r.random_wider, 100.0)));
-                    attrs.push(("random_width_decrease_percent".into(), two(p.random_narrower, r.random_narrower, 100.0)));
-                    attrs.push(("random_seed".into(), p.random_seed.to_string()));
-                }
-                if p.split_staggers == 1 {
-                    attrs.push(("split_method".into(), "simple".into()));
-                } else if p.split_staggers > 1 {
-                    attrs.push(("split_method".into(), "staggered".into()));
-                    attrs.push(("split_staggers".into(), p.split_staggers.to_string()));
-                }
-                if p.random_spacing > 0.0 {
-                    attrs.push(("random_zigzag_spacing_percent".into(), fmt(p.random_spacing * 100.0)));
-                }
-                if p.split_jitter > 0.0 {
-                    attrs.push(("random_split_jitter_percent".into(), fmt(p.split_jitter * 100.0)));
-                }
-                if p.split_random_phase {
-                    attrs.push(("random_split_phase".into(), "True".into()));
-                    if p.split_min_length > 0.0 {
-                        attrs.push(("min_random_split_length_mm".into(), fmt(p.split_min_length)));
-                    }
-                }
-                if p.reverse_rails != RailReverse::Automatic {
-                    attrs.push(("reverse_rails".into(), name_of(RAIL_REVERSE, p.reverse_rails).into()));
-                }
-                if p.random_spacing > 0.0 || p.split_jitter > 0.0 || p.split_random_phase || random_width {
-                    attrs.push(("random_seed".into(), p.random_seed.to_string()));
-                }
-                if p.zigzag_underlay_max_stitch > 0.0 {
-                    attrs.push(("zigzag_underlay_max_stitch_length_mm".into(), fmt(p.zigzag_underlay_max_stitch)));
-                }
+                style = satin_attrs(p, &color, &mut attrs, &mut paths);
             }
             StitchParams::Running(p) => {
-                style = format!("fill:none;stroke:{color};stroke-width:{}", p.zigzag.as_ref().map_or("0.3".to_string(), |z| fmt(z.width)));
-                let method = match (&p.ripple, &p.zigzag) {
-                    (Some(_), _) => "ripple_stitch",
-                    (None, Some(_)) => "zigzag_stitch",
-                    _ => "running_stitch",
-                };
-                attrs.push(("stroke_method".into(), method.into()));
-                if let Some(r) = &p.ripple {
-                    attrs.push(("line_count".into(), r.lines.to_string()));
-                    if r.min_line_dist > 0.0 {
-                        attrs.push(("min_line_dist_mm".into(), fmt(r.min_line_dist)));
-                    }
-                    attrs.push(("skip_start".into(), r.skip_start.to_string()));
-                    attrs.push(("skip_end".into(), r.skip_end.to_string()));
-                    attrs.push(("flip_copies".into(), b(r.flip_copies).into()));
-                    attrs.push(("exponent".into(), fmt(r.exponent)));
-                    attrs.push(("flip_exponent".into(), b(r.flip_exponent).into()));
-                    attrs.push(("staggers".into(), r.staggers.to_string()));
-                    attrs.push(("join_style".into(), if r.join_point { "1" } else { "0" }.into()));
-                    attrs.push(("grid_size_mm".into(), fmt(r.grid_size)));
-                    attrs.push(("grid_first".into(), b(r.grid_first).into()));
-                    attrs.push(("scale_axis".into(), name_of(SCALE_AXIS, r.scale_axis).into()));
-                    attrs.push(("scale_start".into(), fmt(r.scale_start)));
-                    attrs.push(("scale_end".into(), fmt(r.scale_end)));
-                    attrs.push(("rotate_ripples".into(), b(r.rotate_ripples).into()));
-                    attrs.push(("manual_pattern_placement".into(), b(r.manual).into()));
-                    attrs.push(("satin_guide_pattern_position".into(), name_of(GUIDE_POSITION, r.guide_position).into()));
-                    attrs.push(("reverse".into(), b(r.reverse).into()));
-                }
-                if let Some(z) = &p.zigzag {
-                    attrs.push(("zigzag_spacing_mm".into(), fmt(z.spacing)));
-                    if z.pull_comp != 0.0 {
-                        attrs.push(("stroke_pull_compensation_mm".into(), fmt(z.pull_comp)));
-                    }
-                    if z.angle != 0.0 {
-                        attrs.push(("zigzag_angle".into(), fmt(z.angle)));
-                    }
-                }
-                let lengths = if p.length_pattern.is_empty() { fmt(p.length) } else { fmt_list(&p.length_pattern) };
-                attrs.push(("running_stitch_length_mm".into(), lengths));
-                attrs.push(("running_stitch_tolerance_mm".into(), fmt(p.tolerance)));
-                attrs.push(("repeats".into(), p.repeats.to_string()));
-                let beans: Vec<String> = p.beans().iter().map(|b| b.div_ceil(2).to_string()).collect();
-                attrs.push(("bean_stitch_repeats".into(), beans.join(" ")));
-                push_random(&mut attrs, p.random_length, p.random_seed);
-                if p.cutwork_needle > 0 {
-                    attrs.push(("cutwork_needle".into(), p.cutwork_needle.to_string()));
-                }
+                style = running_attrs(p, &color, &mut attrs);
             }
             StitchParams::Applique(_) => {
                 // no Ink/Stitch equivalent: the outline as a running stitch, full settings in filum:params
@@ -2474,6 +2189,309 @@ xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"{}mm\" height=\"{}mm\" view
     s.push_str(&body);
     s.push_str("  </g>\n</svg>\n");
     s
+}
+
+/// A fill's Ink/Stitch attributes (its method's and the fill settings); returns its style.
+fn fill_attrs(doc: &Document, o: &Object, p: &FillParams, color: &str, attrs: &mut Vec<(String, String)>) -> String {
+    let style = format!("fill:{color};stroke:none");
+    let method = match p.method {
+        FillMethod::Contour | FillMethod::Spiral => "contour_fill",
+        FillMethod::Stipple | FillMethod::Meander => "meander_fill",
+        FillMethod::Circular => "circular_fill",
+        FillMethod::Cross => "cross_stitch",
+        FillMethod::Tartan => "tartan_fill",
+        FillMethod::Flow | FillMethod::Curved => "tatami_fill",
+        FillMethod::Guided => "guided_fill",
+        _ => "tatami_fill",
+    };
+    attrs.push(("fill_method".into(), method.into()));
+    attrs.push(("angle".into(), fmt(p.angle)));
+    attrs.push(("row_spacing_mm".into(), fmt(p.row_spacing)));
+    if p.end_row_spacing > 0.0 {
+        attrs.push(("end_row_spacing_mm".into(), fmt(p.end_row_spacing)));
+    }
+    attrs.push(("max_stitch_length_mm".into(), fmt(p.max_stitch_length)));
+    attrs.push(("staggers".into(), p.staggers.to_string()));
+    attrs.push(("pull_compensation_mm".into(), fmt(p.pull_comp)));
+    // automatic underlay (not in Ink/Stitch): what it comes to on this shape and fabric. Ink/Stitch
+    // has no edge-run underlay, so a fill that gets only that is written without one
+    let auto = p.underlay_auto.then(|| {
+        let rings: Vec<Vec<Point>> = o.paths.iter().filter(|s| s.closed).map(|s| s.flatten(0.05)).filter(|r| r.len() >= 3).collect();
+        let mut profile = doc.fabric.profile();
+        profile.knockdown = doc.options.knockdown;
+        crate::stitches::underlay::fill_underlay(&rings, p, &profile).passes
+    });
+    attrs.push(("fill_underlay".into(), b(auto.as_ref().map_or(p.underlay, |a| !a.is_empty())).into()));
+    // Ink/Stitch takes a list of underlay angles: the cross-hatch as two
+    attrs.push((
+        "fill_underlay_angle".into(),
+        if let Some(a) = auto.as_ref().filter(|a| !a.is_empty()) {
+            a.iter().map(|x| fmt(p.angle + x)).collect::<Vec<_>>().join(" ")
+        } else if !p.underlay_angles.is_empty() {
+            p.underlay_angles.iter().map(|a| fmt(p.angle + a)).collect::<Vec<_>>().join(" ")
+        } else if p.underlay_cross {
+            format!("{} {}", fmt(p.angle + p.underlay_angle - 45.0), fmt(p.angle + p.underlay_angle + 45.0))
+        } else {
+            fmt(p.angle + p.underlay_angle)
+        },
+    ));
+    attrs.push(("fill_underlay_row_spacing_mm".into(), fmt(p.underlay_spacing)));
+    attrs.push(("fill_underlay_inset_mm".into(), fmt(p.underlay_inset)));
+    attrs.push(("fill_underlay_max_stitch_length_mm".into(), fmt(p.underlay_stitch_length)));
+    let running = matches!(p.method, FillMethod::Meander | FillMethod::Circular);
+    attrs.push(("running_stitch_length_mm".into(), fmt(if running { p.max_stitch_length } else { p.travel_length })));
+    if p.method == FillMethod::Meander {
+        if let Some(t) = &p.meander_tile {
+            attrs.push(("meander_pattern".into(), t.clone()));
+        }
+        let sx = p.meander_scale / 2.5 * 100.0;
+        let scale = if (p.meander_aspect - 1.0).abs() > 1e-6 { format!("{} {}", fmt(sx), fmt(sx * p.meander_aspect)) } else { fmt(sx) };
+        attrs.push(("meander_scale_percent".into(), scale));
+        if p.meander_zigzag > 0.0 {
+            attrs.push(("zigzag_spacing_mm".into(), fmt(p.meander_zigzag)));
+            attrs.push(("zigzag_width_mm".into(), fmt(p.meander_zigzag_width)));
+        }
+        if p.meander_clip {
+            attrs.push(("clip".into(), "True".into()));
+        }
+        attrs.push(("meander_angle".into(), fmt(p.angle)));
+        attrs.push(("smoothness_mm".into(), fmt(p.smoothness * 2.0)));
+        attrs.push(("random_seed".into(), p.seed.to_string()));
+    }
+    if p.method != FillMethod::Meander {
+        push_random(attrs, p.random_length, p.seed);
+    }
+    if let (FillMethod::Tartan, Some(t)) = (p.method, &p.tartan) {
+        let json = serde_json::json!({
+            "palette": t.palette,
+            "rotate": t.rotate,
+            "offset_x": t.offset[0],
+            "offset_y": t.offset[1],
+            "symmetry": t.symmetry,
+            "scale": t.scale,
+            "min_stripe_width": t.min_stripe_width,
+        });
+        attrs.push(("tartan".into(), json.to_string()));
+        attrs.push(("tartan_angle".into(), fmt(t.angle)));
+        attrs.push(("rows_per_thread".into(), t.rows_per_thread.to_string()));
+        if t.herringbone > 0.0 {
+            attrs.push(("herringbone_width_mm".into(), fmt(t.herringbone)));
+        }
+    }
+    if p.method == FillMethod::Cross {
+        let size = if p.cross_size_y > 0.0 { format!("{} {}", fmt(p.cross_size), fmt(p.cross_size_y)) } else { fmt(p.cross_size) };
+        attrs.push(("pattern_size_mm".into(), size));
+        if p.angle != 0.0 {
+            attrs.push(("cross_rotation".into(), fmt(-p.angle)));
+        }
+        attrs.push(("max_cross_stitch_length_mm".into(), fmt(p.cross_max_length)));
+        attrs.push(("fill_coverage".into(), fmt(p.cross_coverage * 100.0)));
+        let kind = match p.cross_kind {
+            CrossKind::Cross => "simple_cross",
+            CrossKind::Half => "half_cross",
+            CrossKind::Upright if p.cross_dense => "dense_upright_cross",
+            CrossKind::Upright => "upright_cross",
+            CrossKind::Double => "double_cross",
+            CrossKind::Smyrna => "smyrna_cross",
+        };
+        attrs.push(("cross_stitch_method".into(), if p.cross_flip { format!("{kind}_flipped") } else { kind.to_string() }));
+        if p.cross_threads > 1 {
+            attrs.push(("cross_thread_count".into(), p.cross_threads.to_string()));
+        }
+        attrs.push(("canvas_grid_origin".into(), b(p.cross_grid_canvas).into()));
+        if p.cross_offset != [0.0, 0.0] {
+            attrs.push(("cross_offset_mm".into(), format!("{} {}", fmt(p.cross_offset[0]), fmt(p.cross_offset[1]))));
+        }
+    }
+    if p.expand != 0.0 {
+        attrs.push(("expand_mm".into(), fmt(p.expand)));
+    }
+    if p.repeats > 1 {
+        attrs.push(("repeats".into(), p.repeats.to_string()));
+    }
+    if p.bean_repeats > 0 {
+        // ours counts passes (2 = triple), Ink/Stitch the back-and-forths (1 = triple)
+        attrs.push(("bean_stitch_repeats".into(), p.bean_repeats.div_ceil(2).to_string()));
+    }
+    // Ink/Stitch dropdowns are indices: 0 inner to outer, 1 single spiral, 2 double spiral
+    match p.method {
+        FillMethod::Contour => attrs.push(("contour_strategy".into(), "0".into())),
+        FillMethod::Spiral => attrs.push(("contour_strategy".into(), if p.contour_double { "2" } else { "1" }.into())),
+        _ => {}
+    }
+    // Ink/Stitch defaults to clockwise: always written
+    attrs.push(("clockwise".into(), b(p.clockwise).into()));
+    if p.pull_comp_pct > 0.0 {
+        attrs.push(("pull_compensation_percent".into(), fmt(p.pull_comp_pct * 100.0)));
+    }
+    if p.skip_last {
+        attrs.push(("skip_last".into(), "True".into()));
+    }
+    if p.underlay_skip_last {
+        attrs.push(("fill_underlay_skip_last".into(), "True".into()));
+    }
+    if !p.underpath {
+        attrs.push(("underpath".into(), "False".into()));
+    }
+    if p.gap_fill_rows > 0 {
+        attrs.push(("gap_fill_rows".into(), p.gap_fill_rows.to_string()));
+    }
+    if p.method == FillMethod::Guided {
+        attrs.push((
+            "guided_fill_strategy".into(),
+            name_of(GUIDED_STRATEGY, p.guided_strategy).into(),
+        ));
+    }
+    style
+}
+
+/// A satin's Ink/Stitch attributes; a centre-line satin's paths become two rails. Returns its style.
+fn satin_attrs(p: &SatinParams, color: &str, attrs: &mut Vec<(String, String)>, paths: &mut Vec<SubPath>) -> String {
+    let style = format!("fill:none;stroke:{color};stroke-width:0.3");
+    if paths.len() == 1 {
+        // Ink/Stitch needs two rails: expand the centre line
+        let c = paths[0].flatten(0.05);
+        let r0 = offset_polyline(&c, -p.width / 2.0);
+        let r1 = offset_polyline(&c, p.width / 2.0);
+        *paths = vec![SubPath::polyline(&r0, false), SubPath::polyline(&r1, false)];
+    }
+    // direction guides are Ink/Stitch rungs: two-point sub-paths
+    // across both rails (lengthened a little so they cross them)
+    for g in &p.guides {
+        let (a, b) = (Point::from_arr(g[0]), Point::from_arr(g[1]));
+        let u = (b - a).unit() * 0.3;
+        paths.push(SubPath::polyline(&[a - u, b + u], false));
+    }
+    attrs.push(("satin_column".into(), "True".into()));
+    attrs.push((
+        "satin_method".into(),
+        name_of(SATIN_METHOD, p.method).into(),
+    ));
+    attrs.push(("zigzag_spacing_mm".into(), fmt(p.spacing)));
+    // per-rail values: "first second" where the second rail has its own
+    let r = p.second_rail.unwrap_or_default();
+    let two = |a: f64, b: Option<f64>, scale: f64| match b {
+        Some(b) if (b - a).abs() > 1e-9 => format!("{} {}", fmt(a * scale), fmt(b * scale)),
+        _ => fmt(a * scale),
+    };
+    // Ink/Stitch adds them to each side
+    attrs.push(("pull_compensation_mm".into(), two(p.pull_comp, r.pull_comp, 0.5)));
+    attrs.push(("pull_compensation_percent".into(), two(p.pull_comp_pct, r.pull_comp_pct, 0.5)));
+    if p.max_stitch_length > 0.0 {
+        attrs.push(("max_stitch_length_mm".into(), fmt(p.max_stitch_length)));
+    }
+    attrs.push(("short_stitch_inset".into(), fmt(p.short_stitch_inset * 100.0)));
+    attrs.push(("center_walk_underlay".into(), b(p.center_walk).into()));
+    attrs.push(("contour_underlay".into(), b(p.contour_underlay).into()));
+    attrs.push(("contour_underlay_inset_mm".into(), two(p.contour_inset, r.contour_inset, 1.0)));
+    attrs.push(("zigzag_underlay".into(), b(p.zigzag_underlay).into()));
+    attrs.push(("zigzag_underlay_spacing_mm".into(), fmt(p.zigzag_underlay_spacing)));
+    attrs.push(("zigzag_underlay_inset_mm".into(), two(p.zigzag_underlay_inset, r.zigzag_underlay_inset, 1.0)));
+    attrs.push(("center_walk_underlay_repeats".into(), p.center_walk_repeats.to_string()));
+    attrs.push(("center_walk_underlay_position".into(), fmt(p.center_walk_position * 100.0)));
+    attrs.push(("contour_underlay_stitch_length_mm".into(), fmt(p.underlay_stitch_length)));
+    attrs.push(("center_walk_underlay_stitch_length_mm".into(), fmt(p.underlay_stitch_length)));
+    let contour_pct = p.contour_inset_pct > 0.0 || r.contour_inset_pct.is_some_and(|v| v > 0.0);
+    if contour_pct {
+        attrs.push(("contour_underlay_inset_percent".into(), two(p.contour_inset_pct, r.contour_inset_pct, 100.0)));
+    }
+    // written with a contour percentage too: Ink/Stitch's default is half of it
+    if contour_pct || p.zigzag_inset_pct > 0.0 || r.zigzag_inset_pct.is_some_and(|v| v > 0.0) {
+        attrs.push(("zigzag_underlay_inset_percent".into(), two(p.zigzag_inset_pct, r.zigzag_inset_pct, 100.0)));
+    }
+    if p.short_stitch_distance != 0.25 {
+        attrs.push(("short_stitch_distance_mm".into(), fmt(p.short_stitch_distance)));
+    }
+    if p.push_comp > 0.0 {
+        attrs.push(("push_compensation_mm".into(), fmt(p.push_comp)));
+    }
+    let random_width = p.random_wider > 0.0 || p.random_narrower > 0.0 || r.random_wider.is_some_and(|v| v > 0.0) || r.random_narrower.is_some_and(|v| v > 0.0);
+    if random_width {
+        attrs.push(("random_width_increase_percent".into(), two(p.random_wider, r.random_wider, 100.0)));
+        attrs.push(("random_width_decrease_percent".into(), two(p.random_narrower, r.random_narrower, 100.0)));
+        attrs.push(("random_seed".into(), p.random_seed.to_string()));
+    }
+    if p.split_staggers == 1 {
+        attrs.push(("split_method".into(), "simple".into()));
+    } else if p.split_staggers > 1 {
+        attrs.push(("split_method".into(), "staggered".into()));
+        attrs.push(("split_staggers".into(), p.split_staggers.to_string()));
+    }
+    if p.random_spacing > 0.0 {
+        attrs.push(("random_zigzag_spacing_percent".into(), fmt(p.random_spacing * 100.0)));
+    }
+    if p.split_jitter > 0.0 {
+        attrs.push(("random_split_jitter_percent".into(), fmt(p.split_jitter * 100.0)));
+    }
+    if p.split_random_phase {
+        attrs.push(("random_split_phase".into(), "True".into()));
+        if p.split_min_length > 0.0 {
+            attrs.push(("min_random_split_length_mm".into(), fmt(p.split_min_length)));
+        }
+    }
+    if p.reverse_rails != RailReverse::Automatic {
+        attrs.push(("reverse_rails".into(), name_of(RAIL_REVERSE, p.reverse_rails).into()));
+    }
+    if p.random_spacing > 0.0 || p.split_jitter > 0.0 || p.split_random_phase || random_width {
+        attrs.push(("random_seed".into(), p.random_seed.to_string()));
+    }
+    if p.zigzag_underlay_max_stitch > 0.0 {
+        attrs.push(("zigzag_underlay_max_stitch_length_mm".into(), fmt(p.zigzag_underlay_max_stitch)));
+    }
+    style
+}
+
+/// A running stitch's Ink/Stitch attributes (bean, ripple, zig-zag, motif); returns its style.
+fn running_attrs(p: &RunningParams, color: &str, attrs: &mut Vec<(String, String)>) -> String {
+    let style = format!("fill:none;stroke:{color};stroke-width:{}", p.zigzag.as_ref().map_or("0.3".to_string(), |z| fmt(z.width)));
+    let method = match (&p.ripple, &p.zigzag) {
+        (Some(_), _) => "ripple_stitch",
+        (None, Some(_)) => "zigzag_stitch",
+        _ => "running_stitch",
+    };
+    attrs.push(("stroke_method".into(), method.into()));
+    if let Some(r) = &p.ripple {
+        attrs.push(("line_count".into(), r.lines.to_string()));
+        if r.min_line_dist > 0.0 {
+            attrs.push(("min_line_dist_mm".into(), fmt(r.min_line_dist)));
+        }
+        attrs.push(("skip_start".into(), r.skip_start.to_string()));
+        attrs.push(("skip_end".into(), r.skip_end.to_string()));
+        attrs.push(("flip_copies".into(), b(r.flip_copies).into()));
+        attrs.push(("exponent".into(), fmt(r.exponent)));
+        attrs.push(("flip_exponent".into(), b(r.flip_exponent).into()));
+        attrs.push(("staggers".into(), r.staggers.to_string()));
+        attrs.push(("join_style".into(), if r.join_point { "1" } else { "0" }.into()));
+        attrs.push(("grid_size_mm".into(), fmt(r.grid_size)));
+        attrs.push(("grid_first".into(), b(r.grid_first).into()));
+        attrs.push(("scale_axis".into(), name_of(SCALE_AXIS, r.scale_axis).into()));
+        attrs.push(("scale_start".into(), fmt(r.scale_start)));
+        attrs.push(("scale_end".into(), fmt(r.scale_end)));
+        attrs.push(("rotate_ripples".into(), b(r.rotate_ripples).into()));
+        attrs.push(("manual_pattern_placement".into(), b(r.manual).into()));
+        attrs.push(("satin_guide_pattern_position".into(), name_of(GUIDE_POSITION, r.guide_position).into()));
+        attrs.push(("reverse".into(), b(r.reverse).into()));
+    }
+    if let Some(z) = &p.zigzag {
+        attrs.push(("zigzag_spacing_mm".into(), fmt(z.spacing)));
+        if z.pull_comp != 0.0 {
+            attrs.push(("stroke_pull_compensation_mm".into(), fmt(z.pull_comp)));
+        }
+        if z.angle != 0.0 {
+            attrs.push(("zigzag_angle".into(), fmt(z.angle)));
+        }
+    }
+    let lengths = if p.length_pattern.is_empty() { fmt(p.length) } else { fmt_list(&p.length_pattern) };
+    attrs.push(("running_stitch_length_mm".into(), lengths));
+    attrs.push(("running_stitch_tolerance_mm".into(), fmt(p.tolerance)));
+    attrs.push(("repeats".into(), p.repeats.to_string()));
+    let beans: Vec<String> = p.beans().iter().map(|b| b.div_ceil(2).to_string()).collect();
+    attrs.push(("bean_stitch_repeats".into(), beans.join(" ")));
+    push_random(attrs, p.random_length, p.random_seed);
+    if p.cutwork_needle > 0 {
+        attrs.push(("cutwork_needle".into(), p.cutwork_needle.to_string()));
+    }
+    style
 }
 
 /// Ink/Stitch's tartan settings (`inkstitch:tartan` JSON and the tartan fill parameters).
