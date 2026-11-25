@@ -2,359 +2,62 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Menu } from "../components/MenuBar";
 import { useDismiss } from "../components/ui";
 import { contextMenu, type MenuItem } from "../components/menuModel";
-import { linkMenu } from "../components/linkMenu";
-import { addSplitLine, draftPlan, splittable } from "../components/SplitTool";
-import { regionRings, regionsOf } from "../lib/regions";
-import type { SplitDraft } from "../store";
 import { connectionAt, describeConnection } from "../lib/links";
 import { clipFromText, copySelection, pasteClipboard } from "../lib/arrange";
 import { setDensityHover } from "../lib/density";
 import { ImagePlus } from "lucide-react";
 import { Digitize } from "../icons/stitch";
-import {
-  applyMat,
-  dist,
-  ellipsePath,
-  objectBounds,
-  objectBoundsCached,
-  objectOutline,
-  objectPath,
-  rectPath,
-  rotateAbout,
-  scaleAbout,
-  transformObject,
-  translateMat,
-  uid,
-  unionBoxes,
-  defaultStitch,
-  type Box,
-} from "../lib/geometry";
+import { applyMat, dist, objectBounds, transformObject, uid, unionBoxes, defaultStitch, type Box } from "../lib/geometry";
 import { activeThreadOf, useStore } from "../store";
-import type { DesignObject, NodeRef, PathNode, ReferenceImage, StitchDocument, StitchParams, SubPath, Vec2 } from "../types";
-import { bendSegment, handlesCollinear, isRailSatin, joinNodes, moveNodes, nodeKey, nodesInBox, railMap } from "../lib/nodeOps";
-import { syncAll } from "../lib/nodeActions";
-import { addReference, refCenter, refContains, refCorners, referenceAt, refRotateKnob, toLocal, toWorld } from "../lib/references";
+import type { DesignObject, NodeRef, ReferenceImage, StitchDocument, StitchParams, SubPath, Vec2 } from "../types";
+import { isRailSatin, joinNodes, nodeKey } from "../lib/nodeOps";
+import { addReference, refCenter, refContains, refCorners, refRotateKnob } from "../lib/references";
 import { ReferenceBar } from "../components/ReferenceBar";
-import { applyRamp, rampMembers, rampOf, rampRows, selectedRamp, updateRamp } from "../lib/ramp";
+import { rampMembers, rampOf, rampRows, selectedRamp } from "../lib/ramp";
 import { builderRefusal } from "../lib/shapeBuilder";
-import { guideAcross, guideHit, guidesOf, pickLine, pickedLine, selectedSatin, setGuides } from "../lib/satinGuides";
-import { freeSides, orientationLines, removeOrientationLine } from "../lib/satinSides";
+import { guideHit, pickedLine, selectedSatin } from "../lib/satinGuides";
+import { freeSides, orientationLines } from "../lib/satinSides";
 import { engine, type ShapeRegion } from "../engine/client";
-import { handlePoints, readTheme, Renderer, rotateHandle, RULER, type Overlay, type Theme } from "./render";
+import { handlePoints, readTheme, Renderer, rotateHandle, type Overlay, type Theme } from "./render";
 import { StitchGL } from "./gl";
 import { threadWidth } from "../lib/materials";
-import { computeHandles, computeTextHandles, dragHandle, HANDLE_HIT_PX, reverseObject, type Handle } from "./handles";
-import { createTextAt, modernSpacing, selectedTextGroup, textSpec, updateText } from "../lib/textOps";
-import { members, type TextSpec } from "../lib/text";
+import { computeHandles, computeTextHandles, HANDLE_HIT_PX, type Handle } from "./handles";
+import { createTextAt, selectedTextGroup, textSpec } from "../lib/textOps";
+import { members } from "../lib/text";
 import type { InteractiveOverlay } from "./interactive";
 import { buildSatin, satinOutlineOf, zigzagPreview } from "../lib/satinDraw";
-import {
-  addPoint,
-  canClose,
-  continueFrom,
-  deleteFromDraft,
-  insertInDraft,
-  moveAnchor,
-  moveHandle,
-  newDraft,
-  PEN_HINTS,
-  CURVE_HINTS,
-  penHitTest,
-  placePoint,
-  pullHandles,
-  removeLast,
-  rubberBand,
-  toggleSmoothInDraft,
-  type PenDraft,
-  type PenHover,
-  addCurvePoint,
-  curvePreview,
-  smoothDraft,
-} from "./penTool";
-import { extendStroke, finishStroke, isClosedStroke, ropeLength, startStroke, strokeToPath, type FreehandStroke } from "./freehand";
-import { constrainAngle, deleteNode, flattenSubPath, insertNode, nearestOnSubPath, resample, toggleSmooth } from "../lib/bezier";
-import { defaultRunning, type Mat } from "../lib/geometry";
-import { ROTATE_CURSOR, SKEW_CURSOR, rotateZone, skewAbout, snapBox, snapTargets, unitIds, type SnapTargets } from "./transform";
+import { addPoint, canClose, continueFrom, deleteFromDraft, insertInDraft, newDraft, PEN_HINTS, CURVE_HINTS, penHitTest, placePoint, removeLast, rubberBand, toggleSmoothInDraft, type PenDraft, type PenHover, addCurvePoint, curvePreview, smoothDraft } from "./penTool";
+import { isClosedStroke, type FreehandStroke } from "./freehand";
+import { flattenSubPath, insertNode, resample } from "../lib/bezier";
+import { ROTATE_CURSOR, SKEW_CURSOR, rotateZone, unitIds } from "./transform";
 import { finishedPlan } from "../lib/cuts";
-import {
-  commit2D,
-  is2D,
-  makeGradient,
-  makeGradient2D,
-  meshInsert,
-  meshLineHit,
-  meshLocate,
-  meshValid,
-  nodeHit,
-  removeNodes,
-  selectedGradient,
-  setStops,
-  stopsOf,
-  syncGradientGeometry,
-  updateGradient,
-  weightsAt,
-  type StopEdit,
-} from "../lib/gradient";
-import type { GradientParams } from "../types";
+import { commit2D, meshInsert, meshLineHit, meshLocate, meshValid, nodeHit, removeNodes, selectedGradient, stopsOf, weightsAt } from "../lib/gradient";
 import { pxPerMm } from "../lib/screen";
-import { cutChords, cutFills, cutPathObject, cutSatinObject, nearestOnPaths } from "../lib/cut";
+import { nearestOnPaths } from "../lib/cut";
 import { computeIssues } from "../lib/issues";
 import { issuesShown } from "../lib/panelActions";
 import { displayPlan } from "../lib/threads";
-import { cornerWidgets, radiusFromWidget, roundCorners, shapeToolPath, type CornerStyle } from "../lib/shapeOps";
+import { cornerWidgets } from "../lib/shapeOps";
 import { openDroppedFile } from "../lib/actions";
-import { flatten as flattenSub, normAngle } from "../lib/geometry";
-import { pruneGroups } from "../lib/layerRows";
+import { normAngle } from "../lib/geometry";
 import { freshCopies } from "../lib/copies";
-import { transformable } from "../lib/textSettle";
-import { loadFont } from "../lib/fonts";
-import { mapObjects, replaceObject } from "../lib/docEdit";
+import { replaceObject } from "../lib/docEdit";
 import { fitView, zoomAt } from "../lib/view";
-
-/**
- * The box a transform drag works on: round the selected objects it moves
- * (locked objects, and letterings with a locked letter, stay put). The handles
- * are drawn, hit-tested and given cursors on this one box.
- */
-function transformBox(doc: StitchDocument, selection: string[]) {
-  const sel = transformable(doc.objects.filter((o) => selection.includes(o.id)), doc.objects).objects;
-  return sel.length ? unionBoxes(sel.map(objectBoundsCached)) : null;
-}
-
-/**
- * The points a node-tool box picks on the selected paths: those inside it,
- * added to (Shift) or taken from (Alt) the points selected when the drag began.
- */
-function boxedNodes(doc: StitchDocument, ids: string[], m: { x: number; y: number; w: number; h: number }, d: { add: boolean; sub: boolean; base: NodeRef[] }): NodeRef[] {
-  const found = nodesInBox(doc, ids, m);
-  if (d.sub) {
-    const out = new Set(found.map(nodeKey));
-    return d.base.filter((x) => !out.has(nodeKey(x)));
-  }
-  if (d.add) {
-    const have = new Set(d.base.map(nodeKey));
-    return [...d.base, ...found.filter((x) => !have.has(nodeKey(x)))];
-  }
-  return found;
-}
-
-const hitCtx = (() => {
-  const c = document.createElement("canvas");
-  c.width = c.height = 1;
-  return c.getContext("2d")!;
-})();
-
-function hitObject(o: DesignObject, p: Vec2, tol: number): boolean {
-  const st = o.stitch;
-  if (st.type === "satin") {
-    const path = objectOutline(o);
-    if (path && hitCtx.isPointInPath(path, p[0], p[1], "evenodd")) return true;
-    hitCtx.lineWidth = tol * 2;
-    return !!path && hitCtx.isPointInStroke(path, p[0], p[1]);
-  }
-  const path = objectPath(o);
-  if ((st.type === "fill" || st.type === "none" || st.type === "applique") && hitCtx.isPointInPath(path, p[0], p[1], "evenodd")) return true;
-  hitCtx.lineWidth = Math.max(tol * 2, 0.6);
-  return hitCtx.isPointInStroke(path, p[0], p[1]);
-}
-
-type Drag =
-  | { kind: "pan"; sx: number; sy: number; ox: number; oy: number }
-  | { kind: "marquee"; a: Vec2; add: boolean }
-  | { kind: "move"; start: Vec2; orig: DesignObject[]; all: DesignObject[]; moved: boolean; targets: SnapTargets | null }
-  | { kind: "scale"; handle: number; box: Box; orig: DesignObject[]; uniform: boolean; targets: SnapTargets | null; pivot: Vec2 }
-  | { kind: "rotate"; center: Vec2; a0: number; orig: DesignObject[] }
-  | { kind: "skew"; handle: number; box: Box; orig: DesignObject[]; start: Vec2; pivot: Vec2 }
-  | { kind: "pivot"; key: string }
-  | { kind: "gradvec"; a: Vec2; target: string | null; group: string | null }
-  | { kind: "gradend"; which: "from" | "to"; group: string }
-  | { kind: "gradstop"; index: number; group: string; stops: StopEdit[]; g: GradientParams }
-  | { kind: "gradnode"; group: string; idx: number[]; orig: Vec2[]; start: Vec2; moved: boolean }
-  | { kind: "gradspread"; group: string; idx: number }
-  | { kind: "corner"; id: string; sp: number; k: number; orig: DesignObject; all: boolean; p: Vec2; dir: Vec2; phi: number }
-  | { kind: "node"; id: string; sp: number; ni: number; part: "p" | "i" | "o"; orig: DesignObject }
-  | { kind: "shape"; shape: "rect" | "ellipse"; a: Vec2 }
-  | { kind: "freehand" }
-  | { kind: "ruler"; a: Vec2 }
-  | { kind: "handle"; h: Handle; orig: DesignObject; moved: boolean }
-  | { kind: "texthandle"; h: Handle; group: string; spec: TextSpec; start: Vec2; moved: boolean; spacingScale?: number }
-  | { kind: "pen-new"; idx: number; moved: boolean; last: Vec2 }
-  | { kind: "bend"; o: DesignObject; sp: number; seg: number; t: number; start: Vec2; moved: boolean; both: boolean }
-  | { kind: "pen-close"; moved: boolean }
-  | { kind: "pen-last"; moved: boolean; keepIn?: Vec2 }
-  | { kind: "pen-anchor"; idx: number; orig: PathNode; start: Vec2; moved: boolean }
-  | { kind: "pen-handle"; idx: number; part: "i" | "o"; orig: PathNode }
-  | { kind: "cut"; a: Vec2; moved: boolean }
-  | { kind: "split"; a: Vec2; dir: boolean; moved: boolean }
-  | { kind: "nodes"; start: Vec2; orig: StitchDocument; sel: NodeRef[]; moved: boolean; anchor: Vec2 }
-  | { kind: "nodemarquee"; a: Vec2; add: boolean; sub: boolean; base: NodeRef[]; hit: DesignObject | null }
-  | { kind: "ref"; mode: "move" | "scale" | "rotate"; orig: ReferenceImage; start: Vec2; corner: number; a0: number; moved: boolean }
-  | { kind: "rampend"; id: string; which: "from" | "to"; moved: boolean }
-  | { kind: "rampvec"; a: Vec2; target: string | null; mode: "density" | "blend" }
-  | { kind: "build"; faces: number[]; del: boolean }
-  | { kind: "guideend"; id: string; index: number; end: 0 | 1; moved: boolean }
-  | { kind: "guidemove"; id: string; index: number; start: Vec2; orig: [Vec2, Vec2]; moved: boolean }
-  | { kind: "guidedraw"; id: string; a: Vec2 };
-
-const HANDLE_HINTS: Record<string, string> = {
-  angle: "Drag to set the fill angle (Shift: 15° steps)",
-  spacing: "Drag to change the density",
-  center: "Drag to move the radial centre",
-  "width-l": "Drag to change the column width",
-  "width-r": "Drag to change the column width",
-  reverse: "Click to sew the other way",
-  start: "Drag to move the start · double-click for auto",
-  end: "Drag to move the end · double-click for auto",
-  "text-arc": "Drag up or down to bend the text (Shift: 15° steps) · double-click to straighten",
-  "text-spacing": "Drag to change the letter spacing · double-click to reset",
-};
-
-const isPathObject = (o: DesignObject) =>
-  o.stitch.type === "running" || o.stitch.type === "manual" || (o.stitch.type === "satin" && o.paths.length === 1);
-
-function segmentsCross(a: Vec2, b: Vec2, c: Vec2, d: Vec2) {
-  const o = (p: Vec2, q: Vec2, r: Vec2) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
-  return o(a, b, c) * o(a, b, d) < 0 && o(c, d, a) * o(c, d, b) < 0;
-}
-
-/** Does the segment a→b cross the object's outline? */
-/** Split into satins on the canvas: the shape, the lines, where the cuts cut, and the parts with their rungs (the line being dragged included). */
-function splitOverlay(doc: StitchDocument, draft: SplitDraft, live: { a: Vec2; b: Vec2; dir: boolean } | null): InteractiveOverlay["split"] {
-  const shape = draft.id ? doc.objects.find((o) => o.id === draft.id) : undefined;
-  const d = live && shape ? { ...draft, ...(live.dir ? { directions: [...draft.directions, [live.a, live.b] as [Vec2, Vec2]] } : { cuts: [...draft.cuts, [live.a, live.b] as [Vec2, Vec2]] }) } : draft;
-  const plan = shape ? draftPlan(doc, d) : null;
-  return {
-    outline: shape ? regionsOf(shape).flatMap(regionRings) : null,
-    cuts: d.cuts,
-    directions: d.directions,
-    live: live && !shape ? live : null,
-    chords: shape ? d.cuts.flatMap(([a, b]) => cutChords(shape, a, b)) : [],
-    parts: plan?.parts ?? [],
-  };
-}
-
-function crossesObject(o: DesignObject, a: Vec2, b: Vec2) {
-  return o.paths.some((sp) => {
-    const pts = flattenSub(sp);
-    for (let i = 0; i < pts.length; i++) {
-      const p = pts[i];
-      const q = pts[(i + 1) % pts.length];
-      if (segmentsCross(a, b, p, q)) return true;
-    }
-    return false;
-  });
-}
-
-function nextName(objs: DesignObject[], base: string) {
-  let n = 1;
-  while (objs.some((o) => o.name === `${base} ${n}`)) n++;
-  return `${base} ${n}`;
-}
-
-/** The GL view of a drag transform: which objects (by index) and the matrix; the mask is kept while the set is the same. */
-let liveMask: { key: string; n: number; mask: Uint8Array } | null = null;
-function liveFrame(doc: StitchDocument, live: { ids: string[]; m: Mat } | null) {
-  if (!live) return null;
-  const key = live.ids.join(",");
-  if (!liveMask || liveMask.key !== key || liveMask.n !== doc.objects.length) {
-    const ids = new Set(live.ids);
-    const mask = new Uint8Array(doc.objects.length);
-    doc.objects.forEach((o, i) => {
-      if (ids.has(o.id)) mask[i] = 255;
-    });
-    liveMask = { key, n: doc.objects.length, mask };
-  }
-  return { key, mask: liveMask.mask, m: live.m };
-}
-
-interface AutoFit {
-  scale: number;
-  set: { scale: number; ox: number; oy: number };
-}
-
-/**
- * The canvas changed size (a panel opened or closed, the window, a sash):
- * the middle of the view stays where it was. When the hoop was all in view
- * and no longer fits, the view zooms out to fit it; as the canvas grows
- * back, the view returns to the zoom it had (unless it was changed since).
- */
-function keepInView(prev: { w: number; h: number }, w: number, h: number, auto: { current: AutoFit | null }) {
-  const s = useStore.getState();
-  const v = s.view;
-  const hoop = { x: 0, y: 0, w: s.doc.hoop.width, h: s.doc.hoop.height };
-  const inView = (q: { scale: number; ox: number; oy: number }, W: number, H: number) =>
-    q.ox >= RULER - 0.5 && q.oy >= RULER - 0.5 && hoop.w * q.scale + q.ox <= W + 0.5 && hoop.h * q.scale + q.oy <= H + 0.5;
-  const same = (a: { scale: number; ox: number; oy: number }, b: { scale: number; ox: number; oy: number }) =>
-    Math.abs(a.scale - b.scale) < 1e-6 && Math.abs(a.ox - b.ox) < 0.5 && Math.abs(a.oy - b.oy) < 0.5;
-  let next = { scale: v.scale, ox: v.ox + (w - prev.w) / 2, oy: v.oy + (h - prev.h) / 2 };
-  const a = auto.current;
-  if (a && same(v, a.set)) {
-    const f = fitView(w, h, hoop);
-    if (f.scale >= a.scale) {
-      // room again: back to the zoom it had, about the middle
-      const k = a.scale / f.scale;
-      const [cx, cy] = [(RULER + w) / 2, (RULER + h) / 2];
-      next = { scale: a.scale, ox: cx - (cx - f.ox) * k, oy: cy - (cy - f.oy) * k };
-      auto.current = null;
-    } else {
-      next = f;
-      auto.current = { scale: a.scale, set: f };
-    }
-  } else if (inView(v, prev.w, prev.h) && !inView(next, w, h)) {
-    const f = fitView(w, h, hoop);
-    if (f.scale < v.scale) {
-      auto.current = { scale: v.scale, set: f };
-      next = f;
-    } else auto.current = null;
-  } else auto.current = null;
-  s.setView(next);
-}
-
-export { fitView };
-
-// The viewport is three stacked canvases; these helpers flatten them for
-// screenshots (production sheet) and the stitch-out video recorder.
-const layers: { bg: HTMLCanvasElement | null; gl: HTMLCanvasElement | null; top: HTMLCanvasElement | null } = { bg: null, gl: null, top: null };
-let capture: HTMLCanvasElement | null = null;
-
-function flatten(into: HTMLCanvasElement) {
-  const { bg, gl, top } = layers;
-  if (!bg || !top) return;
-  if (into.width !== bg.width || into.height !== bg.height) {
-    into.width = bg.width;
-    into.height = bg.height;
-  }
-  const g = into.getContext("2d")!;
-  g.setTransform(1, 0, 0, 1, 0, 0);
-  g.drawImage(bg, 0, 0);
-  if (gl) g.drawImage(gl, 0, 0);
-  g.drawImage(top, 0, 0);
-}
-
-function captureFrame() {
-  if (capture) flatten(capture);
-}
-
-/** A flattened copy of the current viewport. */
-export function snapshotViewport(): HTMLCanvasElement {
-  const c = document.createElement("canvas");
-  flatten(c);
-  return c;
-}
+import { transformBox, hitObject, isPathObject, nextName } from "./hit";
+import { Drag, HANDLE_HINTS } from "./drag";
+import { splitOverlay, liveFrame } from "./overlays";
+import { AutoFit, keepInView, layers, captureFrame } from "./viewport";
+import { downSelect, moveTransform, upTransform } from "./gestures/transform";
+import type { CanvasCtx } from "./ctx";
+import { downGradient, moveGradient, upGradient } from "./gestures/gradient";
+import { penState } from "./drag";
+import { cornerWidgetHit, downNode, movePen, nodeInsertTarget, railPair, upPen } from "./gestures/pen";
+import { downDraw, moveDraw, upDraw } from "./gestures/draw";
+import { runStitch } from "./gestures/draw";
+import { downGuides, moveHandles, upHandles } from "./gestures/handles";
 
 /** Start mirroring every rendered frame into a canvas (for MediaRecorder). */
 /** Corner style of the live corner widgets (Alt-click a widget to cycle). */
-let cornerStyle: CornerStyle = "round";
-
-export function startCapture(): HTMLCanvasElement {
-  capture = document.createElement("canvas");
-  flatten(capture);
-  return capture;
-}
-
-export function stopCapture() {
-  capture = null;
-}
 
 export function Canvas() {
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -916,14 +619,6 @@ export function Canvas() {
     };
   };
 
-const runStitch = (kind: "running" | "triple", length: number): StitchParams => ({
-    type: "running",
-    ...defaultRunning(),
-    length,
-    beanRepeats: kind === "triple" ? 2 : 0,
-  });
-
-  /** Finish the pen / satin draft into an object (or update the continued one). */
   /**
    * A new running path that ends (or starts) on the end of another open
    * running path joins it: one path, the other's settings.
@@ -970,6 +665,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
     s.toast(`Joined to ${doc.objects.find((x) => x.id === id)?.name ?? "the path"}`, "success");
   };
 
+  /** Finish the pen / satin draft into an object (or update the continued one). */
   const finishPen = (closed: boolean) => {
     const s = useStore.getState();
     const d = penRef.current;
@@ -1030,18 +726,6 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
   /** Copies of objects beside the originals (in their groups; whole groups, letterings and gradients new). */
   const cloneObjects = (objs: DesignObject[]) => freshCopies(useStore.getState().doc, objs, { inPlace: true });
 
-  /** A live corner widget of a selected shape near `p` (node tool). */
-  const cornerWidgetHit = (p: Vec2, tol: number) => {
-    const s = useStore.getState();
-    const off = 13 / s.view.scale;
-    for (const o of s.doc.objects.filter((x) => s.selection.includes(x.id) && !x.text && !x.locked))
-      for (let si = 0; si < o.paths.length; si++)
-        for (const w of cornerWidgets(o.paths[si])) {
-          const q: Vec2 = [w.p[0] + w.dir[0] * off, w.p[1] + w.dir[1] * off];
-          if (dist(q, p) < tol) return { o, sp: si, w };
-        }
-    return null;
-  };
 
   /**
    * Mesh / freeform editing with the gradient tool. Nodes: click selects
@@ -1120,22 +804,6 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
     return false;
   };
 
-  /** Gradient annotator hit: an end handle, a stop, or the line itself. */
-  const gradientHit = (p: Vec2, tol: number) => {
-    const sg = selectedGradient();
-    if (!sg) return null;
-    const { params: g, group } = sg;
-    const at = (t: number): Vec2 => [g.from[0] + (g.to[0] - g.from[0]) * t, g.from[1] + (g.to[1] - g.from[1]) * t];
-    const stops = stopsOf(useStore.getState().doc, group);
-    for (let i = stops.length - 1; i >= 0; i--) if (dist(at(stops[i].pos), p) < tol * 1.2) return { kind: "stop" as const, index: i, group, g, stops };
-    if (dist(g.from, p) < tol * 1.4) return { kind: "from" as const, group, g, stops };
-    if (dist(g.to, p) < tol * 1.4) return { kind: "to" as const, group, g, stops };
-    const d = [g.to[0] - g.from[0], g.to[1] - g.from[1]];
-    const l2 = d[0] * d[0] + d[1] * d[1] || 1;
-    const t = ((p[0] - g.from[0]) * d[0] + (p[1] - g.from[1]) * d[1]) / l2;
-    if (t > 0 && t < 1 && dist(at(t), p) < tol) return { kind: "line" as const, t, group, g, stops };
-    return null;
-  };
 
   /** An end of a selected open path the pen can continue from. */
   const continuable = (p: Vec2, tol: number, kind: PenDraft["kind"]) => {
@@ -1216,24 +884,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
     draw();
   };
 
-  /** Two-rail satin whose nodes pair up as rungs (inserting / deleting keeps the pairs). */
-  const railPair = (o: DesignObject) => (isRailSatin(o) ? railMap(o.paths[0], o.paths[1]) : null);
 
-  /** Where a node-tool click would add a point (on a selected path, away from nodes). */
-  const nodeInsertTarget = (p: Vec2, tol: number) => {
-    const s = useStore.getState();
-    let best: { o: DesignObject; sp: number; seg: number; t: number; p: Vec2; d: number } | null = null;
-    for (const o of s.doc.objects.filter((x) => s.selection.includes(x.id) && !x.locked && !x.text)) {
-      o.paths.forEach((sp, si) => {
-        const hit = nearestOnSubPath(sp, p);
-        if (hit && hit.d < tol && (!best || hit.d < best.d)) best = { o, sp: si, seg: hit.seg, t: hit.t, p: hit.p, d: hit.d };
-      });
-    }
-    const b = best as { o: DesignObject; sp: number; seg: number; t: number; p: Vec2; d: number } | null;
-    if (!b) return null;
-    const near = b.o.paths[b.sp].nodes.some((n) => dist(n.p, b.p) < tol * 1.2 || (n.i && dist(n.i, p) < tol) || (n.o && dist(n.o, p) < tol));
-    return near ? null : b;
-  };
 
   // A two-rail satin's sides are shaped one at a time: the point pairs turn
   // into guides first (the stitches keep their angle). `both` (Ctrl): a pair
@@ -1251,16 +902,6 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
     return { obj: { ...base, paths }, index: r.index };
   };
 
-  const deleteFromObject = (o: DesignObject, si: number, ni: number, both = false): DesignObject | null => {
-    const sp = o.paths[si];
-    if (sp.nodes.length <= 2) return null;
-    const pair = both ? railPair(o) : null;
-    const base = isRailSatin(o) && !pair ? freeSides(o) : o;
-    const paths = [...base.paths];
-    paths[si] = deleteNode(sp, ni);
-    if (pair) paths[1 - si] = deleteNode(paths[1 - si], pair.at(ni));
-    return { ...base, paths };
-  };
 
   const penHint = (text: string, at: Vec2) => {
     iRef.current.tooltip = { p: at, text };
@@ -1362,356 +1003,27 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
       return;
     }
     switch (s.tool) {
-      case "guides": {
-        const gtol = Math.max(tol, 8 / s.view.scale);
-        const sat = selectedSatin();
-        if (sat) {
-          // the satin's orientation lines: its guides, or the point pairs of its rails
-          const hit = guideHit(orientationLines(sat).lines, p, gtol);
-          if (hit) {
-            if (e.altKey) {
-              const next = removeOrientationLine(sat, hit.index);
-              s.commit((doc) => replaceObject(doc, sat.id, next));
-              guideHover.current = null;
-              pickLine(null);
-              draw();
-              return;
-            }
-            pickLine({ id: sat.id, index: hit.index });
-            s.checkpoint();
-            // point pairs become guides first (in the same order): then they move like any guide
-            const freed = freeSides(sat);
-            guideFreedFrom.current = freed !== sat ? s.doc : null;
-            if (freed !== sat) s.liveUpdate((doc) => replaceObject(doc, sat.id, freed));
-            dragRef.current =
-              hit.end === null
-                ? { kind: "guidemove", id: sat.id, index: hit.index, start: p, orig: guidesOf(freed)[hit.index], moved: false }
-                : { kind: "guideend", id: sat.id, index: hit.index, end: hit.end, moved: false };
-            return;
-          }
-        }
-        pickLine(null);
-        // on a satin (the selected one, or another): draw a new guide
-        const h = pick(p);
-        const target = sat && (!h || h.id === sat.id || h.stitch.type !== "satin") ? sat : h && h.stitch.type === "satin" ? h : null;
-        if (target) {
-          if (!s.selection.includes(target.id)) s.select([target.id]);
-          dragRef.current = { kind: "guidedraw", id: target.id, a: p };
-          return;
-        }
-        s.select(h ? unitIds(s.doc, h) : []);
-        if (h) s.toast("Direction guides are for satin columns");
-        return;
-      }
-      case "select": {
-        // parameter handles (reverse order: pins are drawn on top)
-        const hh = [...handlesRef.current].reverse().find((h) => dist(h.p, p) < HANDLE_HIT_PX / s.view.scale);
-        if (hh?.group) {
-          const spec = textSpec(hh.group);
-          if (!spec) return;
-          if (e.detail === 2) {
-            updateText(hh.group, hh.kind === "text-arc" ? { arc: 0 } : { letterSpacing: 0 });
-            return;
-          }
-          s.checkpoint();
-          const drag = { kind: "texthandle" as const, h: hh, group: hh.group, spec, start: p, moved: false, spacingScale: 1 };
-          dragRef.current = drag;
-          // embroidery fonts: spacing is at the font's own size, so the handle follows the pointer at the text's scale
-          void loadFont(spec.font).then((f) => {
-            if (f.kind === "embroidery" && f.size > 0) drag.spacingScale = spec.size / f.size;
-          });
-          // an older design's spacing (mm): the drag starts from it in today's terms
-          if (spec.legacySpacing) void modernSpacing(spec).then((m) => (drag.spec = m));
-          iRef.current.activeHandle = hh;
-          return;
-        }
-        if (hh) {
-          const o = s.doc.objects.find((x) => x.id === hh.objId)!;
-          if (hh.kind === "reverse") {
-            s.commit((d) => mapObjects(d, o.id, (x) => reverseObject(x, hh)));
-            return;
-          }
-          if ((hh.kind === "start" || hh.kind === "end") && e.detail === 2) {
-            s.commit((d) => mapObjects(d, o.id, (x) => ({ ...x, [hh.kind]: undefined })));
-            return;
-          }
-          s.checkpoint();
-          dragRef.current = { kind: "handle", h: hh, orig: o, moved: false };
-          iRef.current.activeHandle = hh;
-          return;
-        }
-        if (issuesShown(s)) {
-          const iss = computeIssues(s.doc, s.plan).find((i) => i.objId && dist(i.at, p) < 9 / s.view.scale);
-          if (iss) {
-            s.select([iss.objId]);
-            return;
-          }
-        }
-        const sel = transformable(s.doc.objects.filter((o) => s.selection.includes(o.id)), s.doc.objects).objects;
-        const box = unionBoxes(sel.map(objectBounds));
-        if (box && sel.length && sel.every((o) => !o.locked)) {
-          const pv = pivotOf(box);
-          // Alt-drag the pivot to move it (Alt-double-click: back to the centre)
-          if (e.altKey && dist(p, pv) < tol * 1.2) {
-            if (e.detail === 2) {
-              pivotRef.current = null;
-              draw();
-              return;
-            }
-            dragRef.current = { kind: "pivot", key: selKey() };
-            return;
-          }
-          const [rx, ry] = rotateHandle(box, s.view.scale);
-          const hi = handlePoints(box).findIndex((h) => dist(h, p) < tol);
-          if (dist(p, [rx, ry]) < tol || (hi < 0 && rotateZone(box, p, s.view.scale) >= 0)) {
-            s.checkpoint();
-            dragRef.current = { kind: "rotate", center: pv, a0: Math.atan2(p[1] - pv[1], p[0] - pv[0]), orig: sel };
-            return;
-          }
-          if (hi >= 0) {
-            s.checkpoint();
-            if ((e.ctrlKey || e.metaKey) && hi % 2 === 1) {
-              dragRef.current = { kind: "skew", handle: hi, box, orig: sel, start: p, pivot: pv };
-              return;
-            }
-            const targets = s.smartGuides ? snapTargets(s.doc, new Set(s.selection)) : null;
-            dragRef.current = { kind: "scale", handle: hi, box, orig: sel, uniform: sel.some((o) => o.text), targets, pivot: pv };
-            return;
-          }
-        }
-        // with the jumps shown, a click right on the line between two objects: Trim / Jump / Sew (Shift: select as usual)
-        const conn = s.showJumps && !e.shiftKey ? connectionAt(s.plan, p, 4 / s.view.scale) : undefined;
-        const from = conn && s.doc.objects[conn.from];
-        if (from) {
-          iRef.current.connHover = null;
-          iRef.current.tooltip = null;
-          // after this pointer event: the menu's outside-click listener would close it at once
-          const at = { x: e.clientX, y: e.clientY };
-          setTimeout(() => setCtxMenu({ ...at, onObject: false, items: linkMenu(from.id) }), 0);
-          draw();
-          return;
-        }
-        const hit = pick(p);
-        if (hit) {
-          // groups and letterings are picked as a whole; Ctrl / Cmd picks one object inside
-          const unit = e.ctrlKey || e.metaKey ? [hit.id] : unitIds(s.doc, hit);
-          let ids = s.selection;
-          if (e.shiftKey) ids = ids.includes(hit.id) ? ids.filter((x) => !unit.includes(x)) : [...ids, ...unit.filter((x) => !ids.includes(x))];
-          else if (e.ctrlKey || e.metaKey || !ids.includes(hit.id)) ids = unit;
-          s.select(ids);
-          if (e.detail === 2) {
-            if (hit.text) s.set({ editingText: hit.text.group });
-            else s.setTool("node");
-            return;
-          }
-          s.set({ activeThread: hit.thread });
-          dragRef.current = {
-            kind: "move",
-            start: p,
-            // locked objects stay put; an Alt-drag copy takes them along
-            // a lettering with locked letters stays in place with them
-            orig: (() => {
-              const t = transformable(s.doc.objects.filter((o) => ids.includes(o.id)), s.doc.objects);
-              if (t.held) s.toast("A lettering with locked letters stays in place: unlock it in Layers to move it");
-              return t.objects;
-            })(),
-            all: s.doc.objects.filter((o) => ids.includes(o.id)),
-            moved: false,
-            targets: s.smartGuides ? snapTargets(s.doc, new Set(ids)) : null,
-          };
-        } else {
-          if (e.detail === 2) {
-            const r = referenceAt(p);
-            if (r) {
-              s.set({ refEdit: r.id });
-              return;
-            }
-          }
-          if (!e.shiftKey) s.select([]);
-          dragRef.current = { kind: "marquee", a: p, add: e.shiftKey };
-        }
-        return;
-      }
-      case "node": {
-        for (const o of s.doc.objects.filter((x) => s.selection.includes(x.id) && !x.locked)) {
-          for (let si = 0; si < o.paths.length; si++)
-            for (let ni = 0; ni < o.paths[si].nodes.length; ni++) {
-              const n = o.paths[si].nodes[ni];
-              for (const part of ["i", "o", "p"] as const) {
-                const q = n[part];
-                if (q && dist(q, p) < tol) {
-                  if (part === "p" && e.altKey) {
-                    // Alt-click: delete the point (Ctrl too: the pair on both rails of a satin)
-                    const next = deleteFromObject(o, si, ni, e.ctrlKey || e.metaKey);
-                    if (next) s.commit((doc) => syncGradientGeometry(replaceObject(doc, o.id, next), next));
-                    else s.toast("A path needs at least two points");
-                    s.set({ nodeSel: [] });
-                    return;
-                  }
-                  if (part === "p" && e.detail === 2) {
-                    const paths = o.paths.map((x, k) => (k === si ? toggleSmooth(x, ni) : x));
-                    s.commit((doc) => syncGradientGeometry(replaceObject(doc, o.id, { ...o, paths }), { ...o, paths }));
-                    return;
-                  }
-                  if (part === "p") {
-                    // select the point (Shift: add / remove), then drag every selected point
-                    const ref = { id: o.id, sp: si, ni };
-                    const key = nodeKey(ref);
-                    const has = s.nodeSel.some((x) => nodeKey(x) === key);
-                    let sel = s.nodeSel;
-                    if (e.shiftKey) sel = has ? sel.filter((x) => nodeKey(x) !== key) : [...sel, ref];
-                    else if (!has) sel = [ref];
-                    s.set({ nodeSel: sel });
-                    if (e.shiftKey && has) return;
-                    s.checkpoint();
-                    dragRef.current = { kind: "nodes", start: p, orig: s.doc, sel, moved: false, anchor: n.p };
-                    return;
-                  }
-                  s.checkpoint();
-                  dragRef.current = { kind: "node", id: o.id, sp: si, ni, part, orig: o };
-                  return;
-                }
-              }
-            }
-        }
-        if (e.altKey) {
-          // Alt-click a satin's orientation line (a guide or a point pair): delete it
-          for (const o of s.doc.objects.filter((x) => s.selection.includes(x.id) && !x.locked && x.stitch.type === "satin")) {
-            const hit = guideHit(orientationLines(o).lines, p, Math.max(tol, 6 / s.view.scale));
-            if (hit && hit.end === null) {
-              const next = removeOrientationLine(o, hit.index);
-              s.commit((doc) => replaceObject(doc, o.id, next));
-              return;
-            }
-          }
-        }
-        const cw = cornerWidgetHit(p, Math.max(tol, 6 / s.view.scale));
-        if (cw) {
-          if (e.altKey) {
-            cornerStyle = cornerStyle === "round" ? "inverted" : cornerStyle === "inverted" ? "chamfer" : "round";
-            s.toast(`Corner style: ${cornerStyle === "round" ? "round" : cornerStyle === "inverted" ? "inverted round" : "chamfer"}`);
-            return;
-          }
-          s.checkpoint();
-          dragRef.current = { kind: "corner", id: cw.o.id, sp: cw.sp, k: cw.w.k, orig: cw.o, all: e.shiftKey, p: cw.w.p, dir: cw.w.dir, phi: cw.w.phi };
-          return;
-        }
-        const ins = nodeInsertTarget(p, Math.max(tol, 7 / s.view.scale));
-        if (ins) {
-          // on a segment: drag to bend it, click to add a point there
-          dragRef.current = { kind: "bend", o: ins.o, sp: ins.sp, seg: ins.seg, t: ins.t, start: p, moved: false, both: e.ctrlKey || e.metaKey };
-          iRef.current.insertAt = null;
-          return;
-        }
-        // anywhere else: a box selects points (a click decides on release)
-        const hit = pick(p);
-        // Shift: add to the selected points, Alt: take away from them
-        dragRef.current = { kind: "nodemarquee", a: p, add: e.shiftKey, sub: e.altKey && !e.shiftKey, base: s.nodeSel, hit: hit && !s.selection.includes(hit.id) ? hit : null };
-        return;
-      }
+      case "guides":
+        return downGuides(ctx, s.tool, s, e, p, tol);
+      case "select":
+        return downSelect(ctx, s.tool, s, e, p, tol);
+      case "node":
+        return downNode(ctx, s.tool, s, e, p, tol);
       case "ruler":
-        dragRef.current = { kind: "ruler", a: p };
-        return;
       case "rect":
       case "ellipse":
-        dragRef.current = { kind: "shape", shape: s.tool, a: p };
-        return;
       case "freehand":
-        fhRef.current = startStroke(p);
-        dragRef.current = { kind: "freehand" };
-        iRef.current.tooltip = null;
-        return;
+      case "cut":
+      case "split":
+      case "builder":
+        return downDraw(ctx, s.tool, s, e, p);
       case "pen":
       case "curve":
       case "satin":
         penDown(e, p, Math.max(tol, 7 / s.view.scale));
         return;
-      case "cut":
-        dragRef.current = { kind: "cut", a: p, moved: false };
-        return;
-      case "split": {
-        const dft = s.splitDraft;
-        const h = pick(p);
-        const cur = dft.id ? s.doc.objects.find((o) => o.id === dft.id) : undefined;
-        // the shape: the one clicked (while no line is drawn yet), else the one being split, else the selected fill
-        const lone = s.selection.length === 1 ? s.doc.objects.find((o) => o.id === s.selection[0]) : undefined;
-        const next = splittable(h) && (!cur || (!dft.cuts.length && !dft.directions.length)) ? h : cur && splittable(cur) ? cur : splittable(lone) ? lone : undefined;
-        if (next && next.id !== dft.id) {
-          // not selected: its stitches and handles would cover the preview of the parts
-          s.set({ splitDraft: { ...dft, id: next.id, cuts: [], directions: [], order: [] } });
-          if (s.selection.length) s.select([]);
-        } else if (!next && h) s.toast("Split into satins works on fill shapes");
-        dragRef.current = { kind: "split", a: p, dir: e.altKey || dft.draw === "direction", moved: false };
-        return;
-      }
-      case "builder": {
-        refreshRegions();
-        const f = faceAt(p);
-        if (f != null) {
-          dragRef.current = { kind: "build", faces: [f], del: e.altKey || s.toolOptions.builder.mode === "delete" };
-          draw();
-          return;
-        }
-        // outside the regions: choose shapes (Shift adds)
-        const hit = pick(p);
-        if (hit) s.select(e.shiftKey ? [...new Set([...s.selection, hit.id])] : unitIds(s.doc, hit));
-        else if (!e.shiftKey) s.select([]);
-        return;
-      }
-      case "gradient": {
-        const gtol = Math.max(tol, 8 / s.view.scale);
-        if (rampDown(p, gtol)) return;
-        const sg2 = selectedGradient();
-        if (sg2 && is2D(sg2.params.kind) && gradient2DDown(e, p, gtol, sg2)) return;
-        const mode = s.toolOptions.gradient.kind;
-        if (is2D(mode) && !(sg2 && !is2D(sg2.params.kind))) {
-          // mesh / points: one click on a closed shape makes the gradient there
-          const h = pick(p);
-          const target = h && h.paths.some((sp) => sp.closed) && !(h.stitch.type === "fill" && h.stitch.gradient) ? h : null;
-          if (!target) {
-            s.select(h ? unitIds(s.doc, h) : []);
-            if (!h) s.toast(mode === "mesh" ? "Click a closed shape to add a gradient mesh" : "Click a closed shape to add colour points");
-            draw();
-            return;
-          }
-          makeGradient2D(target.id, p, mode as "mesh" | "freeform");
-          draw();
-          return;
-        }
-        const gh = sg2 && is2D(sg2.params.kind) ? null : gradientHit(p, gtol);
-        if (gh) {
-          if (gh.kind === "from" || gh.kind === "to") {
-            s.checkpoint();
-            dragRef.current = { kind: "gradend", which: gh.kind, group: gh.group };
-            return;
-          }
-          if (gh.kind === "stop") {
-            if ((e.altKey || e.detail === 2) && gh.stops.length > 2) {
-              setStops(gh.group, gh.stops.filter((_, i) => i !== gh.index));
-              return;
-            }
-            s.checkpoint();
-            dragRef.current = { kind: "gradstop", index: gh.index, group: gh.group, stops: gh.stops, g: gh.g };
-            return;
-          }
-          // click on the line: a new stop there, with the colour of the nearest stop
-          const near = gh.stops.reduce((b, st, i) => (Math.abs(st.pos - gh.t) < Math.abs(gh.stops[b].pos - gh.t) ? i : b), 0);
-          setStops(gh.group, [...gh.stops, { pos: gh.t, mid: 0.5, thread: gh.stops[near].thread }].sort((a, b) => a.pos - b.pos));
-          return;
-        }
-        // a new gradient vector across the selected (or clicked) shape
-        const sg = sg2 && !is2D(sg2.params.kind) ? sg2 : null;
-        const target =
-          sg?.layers[0] ??
-          s.doc.objects.find((o) => s.selection.includes(o.id) && o.paths.some((sp) => sp.closed)) ??
-          (() => {
-            const h = pick(p);
-            return h && h.paths.some((sp) => sp.closed) ? h : null;
-          })();
-        if (target && !s.selection.includes(target.id)) s.select(unitIds(s.doc, target));
-        dragRef.current = { kind: "gradvec", a: p, target: target?.id ?? null, group: sg?.group ?? null };
-        return;
-      }
+      case "gradient":
+        return downGradient(ctx, s.tool, s, e, p, tol);
       case "text": {
         if (s.editingText) {
           s.set({ editingText: null });
@@ -1790,7 +1102,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         const cw = cornerWidgetHit(p, 7 / s.view.scale);
         if (cw) {
           iRef.current.insertAt = null;
-          iRef.current.tooltip = { p, text: `Drag to round this corner (${cornerStyle}) · Shift-drag: all corners · Alt-click: corner style` };
+          iRef.current.tooltip = { p, text: `Drag to round this corner (${penState.cornerStyle}) · Shift-drag: all corners · Alt-click: corner style` };
           draw();
           return;
         }
@@ -1876,500 +1188,46 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         if (rightRef.current && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) > 4) rightRef.current.moved = true;
         s.setView({ ox: d.ox + e.clientX - d.sx, oy: d.oy + e.clientY - d.sy });
         return;
-      case "nodes": {
-        let dv: Vec2 = [p[0] - d.start[0], p[1] - d.start[1]];
-        if (!d.moved && Math.hypot(dv[0], dv[1]) * s.view.scale < 2) return;
-        d.moved = true;
-        // Shift: only horizontally or vertically
-        if (e.shiftKey) dv = Math.abs(dv[0]) > Math.abs(dv[1]) ? [dv[0], 0] : [0, dv[1]];
-        // snap the grabbed point to other points
-        const target: Vec2 = [d.anchor[0] + dv[0], d.anchor[1] + dv[1]];
-        const snap = !e.ctrlKey && s.prefs.snapPoints ? snapToNode(target, 7 / s.view.scale, new Set(d.sel.map(nodeKey))) : null;
-        if (snap) dv = [snap[0] - d.anchor[0], snap[1] - d.anchor[1]];
-        overlayRef.current.snap = snap;
-        s.liveUpdate(() => syncAll(d.orig, moveNodes(d.orig, d.sel, dv)));
-        iRef.current.tooltip = { p, text: `${d.sel.length > 1 ? `${d.sel.length} points · ` : ""}Δ ${dv[0].toFixed(1)}, ${dv[1].toFixed(1)} mm${snap ? " · snapped" : " · Shift: straight · Ctrl: no snapping"}` };
-        draw();
-        return;
-      }
-      case "guideend": {
-        const g = guidesOf(s.doc.objects.find((o) => o.id === d.id));
-        if (!g[d.index]) return;
-        d.moved = true;
-        const next = g.map((x, i) => (i === d.index ? ((d.end === 0 ? [p, x[1]] : [x[0], p]) as [Vec2, Vec2]) : x));
-        setGuides(d.id, next, true);
-        const v = next[d.index];
-        iRef.current.tooltip = { p, text: `${(Math.atan2(v[1][1] - v[0][1], v[1][0] - v[0][0]) * -180 / Math.PI).toFixed(0)}°` };
-        draw();
-        return;
-      }
-      case "guidemove": {
-        const g = guidesOf(s.doc.objects.find((o) => o.id === d.id));
-        if (!g[d.index]) return;
-        d.moved = true;
-        const dv: Vec2 = [p[0] - d.start[0], p[1] - d.start[1]];
-        setGuides(d.id, g.map((x, i) => (i === d.index ? ([[d.orig[0][0] + dv[0], d.orig[0][1] + dv[1]], [d.orig[1][0] + dv[0], d.orig[1][1] + dv[1]]] as [Vec2, Vec2]) : x)), true);
-        draw();
-        return;
-      }
+      case "corner":
+      case "node":
+      case "pen-new":
+      case "pen-close":
+      case "pen-last":
+      case "bend":
+      case "pen-anchor":
+      case "pen-handle":
+      case "nodes":
+      case "nodemarquee":
+        return movePen(ctx, s, d, p, e);
+      case "guideend":
+      case "guidemove":
       case "guidedraw":
-        overlayRef.current.guideDraft = [d.a, e.shiftKey ? constrainAngle(d.a, p, 15) : p];
-        draw();
-        return;
-      case "rampend": {
-        d.moved = true;
-        updateRamp(d.id, { [d.which]: p }, true);
-        iRef.current.tooltip = { p, text: d.which === "from" ? "Dense end" : "Open end" };
-        draw();
-        return;
-      }
+      case "ref":
+      case "texthandle":
+      case "handle":
+        return moveHandles(ctx, s, d, p, e);
+      case "gradvec":
+      case "gradend":
+      case "gradnode":
+      case "gradspread":
+      case "gradstop":
+      case "rampend":
       case "rampvec":
-        overlayRef.current.rampDraft = { a: d.a, b: e.shiftKey ? constrainAngle(d.a, p, 45) : p };
-        draw();
-        return;
-      case "build": {
-        const f = faceAt(p);
-        if (f != null && !d.faces.includes(f)) d.faces.push(f);
-        builderRef.current.hover = f;
-        draw();
-        return;
-      }
-      case "nodemarquee": {
-        const m = { x: Math.min(d.a[0], p[0]), y: Math.min(d.a[1], p[1]), w: Math.abs(p[0] - d.a[0]), h: Math.abs(p[1] - d.a[1]) };
-        overlayRef.current.nodeMarquee = m;
-        // the points inside light up while the box is drawn
-        if (Math.max(m.w, m.h) * s.view.scale > 3) s.set({ nodeSel: boxedNodes(s.doc, s.selection, m, d) });
-        draw();
-        return;
-      }
-      case "ref": {
-        const o = d.orig;
-        d.moved = true;
-        let patch: Partial<ReferenceImage> = {};
-        if (d.mode === "move") patch = { x: o.x + p[0] - d.start[0], y: o.y + p[1] - d.start[1] };
-        else if (d.mode === "rotate") {
-          const c = refCenter(o);
-          let a = o.rotation + ((Math.atan2(p[1] - c[1], p[0] - c[0]) - d.a0) * 180) / Math.PI;
-          if (e.shiftKey) a = Math.round(a / 15) * 15;
-          a = ((a % 360) + 540) % 360 - 180;
-          patch = { rotation: Math.round(a * 10) / 10 };
-          iRef.current.tooltip = { p, text: `${patch.rotation}° · Shift: 15° steps` };
-        } else {
-          // the opposite corner stays put; Shift: free aspect ratio
-          const sx = d.corner === 1 || d.corner === 2 ? 1 : -1;
-          const sy = d.corner >= 2 ? 1 : -1;
-          const opp: Vec2 = [(-sx * o.width) / 2, (-sy * o.height) / 2];
-          const q = toLocal(o, p);
-          let w = Math.max(1, (q[0] - opp[0]) * sx);
-          let h = Math.max(1, (q[1] - opp[1]) * sy);
-          if (!e.shiftKey) {
-            const k = Math.max(w / o.width, h / o.height);
-            w = o.width * k;
-            h = o.height * k;
-          }
-          const c = toWorld(o, [opp[0] + (sx * w) / 2, opp[1] + (sy * h) / 2]);
-          patch = { width: w, height: h, x: c[0] - w / 2, y: c[1] - h / 2 };
-          iRef.current.tooltip = { p, text: `${w.toFixed(1)} × ${h.toFixed(1)} mm · Shift: free aspect` };
-        }
-        s.liveUpdate((doc) => ({ ...doc, references: (doc.references ?? []).map((x) => (x.id === o.id ? { ...x, ...patch } : x)) }));
-        draw();
-        return;
-      }
-      case "marquee": {
-        overlayRef.current.marquee = { x: Math.min(d.a[0], p[0]), y: Math.min(d.a[1], p[1]), w: Math.abs(p[0] - d.a[0]), h: Math.abs(p[1] - d.a[1]) };
-        draw();
-        return;
-      }
-      case "move": {
-        let dx = p[0] - d.start[0];
-        let dy = p[1] - d.start[1];
-        if (e.shiftKey) Math.abs(dx) > Math.abs(dy) ? (dy = 0) : (dx = 0);
-        if (!d.moved && Math.hypot(dx, dy) * s.view.scale < 3) return;
-        if (!d.moved) {
-          s.checkpoint();
-          if (e.altKey) {
-            // Alt-drag: move a copy, leave the original
-            const { objects: copies, parents, names } = cloneObjects(d.all);
-            s.liveUpdate((doc) =>
-              pruneGroups({
-                ...doc,
-                objects: [...doc.objects, ...copies],
-                ...(Object.keys(parents).length ? { groupParents: { ...doc.groupParents, ...parents } } : {}),
-                ...(Object.keys(names).length ? { groupNames: { ...doc.groupNames, ...names } } : {}),
-              }),
-            );
-            s.select(copies.map((c) => c.id));
-            d.orig = copies;
-            d.targets = s.smartGuides ? snapTargets(useStore.getState().doc, new Set(copies.map((c) => c.id))) : null;
-          }
-        }
-        d.moved = true;
-        // smart guides: snap edges / centres to other objects and the hoop (Ctrl: off)
-        iRef.current.guides = null;
-        if (d.targets && !e.ctrlKey && !e.metaKey) {
-          const b0 = unionBoxes(d.orig.map(objectBoundsCached));
-          if (b0) {
-            const snap = snapBox({ ...b0, x: b0.x + dx, y: b0.y + dy }, d.targets, 6 / s.view.scale);
-            if (!(e.shiftKey && dx === 0)) dx += snap.dx;
-            if (!(e.shiftKey && dy === 0)) dy += snap.dy;
-            iRef.current.guides = snap.guides;
-          }
-        }
-        iRef.current.tooltip = { p, text: `${dx >= 0 ? "+" : ""}${dx.toFixed(1)}, ${dy >= 0 ? "+" : ""}${dy.toFixed(1)} mm${e.altKey ? " · copy" : ""}` };
-        const m = translateMat(dx, dy);
-        const moved = new Map(d.orig.map((o) => [o.id, transformObject(o, m)]));
-        s.liveTransform({ ids: d.orig.map((o) => o.id), m }, (doc) => ({ ...doc, objects: doc.objects.map((o) => moved.get(o.id) ?? o) }));
-        return;
-      }
-      case "scale": {
-        // free by default, Shift keeps proportions, Alt scales from the centre
-        const b = d.box;
-        const hp = handlePoints(b)[d.handle];
-        const opp = handlePoints(b)[(d.handle + 4) % 8];
-        const [ax, ay] = e.altKey ? [b.x + b.w / 2, b.y + b.h / 2] : opp;
-        const side = d.handle % 2 === 1;
-        let q: Vec2 = p;
-        iRef.current.guides = null;
-        if (d.targets && !e.ctrlKey && !e.metaKey) {
-          // snap the dragged edge(s)
-          const snap = snapBox(
-            { x: p[0], y: p[1], w: 0, h: 0 },
-            d.targets,
-            6 / s.view.scale,
-            { x: d.handle === 1 || d.handle === 5 ? [] : [p[0]], y: d.handle === 3 || d.handle === 7 ? [] : [p[1]] },
-          );
-          q = [p[0] + snap.dx, p[1] + snap.dy];
-          iRef.current.guides = snap.guides;
-        }
-        // a flat box (a straight horizontal or vertical line) keeps that axis
-        const flatX = Math.abs(hp[0] - ax) < 1e-6;
-        const flatY = Math.abs(hp[1] - ay) < 1e-6;
-        let sx = d.handle === 1 || d.handle === 5 || flatX ? 1 : (q[0] - ax) / (hp[0] - ax);
-        let sy = d.handle === 3 || d.handle === 7 || flatY ? 1 : (q[1] - ay) / (hp[1] - ay);
-        if ((e.shiftKey || d.uniform) && flatX !== flatY) {
-          // uniform on a flat box: the other axis sets the factor
-          const k = flatX ? sy : sx;
-          sx = flatX ? Math.abs(k) : k;
-          sy = flatY ? Math.abs(k) : k;
-        } else if (e.shiftKey || d.uniform) {
-          if (side) {
-            // the dragged side sets the factor, the other axis follows it
-            const vertical = d.handle === 1 || d.handle === 5;
-            const k = vertical ? sy : sx;
-            sx = vertical ? Math.abs(k) : k;
-            sy = vertical ? k : Math.abs(k);
-          } else {
-            const k = Math.max(Math.abs(sx), Math.abs(sy));
-            sx = Math.sign(sx || 1) * k;
-            sy = Math.sign(sy || 1) * k;
-          }
-        }
-        if (Math.abs(sx) < 0.01 || Math.abs(sy) < 0.01) return;
-        const m = scaleAbout(sx, sy, ax, ay);
-        const next = new Map(d.orig.map((o) => [o.id, xform(o, m)]));
-        s.liveTransform({ ids: d.orig.map((o) => o.id), m }, (doc) => ({ ...doc, objects: doc.objects.map((o) => next.get(o.id) ?? o) }));
-        iRef.current.tooltip = {
-          p,
-          text: `${(b.w * Math.abs(sx)).toFixed(1)} × ${(b.h * Math.abs(sy)).toFixed(1)} mm · ${Math.round(Math.abs(sx) * 100)} % × ${Math.round(Math.abs(sy) * 100)} %`,
-        };
-        return;
-      }
-      case "rotate": {
-        const a = Math.atan2(p[1] - d.center[1], p[0] - d.center[0]);
-        let deg = ((a - d.a0) * 180) / Math.PI;
-        if (e.shiftKey) deg = Math.round(deg / 15) * 15;
-        const m = rotateAbout(deg, d.center[0], d.center[1]);
-        const next = new Map(d.orig.map((o) => [o.id, transformObject(o, m, deg)]));
-        s.liveTransform({ ids: d.orig.map((o) => o.id), m }, (doc) => ({ ...doc, objects: doc.objects.map((o) => next.get(o.id) ?? o) }));
-        const shown = ((deg % 360) + 540) % 360 - 180;
-        iRef.current.tooltip = { p, text: `${shown.toFixed(1)}°` };
-        return;
-      }
-      case "skew": {
-        // Ctrl-drag a side handle: shear parallel to that side (Alt: around the pivot)
-        const b = d.box;
-        const horiz = d.handle === 1 || d.handle === 5;
-        const hp = handlePoints(b)[d.handle];
-        const opp = handlePoints(b)[(d.handle + 4) % 8];
-        const [ax, ay] = e.altKey ? d.pivot : opp;
-        let k = horiz ? (p[0] - d.start[0]) / (hp[1] - ay || 1e-9) : (p[1] - d.start[1]) / (hp[0] - ax || 1e-9);
-        let deg = (Math.atan(k) * 180) / Math.PI;
-        if (e.shiftKey) {
-          deg = Math.round(deg / 15) * 15;
-          k = Math.tan((deg * Math.PI) / 180);
-        }
-        if (Math.abs(deg) > 80) return;
-        const m = horiz ? skewAbout(k, 0, ax, ay) : skewAbout(0, k, ax, ay);
-        const next = new Map(d.orig.map((o) => [o.id, xform(o, m)]));
-        s.liveTransform({ ids: d.orig.map((o) => o.id), m }, (doc) => ({ ...doc, objects: doc.objects.map((o) => next.get(o.id) ?? o) }));
-        iRef.current.tooltip = { p, text: `Skew ${deg.toFixed(1)}°` };
-        return;
-      }
-      case "pivot": {
-        // snap the pivot to the box's handles and centre
-        const sb = transformBox(s.doc, s.selection);
-        let q: Vec2 = p;
-        if (sb) {
-          const cands = [...handlePoints(sb), [sb.x + sb.w / 2, sb.y + sb.h / 2] as Vec2];
-          const near = cands.find((c) => dist(c, p) * s.view.scale < 8);
-          if (near) q = near;
-        }
-        pivotRef.current = { key: d.key, p: q };
-        iRef.current.tooltip = { p, text: "Pivot for rotating and scaling · Alt-double-click to reset" };
-        draw();
-        return;
-      }
-      case "gradvec": {
-        let b2: Vec2 = p;
-        if (e.shiftKey) b2 = constrainAngle(d.a, p, 45);
-        iRef.current.gradDraft = { a: d.a, b: b2 };
-        const len = dist(d.a, b2);
-        iRef.current.tooltip = { p, text: d.target ? `Gradient ${len.toFixed(1)} mm · Shift: 45° steps` : "Select or start on a closed shape" };
-        draw();
-        return;
-      }
-      case "gradend": {
-        const sg = selectedGradient();
-        if (!sg) return;
-        const other = d.which === "from" ? sg.params.to : sg.params.from;
-        const q = e.shiftKey ? constrainAngle(other, p, 45) : p;
-        const patch: Partial<GradientParams> & { angle?: number } = { [d.which]: q };
-        updateGradient(d.group, patch, true);
-        draw();
-        return;
-      }
-      case "gradnode": {
-        const sg = selectedGradient();
-        if (!sg) return;
-        const g = sg.params;
-        const dx = p[0] - d.start[0];
-        const dy = p[1] - d.start[1];
-        const moved = <T extends { p: Vec2 }>(xs: T[]) =>
-          xs.map((x, i) => {
-            const k = d.idx.indexOf(i);
-            return k < 0 ? x : { ...x, p: [d.orig[k][0] + dx, d.orig[k][1] + dy] as Vec2 };
-          });
-        if (g.kind === "mesh" && g.mesh) updateGradient(d.group, { mesh: { ...g.mesh, nodes: moved(g.mesh.nodes) } }, true);
-        else if (g.points) updateGradient(d.group, { points: moved(g.points) }, true);
-        d.moved = true;
-        draw();
-        return;
-      }
-      case "gradspread": {
-        const sg = selectedGradient();
-        const q = sg?.params.points?.[d.idx];
-        if (!sg || !q) return;
-        const spread = Math.max(0.5, dist(q.p, p));
-        updateGradient(d.group, { points: sg.params.points!.map((x, i) => (i === d.idx ? { ...x, spread } : x)) }, true);
-        iRef.current.tooltip = { p, text: "Spread " + spread.toFixed(1) + " mm" };
-        draw();
-        return;
-      }
-      case "gradstop": {
-        const g = d.g;
-        const dv = [g.to[0] - g.from[0], g.to[1] - g.from[1]];
-        const l2 = dv[0] * dv[0] + dv[1] * dv[1] || 1;
-        const t = Math.min(1, Math.max(0, ((p[0] - g.from[0]) * dv[0] + (p[1] - g.from[1]) * dv[1]) / l2));
-        setStops(d.group, d.stops.map((st, i) => (i === d.index ? { ...st, pos: t } : st)), true);
-        iRef.current.tooltip = { p, text: `${Math.round(t * 100)} %` };
-        draw();
-        return;
-      }
-      case "corner": {
-        const along = (p[0] - d.p[0]) * d.dir[0] + (p[1] - d.p[1]) * d.dir[1];
-        const r = Math.round(radiusFromWidget(along, d.phi) * 10) / 10;
-        const src = d.orig.paths[d.sp];
-        const paths = d.orig.paths.map((sp, i) => {
-          if (d.all) return roundCorners(sp, r, cornerStyle);
-          if (i !== d.sp) return sp;
-          const radii = src.nodes.map((_, k) => (k === d.k ? r : 0));
-          return roundCorners(sp, radii, cornerStyle);
-        });
-        const o = { ...d.orig, paths };
-        s.liveUpdate((doc) => syncGradientGeometry(replaceObject(doc, o.id, o), o));
-        iRef.current.tooltip = { p, text: `${d.all ? "All corners" : "Corner"} ${r.toFixed(1)} mm · ${cornerStyle}${d.all ? "" : " · Shift: all corners"} · Alt-click a widget: style` };
-        draw();
-        return;
-      }
-      case "node": {
-        const o = structuredClone(d.orig);
-        const n = o.paths[d.sp].nodes[d.ni];
-        const orig = d.orig.paths[d.sp].nodes[d.ni];
-        if (d.part === "p") {
-          const dx = p[0] - orig.p[0];
-          const dy = p[1] - orig.p[1];
-          n.p = p;
-          if (orig.i) n.i = [orig.i[0] + dx, orig.i[1] + dy];
-          if (orig.o) n.o = [orig.o[0] + dx, orig.o[1] + dy];
-        } else {
-          n[d.part] = p;
-          const other = d.part === "i" ? "o" : "i";
-          if (orig[other] && !e.altKey && handlesCollinear(orig)) {
-            const len = dist(orig[other]!, orig.p);
-            const dx = orig.p[0] - p[0];
-            const dy = orig.p[1] - p[1];
-            const l = Math.hypot(dx, dy) || 1;
-            n[other] = [orig.p[0] + (dx / l) * len, orig.p[1] + (dy / l) * len];
-          }
-        }
-        s.liveUpdate((doc) => syncGradientGeometry(replaceObject(doc, o.id, o), o));
-        return;
-      }
-      case "shape": {
-        let w = p[0] - d.a[0];
-        let h = p[1] - d.a[1];
-        if (e.shiftKey) {
-          const k = Math.max(Math.abs(w), Math.abs(h));
-          w = Math.sign(w || 1) * k;
-          h = Math.sign(h || 1) * k;
-        }
-        const box = { x: Math.min(d.a[0], d.a[0] + w), y: Math.min(d.a[1], d.a[1] + h), w: Math.abs(w), h: Math.abs(h) };
-        const so = s.toolOptions.shape;
-        overlayRef.current.shape = {
-          kind: d.shape,
-          box,
-          path: d.shape === "rect" && (so.kind !== "rect" || so.radius > 0) ? shapeToolPath(so.kind, box, so) : undefined,
-        };
-        draw();
-        return;
-      }
-      case "freehand": {
-        const fh = fhRef.current;
-        if (!fh) return;
-        extendStroke(fh, p, ropeLength(s.toolOptions.freehand.smoothing, s.view.scale), 1.5 / s.view.scale);
-        draw();
-        return;
-      }
-      case "pen-new": {
-        const pd = penRef.current;
-        if (!pd) return;
-        const n = pd.nodes[d.idx];
-        if (s.tool === "curve") {
-          // curvature: dragging moves the point, the curve follows
-          if (!d.moved && dist(n.p, p) * s.view.scale < 3) return;
-          d.moved = true;
-          pd.nodes[d.idx] = { p };
-          smoothDraft(pd);
-        } else if (spaceRef.current) {
-          // Space: reposition the point while placing it
-          pd.nodes[d.idx] = moveAnchor(n, [n.p[0] + p[0] - d.last[0], n.p[1] + p[1] - d.last[1]]);
-        } else {
-          if (!d.moved && dist(n.p, p) * s.view.scale < 3) return;
-          d.moved = true;
-          pullHandles(n, p, { shift: e.shiftKey, onlyOut: e.altKey, keepIn: n.i });
-        }
-        d.last = p;
-        draw();
-        return;
-      }
-      case "pen-close": {
-        const pd = penRef.current;
-        if (!pd) return;
-        if (!d.moved && dist(pd.nodes[0].p, p) * s.view.scale < 3) return;
-        d.moved = true;
-        pullHandles(pd.nodes[0], p, { shift: e.shiftKey, onlyOut: false });
-        draw();
-        return;
-      }
-      case "pen-last": {
-        const pd = penRef.current;
-        if (!pd) return;
-        const n = pd.nodes[pd.nodes.length - 1];
-        if (!d.moved && dist(n.p, p) * s.view.scale < 3) return;
-        d.moved = true;
-        if (s.tool === "curve") {
-          pd.nodes[pd.nodes.length - 1] = { p };
-          smoothDraft(pd);
-        } else pullHandles(n, p, { shift: e.shiftKey, onlyOut: true, keepIn: d.keepIn });
-        draw();
-        return;
-      }
-      case "bend": {
-        // drag a segment: it bends through the pointer, the end points stay
-        if (!d.moved && dist(d.start, p) * s.view.scale < 3) return;
-        if (!d.moved) s.checkpoint();
-        d.moved = true;
-        const paths = [...d.o.paths];
-        paths[d.sp] = bendSegment(d.o.paths[d.sp], d.seg, d.t, [p[0] - d.start[0], p[1] - d.start[1]]);
-        const o = { ...d.o, paths };
-        s.liveUpdate((doc) => syncGradientGeometry(replaceObject(doc, o.id, o), o));
-        return;
-      }
-      case "pen-anchor": {
-        const pd = penRef.current;
-        if (!pd) return;
-        if (!d.moved && dist(d.start, p) * s.view.scale < 3) return;
-        d.moved = true;
-        const to = e.shiftKey ? constrainAngle(d.orig.p, p, 45) : p;
-        pd.nodes[d.idx] = moveAnchor(d.orig, [d.orig.p[0] + to[0] - d.start[0], d.orig.p[1] + to[1] - d.start[1]]);
-        smoothDraft(pd);
-        draw();
-        return;
-      }
-      case "pen-handle": {
-        const pd = penRef.current;
-        if (!pd) return;
-        pd.nodes[d.idx] = moveHandle(d.orig, d.part, p, e.altKey, e.shiftKey);
-        // a handle set by hand no longer follows the neighbours
-        if (pd.auto) pd.auto[d.idx] = false;
-        draw();
-        return;
-      }
+        return moveGradient(ctx, d, p, e);
+      case "build":
+      case "marquee":
+      case "shape":
+      case "freehand":
       case "ruler":
-        overlayRef.current.ruler = { a: d.a, b: p };
-        draw();
-        return;
-      case "texthandle": {
-        const v = (p[0] - d.start[0]) * d.h.dir![0] + (p[1] - d.start[1]) * d.h.dir![1];
-        if (!d.moved && Math.abs(v) * s.view.scale < 2) return;
-        d.moved = true;
-        let label: string;
-        if (d.h.kind === "text-arc") {
-          let arc = d.spec.arc + v * s.view.scale * 0.75;
-          arc = Math.max(-330, Math.min(330, e.shiftKey ? Math.round(arc / 15) * 15 : Math.round(arc)));
-          updateText(d.group, { arc }, true);
-          label = arc ? `Arc ${arc}°` : "Straight";
-        } else {
-          const lines = d.spec.content.split("\n").map((l) => Array.from(l).length);
-          const gaps = Math.max(1, Math.max(...lines) - 1);
-          const k = d.spec.align === "center" ? 2 : 1;
-          const sc = d.spacingScale || 1;
-          let ls = d.spec.letterSpacing + (v * k) / gaps / sc;
-          ls = Math.max((-d.spec.size * 0.5) / sc, Math.min((d.spec.size * 3) / sc, e.shiftKey ? Math.round(ls * 2) / 2 : Math.round(ls * 20) / 20));
-          updateText(d.group, { letterSpacing: ls }, true);
-          label = `Letter spacing ${ls.toFixed(2)} mm`;
-        }
-        iRef.current.tooltip = { p, text: label };
-        draw();
-        return;
-      }
-      case "handle": {
-        const res = dragHandle(d.orig, d.h, p, s.view.scale, e.shiftKey);
-        d.moved = true;
-        s.liveUpdate((doc) => replaceObject(doc, res.object.id, res.object));
-        iRef.current.tooltip = { p, text: res.label };
-        draw();
-        return;
-      }
-      case "split": {
-        if (!d.moved && dist(d.a, p) * s.view.scale < 4) return;
-        d.moved = true;
-        splitLiveRef.current = { a: d.a, b: p, dir: d.dir };
-        iRef.current.tooltip = { p, text: d.dir ? "The part under this line is sewn this way" : "Cuts where the line is solid: start and end outside the shape" };
-        draw();
-        return;
-      }
-      case "cut": {
-        if (!d.moved && dist(d.a, p) * s.view.scale < 4) return;
-        d.moved = true;
-        // the stretches that will cut: inside a fill from edge to edge
-        const chords = s.doc.objects.filter((o) => o.visible && !o.locked && o.stitch.type === "fill" && crossesObject(o, d.a, p)).flatMap((o) => cutChords(o, d.a, p));
-        iRef.current.cutLine = { a: d.a, b: p, chords };
-        iRef.current.cutPoint = null;
-        iRef.current.tooltip = { p, text: chords.length ? "Release to cut where the line is solid" : "Drag all the way across a fill to cut it" };
-        draw();
-        return;
-      }
+      case "split":
+      case "cut":
+        return moveDraw(ctx, s, d, p, e);
+      case "move":
+      case "scale":
+      case "rotate":
+      case "skew":
+      case "pivot":
+        return moveTransform(ctx, s, d, p, e);
     }
   };
 
@@ -2385,242 +1243,14 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
     // after the release (the font loads first), and that change needs the step.
     if (!(d.kind === "texthandle" && d.moved)) s.dropCheckpoint();
     if (d.kind === "move" || d.kind === "scale" || d.kind === "rotate" || d.kind === "skew" || d.kind === "pivot") {
-      iRef.current.guides = null;
-      iRef.current.tooltip = null;
-      if (d.kind !== "pivot" && d.kind !== "move") pivotRef.current = pivotRef.current?.key === selKey() ? pivotRef.current : null;
-      draw();
+      upTransform(ctx, d);
       if (d.kind !== "move") return;
     }
-    if (d.kind === "gradvec") {
-      const draft = iRef.current.gradDraft;
-      iRef.current.gradDraft = null;
-      iRef.current.tooltip = null;
-      if (!draft || dist(draft.a, draft.b) * s.view.scale < 6) {
-        const h = pick(toMm(e));
-        s.select(h ? unitIds(s.doc, h) : []);
-        draw();
-        return;
-      }
-      if (d.group) updateGradient(d.group, { from: draft.a, to: draft.b });
-      else if (d.target) {
-        makeGradient(d.target, draft.a, draft.b); // says why when it can't
-      } else s.toast("Select a closed shape, then drag across it");
-      draw();
-      return;
-    }
-    if (d.kind === "gradend" || d.kind === "gradstop" || d.kind === "gradnode" || d.kind === "gradspread" || d.kind === "corner") {
-      iRef.current.tooltip = null;
-      draw();
-      return;
-    }
-    if (d.kind === "guideend" || d.kind === "guidemove") {
-      // a click on a point pair: it is picked, the pairs stay pairs
-      if (!d.moved && guideFreedFrom.current) {
-        s.set({ doc: guideFreedFrom.current });
-        s.dropCheckpoint();
-      } else if (!d.moved) s.dropCheckpoint();
-      guideFreedFrom.current = null;
-      iRef.current.tooltip = null;
-      draw();
-      return;
-    }
-    if (d.kind === "guidedraw") {
-      const draft = overlayRef.current.guideDraft;
-      overlayRef.current.guideDraft = null;
-      const o = s.doc.objects.find((x) => x.id === d.id);
-      if (o) {
-        // a click: a guide across the column there; a drag: the drawn line
-        const g = !draft || dist(draft[0], draft[1]) * s.view.scale < 6 ? guideAcross(o, d.a) : draft;
-        // added to the point pairs, which become guides too (a guide alone would replace them)
-        const f = freeSides(o);
-        if (g) s.commit((doc) => ({ ...doc, objects: doc.objects.map((x) => (x.id === o.id && f.stitch.type === "satin" ? { ...f, stitch: { ...f.stitch, guides: [...(f.stitch.guides ?? []), g] } } : x)) }));
-      }
-      draw();
-      return;
-    }
-    if (d.kind === "rampend") {
-      iRef.current.tooltip = null;
-      draw();
-      return;
-    }
-    if (d.kind === "rampvec") {
-      const draft = overlayRef.current.rampDraft;
-      overlayRef.current.rampDraft = null;
-      if (!draft || dist(draft.a, draft.b) * s.view.scale < 6) {
-        const h = pick(toMm(e));
-        s.select(h ? unitIds(s.doc, h) : []);
-      } else if (!d.target) s.toast("Select a closed shape (or start the drag on one)");
-      else {
-        const err = applyRamp(d.target, draft.a, draft.b, d.mode);
-        if (err) s.toast(err, "error");
-      }
-      draw();
-      return;
-    }
-    if (d.kind === "build") {
-      void applyBuild(d.faces, d.del || e.altKey);
-      draw();
-      return;
-    }
-    if (d.kind === "nodes" || d.kind === "ref") {
-      overlayRef.current.snap = null;
-      iRef.current.tooltip = null;
-      draw();
-      return;
-    }
-    if (d.kind === "nodemarquee") {
-      const m = overlayRef.current.nodeMarquee;
-      overlayRef.current.nodeMarquee = null;
-      // a box (a thin one too: points along a straight line); else a click
-      const boxed = !!m && Math.max(m.w, m.h) * s.view.scale > 3;
-      // a box that shrank back to a click: the points as they were
-      if (!boxed && s.nodeSel !== d.base) s.set({ nodeSel: d.base });
-      if (boxed) {
-        s.set({ nodeSel: boxedNodes(s.doc, s.selection, m!, d) });
-      } else if (d.hit) {
-        // a click on another object: edit its points (Shift: as well)
-        s.select(e.shiftKey ? [...s.selection, d.hit.id] : [d.hit.id]);
-      } else if (!d.add && !d.sub) {
-        if (s.nodeSel.length) s.set({ nodeSel: [] });
-        else if (!pick(toMm(e))) {
-          s.select([]);
-          s.setTool("select");
-        }
-      }
-      draw();
-      return;
-    }
+    if (d.kind === "gradvec" || d.kind === "gradend" || d.kind === "gradstop" || d.kind === "gradnode" || d.kind === "gradspread" || d.kind === "rampend" || d.kind === "rampvec") return upGradient(ctx, s, d, e);
+    if (d.kind === "corner" || d.kind === "nodes" || d.kind === "nodemarquee" || d.kind === "pen-new" || d.kind === "pen-anchor" || d.kind === "pen-handle" || d.kind === "bend" || d.kind === "pen-close" || d.kind === "pen-last") return upPen(ctx, s, d, e);
+    if (d.kind === "guideend" || d.kind === "guidemove" || d.kind === "guidedraw" || d.kind === "ref" || d.kind === "texthandle" || d.kind === "handle") return upHandles(ctx, s, d);
+    if (d.kind === "build" || d.kind === "marquee" || d.kind === "shape" || d.kind === "freehand" || d.kind === "ruler" || d.kind === "split" || d.kind === "cut") return upDraw(ctx, s, d, e);
     switch (d.kind) {
-      case "marquee": {
-        const m = overlayRef.current.marquee;
-        overlayRef.current.marquee = null;
-        if (m && m.w > 0.5 && m.h > 0.5) {
-          const ids = s.doc.objects
-            .filter((o) => o.visible && !o.locked)
-            .filter((o) => {
-              const b = objectBounds(o);
-              return b && b.x >= m.x && b.y >= m.y && b.x + b.w <= m.x + m.w && b.y + b.h <= m.y + m.h;
-            })
-            .map((o) => o.id);
-          s.select(d.add ? [...new Set([...s.selection, ...ids])] : ids);
-        }
-        draw();
-        return;
-      }
-      case "shape": {
-        const sh = overlayRef.current.shape;
-        overlayRef.current.shape = null;
-        if (sh && sh.box.w > 0.5 && sh.box.h > 0.5) {
-          const b = sh.box;
-          const so = s.toolOptions.shape;
-          const path = sh.kind === "rect" ? (so.kind !== "rect" || so.radius > 0 ? shapeToolPath(so.kind, b, so) : rectPath(b.x, b.y, b.w, b.h)) : ellipsePath(b.x + b.w / 2, b.y + b.h / 2, b.w / 2, b.h / 2);
-          const name = sh.kind === "ellipse" ? "Ellipse" : so.kind === "polygon" ? `${so.sides}-gon` : so.kind === "star" ? `${so.sides}-point star` : so.radius > 0 ? "Rounded rectangle" : "Rectangle";
-          const o = newObject([path], defaultStitch("fill"), name);
-          s.addObjects([o]);
-          s.select([o.id]);
-        }
-        draw();
-        return;
-      }
-      case "freehand": {
-        const fh = fhRef.current;
-        fhRef.current = null;
-        if (!fh) return draw();
-        const pts = finishStroke(fh);
-        let length = 0;
-        for (let i = 1; i < pts.length; i++) length += dist(pts[i], pts[i - 1]);
-        if (length * s.view.scale < 4) return draw();
-        const fo = s.toolOptions.freehand;
-        const closed = isClosedStroke(pts, s.view.scale);
-        const sp = strokeToPath(pts, fo.smoothing, s.view.scale, closed, fo.corners ?? 65, fo.lines ?? true);
-        if (sp.nodes.length < 2) return draw();
-        const o =
-          closed && fo.closed === "fill"
-            ? newObject([sp], defaultStitch("fill"), "Fill")
-            : fo.output === "satin"
-              ? newObject([sp], { ...defaultStitch("satin"), width: fo.width } as StitchParams, "Satin")
-              : newObject([sp], runStitch(fo.output === "triple" ? "triple" : "running", s.toolOptions.pen.length), "Running");
-        s.addObjects([o]);
-        s.select([o.id]);
-        draw();
-        return;
-      }
-      case "pen-new":
-      case "pen-anchor":
-      case "pen-handle":
-        draw();
-        return;
-      case "bend": {
-        if (d.moved) return draw();
-        // a click on a segment adds a point there
-        s.checkpoint();
-        const r = insertIntoObject(d.o, d.sp, d.seg, d.t, d.both);
-        s.liveUpdate((doc) => syncGradientGeometry(replaceObject(doc, r.obj.id, r.obj), r.obj));
-        s.set({ nodeSel: [{ id: r.obj.id, sp: d.sp, ni: r.index }] });
-        draw();
-        return;
-      }
-      case "pen-close":
-        finishPen(true);
-        return;
-      case "pen-last":
-        if (!d.moved) finishPen(false);
-        else draw();
-        return;
-      case "ruler":
-        return;
-      case "texthandle":
-      case "handle":
-        iRef.current.activeHandle = null;
-        iRef.current.tooltip = null;
-        draw();
-        return;
-      case "split": {
-        const p = toMm(e);
-        splitLiveRef.current = null;
-        iRef.current.tooltip = null;
-        if (d.moved && dist(d.a, p) > 0.3) {
-          if (!s.splitDraft.id) {
-            // no shape yet: the fill the line crosses
-            const f = s.doc.objects.find((o) => splittable(o) && o.visible && cutChords(o, d.a, p).length);
-            if (f) s.set({ splitDraft: { ...s.splitDraft, id: f.id } });
-          }
-          if (useStore.getState().splitDraft.id) addSplitLine([d.a, p], d.dir);
-          else s.toast("Draw across a fill shape");
-        }
-        draw();
-        return;
-      }
-      case "cut": {
-        const p = toMm(e);
-        iRef.current.cutLine = null;
-        iRef.current.cutPoint = null;
-        iRef.current.tooltip = null;
-        if (d.moved) {
-          const targets = s.doc.objects.filter((o) => o.visible && !o.locked && o.stitch.type === "fill" && crossesObject(o, d.a, p));
-          // gradients, tartans and colour blends: cut as one, each half a set of its own
-          const { doc, n, left } = cutFills(s.doc, targets, d.a, p);
-          if (n) {
-            s.setDoc(doc, { keepSelection: false });
-            s.toast(`Cut ${n} fill${n > 1 ? "s" : ""} in two`, "success");
-          }
-          if (left) s.toast(`${left} gradient${left > 1 ? "s, tartans or blends" : ", tartan or blend"} left whole: a layer is locked or hidden`, "error");
-          if (!n && !left && targets.length) s.toast("Nothing cut: drag all the way across the shape", "info");
-        } else {
-          const hit = pick(p);
-          if (hit && isPathObject(hit)) {
-            // two-rail satins: both rails at once (a cut across the column)
-            const parts = cutSatinObject(hit, p) ?? cutPathObject(hit, p);
-            if (parts) {
-              replaceObjects(hit, parts);
-              s.select(parts.map((x) => x.id));
-              s.toast(parts.length > 1 ? "Split into two objects" : "Opened the closed path at this point", "success");
-            }
-          }
-        }
-        draw();
-        return;
-      }
       default:
         void e;
         draw();
@@ -2729,6 +1359,10 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
     c.addEventListener("wheel", h, { passive: false });
     return () => c.removeEventListener("wheel", h);
   }, []);
+
+  // what the gesture modules (canvas/gestures/) use of the component; the
+  // handlers above read it when an event comes, after this render
+  const ctx: CanvasCtx = { draw, iRef, pivotRef, xform, cloneObjects, selKey, overlayRef, pick, toMm, penRef, spaceRef, snapToNode, finishPen, insertIntoObject, fhRef, splitLiveRef, builderRef, faceAt, applyBuild, newObject, replaceObjects, guideFreedFrom, dragRef, refreshRegions, rampDown, gradient2DDown, guideHover, handlesRef, pivotOf, setCtxMenu };
 
   return (
     <>

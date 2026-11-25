@@ -5,7 +5,7 @@ import { ArrowLeftToLine, ArrowRightToLine, Gauge, Pause, Play, Video, X, ZoomIn
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { BlockNext, BlockPrevious, ColorChange, FollowNeedle, GradientTool, MachineStop, Trim } from "../icons/stitch";
 import { saveFile } from "../lib/platform";
-import { startCapture, stopCapture } from "../canvas/Canvas";
+import { startCapture, stopCapture } from "../canvas/viewport";
 import { SPEEDS, blockAt, buildTimeline, playRate, speedLabel, tickStep, type Timeline, type TimelineBlock } from "../lib/stitchout";
 import { colorSequence } from "../lib/threads";
 import { useStore } from "../store";
