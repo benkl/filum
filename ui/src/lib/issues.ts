@@ -3,7 +3,7 @@
 // offers one-click fixes.
 
 import type { DesignObject, PlanData, StitchDocument, Vec2 } from "../types";
-import { FLAG } from "../types";
+import { FLAG, NO_OBJECT } from "../types";
 import { objectBoundsCached, transformObject, translateMat } from "./geometry";
 import { denseIssues } from "./denseIssues";
 import { rowAngleFor, rowsAlongGradient } from "./gradient";
@@ -60,7 +60,7 @@ function statsOf(plan: PlanData, n: number, hw: number, hh: number, oval: boolea
   if (hit && hit.key === key) return hit.stats;
   const { coords, flags, objects } = plan;
   let size = n;
-  for (let i = 0; i < objects.length; i++) if (objects[i] !== 0xffffffff && objects[i] >= size) size = objects[i] + 1;
+  for (let i = 0; i < objects.length; i++) if (objects[i] !== NO_OBJECT && objects[i] >= size) size = objects[i] + 1;
   const st: PlanStats = { stitches: new Uint32Array(size), reach: new Float32Array(oval ? size : 0), longest: new Float32Array(size), longestAt: new Float32Array(size * 2) };
   let pen = false;
   let px = 0;

@@ -8,29 +8,7 @@ use filum_core::optimize::optimize_order;
 use filum_core::*;
 
 fn obj(id: &str, thread: &str, paths: Vec<SubPath>, stitch: StitchParams) -> Object {
-    Object {
-        id: id.into(),
-        name: id.into(),
-        thread: thread.into(),
-        visible: true,
-        locked: false,
-        paths,
-        stitch,
-        trim_after: false,
-        stop_after: false,
-        ties: Default::default(),
-        force_lock: false,
-        min_stitch: None,
-        min_jump: None,
-        clone: None,
-        hidden: None,
-        patterns: vec![],
-        start: None,
-        end: None,
-        lock: None,
-        color_sort_index: None,
-        link: None,
-    }
+    Object::new(id, thread, paths, stitch)
 }
 
 fn rect(x: f64, y: f64, w: f64, h: f64) -> Vec<SubPath> {
@@ -43,7 +21,7 @@ fn line(pts: &[(f64, f64)]) -> Vec<SubPath> {
 }
 
 fn thread(id: &str, color: &str) -> Thread {
-    Thread { id: id.into(), name: id.into(), color: color.into(), brand: String::new(), code: String::new(), weight: None, min_stitch: None }
+    Thread::new(id, id, color)
 }
 
 fn doc(objects: Vec<Object>) -> Document {

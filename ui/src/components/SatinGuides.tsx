@@ -6,6 +6,7 @@ import { StitchAngle } from "../icons/stitch";
 import { autoGuides, selectedSatin, setGuides } from "../lib/satinGuides";
 import { clearOrientation, freeSides, orientationLines } from "../lib/satinSides";
 import { useStore } from "../store";
+import { replaceObject } from "../lib/docEdit";
 
 export function GuideActions({ compact = false }: { compact?: boolean }) {
   // re-render with the document
@@ -15,7 +16,7 @@ export function GuideActions({ compact = false }: { compact?: boolean }) {
   if (!o) return <span className="stat">{compact ? "Choose a satin column" : ""}</span>;
   const { lines, pairs } = orientationLines(o);
   const n = lines.length;
-  const replace = (next: typeof o) => useStore.getState().commit((d) => ({ ...d, objects: d.objects.map((x) => (x.id === o.id ? next : x)) }));
+  const replace = (next: typeof o) => useStore.getState().commit((d) => replaceObject(d, o.id, next));
   const auto = () => {
     const g = autoGuides(o);
     if (!g.length) useStore.getState().toast("No sharp corners on this column");

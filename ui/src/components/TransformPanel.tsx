@@ -9,7 +9,7 @@ import { skewAbout } from "../canvas/transform";
 import { useStore } from "../store";
 import type { DesignObject, Vec2 } from "../types";
 import { Num } from "./ui";
-import { safeSetItem } from "../lib/storage";
+import { loadJson, safeSetItem } from "../lib/storage";
 
 const REF_KEY = "filum.refPoint";
 const LOCK_KEY = "filum.lockRatio";
@@ -30,13 +30,7 @@ function applyToSelection(ids: string[], m: number[], rot = 0) {
 
 export function TransformPanel({ objects }: { objects: DesignObject[] }) {
   const doc = useStore((s) => s.doc);
-  const [ref, setRef] = useState<[number, number]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem(REF_KEY) ?? "[0.5,0.5]");
-    } catch {
-      return [0.5, 0.5];
-    }
-  });
+  const [ref, setRef] = useState<[number, number]>(() => loadJson(REF_KEY, [0.5, 0.5]));
   const [lock, setLock] = useState(() => localStorage.getItem(LOCK_KEY) !== "0");
   const b = unionBoxes(objects.map(objectBounds));
   if (!b) return null;

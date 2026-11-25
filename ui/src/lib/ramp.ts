@@ -7,6 +7,7 @@ import type { DensityRamp, DesignObject, FillParams, RampProfile, StitchDocument
 import { rampMembers, rampOf, removeRampDoc } from "./fillLayers";
 import { uid } from "./geometry";
 import { INK_TATAMI } from "./inkDefaults";
+import { mapObjects } from "./docEdit";
 
 export const RAMP_PROFILES: { id: RampProfile; label: string; hint: string }[] = [
   { id: "linear", label: "Linear", hint: "Even change from dense to open" },
@@ -112,7 +113,7 @@ export function applyRamp(id: string, a: Vec2, b: Vec2, mode: "density" | "blend
     ramp,
   });
   if (mode === "density") {
-    s.commit((d) => ({ ...d, objects: d.objects.map((x) => (x.id === id ? { ...x, stitch: { type: "fill", ...fill(x.stitch, base) } as DesignObject["stitch"] } : x)) }));
+    s.commit((d) => mapObjects(d, id, (x) => ({ ...x, stitch: { type: "fill", ...fill(x.stitch, base) } as DesignObject["stitch"] })));
     return null;
   }
   // colour blend: this colour fades out, the second fades in

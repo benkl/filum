@@ -7,14 +7,10 @@
 
 import type { DesignObject, SubPath, Vec2 } from "../types";
 import { flatten } from "./geometry";
+import { add, cross, len, mul, sub } from "./vec";
 
 export type Line = [Vec2, Vec2];
 
-const sub = (a: Vec2, b: Vec2): Vec2 => [a[0] - b[0], a[1] - b[1]];
-const add = (a: Vec2, b: Vec2): Vec2 => [a[0] + b[0], a[1] + b[1]];
-const mul = (a: Vec2, k: number): Vec2 => [a[0] * k, a[1] * k];
-const cross = (a: Vec2, b: Vec2) => a[0] * b[1] - a[1] * b[0];
-const len = (a: Vec2) => Math.hypot(a[0], a[1]);
 export const midOf = (a: Vec2, b: Vec2): Vec2 => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
 
 /** A vertex of a ring; `tag` marks where a cut crosses the outline. */

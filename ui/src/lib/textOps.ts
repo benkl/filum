@@ -10,17 +10,13 @@ import { batchFileName, fontSampleText } from "./letteringTools";
 import { carryOver, historyJump } from "./textSettle";
 import type { ZipEntry } from "./zip";
 import { engine } from "../engine/client";
-import { safeSetItem } from "./storage";
+import { loadJson, safeSetItem } from "./storage";
 
 const LAST_KEY = "filum.textDefaults";
 
 /** Last used font / size / style become the defaults for new text. */
 function defaults(): Partial<TextSpec> {
-  try {
-    return JSON.parse(localStorage.getItem(LAST_KEY) ?? "{}");
-  } catch {
-    return {};
-  }
+  return loadJson(LAST_KEY, {});
 }
 function remember(s: TextSpec) {
   // per-lettering layout (spacing, arc, rotation) is not carried over to new text

@@ -6,8 +6,8 @@
 import type { DesignObject, SatinParams, SubPath, Vec2 } from "../types";
 import { flattenSubPath } from "./bezier";
 import { satinRailIndices, uid } from "./geometry";
+import { lerp } from "./vec";
 
-const lerp = (a: Vec2, b: Vec2, t: number): Vec2 => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
 
 /** A polyline resampled to n points evenly along its length. */
 function resample(pts: Vec2[], n: number): Vec2[] {

@@ -7,7 +7,7 @@
 // uncut are counted as hand trims.
 
 import type { MachineSettings, PlanData } from "../types";
-import { FLAG } from "../types";
+import { FLAG, NO_OBJECT } from "../types";
 
 export type CutterKind = "trims" | "jumps" | "none";
 
@@ -33,8 +33,6 @@ export interface Uncut {
 
 const cache = new WeakMap<Uint8Array, { key: string; uncut: Uncut | null }>();
 const finishedCache = new WeakMap<PlanData, PlanData>();
-/** Plan records outside any object (basting, knockdown). */
-const NO_OBJECT = 0xffffffff;
 
 /**
  * The plan as the finished piece shows it: the jump threads you snip by hand

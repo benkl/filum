@@ -72,15 +72,7 @@ pub fn pattern_to_plan(p: &fmts::Pattern) -> StitchPlan {
             .threads
             .iter()
             .enumerate()
-            .map(|(i, t)| Thread {
-                id: format!("t{}", i + 1),
-                name: if t.name.is_empty() { crate::threads::nearest_name(t.rgb) } else { t.name.clone() },
-                color: crate::model::hex_color(t.rgb),
-                brand: t.brand.clone(),
-                code: t.code.clone(),
-                weight: None,
-                min_stitch: None,
-            })
+            .map(|(i, t)| Thread { brand: t.brand.clone(), code: t.code.clone(), ..Thread::new(format!("t{}", i + 1), if t.name.is_empty() { crate::threads::nearest_name(t.rgb) } else { t.name.clone() }, crate::model::hex_color(t.rgb)) })
             .collect(),
         basting: None,
         links: Vec::new(),
@@ -105,15 +97,7 @@ pub fn plan_to_document(plan: &StitchPlan, name: &str) -> Document {
         if paths.is_empty() {
             return;
         }
-        let t = plan.threads.get(block).cloned().unwrap_or(Thread {
-            id: format!("t{}", block + 1),
-            name: "Thread".into(),
-            color: "#1c1c1c".into(),
-            brand: String::new(),
-            code: String::new(),
-            weight: None,
-            min_stitch: None,
-        });
+        let t = plan.threads.get(block).cloned().unwrap_or(Thread::new(format!("t{}", block + 1), "Thread", "#1c1c1c"));
         let tid = if doc.threads.iter().any(|x| x.id == t.id) {
             format!("t{}", doc.threads.len() + 1)
         } else {
@@ -342,30 +326,8 @@ mod origin_tests {
     fn exports_repeats_and_thread_lists() {
         use crate::model::{Object, StitchParams, SubPath};
         let mut doc = Document::default();
-        doc.threads = vec![Thread { id: "a".into(), name: "Red".into(), color: "#ff0000".into(), brand: "Madeira".into(), code: "1147".into(), weight: None, min_stitch: None }];
-        doc.objects = vec![Object {
-            id: "o".into(),
-            name: "o".into(),
-            thread: "a".into(),
-            visible: true,
-            locked: false,
-            paths: vec![SubPath::polyline(&[crate::geom::pt(0.0, 0.0), crate::geom::pt(3.0, 0.0), crate::geom::pt(6.0, 0.0)], false)],
-            stitch: StitchParams::Manual(Default::default()),
-            trim_after: false,
-            stop_after: true,
-            ties: Default::default(),
-            force_lock: false,
-            min_stitch: None,
-            min_jump: None,
-            patterns: vec![],
-            clone: None,
-            hidden: None,
-            start: None,
-            end: None,
-            lock: None,
-            color_sort_index: None,
-            link: None,
-        }];
+        doc.threads = vec![Thread { brand: "Madeira".into(), code: "1147".into(), ..Thread::new("a", "Red", "#ff0000") }];
+        doc.objects = vec![Object { stop_after: true, ..Object::new("o", "a", vec![SubPath::polyline(&[crate::geom::pt(0.0, 0.0), crate::geom::pt(3.0, 0.0), crate::geom::pt(6.0, 0.0)], false)], StitchParams::Manual(Default::default())) }];
         let mut e = Engine::new();
         let one = export_plan(&doc, &mut e, &ExportOptions::default());
         let four = export_plan(&doc, &mut e, &ExportOptions { x_repeats: 2, y_repeats: 2, x_spacing: 20.0, y_spacing: 10.0, ..Default::default() });

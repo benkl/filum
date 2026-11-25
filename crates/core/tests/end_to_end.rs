@@ -14,15 +14,14 @@ fn circle(cx: f64, cy: f64, r: f64) -> SubPath {
 }
 
 fn obj(id: &str, thread: &str, paths: Vec<SubPath>, stitch: StitchParams) -> Object {
-    Object { id: id.into(), name: id.into(), thread: thread.into(), visible: true, locked: false, paths, stitch, trim_after: false, stop_after: false, ties: Default::default(), force_lock: false, min_stitch: None, min_jump: None, clone: None, lock: None, color_sort_index: None, link: None,
-            hidden: None, patterns: vec![], start: None, end: None }
+    Object::new(id, thread, paths, stitch)
 }
 
 fn sample() -> Document {
     let mut d = Document::default();
     d.threads = vec![
-        Thread { id: "a".into(), name: "Red".into(), color: "#c8102e".into(), brand: String::new(), code: String::new(), weight: None, min_stitch: None },
-        Thread { id: "b".into(), name: "Navy".into(), color: "#1f2a56".into(), brand: String::new(), code: String::new(), weight: None, min_stitch: None },
+        Thread::new("a", "Red", "#c8102e"),
+        Thread::new("b", "Navy", "#1f2a56"),
     ];
     d.objects = vec![
         obj("fill", "a", vec![circle(50.0, 50.0, 20.0), circle(50.0, 50.0, 8.0)], StitchParams::Fill(FillParams::default())),

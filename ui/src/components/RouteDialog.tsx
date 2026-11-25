@@ -8,7 +8,7 @@ import { useState } from "react";
 import { autoRouteSatins, autoRouteSelection, autoSatinOptions, jumpsToStrokes, setAutoSatinOptions } from "../lib/autoRoute";
 import { useStore } from "../store";
 import { Dialog, Num, Row, Toggle } from "./ui";
-import { safeSetItem } from "../lib/storage";
+import { loadMerged, safeSetItem } from "../lib/storage";
 
 export type RouteTab = "running" | "satin" | "jumps";
 let pendingTab: RouteTab | null = null;
@@ -27,11 +27,7 @@ interface RouteOptions {
 }
 const DEFAULTS: RouteOptions = { redwork: false, jumpMin: 1, jumpMax: 15 };
 export function routeOptions(): RouteOptions {
-  try {
-    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) ?? "{}") };
-  } catch {
-    return DEFAULTS;
-  }
+  return loadMerged(KEY, DEFAULTS);
 }
 
 const TAB_ICONS: Record<RouteTab, LucideIcon> = { running: StitchRunning, satin: StitchSatin, jumps: Jump };

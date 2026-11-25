@@ -35,7 +35,7 @@ import { clamp, DEFAULT_LAYOUT, LIMITS, type Layout } from "../lib/layout";
 import { useStore } from "../store";
 import { FoldAllGroups, IssuesPanel, LayersPanel, PropertiesPanel, ScenePanel, useIssueCount } from "./Dock";
 import { ElementInfoSection } from "./ElementInfo";
-import { openSection, SectionScope } from "./ui";
+import { followPointer, openSection, SectionScope } from "./ui";
 
 /* ---------------- layout ---------------- */
 
@@ -194,17 +194,11 @@ function Sash({
         const move = (ev: PointerEvent) => {
           v = onDrag(value, ev.clientX - x0, ev.clientY - y0, (c) => setDrag(c ? "collapse" : "on"));
         };
-        const up = () => {
-          el.removeEventListener("pointermove", move);
-          el.removeEventListener("pointerup", up);
-          el.removeEventListener("pointercancel", up);
+        followPointer(el, move, () => {
           document.body.classList.remove("resizing-x", "resizing-y");
           setDrag("");
           if (v !== value) onCommit(v);
-        };
-        el.addEventListener("pointermove", move);
-        el.addEventListener("pointerup", up);
-        el.addEventListener("pointercancel", up);
+        });
       }}
     />
   );

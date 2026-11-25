@@ -559,7 +559,7 @@ pub(crate) fn starts_near(st: &StitchParams) -> bool {
 fn knockdown_thread(doc: &Document) -> Thread {
     let c = doc.options.knockdown_color.trim();
     let color = if c.starts_with('#') && c.len() == 7 { c.to_string() } else { "#f4f1ea".to_string() };
-    Thread { id: "knockdown".into(), name: "Knockdown".into(), color, brand: String::new(), code: String::new(), weight: None, min_stitch: None }
+    Thread::new("knockdown", "Knockdown", color)
 }
 
 /// Knockdown (laydown stitch): a light net over the area of the whole
@@ -722,7 +722,7 @@ fn seg_dist(p: Point, a: Point, b: Point) -> f64 {
 }
 
 fn fallback_thread(i: usize) -> Thread {
-    Thread { id: format!("auto{i}"), name: "Black".into(), color: "#1c1c1c".into(), brand: String::new(), code: String::new(), weight: None, min_stitch: None }
+    Thread::new(format!("auto{i}"), "Black", "#1c1c1c")
 }
 
 /// Machine-level stitch list under construction.
@@ -931,7 +931,7 @@ impl Builder<'_> {
             // drop too-short stitches that change nothing, but always land
             // on the run's final point and keep every turn (a fill's step to
             // its next row)
-            if d < self.min_stitch && j + 1 < k && (redundant(last, q, run[j + 1].0) || self.loose_turns && f & flags::TIE == 0 && loose_turn(last, q, run[j + 1].0)) {
+            if j + 1 < k && drops_short(last, q, run[j + 1].0, f, self.min_stitch, self.loose_turns) {
                 continue;
             }
             self.out.push(Stitch::new(q, f, o));
@@ -961,6 +961,19 @@ const ON_THE_WAY: f64 = 0.05;
 /// from a fill row to the next (0.25 mm at a dense spacing) dropped would
 /// start every other row with a slanted stitch — a saw-tooth edge with
 /// fabric showing between the rows.
+/// Whether the plan leaves out the stitch from `last` to `q` (`next` comes
+/// after it): shorter than `min` and changing nothing, or, where turns may be
+/// loose (`loose_turns_for`), only turning a hair's breadth. Lock stitches
+/// keep their turns. Element Info counts the dropped stitches with this too.
+pub(crate) fn drops_short(last: Point, q: Point, next: Point, f: u8, min: f64, loose_turns: bool) -> bool {
+    last.dist(q) < min && (redundant(last, q, next) || loose_turns && f & flags::TIE == 0 && loose_turn(last, q, next))
+}
+
+/// Objects whose short turns may go (`loose_turn`): running stitch without beans.
+pub(crate) fn loose_turns_for(obj: &Object) -> bool {
+    matches!(&obj.stitch, StitchParams::Running(p) if p.beans().iter().all(|r| *r == 0))
+}
+
 pub(crate) fn redundant(last: Point, q: Point, next: Point) -> bool {
     q.dist(last) <= DUPLICATE_STITCH || seg_dist(q, last, next) < ON_THE_WAY
 }
@@ -1093,7 +1106,7 @@ fn assemble_basted(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[Run], 
         b.ties = object_ties(obj);
         b.lock = obj.lock.unwrap_or_default();
         b.min_stitch = doc.min_stitch_of(obj);
-        b.loose_turns = matches!(&obj.stitch, StitchParams::Running(p) if p.beans().iter().all(|r| *r == 0));
+        b.loose_turns = loose_turns_for(obj);
         b.min_jump = obj.min_jump.unwrap_or(doc.machine.trim_distance).max(0.0);
         b.min_jump_set = obj.min_jump.is_some();
         b.link = obj.link;
@@ -1147,36 +1160,14 @@ mod tests {
     use crate::model::*;
 
     fn obj(id: &str, paths: Vec<SubPath>, stitch: StitchParams) -> Object {
-        Object {
-            id: id.into(),
-            name: id.into(),
-            thread: "t".into(),
-            visible: true,
-            locked: false,
-            paths,
-            stitch,
-            trim_after: false,
-            stop_after: false,
-            ties: Default::default(),
-            force_lock: false,
-            min_stitch: None,
-            min_jump: None,
-            clone: None,
-            hidden: None,
-            patterns: vec![],
-            start: None,
-            end: None,
-            lock: None,
-            color_sort_index: None,
-            link: None,
-        }
+        Object::new(id, "t", paths, stitch)
     }
     fn square(x: f64, y: f64, s: f64) -> Vec<SubPath> {
         vec![SubPath::polyline(&[pt(x, y), pt(x + s, y), pt(x + s, y + s), pt(x, y + s)], true)]
     }
     fn doc(objects: Vec<Object>) -> Document {
         Document {
-            threads: vec![Thread { id: "t".into(), name: "x".into(), color: "#000000".into(), brand: "".into(), code: "".into(), weight: None, min_stitch: None }],
+            threads: vec![Thread::new("t", "x", "#000000")],
             objects,
             ..Default::default()
         }
@@ -1187,7 +1178,7 @@ mod tests {
 
     #[test]
     fn threads_on_the_same_spool_need_no_colour_change() {
-        let th = |id: &str, color: &str, code: &str| Thread { id: id.into(), name: id.into(), color: color.into(), brand: "Madeira".into(), code: code.into(), weight: None, min_stitch: None };
+        let th = |id: &str, color: &str, code: &str| Thread { brand: "Madeira".into(), code: code.into(), ..Thread::new(id, id, color) };
         let fill = StitchParams::Fill(FillParams { underlay: false, ..Default::default() });
         let mk = |a: &str, b: &str| {
             let mut d = doc(vec![Object { thread: "a".into(), ..obj("1", square(0.0, 0.0, 10.0), fill.clone()) }, Object { thread: "b".into(), ..obj("2", square(20.0, 0.0, 10.0), fill.clone()) }]);
@@ -1564,32 +1555,10 @@ mod trim_tests {
 
     fn line(id: &str, thread: &str, pts: &[(f64, f64)]) -> Object {
         let p: Vec<Point> = pts.iter().map(|&(x, y)| pt(x, y)).collect();
-        Object {
-            id: id.into(),
-            name: id.into(),
-            thread: thread.into(),
-            visible: true,
-            locked: false,
-            paths: vec![SubPath::polyline(&p, false)],
-            stitch: StitchParams::Running(RunningParams::default()),
-            trim_after: false,
-            stop_after: false,
-            ties: Default::default(),
-            force_lock: false,
-            min_stitch: None,
-            min_jump: None,
-            clone: None,
-            hidden: None,
-            patterns: vec![],
-            start: None,
-            end: None,
-            lock: None,
-            color_sort_index: None,
-            link: None,
-        }
+        Object::new(id, thread, vec![SubPath::polyline(&p, false)], StitchParams::Running(RunningParams::default()))
     }
     fn thread(id: &str, color: &str) -> Thread {
-        Thread { id: id.into(), name: id.into(), color: color.into(), brand: "".into(), code: "".into(), weight: None, min_stitch: None }
+        Thread::new(id, id, color)
     }
     fn plan(objects: Vec<Object>) -> StitchPlan {
         let d = Document { threads: vec![thread("a", "#000000"), thread("b", "#ff0000")], objects, ..Default::default() };
@@ -1752,7 +1721,7 @@ mod link_tests {
         o
     }
     fn doc(objects: Vec<Object>) -> Document {
-        let th = |id: &str, c: &str| Thread { id: id.into(), name: id.into(), color: c.into(), brand: "".into(), code: "".into(), weight: None, min_stitch: None };
+        let th = |id: &str, c: &str| Thread::new(id, id, c);
         Document { threads: vec![th("t", "#000000"), th("u", "#cc1219")], objects, ..Default::default() }
     }
     /// Two lines 10 mm apart on one row: a ends at (30, 0), b starts at (40, 0).

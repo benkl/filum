@@ -12,6 +12,7 @@ import type {
   FlowField,
 } from "../types";
 import { FILUM_NEW_FILL, INK_FILL_METHODS, INK_RUNNING, INK_SATIN, INK_TATAMI } from "./inkDefaults";
+import { dist } from "./vec";
 
 export const uid = (p = "o") => `${p}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
@@ -472,7 +473,8 @@ export function simplifyPts(pts: Vec2[], tol: number): Vec2[] {
   return pts.filter((_, i) => keep[i]);
 }
 
-export const dist = (a: Vec2, b: Vec2) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+/** The distance between two points (from vec.ts; many modules import it from here). */
+export { dist };
 
 /** Offset a polyline sideways (for drawing satin centre lines as columns). */
 export function offsetPolyline(pts: Vec2[], d: number): Vec2[] {

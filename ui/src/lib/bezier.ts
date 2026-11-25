@@ -5,20 +5,12 @@
 // Digitized Curves", Graphics Gems 1990) for freehand strokes.
 
 import type { PathNode, SubPath, Vec2 } from "../types";
+import { add, dist, dot, len, lerp, mul, norm, sub } from "./vec";
 
 export type Cubic = [Vec2, Vec2, Vec2, Vec2];
 
-const add = (a: Vec2, b: Vec2): Vec2 => [a[0] + b[0], a[1] + b[1]];
-const sub = (a: Vec2, b: Vec2): Vec2 => [a[0] - b[0], a[1] - b[1]];
-const mul = (a: Vec2, k: number): Vec2 => [a[0] * k, a[1] * k];
-const dot = (a: Vec2, b: Vec2) => a[0] * b[0] + a[1] * b[1];
-const len = (a: Vec2) => Math.hypot(a[0], a[1]);
-const lerp = (a: Vec2, b: Vec2, t: number): Vec2 => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
-export const vdist = (a: Vec2, b: Vec2) => Math.hypot(a[0] - b[0], a[1] - b[1]);
-const norm = (a: Vec2): Vec2 => {
-  const l = len(a);
-  return l < 1e-12 ? [0, 0] : [a[0] / l, a[1] / l];
-};
+/** The distance between two points (vec.ts `dist`). */
+export const vdist = dist;
 
 export function cubicAt([a, b, c, d]: Cubic, t: number): Vec2 {
   const u = 1 - t;

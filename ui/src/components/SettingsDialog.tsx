@@ -12,7 +12,7 @@ import { ACCENTS, APP_COLOR, DEFAULT_PREFS } from "../lib/prefs";
 import { loadMatchOptions, saveMatchOptions, useMyThreads } from "../lib/threads";
 import { MATCH_PRESETS } from "../lib/threadMatch";
 import { DEFAULT_TOOL_OPTIONS, useStore } from "../store";
-import { Dialog, Num, Row, Toggle } from "./ui";
+import { Dialog, Num, Row, Seg, Toggle } from "./ui";
 import { safeSetItem } from "../lib/storage";
 import { dpiOf, pxPerMm, validCalibration } from "../lib/screen";
 
@@ -27,18 +27,6 @@ const TABS: { id: Tab; label: string; icon: ReactNode }[] = [
   { id: "files", label: "Files & data", icon: <FolderCog size={15} /> },
   { id: "keys", label: "Keyboard", icon: <Keyboard size={15} /> },
 ];
-
-function Seg<T extends string | number>({ value, options, onChange }: { value: T; options: [T, string, string?][]; onChange: (v: T) => void }) {
-  return (
-    <div className="seg">
-      {options.map(([id, label, title]) => (
-        <button key={String(id)} className={value === id ? "on" : ""} title={title} onClick={() => onChange(id)}>
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 function Section({ title, hint, children }: { title: string; hint?: ReactNode; children: ReactNode }) {
   return (

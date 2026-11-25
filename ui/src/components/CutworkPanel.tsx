@@ -7,16 +7,12 @@ import { CUTWORK_SECTORS, cutworkSegmentation, type CutworkSector } from "../lib
 import { useStore } from "../store";
 import type { DesignObject } from "../types";
 import { Num, Row, Section, Toggle } from "./ui";
-import { safeSetItem } from "../lib/storage";
+import { loadMerged, safeSetItem } from "../lib/storage";
 
 const KEY = "filum.cutwork";
 
 export function cutworkSettings(): { sectors: CutworkSector[]; sortByNeedle: boolean; keepOriginals: boolean } {
-  try {
-    return { sectors: CUTWORK_SECTORS, sortByNeedle: true, keepOriginals: false, ...JSON.parse(localStorage.getItem(KEY) ?? "{}") };
-  } catch {
-    return { sectors: CUTWORK_SECTORS, sortByNeedle: true, keepOriginals: false };
-  }
+  return loadMerged(KEY, { sectors: CUTWORK_SECTORS, sortByNeedle: true, keepOriginals: false });
 }
 
 /** Split the selected lines for the cutwork needles. */

@@ -1058,7 +1058,7 @@ fn ensure_thread(threads: &mut Vec<Thread>, rgb: [u8; 3], name: String, code: St
         return t.id.clone();
     }
     let id = format!("t{}", threads.len() + 1);
-    threads.push(Thread { id: id.clone(), name, color: hex, brand, code, weight: None, min_stitch: None });
+    threads.push(Thread { brand: brand, code: code, ..Thread::new(id.clone(), name, hex) });
     id
 }
 
@@ -1330,29 +1330,7 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
     for &ri in &ordered {
         let r = slots[ri].take().expect("region used once");
         let push = |objects: &mut Vec<Object>, name: String, thread: String, stitch: StitchParams, paths: Vec<SubPath>| {
-            objects.push(Object {
-                id: format!("dz{}", objects.len() + 1),
-                name,
-                thread,
-                visible: true,
-                locked: false,
-                paths,
-                stitch,
-                trim_after: false,
-                stop_after: false,
-            ties: Default::default(),
-            force_lock: false,
-            min_stitch: None,
-            min_jump: None,
-            clone: None,
-            hidden: None,
-            patterns: vec![],
-                start: None,
-                end: None,
-                lock: None,
-                color_sort_index: None,
-                link: None,
-            });
+            objects.push(Object { name: name, ..Object::new(format!("dz{}", objects.len() + 1), thread, paths, stitch) });
         };
         if let StitchParams::Fill(fp) = &r.stitch {
             if let Some(gp) = &fp.gradient {
@@ -1447,29 +1425,7 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
                     cursor = pt(e.p[0], e.p[1]);
                 }
                 k += 1;
-                batch.push(Object {
-                    id: format!("dz{}", objects.len() + batch.len() + 1),
-                    name: format!("{tname} line {k}"),
-                    thread: tid.clone(),
-                    visible: true,
-                    locked: false,
-                    paths,
-                    stitch,
-                    trim_after: false,
-                    stop_after: false,
-            ties: Default::default(),
-            force_lock: false,
-            min_stitch: None,
-            min_jump: None,
-            clone: None,
-            hidden: None,
-            patterns: vec![],
-                    start: None,
-                    end: None,
-                    lock: None,
-                    color_sort_index: None,
-                    link: None,
-                });
+                batch.push(Object { name: format!("{tname} line {k}"), ..Object::new(format!("dz{}", objects.len() + batch.len() + 1), tid.clone(), paths, stitch) });
             }
             let batch = if opts.route_lines { crate::outline_route::route_lines(batch, from) } else { batch };
             if let Some(e) = batch.last().and_then(|o| o.paths.last()).and_then(|sp| sp.nodes.last()) {
@@ -1487,29 +1443,7 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
             OutlineKind::Satin => StitchParams::Satin(SatinParams { width, ..satin_params(width) }),
             _ => StitchParams::Running(RunningParams { length: 2.0, bean_repeats: 2, ..Default::default() }),
         };
-        objects.push(Object {
-            id: format!("dz{}", objects.len() + 1),
-            name,
-            thread,
-            visible: true,
-            locked: false,
-            paths,
-            stitch,
-            trim_after: false,
-            stop_after: false,
-            ties: Default::default(),
-            force_lock: false,
-            min_stitch: None,
-            min_jump: None,
-            clone: None,
-            hidden: None,
-            patterns: vec![],
-            start: None,
-            end: None,
-            lock: None,
-            color_sort_index: None,
-            link: None,
-        });
+        objects.push(Object { name: name, ..Object::new(format!("dz{}", objects.len() + 1), thread, paths, stitch) });
     };
 
     // Lines come from four places: strokes in the picture (satin / running
@@ -2155,29 +2089,7 @@ fn photo_zigzag(prep: &Prepared, opts: &DigitizeOptions) -> DigitizeResult {
         let rgb = darkest.map(|l| prep.colors[l]).filter(|c| rgb_to_lab(*c)[0] < 45.0).unwrap_or([20, 20, 20]);
         let (rgb, name, code, brand) = snap_rgb(rgb, opts);
         let tid = ensure_thread(&mut threads, rgb, name, code, brand);
-        objects.push(Object {
-            id: "dz1".into(),
-            name: "Zig-zag photo".into(),
-            thread: tid,
-            visible: true,
-            locked: false,
-            paths,
-            stitch: StitchParams::Manual(Default::default()),
-            trim_after: false,
-            stop_after: false,
-            ties: Default::default(),
-            force_lock: false,
-            min_stitch: None,
-            min_jump: None,
-            clone: None,
-            hidden: None,
-            patterns: vec![],
-            start: None,
-            end: None,
-            lock: None,
-            color_sort_index: None,
-            link: None,
-        });
+        objects.push(Object { name: "Zig-zag photo".into(), ..Object::new("dz1", tid, paths, StitchParams::Manual(Default::default())) });
     }
     DigitizeResult { threads, objects, colors: prep.info.clone(), width_mm: wm, height_mm: hm }
 }

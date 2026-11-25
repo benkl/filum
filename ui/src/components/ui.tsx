@@ -1,7 +1,7 @@
 import { ChevronRight, GripHorizontal, GripVertical, X } from "lucide-react";
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { openExternal } from "../lib/platform";
-import { safeSetItem } from "../lib/storage";
+import { loadJson, safeSetItem } from "../lib/storage";
 
 export function Num({
   value,
@@ -131,6 +131,37 @@ export function ExtLink({ href, children, className, title }: { href: string; ch
   );
 }
 
+/**
+ * A segmented control: one of a few choices side by side. `options` are
+ * [value, label, tooltip?]; `label` names the group for screen readers;
+ * `full` stretches it over the row.
+ */
+export function Seg<T extends string | number>({
+  value,
+  options,
+  onChange,
+  label,
+  full,
+  disabled,
+}: {
+  value: T;
+  options: readonly (readonly [T, ReactNode, string?])[];
+  onChange: (v: T) => void;
+  label?: string;
+  full?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <div className={`seg${full ? " seg-full" : ""}${disabled ? " disabled" : ""}`} role="group" aria-label={label}>
+      {options.map(([id, text, title]) => (
+        <button key={String(id)} className={value === id ? "on" : ""} title={title} disabled={disabled} onClick={() => onChange(id)}>
+          {text}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function Toggle({ on, onChange, title }: { on: boolean; onChange: (v: boolean) => void; title?: string }) {
   return <button className={`toggle ${on ? "on" : ""}`} title={title} onClick={() => onChange(!on)} aria-pressed={on} />;
 }
@@ -153,13 +184,7 @@ export const SectionScope = createContext<{ scope: string; query: string } | nul
 const SectionDepth = createContext(0);
 
 const OPEN_KEY = "filum.sections";
-const openMemory: Record<string, boolean> = (() => {
-  try {
-    return JSON.parse(localStorage.getItem(OPEN_KEY) ?? "{}");
-  } catch {
-    return {};
-  }
-})();
+const openMemory: Record<string, boolean> = loadJson(OPEN_KEY, {});
 type SectionCmd = { scope: string; depth: number; title: string; kind: "open" | "solo" };
 const sectionListeners = new Set<(c: SectionCmd) => void>();
 
@@ -279,6 +304,66 @@ export function Dialog({
   );
 }
 
+/**
+ * Follows a drag until the pointer is released or the browser cancels it
+ * (a touch turned into a scroll, the window lost the pointer): `move` on
+ * every step, `end` once, with `cancelled` for a cancel. Listens on `on`:
+ * the element that captured the pointer, or the window.
+ */
+export function followPointer(on: Window | Element, move: (ev: PointerEvent) => void, end?: (ev: PointerEvent, cancelled: boolean) => void) {
+  const step = move as EventListener;
+  const up = ((ev: PointerEvent) => {
+    on.removeEventListener("pointermove", step);
+    on.removeEventListener("pointerup", up);
+    on.removeEventListener("pointercancel", up);
+    end?.(ev, ev.type === "pointercancel");
+  }) as EventListener;
+  on.addEventListener("pointermove", step);
+  on.addEventListener("pointerup", up);
+  on.addEventListener("pointercancel", up);
+}
+
+/** What doesn't count as outside a popover: an element (its anchor), a ref (the popover) or a CSS selector (".menu" for its submenus). */
+export type Inside = Element | RefObject<Element | null> | string | null | undefined;
+
+/**
+ * Closes a popover or menu while it is `open`: on a press anywhere outside
+ * it (`inside` lists what belongs to it) and on Escape, which then goes no
+ * further (the selection, the tool or the player behind it stay). Popovers
+ * with their own Escape handling (focus going back to a button, menus
+ * stepping back a level) pass `escape: false`.
+ */
+export function useDismiss(open: boolean, onClose: () => void, inside: Inside[], opts: { escape?: boolean } = {}) {
+  const latest = useRef({ onClose, inside });
+  latest.current = { onClose, inside };
+  const escape = opts.escape !== false;
+  useEffect(() => {
+    if (!open) return;
+    const within = (t: EventTarget | null) =>
+      t instanceof Node &&
+      latest.current.inside.some((x) => {
+        if (!x) return false;
+        if (typeof x === "string") return !!(t instanceof Element ? t : t.parentElement)?.closest(x);
+        const el = x instanceof Element ? x : x.current;
+        return !!el?.contains(t);
+      });
+    const down = (e: PointerEvent) => {
+      if (!within(e.target)) latest.current.onClose();
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      latest.current.onClose();
+    };
+    window.addEventListener("pointerdown", down, true);
+    if (escape) window.addEventListener("keydown", key, true);
+    return () => {
+      window.removeEventListener("pointerdown", down, true);
+      window.removeEventListener("keydown", key, true);
+    };
+  }, [open, escape]);
+}
+
 export const fmtTime = (s: number) => {
   const t = Math.max(0, Math.round(s));
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
@@ -288,13 +373,7 @@ export const fmtTime = (s: number) => {
 // Movable popovers
 
 const MOVED_KEY = "filum.popovers";
-const moved: Record<string, [number, number]> = (() => {
-  try {
-    return JSON.parse(localStorage.getItem(MOVED_KEY) ?? "{}");
-  } catch {
-    return {};
-  }
-})();
+const moved: Record<string, [number, number]> = loadJson(MOVED_KEY, {});
 
 /**
  * Lets a popover be dragged by its grip. The offset is added to the
@@ -335,15 +414,7 @@ export function useMovable(remember?: string) {
         last = [ox + dx, oy + dy];
         setOff(last);
       };
-      const up = () => {
-        el.removeEventListener("pointermove", move);
-        el.removeEventListener("pointerup", up);
-        el.removeEventListener("pointercancel", up);
-        save(last);
-      };
-      el.addEventListener("pointermove", move);
-      el.addEventListener("pointerup", up);
-      el.addEventListener("pointercancel", up);
+      followPointer(el, move, () => save(last));
     },
     onDoubleClick: (e: React.MouseEvent) => {
       if ((e.target as Element).closest?.("button,input,select,textarea,a")) return;

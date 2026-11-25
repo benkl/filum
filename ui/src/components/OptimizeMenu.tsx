@@ -9,6 +9,7 @@ import { optimizeOrder } from "../lib/actions";
 import { optimizeSteps } from "../lib/prefs";
 import { useStore } from "../store";
 import type { OptimizeSteps } from "../types";
+import { useDismiss } from "./ui";
 
 type Step = { id: keyof OptimizeSteps; label: string; hint: string };
 
@@ -69,15 +70,8 @@ export function OptimizeButton() {
     setAt(null);
     if (focus) caret.current?.focus();
   };
-  useEffect(() => {
-    if (!at) return;
-    const onDown = (e: PointerEvent) => {
-      if (!(e.target as HTMLElement).closest(".optimize-menu,.optimize-split"))
-        setAt(null);
-    };
-    window.addEventListener("pointerdown", onDown);
-    return () => window.removeEventListener("pointerdown", onDown);
-  }, [at]);
+  // Escape is the menu's own (the focus goes back to the caret)
+  useDismiss(!!at, () => setAt(null), [".optimize-menu", ".optimize-split"], { escape: false });
   return (
     <div className="split-btn optimize-split">
       <button

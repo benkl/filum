@@ -19,6 +19,7 @@ import { defaultSatin, uid } from "./geometry";
 import { withParent } from "./groups";
 import { pruneGroups } from "./layerRows";
 import { cutParts, insideRegion, regionRings, regionsOf, ringPoints, type Line, type Region } from "./regions";
+import { add, cross, dot, len, mul, norm as unit, sub } from "./vec";
 
 export type { Line } from "./regions";
 
@@ -49,16 +50,6 @@ export interface SplitPlan {
   overlap: number;
 }
 
-const sub = (a: Vec2, b: Vec2): Vec2 => [a[0] - b[0], a[1] - b[1]];
-const add = (a: Vec2, b: Vec2): Vec2 => [a[0] + b[0], a[1] + b[1]];
-const mul = (a: Vec2, k: number): Vec2 => [a[0] * k, a[1] * k];
-const dot = (a: Vec2, b: Vec2) => a[0] * b[0] + a[1] * b[1];
-const cross = (a: Vec2, b: Vec2) => a[0] * b[1] - a[1] * b[0];
-const len = (a: Vec2) => Math.hypot(a[0], a[1]);
-const unit = (a: Vec2): Vec2 => {
-  const l = len(a);
-  return l < 1e-12 ? [0, 0] : [a[0] / l, a[1] / l];
-};
 
 /** Overlap between neighbouring parts: the fabric preset's (NOVAstitch), else 0.2 mm. */
 export function overlapFor(doc: Pick<StitchDocument, "options" | "fabric">): number {

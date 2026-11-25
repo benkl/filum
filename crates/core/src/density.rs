@@ -497,32 +497,10 @@ mod tests {
         vec![SubPath::polyline(&[pt(x, y), pt(x + s, y), pt(x + s, y + s), pt(x, y + s)], true)]
     }
     fn obj(id: &str, paths: Vec<SubPath>, stitch: StitchParams) -> Object {
-        Object {
-            id: id.into(),
-            name: id.into(),
-            thread: "t".into(),
-            visible: true,
-            locked: false,
-            paths,
-            stitch,
-            trim_after: false,
-            stop_after: false,
-            ties: Default::default(),
-            force_lock: false,
-            min_stitch: None,
-            min_jump: None,
-            patterns: vec![],
-            clone: None,
-            hidden: None,
-            start: None,
-            end: None,
-            lock: None,
-            color_sort_index: None,
-            link: None,
-        }
+        Object::new(id, "t", paths, stitch)
     }
     fn doc(objects: Vec<Object>) -> Document {
-        Document { threads: vec![Thread { id: "t".into(), name: "x".into(), color: "#000000".into(), brand: "".into(), code: "".into(), weight: None, min_stitch: None }], objects, ..Default::default() }
+        Document { threads: vec![Thread::new("t", "x", "#000000")], objects, ..Default::default() }
     }
     fn field(d: &Document) -> DensityField {
         let plan = crate::Engine::new().plan(d);

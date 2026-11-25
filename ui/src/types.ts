@@ -755,6 +755,9 @@ export const FLAG = {
   COMMANDS: 1 | 2 | 4 | 8 | 16,
 } as const;
 
+/** `plan.objects` for a record no object sews (a command, the frame moving out): the engine's u32::MAX. */
+export const NO_OBJECT = 0xffffffff;
+
 /** An Ink/Stitch meander tile: segments [x1, y1, x2, y2] and repeat vectors, mm at 100 %. */
 export interface MeanderTile {
   id: string;

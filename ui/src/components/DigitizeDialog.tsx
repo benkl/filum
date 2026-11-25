@@ -38,8 +38,8 @@ import { REGION_REASON, type ColorInfo, type DigitizeOptions, type DigitizePrevi
 import { ChartSelect } from "./ThreadPicker";
 import { RegionEditor, regionAt } from "./RegionEditor";
 import { chartLabel, loadChart } from "../lib/threads";
-import { Dialog, fmtTime, Num, Row, Slider, Toggle } from "./ui";
-import { safeSetItem } from "../lib/storage";
+import { Dialog, fmtTime, Num, Row, Seg, Slider, Toggle } from "./ui";
+import { loadMerged, safeSetItem } from "../lib/storage";
 
 type Rgb = [number, number, number];
 
@@ -176,11 +176,7 @@ const CROSS_KEY = "filum.digitize.cross";
 /** Panes of each output (cross stitch: no tracing, lines or fill methods). */
 const PANES_OF: Record<Output, Pane[]> = { shapes: ["style", "colours", "shapes", "lines", "stitches", "ai"], cross: ["style", "colours", "cross", "ai"] };
 const loadCross = (): CrossSettings => {
-  try {
-    return { ...CROSS_DEFAULTS, ...JSON.parse(localStorage.getItem(CROSS_KEY) ?? "{}") };
-  } catch {
-    return CROSS_DEFAULTS;
-  }
+  return loadMerged(CROSS_KEY, CROSS_DEFAULTS);
 };
 /** Cross stitch preset: the colour stage's settings that suit a grid of crosses. */
 const CROSS_PRESET: Partial<Settings> = { photoZigzag: false, gradients: false, colors: 8, denoise: 1, mergeDeltaE: 3, removeBackground: true };
@@ -195,18 +191,6 @@ function Group({ title, hint, extra, children }: { title: string; hint?: ReactNo
       {children}
       {hint && <p className="dz-hint">{hint}</p>}
     </section>
-  );
-}
-
-function Seg<T extends string>({ value, options, onChange, full, disabled }: { value: T; options: [T, string][]; onChange: (v: T) => void; full?: boolean; disabled?: boolean }) {
-  return (
-    <div className={`seg ${full ? "seg-full" : ""} ${disabled ? "disabled" : ""}`}>
-      {options.map(([k, label]) => (
-        <button key={k} className={value === k ? "on" : ""} disabled={disabled} onClick={() => onChange(k)}>
-          {label}
-        </button>
-      ))}
-    </div>
   );
 }
 

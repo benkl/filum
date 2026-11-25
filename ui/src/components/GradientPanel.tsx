@@ -37,7 +37,7 @@ import {
 import { useStore } from "../store";
 import type { DitherMethod, GradientKind, GradientParams, DesignObject } from "../types";
 import { ThreadPicker } from "./ThreadPicker";
-import { Num, Row, Section, Slider } from "./ui";
+import { followPointer, Num, Row, Section, Slider } from "./ui";
 
 /** Paint a dithered preview of the gradient into a canvas. */
 function paintDither(c: HTMLCanvasElement | null, g: Pick<GradientParams, "stops" | "curve" | "steps" | "dither">, colors: string[], cols: number, rows: number) {
@@ -179,13 +179,7 @@ export function GradientBar({ group, selected, onSelect }: { group: string; sele
     e.preventDefault();
     e.stopPropagation();
     useStore.getState().checkpoint();
-    const move = (ev: PointerEvent) => setStops(group, apply(posAt(ev.clientX)), true);
-    const up = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
+    followPointer(window, (ev) => setStops(group, apply(posAt(ev.clientX)), true));
   };
   const order = stops.map((_, i) => i).sort((a, b) => stops[a].pos - stops[b].pos);
   return (

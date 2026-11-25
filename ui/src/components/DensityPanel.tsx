@@ -4,12 +4,12 @@
 
 import { useState, useSyncExternalStore } from "react";
 import { AlertTriangle, Check, ChevronRight } from "lucide-react";
-import { fitView } from "../canvas/Canvas";
 import { classShares, CLASS_LABELS, colorAt, DENSITY_MODES, densityAt, densityHover, densityScale, THIN_BLUE } from "../lib/density";
 import { defaultDesignOptions } from "../lib/geometry";
 import { fabricInfo } from "../lib/materials";
 import { fillsStackAt } from "../lib/denseIssues";
 import { useStore } from "../store";
+import { focus } from "../lib/focus";
 
 const pct = (v: number) => (v > 0 && v < 0.005 ? "<1" : Math.round(v * 100).toString());
 
@@ -42,18 +42,13 @@ export function DensityLegend() {
     const h = spots[k];
     if (!h) return;
     setHot(k);
-    const s = useStore.getState();
-    const ids = h.objects.map((i) => s.doc.objects[i]?.id).filter((x): x is string => !!x);
-    if (ids.length) s.select(ids);
-    const el = document.querySelector(".canvas-wrap")?.getBoundingClientRect();
-    if (!el) return;
-    const pad = Math.max(0, 16 - Math.max(h.w, h.h)) / 2;
-    s.setView(fitView(el.width, el.height, { x: h.x - pad, y: h.y - pad, w: h.w + 2 * pad, h: h.h + 2 * pad }));
+    const objs = useStore.getState().doc.objects;
+    focus({ ids: h.objects.map((i) => objs[i]?.id).filter((x): x is string => !!x), box: h, minSize: 16 });
   };
 
   return (
     <div className="density-legend" role="region" aria-label="Density map">
-      <div className="dl-head">
+      <div className="dmap-head">
         <b>Density</b>
         <span className="stat" title={`Limits for ${fab.label.toLowerCase()} — change the fabric in Design ▸ Fabric & thread`}>
           on {fab.label.toLowerCase()}
@@ -62,31 +57,31 @@ export function DensityLegend() {
           ×
         </button>
       </div>
-      <div className="seg dl-modes">
+      <div className="seg dmap-modes">
         {DENSITY_MODES.map((m) => (
           <button key={m.id} className={mode === m.id ? "on" : ""} title={m.title} onClick={() => set({ densityMode: m.id })}>
             {m.label}
           </button>
         ))}
       </div>
-      <div className="dl-scale">
+      <div className="dmap-scale">
         {mode === "coverage" && (
-          <span className="dl-thin" title="A fill or satin so open the fabric shows through">
+          <span className="dmap-thin" title="A fill or satin so open the fabric shows through">
             <i style={{ background: `rgb(${THIN_BLUE.join(",")})` }} /> thin
           </span>
         )}
-        <div className="dl-bar" style={{ background: `linear-gradient(90deg, ${grad})` }}>
+        <div className="dmap-bar" style={{ background: `linear-gradient(90deg, ${grad})` }}>
           {scale.ticks.map((t) => (
-            <span key={t.label} className="dl-tick" style={{ left: `${(t.v / scale.max) * 100}%` }}>
+            <span key={t.label} className="dmap-tick" style={{ left: `${(t.v / scale.max) * 100}%` }}>
               {t.label}
             </span>
           ))}
         </div>
-        <span className="stat dl-unit">{scale.unit}</span>
+        <span className="stat dmap-unit">{scale.unit}</span>
       </div>
       {shares && f!.stats.area > 0 ? (
-        <div className="dl-shares" title="Share of the stitched area">
-          <div className="dl-stack">
+        <div className="dmap-shares" title="Share of the stitched area">
+          <div className="dmap-stack">
             {mode === "coverage" && <i className="c-thin" style={{ width: `${shares.thin * 100}%` }} />}
             <i className="c-ok" style={{ width: `${(shares.ok + (mode === "coverage" ? 0 : shares.thin)) * 100}%` }} />
             <i className="c-heavy" style={{ width: `${shares.heavy * 100}%` }} />
@@ -100,7 +95,7 @@ export function DensityLegend() {
       ) : (
         <span className="stat">{f ? "No stitches" : "Measuring…"}</span>
       )}
-      <div className="dl-read">
+      <div className="dmap-read">
         {read ? (
           <>
             <span title="Layers of thread (1 = just covered)">
@@ -112,7 +107,7 @@ export function DensityLegend() {
             <span title={`Thread added to the fabric (top + bobbin); the fabric weighs about ${f?.limits?.gsm ?? "?"} g/m²`}>
               +<b>{read.added.toFixed(0)}</b> g/m²
             </span>
-            <span className={`dl-cls k${read.cls}`}>{CLASS_LABELS[read.cls]}</span>
+            <span className={`dmap-cls k${read.cls}`}>{CLASS_LABELS[read.cls]}</span>
           </>
         ) : f && f.stats.area > 0 ? (
           <span className="stat">
@@ -121,7 +116,7 @@ export function DensityLegend() {
         ) : null}
       </div>
       {f && f.stats.area > 0 && (
-        <div className={`dl-hot ${spots.length ? "bad" : "good"}`}>
+        <div className={`dmap-hot ${spots.length ? "bad" : "good"}`}>
           {spots.length ? (
             <>
               <AlertTriangle size={13} />

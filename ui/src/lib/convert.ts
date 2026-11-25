@@ -12,16 +12,8 @@
 import type { PathNode, SubPath, Vec2 } from "../types";
 import { cubicAt, fitPath, flattenSubPath, segmentOf, vdist } from "./bezier";
 import { offsetPolyline } from "./geometry";
+import { add, cross as crossZ, lerp, mul, norm as unit, sub } from "./vec";
 
-const sub = (a: Vec2, b: Vec2): Vec2 => [a[0] - b[0], a[1] - b[1]];
-const add = (a: Vec2, b: Vec2): Vec2 => [a[0] + b[0], a[1] + b[1]];
-const mul = (a: Vec2, k: number): Vec2 => [a[0] * k, a[1] * k];
-const lerp = (a: Vec2, b: Vec2, t: number): Vec2 => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
-const unit = (a: Vec2): Vec2 => {
-  const l = Math.hypot(a[0], a[1]);
-  return l < 1e-12 ? [0, 0] : [a[0] / l, a[1] / l];
-};
-const crossZ = (a: Vec2, b: Vec2) => a[0] * b[1] - a[1] * b[0];
 
 /** Intersection of segments p1p2 and q1q2 (parameter on p, point), if any. */
 export function segmentHit(p1: Vec2, p2: Vec2, q1: Vec2, q2: Vec2): { t: number; p: Vec2 } | null {

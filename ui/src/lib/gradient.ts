@@ -9,6 +9,7 @@ import { gradientLayers, gradientRefusal, plainGroupOf, removeGradientDoc } from
 import { defaultFill, normAngle, objectBounds, uid, unionBoxes, type Box } from "./geometry";
 import { withParent } from "./groups";
 import { pruneGroups } from "./layerRows";
+import { cross } from "./vec";
 
 export { gradientLayers, gradientRefusal, repairGradients, reverseStops } from "./fillLayers";
 
@@ -433,7 +434,6 @@ function shapeMix(g: GradientParams, w: number[]) {
   } else for (let k = 0; k < w.length; k++) w[k] /= sum;
 }
 
-const cross = (a: Vec2, b: Vec2) => a[0] * b[1] - a[1] * b[0];
 
 /** (u, v) of `p` in the quad a (0,0) → b (1,0) → c (1,1) → d (0,1). */
 export function invBilinear(p: Vec2, a: Vec2, b: Vec2, c: Vec2, d: Vec2): [number, number] | null {

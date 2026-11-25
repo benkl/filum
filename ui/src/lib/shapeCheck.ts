@@ -7,8 +7,8 @@ import { flattenSubPath } from "./bezier";
 import { satinRailIndices } from "./geometry";
 import { repairLayers } from "./fillLayers";
 import { pruneGroups } from "./layerRows";
+import { sub } from "./vec";
 
-const sub = (a: Vec2, b: Vec2): Vec2 => [a[0] - b[0], a[1] - b[1]];
 const crossZ = (a: Vec2, b: Vec2) => a[0] * b[1] - a[1] * b[0];
 
 function properCross(p1: Vec2, p2: Vec2, q1: Vec2, q2: Vec2): boolean {

@@ -13,6 +13,7 @@
 import type { DesignObject, PathNode, SubPath, Vec2 } from "../types";
 import { cubicAt, flattenSubPath, isCurved, segmentOf, splitCubic } from "./bezier";
 import { satinRailIndices, uid } from "./geometry";
+import { dist, lerp } from "./vec";
 
 export interface AutoSatinOptions {
   /** Keep the order of the objects (only split them and add underpaths). */
@@ -26,8 +27,6 @@ export interface AutoSatinOptions {
   end?: Vec2;
 }
 
-const dist = (a: Vec2, b: Vec2) => Math.hypot(a[0] - b[0], a[1] - b[1]);
-const lerp = (a: Vec2, b: Vec2, t: number): Vec2 => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
 
 function cumulative(pts: Vec2[]): number[] {
   const c = [0];

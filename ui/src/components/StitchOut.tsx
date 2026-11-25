@@ -9,16 +9,13 @@ import { startCapture, stopCapture } from "../canvas/Canvas";
 import { SPEEDS, blockAt, buildTimeline, playRate, speedLabel, tickStep, type Timeline, type TimelineBlock } from "../lib/stitchout";
 import { colorSequence } from "../lib/threads";
 import { useStore } from "../store";
-import { FLAG, type PlanData } from "../types";
-import { fmtTime } from "./ui";
+import { FLAG, NO_OBJECT, type PlanData } from "../types";
+import { fmtTime, followPointer } from "./ui";
 import { threadTitle } from "./ThreadPicker";
 import { safeSetItem } from "../lib/storage";
 
 // ---------------------------------------------------------------------------
 // Playback
-
-/** A record no object sews (plan.objects). */
-const NO_OBJECT = 0xffffffff;
 
 const timelines = new WeakMap<PlanData, { key: string; tl: Timeline }>();
 
@@ -529,21 +526,15 @@ export function StitchOutPanel() {
       scrubbing = true;
       seek(recordAt(ev.clientX));
     };
-    const up = (ev: PointerEvent) => {
-      el.removeEventListener("pointermove", move);
-      el.removeEventListener("pointerup", up);
-      el.removeEventListener("pointercancel", up);
-      if (scrubbing || !seg || ev.type !== "pointerup") return;
+    followPointer(el, move, (ev, cancelled) => {
+      if (scrubbing || !seg || cancelled) return;
       // the captured pointer sends click and dblclick to the track: a second click on the same part goes to its start
       const start = Number(seg.dataset.start);
       const again = lastClick.current && lastClick.current.start === start && ev.timeStamp - lastClick.current.t < 400;
       lastClick.current = again ? null : { start, t: ev.timeStamp };
       if (again) seek(start);
       else selectObject(Number(seg.dataset.obj), ev.shiftKey || ev.ctrlKey || ev.metaKey);
-    };
-    el.addEventListener("pointermove", move);
-    el.addEventListener("pointerup", up);
-    el.addEventListener("pointercancel", up);
+    });
   };
 
   const resizeFrom = (e: RPointerEvent<HTMLDivElement>) => {
@@ -556,13 +547,7 @@ export function StitchOutPanel() {
       h = Math.round(Math.max(MIN_H, Math.min(max, h0 + y0 - ev.clientY)));
       setHeight(h);
     };
-    const up = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-      safeSetItem(HEIGHT_KEY, String(h));
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
+    followPointer(window, move, () => safeSetItem(HEIGHT_KEY, String(h)));
   };
 
   // a few blocks: the panel is only as tall as they need

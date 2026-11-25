@@ -405,29 +405,7 @@ mod tests {
 
     fn line(pts: &[(f64, f64)], satin: bool) -> Object {
         let p: Vec<Point> = pts.iter().map(|&(x, y)| pt(x, y)).collect();
-        Object {
-            id: "o".into(),
-            name: "Black line 1".into(),
-            thread: "t".into(),
-            visible: true,
-            locked: false,
-            paths: vec![SubPath::polyline(&p, false)],
-            stitch: if satin { StitchParams::Satin(SatinParams { width: 1.2, ..Default::default() }) } else { StitchParams::Running(RunningParams::default()) },
-            trim_after: false,
-            stop_after: false,
-            ties: Default::default(),
-            force_lock: false,
-            min_stitch: None,
-            min_jump: None,
-            clone: None,
-            hidden: None,
-            patterns: vec![],
-            start: None,
-            end: None,
-            lock: None,
-            color_sort_index: None,
-            link: None,
-        }
+        Object { name: "Black line 1".into(), ..Object::new("o", "t", vec![SubPath::polyline(&p, false)], if satin { StitchParams::Satin(SatinParams { width: 1.2, ..Default::default() }) } else { StitchParams::Running(RunningParams::default()) }) }
     }
 
     fn ends(o: &Object, doc: &crate::model::Document) -> (Point, Point) {

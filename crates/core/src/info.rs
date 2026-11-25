@@ -167,17 +167,17 @@ fn tally(plan: &StitchPlan, want: impl Fn(u32) -> bool) -> Tally {
 fn small_removed(engine: &mut Engine, doc: &Document, i: usize) -> usize {
     // the object's own minimum wins, as in the assembly
     let min = doc.min_stitch_of(&doc.objects[i]);
+    let loose = crate::assemble::loose_turns_for(&doc.objects[i]);
     let mut n = 0;
     for run in engine.object_runs(doc, i) {
         let Some(&(first, _)) = run.first() else { continue };
         let mut last = first;
         let k = run.len();
-        for (j, &(q, _)) in run.iter().enumerate().skip(1) {
-            let d = q.dist(last);
-            if d < 1e-6 {
+        for (j, &(q, f)) in run.iter().enumerate().skip(1) {
+            if q.dist(last) < 1e-6 {
                 continue;
             }
-            if d < min && j + 1 < k && crate::assemble::redundant(last, q, run[j + 1].0) {
+            if j + 1 < k && crate::assemble::drops_short(last, q, run[j + 1].0, f, min, loose) {
                 n += 1;
                 continue;
             }
@@ -254,34 +254,12 @@ mod tests {
     use crate::model::{Object, SubPath, Thread};
 
     fn obj(id: &str, thread: &str, pts: &[Point]) -> Object {
-        Object {
-            id: id.into(),
-            name: id.into(),
-            thread: thread.into(),
-            visible: true,
-            locked: false,
-            paths: vec![SubPath::polyline(pts, false)],
-            stitch: StitchParams::Manual(Default::default()),
-            trim_after: false,
-            stop_after: false,
-            ties: Default::default(),
-            force_lock: false,
-            min_stitch: None,
-            min_jump: None,
-            patterns: vec![],
-            clone: None,
-            hidden: None,
-            start: None,
-            end: None,
-            lock: None,
-            color_sort_index: None,
-            link: None,
-        }
+        Object::new(id, thread, vec![SubPath::polyline(pts, false)], StitchParams::Manual(Default::default()))
     }
 
     #[test]
     fn counts_per_object_and_total() {
-        let t = |id: &str, c: &str| Thread { id: id.into(), name: id.into(), color: c.into(), brand: String::new(), code: String::new(), weight: None, min_stitch: None };
+        let t = |id: &str, c: &str| Thread::new(id, id, c);
         let mut doc = Document {
             threads: vec![t("a", "#ff0000"), t("b", "#00ff00")],
             objects: vec![
@@ -312,7 +290,7 @@ mod tests {
 
     #[test]
     fn small_stitches_follow_the_objects_own_minimum() {
-        let t = Thread { id: "a".into(), name: "a".into(), color: "#ff0000".into(), brand: String::new(), code: String::new(), weight: None, min_stitch: None };
+        let t = Thread::new("a", "a", "#ff0000");
         let mut o = obj("o1", "a", &[pt(0.0, 0.0), pt(2.0, 0.0), pt(2.1, 0.0), pt(6.0, 0.0)]);
         o.min_stitch = Some(0.0);
         let mut doc = Document { threads: vec![t], objects: vec![o], ..Document::default() };
@@ -325,5 +303,32 @@ mod tests {
         doc.objects[0].min_stitch = Some(2.2);
         let info = element_info(&doc, &mut e, &[]);
         assert_eq!((info.objects[0].stitches, info.objects[0].small_removed), (2, 2));
+    }
+
+    #[test]
+    fn small_stitches_removed_add_up_with_the_plan() {
+        // a pixel staircase: the plan drops its loose turns too, and Info counts them
+        let mut st = vec![pt(0.0, 0.0)];
+        let (mut x, mut y) = (0.0, 0.0);
+        while x < 30.0 {
+            x += 0.3;
+            st.push(pt(x, y));
+            if y + 0.3 <= x * 0.577 {
+                y += 0.3;
+                st.push(pt(x, y));
+            }
+        }
+        let t = Thread::new("a", "a", "#ff0000");
+        let mut o = obj("o1", "a", &st);
+        o.stitch = StitchParams::Running(Default::default());
+        let mut doc = Document { threads: vec![t], objects: vec![o], ..Document::default() };
+        doc.machine.ties = false;
+        doc.machine.min_stitch = 0.6;
+        let mut e = Engine::new();
+        let points: usize = e.object_runs(&doc, 0).iter().map(|r| r.len()).sum();
+        let info = element_info(&doc, &mut e, &[]);
+        let a = &info.objects[0];
+        assert!(a.small_removed > 20, "{a:?}");
+        assert_eq!(a.stitches + a.small_removed, points, "every point is either sewn or counted as removed");
     }
 }

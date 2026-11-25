@@ -6,15 +6,9 @@
 import type { DesignObject, NodeRef, PathNode, StitchDocument, SubPath, Vec2 } from "../types";
 import { cubicAt, segmentOf, vdist } from "./bezier";
 import { freeSides } from "./satinSides";
+import { add, dot, mul, norm, sub } from "./vec";
+import { replaceObject } from "./docEdit";
 
-const sub = (a: Vec2, b: Vec2): Vec2 => [a[0] - b[0], a[1] - b[1]];
-const add = (a: Vec2, b: Vec2): Vec2 => [a[0] + b[0], a[1] + b[1]];
-const mul = (a: Vec2, k: number): Vec2 => [a[0] * k, a[1] * k];
-const dot = (a: Vec2, b: Vec2) => a[0] * b[0] + a[1] * b[1];
-const norm = (a: Vec2): Vec2 => {
-  const l = Math.hypot(a[0], a[1]);
-  return l < 1e-12 ? [0, 0] : [a[0] / l, a[1] / l];
-};
 const clone = (n: PathNode): PathNode => ({ p: n.p, ...(n.i ? { i: n.i } : {}), ...(n.o ? { o: n.o } : {}) });
 
 export const nodeKey = (n: NodeRef) => `${n.id}/${n.sp}/${n.ni}`;
@@ -349,7 +343,7 @@ export function joinNodes(doc: StitchDocument, sel: NodeRef[]): { doc: StitchDoc
       nodes.pop();
     }
     const paths = oa.paths.map((sp, k) => (k === a.sp ? { ...sp, nodes, closed: true } : sp));
-    return { doc: { ...doc, objects: doc.objects.map((o) => (o.id === oa.id ? { ...oa, paths } : o)) } };
+    return { doc: replaceObject(doc, oa.id, { ...oa, paths }) };
   }
   // orient: path A ends at the joint, path B starts there
   const rev = (sp: SubPath): PathNode[] => [...sp.nodes].reverse().map((n) => ({ p: n.p, ...(n.o ? { i: n.o } : {}), ...(n.i ? { o: n.i } : {}) }));
@@ -362,7 +356,7 @@ export function joinNodes(doc: StitchDocument, sel: NodeRef[]): { doc: StitchDoc
   if (oa.id === ob.id) {
     const paths = oa.paths.filter((_, k) => k !== a.sp && k !== b.sp);
     paths.splice(Math.min(a.sp, b.sp), 0, joined);
-    return { doc: { ...doc, objects: doc.objects.map((o) => (o.id === oa.id ? { ...oa, paths } : o)) } };
+    return { doc: replaceObject(doc, oa.id, { ...oa, paths }) };
   }
   // two objects: the second one's path moves into the first
   const paths = oa.paths.map((sp, k) => (k === a.sp ? joined : sp));

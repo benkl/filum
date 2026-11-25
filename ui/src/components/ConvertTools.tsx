@@ -11,7 +11,7 @@ import type { DesignObject, SubPath, Vec2 } from "../types";
 import { flattenSubPath } from "../lib/bezier";
 import { patternSatin, SATIN_PATTERNS, type SatinPattern, type ZigzagPattern } from "../lib/convert";
 import { applies, applyPlan, DEFAULT_CONVERT, planConversion, UNDERLAYS, type ConvertId, type ConvertOptions, type ConvertPlan } from "../lib/convertActions";
-import { Dialog, Num, Row, Slider, Toggle } from "./ui";
+import { Dialog, Num, Row, Slider, Toggle, useDismiss } from "./ui";
 import { safeSetItem } from "../lib/storage";
 
 const KEY = "filum.convert";
@@ -449,14 +449,7 @@ export function ConvertDialog({ onClose }: { onClose: () => void }) {
 export function ConvertMenuButton({ objects }: { objects: DesignObject[] }) {
   const [at, setAt] = useState<{ x: number; y: number } | null>(null);
   const items = CONVERSIONS.filter((c) => applies(c.id, objects));
-  useEffect(() => {
-    if (!at) return;
-    const close = (e: PointerEvent) => {
-      if (!(e.target as HTMLElement).closest(".convert-menu,.convert-btn")) setAt(null);
-    };
-    window.addEventListener("pointerdown", close);
-    return () => window.removeEventListener("pointerdown", close);
-  }, [at]);
+  useDismiss(!!at, () => setAt(null), [".convert-menu", ".convert-btn"]);
   if (!items.length) return null;
   return (
     <>

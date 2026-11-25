@@ -15,9 +15,8 @@
 // the digitizer can route with it too.
 
 import type { Vec2 } from "../types";
+import { d2, dist } from "./vec";
 
-const d2 = (a: Vec2, b: Vec2) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2;
-const dist = (a: Vec2, b: Vec2) => Math.sqrt(d2(a, b));
 
 /** Where two segments cross (parameters on both), if they do. */
 function cross(a: Vec2, b: Vec2, c: Vec2, d: Vec2): [number, number] | null {

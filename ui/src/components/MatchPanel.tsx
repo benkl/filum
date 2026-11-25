@@ -8,7 +8,7 @@ import { createPortal } from "react-dom";
 import { fitTargetId, loadMatchOptions, myLines, previewFit, saveMatchOptions, useMyThreads, type FitTarget } from "../lib/threads";
 import { MATCH_PRESETS, type MatchOptions } from "../lib/threadMatch";
 import { useStore } from "../store";
-import { Grip, Num, Row, Slider, Toggle, useMovable } from "./ui";
+import { Grip, Num, Row, Slider, Toggle, useDismiss, useMovable } from "./ui";
 
 /** The match options, shared by the panel and the fit (localStorage). */
 export function useMatchOptions(): [MatchOptions, (p: Partial<MatchOptions>, preset?: MatchOptions["preset"]) => void] {
@@ -52,18 +52,7 @@ function MatchPanel({ anchor, target, opts, set, onClose }: { anchor: HTMLElemen
     const w = 360;
     setPos({ left: Math.max(8, Math.min(window.innerWidth - w - 8, r.left)), top: Math.min(r.bottom + 4, window.innerHeight - 560) });
   }, [anchor]);
-  useEffect(() => {
-    const down = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node) && !anchor.contains(e.target as Node)) onClose();
-    };
-    const key = (e: KeyboardEvent) => e.key === "Escape" && (e.stopPropagation(), onClose());
-    window.addEventListener("pointerdown", down, true);
-    window.addEventListener("keydown", key, true);
-    return () => {
-      window.removeEventListener("pointerdown", down, true);
-      window.removeEventListener("keydown", key, true);
-    };
-  }, [anchor, onClose]);
+  useDismiss(true, onClose, [ref, anchor]);
   // live preview of the fit with these options
   useEffect(() => {
     let live = true;

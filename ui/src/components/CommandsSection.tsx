@@ -46,11 +46,7 @@ export function CommandsSection({ objects }: { objects: DesignObject[] }) {
   const ids = new Set(objects.map((o) => o.id));
   const choice = linkChoiceOf(last);
   const conn = connectionAfter(plan, { objects: order }, last.id);
-  const all = (p: Partial<DesignObject>) =>
-    useStore.getState().commit((d) => ({
-      ...d,
-      objects: d.objects.map((o) => (ids.has(o.id) ? { ...o, ...p } : o)),
-    }));
+  const all = (p: Partial<DesignObject>) => useStore.getState().updateObject([...ids], p);
   const ties = objects.every((o) => (o.ties ?? "both") === (objects[0].ties ?? "both")) ? (objects[0].ties ?? "both") : null;
   const same = <T,>(f: (o: DesignObject) => T) => (objects.every((o) => f(o) === f(objects[0])) ? f(objects[0]) : undefined);
   return (

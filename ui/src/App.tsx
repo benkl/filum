@@ -28,6 +28,7 @@ import { compoundSelection, joinSelection, releaseSelection } from "./lib/pathAc
 import { averageSelectedNodes } from "./lib/nodeActions";
 import { pickLine, pickedLine } from "./lib/satinGuides";
 import { orientationLines, removeOrientationLine } from "./lib/satinSides";
+import { replaceObject } from "./lib/docEdit";
 
 const TOOL_KEYS: Record<string, Tool> = {
   v: "select",
@@ -152,7 +153,7 @@ function useShortcuts() {
           const o = pl && s.doc.objects.find((x) => x.id === pl.id && !x.locked);
           if (pl && o && orientationLines(o).lines[pl.index]) {
             const next = removeOrientationLine(o, pl.index);
-            s.commit((d) => ({ ...d, objects: d.objects.map((x) => (x.id === o.id ? next : x)) }));
+            s.commit((d) => replaceObject(d, o.id, next));
             pickLine(null);
             return;
           }

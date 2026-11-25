@@ -19,6 +19,7 @@
 
 import type { PathNode, SubPath, Vec2 } from "../types";
 import { cubicAt, flattenSubPath, segmentOf } from "./bezier";
+import { d2, dist, norm, sub } from "./vec";
 
 export interface ConnectOptions {
   /** Piece ends closer than this meet (mm). */
@@ -41,13 +42,6 @@ export interface ConnectResult {
   doubled: number;
 }
 
-const d2 = (a: Vec2, b: Vec2) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2;
-const dist = (a: Vec2, b: Vec2) => Math.sqrt(d2(a, b));
-const sub = (a: Vec2, b: Vec2): Vec2 => [a[0] - b[0], a[1] - b[1]];
-const norm = (v: Vec2): Vec2 => {
-  const l = Math.hypot(v[0], v[1]);
-  return l > 1e-12 ? [v[0] / l, v[1] / l] : [0, 0];
-};
 
 /** A piece turned round: nodes in reverse order, in and out handles swapped. */
 export function reversePiece(sp: SubPath): SubPath {

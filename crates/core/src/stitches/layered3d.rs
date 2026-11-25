@@ -129,7 +129,7 @@ mod tests {
     fn thread(id: &str) -> Thread {
         // each its own colour (threads of one colour share a spool)
         let color = format!("#{:06x}", id.bytes().fold(7u32, |h, c| h.wrapping_mul(31).wrapping_add(c as u32)) & 0xff_ffff);
-        Thread { id: id.into(), name: id.into(), color, brand: "".into(), code: "".into(), weight: None, min_stitch: None }
+        Thread::new(id, id, color)
     }
     fn doc(objects: Vec<Object>, threads: &[&str]) -> Document {
         Document { threads: threads.iter().map(|t| thread(t)).collect(), objects, ..Default::default() }

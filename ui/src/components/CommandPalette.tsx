@@ -7,15 +7,11 @@ import { Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { commandScore as score } from "../lib/commandSearch";
 import { buildMenus, flattenMenus, type MenuEntry } from "./menuModel";
-import { safeSetItem } from "../lib/storage";
+import { loadJson, safeSetItem } from "../lib/storage";
 
 const RECENT_KEY = "filum.palette.recent";
 const recent = (): string[] => {
-  try {
-    return JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]");
-  } catch {
-    return [];
-  }
+  return loadJson(RECENT_KEY, []);
 };
 const keyOf = (path: string[], label: string) => [...path, label].join(" ▸ ");
 

@@ -7,10 +7,11 @@ import { useEffect, useRef, useState } from "react";
 import { engine } from "../engine/client";
 import { defaultStitch, pathsToPath2D, uid } from "../lib/geometry";
 import { useStore } from "../store";
-import type { DesignObject, StitchParams, SubPath } from "../types";
+import { FLAG, type DesignObject, type StitchParams, type SubPath } from "../types";
 import { Dialog, Num, Row, Toggle } from "./ui";
 import "../output.css";
-import { safeSetItem } from "../lib/storage";
+import { loadMerged, safeSetItem } from "../lib/storage";
+import { planBounds } from "../lib/planBounds";
 
 /** Ink/Stitch's outline options (mm, threshold mm²). */
 interface OutlineParams {
@@ -31,13 +32,7 @@ export function RebuildShapesDialog({ onClose }: { onClose: () => void }) {
   const doc = useStore((s) => s.doc);
   const selection = useStore((s) => s.selection);
   const objects = doc.objects.filter((o) => selection.includes(o.id) && o.stitch.type !== "none");
-  const [p, setP] = useState<OutlineParams>(() => {
-    try {
-      return { ...PRESETS[0].p, ...JSON.parse(localStorage.getItem(KEY) ?? "{}") };
-    } catch {
-      return PRESETS[0].p;
-    }
-  });
+  const [p, setP] = useState<OutlineParams>(() => loadMerged(KEY, PRESETS[0].p));
   const [keep, setKeep] = useState(false);
   const [as, setAs] = useState<"fill" | "running">("fill");
   const [result, setResult] = useState<{ id: string; paths: SubPath[] }[] | null>(null);
@@ -76,18 +71,9 @@ export function RebuildShapesDialog({ onClose }: { onClose: () => void }) {
     const ctx = c.getContext("2d")!;
     ctx.clearRect(0, 0, c.width, c.height);
     const idx = new Set(objects.map((o) => doc.objects.indexOf(o)));
-    let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
-    if (plan)
-      for (let i = 0; i < plan.flags.length; i++) {
-        if (!idx.has(plan.objects[i]) || plan.flags[i] & 31) continue;
-        const x = plan.coords[2 * i];
-        const y = plan.coords[2 * i + 1];
-        x0 = Math.min(x0, x);
-        y0 = Math.min(y0, y);
-        x1 = Math.max(x1, x);
-        y1 = Math.max(y1, y);
-      }
-    if (!(x1 > x0) && !(y1 > y0)) return;
+    const b = plan && planBounds(plan, (i) => idx.has(plan.objects[i]));
+    if (!b || (!(b.w > 0) && !(b.h > 0))) return;
+    const [x0, y0, x1, y1] = [b.x, b.y, b.x + b.w, b.y + b.h];
     const s = Math.min((W - 24) / Math.max(1, x1 - x0), (H - 24) / Math.max(1, y1 - y0));
     ctx.setTransform(s * dpr, 0, 0, s * dpr, dpr * ((W - (x1 - x0) * s) / 2 - x0 * s), dpr * ((H - (y1 - y0) * s) / 2 - y0 * s));
     const color = (o: DesignObject) => doc.threads.find((t) => t.id === o.thread)?.color ?? "#333";
@@ -99,7 +85,7 @@ export function RebuildShapesDialog({ onClose }: { onClose: () => void }) {
       ctx.beginPath();
       for (let i = 0; i < plan.flags.length; i++) {
         const f = plan.flags[i];
-        if (!idx.has(plan.objects[i]) || f & 31) {
+        if (!idx.has(plan.objects[i]) || f & FLAG.COMMANDS) {
           pen = false;
           continue;
         }

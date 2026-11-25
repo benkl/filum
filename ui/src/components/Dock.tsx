@@ -26,11 +26,11 @@ import { useShallow } from "zustand/react/shallow";
 import { buildLayerRows, dropOnRow, groupInfo, moveBlock, pruneGroups, type GroupLayerRow as GroupRow, type LayerListRow, type ObjectLayerRow as ObjectRow } from "../lib/layerRows";
 import { liveGroups, within } from "../lib/groups";
 import { filterRows, groupByKind, groupByThread, groupTargets, KIND_FILTERS, moveToGroup, rangeIds, solo, ungroupAll, type KindFilter } from "../lib/layerTools";
-import { groupSelection, selectSimilar, ungroupSelection } from "../lib/arrange";
+import { groupSelection, selectSimilar, showAll, ungroupSelection, unlockAll } from "../lib/arrange";
 import { Menu } from "./MenuBar";
 import { lastInOrder, linkMenu } from "./linkMenu";
 import { linkChoiceOf } from "../lib/links";
-import type { MenuItem } from "./menuModel";
+import { mod, type MenuItem } from "./menuModel";
 import {
   defaultDesignOptions,
   defaultGuide,
@@ -46,7 +46,7 @@ import { HoopOptions } from "./Bars";
 import { HoopShapeRow, MaterialSection } from "./MaterialPanel";
 import { HOOPS, hoopIndex, hoopOf } from "../lib/hoops";
 import { fitHoopToDesign } from "../lib/actions";
-import { Num, PatternInput, Row, Section, Slider, Toggle } from "./ui";
+import { Num, PatternInput, Row, Section, Slider, Toggle, useDismiss } from "./ui";
 import { Satin3dSection } from "./Satin3dSection";
 import { beansToPasses, formatPattern, parsePattern, passesToBeans } from "../lib/patterns";
 import { defaultRippleGuide, guidePair, isRipple, useAsRippleGuide } from "../lib/rippleGuide";
@@ -56,6 +56,8 @@ import { TartanSection } from "./TartanPanel";
 import { CutworkSection } from "./CutworkPanel";
 import { ElementInfoSection } from "./ElementInfo";
 import { differingSettings, EditTargets, settingLabel, useEditTargets } from "./editTargets";
+import { mapObjects } from "../lib/docEdit";
+import { focus } from "../lib/focus";
 
 function Thumb({ o, color }: { o: DesignObject; color: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -417,6 +419,8 @@ export function LayersPanel() {
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<KindFilter>("all");
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
+  const closeMenu = () => setMenu(null);
+  useDismiss(!!menu, closeMenu, [".menu"]);
   /** Where a Shift-click range starts: the row clicked last. */
   const anchor = useRef<string | null>(null);
   const filtering = !!query.trim() || kind !== "all";
@@ -436,10 +440,7 @@ export function LayersPanel() {
   const ctl = useRef<LayerCtl | null>(null);
   if (!ctl.current) {
     const row = (key: string) => cur.current.rows.find((r) => r.key === key);
-    const setAll = (ids: string[], patch: (o: DesignObject) => Partial<DesignObject>) => {
-      const set = new Set(ids);
-      s().commit((d) => ({ ...d, objects: d.objects.map((x) => (set.has(x.id) ? { ...x, ...patch(x) } : x)) }));
-    };
+    const setAll = (ids: string[], patch: (o: DesignObject) => Partial<DesignObject>) => s().updateObject(ids, patch);
     ctl.current = {
       select: (key, e) => {
         const r = row(key);
@@ -522,8 +523,8 @@ export function LayersPanel() {
                 "-",
               ] as MenuItem[])
             : []),
-          { label: "Group", kbd: "Ctrl+G", run: groupSelection, disabled: ids.length < 2 && r.kind !== "group" },
-          { label: "Ungroup", kbd: "Ctrl+⇧G", run: ungroupSelection, disabled: !objs.some((o) => o.group) },
+          { label: "Group", kbd: `${mod}G`, run: groupSelection, disabled: ids.length < 2 && r.kind !== "group" },
+          { label: "Ungroup", kbd: `${mod}⇧G`, run: ungroupSelection, disabled: !objs.some((o) => o.group) },
           {
             label: "Move to group",
             disabled: !targets.length && !objs.some((o) => o.group),
@@ -544,7 +545,7 @@ export function LayersPanel() {
           "-",
           ...(r.kind !== "group" && ids.length ? ([{ label: "After it", hint: "Automatic, trim, jump or sew to the next object", sub: linkMenu(lastInOrder(ids)!) }, "-"] as MenuItem[]) : []),
           { label: "Show only this", run: () => s().commit((d) => solo(d, ids)), hint: "Alt-click an eye does the same" },
-          { label: "Show all", run: () => setAll(s().doc.objects.map((o) => o.id), () => ({ visible: true })), disabled: doc.objects.every((o) => o.visible) },
+          { label: "Show all", kbd: `${mod}Alt+3`, run: showAll, disabled: doc.objects.every((o) => o.visible) },
           { label: objs.every((o) => o.locked) ? "Unlock" : "Lock", run: () => setAll(ids, () => ({ locked: !objs.every((o) => o.locked) })) },
           "-",
           { label: "Delete", kbd: "Del", run: () => s().deleteSelection() },
@@ -608,8 +609,8 @@ export function LayersPanel() {
         { label: "Unfold all groups", run: () => setGroupsFolded(groups, false), disabled: !groups.length },
         "-",
         { label: "Select what's listed", run: () => s().select([...new Set(rows.flatMap((x) => x.ids))]), hint: "Every object the filter shows" },
-        { label: "Show all", run: () => s().commit((d) => ({ ...d, objects: d.objects.map((o) => (o.visible ? o : { ...o, visible: true })) })), disabled: doc.objects.every((o) => o.visible) },
-        { label: "Unlock all", run: () => s().commit((d) => ({ ...d, objects: d.objects.map((o) => (o.locked ? { ...o, locked: false } : o)) })), disabled: !doc.objects.some((o) => o.locked) },
+        { label: "Show all", kbd: `${mod}Alt+3`, run: showAll, disabled: doc.objects.every((o) => o.visible) },
+        { label: "Unlock all", kbd: `${mod}Alt+2`, run: unlockAll, disabled: !doc.objects.some((o) => o.locked) },
       ],
     });
   };
@@ -651,7 +652,7 @@ export function LayersPanel() {
           </button>
         </div>
       )}
-      {menu && <Menu items={menu.items} x={menu.x} y={menu.y} onClose={() => setMenu(null)} />}
+      {menu && <Menu items={menu.items} x={menu.x} y={menu.y} onClose={closeMenu} />}
       {rows.map((r) =>
         r.kind === "group" ? (
           <GroupHeader
@@ -1891,7 +1892,6 @@ export function PropertiesPanel() {
 export function IssuesPanel() {
   const doc = useStore((s) => s.doc);
   const plan = useStore((s) => s.plan);
-  const view = useStore((s) => s.view);
   const issues = computeIssues(doc, plan);
   const tiny = cleanupCandidates(doc);
   const cleanup = tiny.length ? (
@@ -1913,12 +1913,7 @@ export function IssuesPanel() {
     </div>
   ) : null;
   if (!issues.length) return cleanup ?? <div className="hint" style={{ padding: 14 }}>No problems found. Markers appear on the canvas while this tab is open.</div>;
-  const locate = (i: Issue) => {
-    const s = useStore.getState();
-    if (i.objId) s.select([i.objId]);
-    const el = document.querySelector(".canvas-wrap")!.getBoundingClientRect();
-    s.setView({ ox: el.width / 2 - i.at[0] * view.scale, oy: el.height / 2 - i.at[1] * view.scale });
-  };
+  const locate = (i: Issue) => focus({ ids: i.objId ? [i.objId] : undefined, at: i.at });
   return (
     <div>
       {cleanup}
@@ -2225,7 +2220,7 @@ function CloneInfo({ o }: { o: DesignObject }) {
         <button
           className="btn sm ghost"
           title="Make it a plain copy that no longer follows the original"
-          onClick={() => useStore.getState().commit((d) => ({ ...d, objects: d.objects.map((x) => (x.id === o.id ? unlinkClone(x) : x)) }))}
+          onClick={() => useStore.getState().commit((d) => mapObjects(d, o.id, (x) => unlinkClone(x)))}
         >
           Unlink
         </button>

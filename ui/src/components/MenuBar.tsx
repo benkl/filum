@@ -1,6 +1,7 @@
 import { Check, ChevronRight, Redo2, Save, Search, Undo2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { useDismiss } from "./ui";
 import { saveDocument } from "../lib/actions";
 import { isTauri } from "../lib/platform";
 import { useStore } from "../store";
@@ -22,14 +23,8 @@ export function MenuBar() {
   useWindowTitle(title);
   const focused = useWindowFocused();
 
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: PointerEvent) => {
-      if (!(e.target as HTMLElement).closest(".menu,.menu-btn")) setOpen(null);
-    };
-    window.addEventListener("pointerdown", close);
-    return () => window.removeEventListener("pointerdown", close);
-  }, [open]);
+  // Escape is the menu bar's own (see the keyboard handling below)
+  useDismiss(!!open, () => setOpen(null), [".menu", ".menu-btn"], { escape: false });
 
   const menus = buildMenus();
   const names = Object.keys(menus);

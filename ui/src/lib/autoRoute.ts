@@ -1,6 +1,6 @@
 // Auto-route running stitch on the selection (see ./route for the routing).
 
-import type { DesignObject, Vec2 } from "../types";
+import { FLAG, NO_OBJECT, type DesignObject, type Vec2 } from "../types";
 import { useStore } from "../store";
 import { flattenSubPath } from "./bezier";
 import { uid } from "./geometry";
@@ -8,7 +8,7 @@ import { routeRunning } from "./route";
 import { autoSatin } from "./autoSatin";
 import { withParent } from "./groups";
 import { pruneGroups } from "./layerRows";
-import { safeSetItem } from "./storage";
+import { loadMerged, safeSetItem } from "./storage";
 
 // ---------------------------------------------------------------------------
 // The action on the selection
@@ -100,7 +100,7 @@ export function jumpsToStrokes(min = 1, max = 15): string | null {
   const last = new Map<number, Vec2>();
   for (let i = 0; i < plan.objects.length; i++) {
     const o = plan.objects[i];
-    if (o === 0xffffffff || plan.flags[i] & 31) continue;
+    if (o === NO_OBJECT || plan.flags[i] & FLAG.COMMANDS) continue;
     const p: Vec2 = [plan.coords[i * 2], plan.coords[i * 2 + 1]];
     if (!first.has(o)) first.set(o, p);
     last.set(o, p);
@@ -151,11 +151,7 @@ const SATIN_OPTS = "filum.autoSatin";
 
 /** The remembered options of Auto-route satins. */
 export function autoSatinOptions(): { trim: boolean; preserveOrder: boolean; keepOriginals: boolean } {
-  try {
-    return { trim: false, preserveOrder: false, keepOriginals: false, ...JSON.parse(localStorage.getItem(SATIN_OPTS) ?? "{}") };
-  } catch {
-    return { trim: false, preserveOrder: false, keepOriginals: false };
-  }
+  return loadMerged(SATIN_OPTS, { trim: false, preserveOrder: false, keepOriginals: false });
 }
 export function setAutoSatinOptions(o: Partial<ReturnType<typeof autoSatinOptions>>) {
   safeSetItem(SATIN_OPTS, JSON.stringify({ ...autoSatinOptions(), ...o }));

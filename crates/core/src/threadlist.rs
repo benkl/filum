@@ -239,15 +239,7 @@ pub fn apply_thread_list(doc: &Document, engine: &mut Engine, entries: &[ThreadL
     let mut out = doc.clone();
     let spec = |t: &Thread, e: &ThreadListEntry| -> Thread {
         let rgb = parse_hex(e.color.as_deref().unwrap_or("")).unwrap_or([0, 0, 0]);
-        Thread {
-            id: t.id.clone(),
-            name: if e.name.is_empty() { crate::threads::nearest_name(rgb) } else { e.name.clone() },
-            color: hex_color(rgb),
-            brand: e.brand.clone(),
-            code: e.code.clone(),
-            weight: t.weight,
-            min_stitch: t.min_stitch,
-        }
+        Thread { brand: e.brand.clone(), code: e.code.clone(), weight: t.weight, min_stitch: t.min_stitch, ..Thread::new(t.id.clone(), if e.name.is_empty() { crate::threads::nearest_name(rgb) } else { e.name.clone() }, hex_color(rgb)) }
     };
     let same = |a: &Thread, b: &Thread| a.color.eq_ignore_ascii_case(&b.color) && a.name == b.name && a.code == b.code && a.brand == b.brand;
     // per thread id: the distinct new threads in object order
@@ -269,7 +261,7 @@ pub fn apply_thread_list(doc: &Document, engine: &mut Engine, entries: &[ThreadL
         let Some(old) = doc.threads.iter().find(|t| t.id == tid) else {
             // an object without a known thread gets a new one
             let id = next_id();
-            let blank = Thread { id: id.clone(), name: String::new(), color: String::new(), brand: String::new(), code: String::new(), weight: None, min_stitch: None };
+            let blank = Thread::new(id.clone(), String::new(), String::new());
             new_threads.push(spec(&blank, e));
             out.objects[i].thread = id;
             continue;
@@ -311,33 +303,11 @@ mod tests {
     use crate::geom::pt;
 
     fn thread(id: &str, color: &str) -> Thread {
-        Thread { id: id.into(), name: id.into(), color: color.into(), brand: String::new(), code: String::new(), weight: None, min_stitch: None }
+        Thread::new(id, id, color)
     }
 
     fn line_object(id: &str, thread: &str, y: f64) -> Object {
-        Object {
-            id: id.into(),
-            name: id.into(),
-            thread: thread.into(),
-            visible: true,
-            locked: false,
-            paths: vec![SubPath::polyline(&[pt(0.0, y), pt(5.0, y), pt(10.0, y)], false)],
-            stitch: StitchParams::Manual(Default::default()),
-            trim_after: false,
-            stop_after: false,
-            ties: Default::default(),
-            force_lock: false,
-            min_stitch: None,
-            min_jump: None,
-            patterns: vec![],
-            clone: None,
-            hidden: None,
-            start: None,
-            end: None,
-            lock: None,
-            color_sort_index: None,
-            link: None,
-        }
+        Object::new(id, thread, vec![SubPath::polyline(&[pt(0.0, y), pt(5.0, y), pt(10.0, y)], false)], StitchParams::Manual(Default::default()))
     }
 
     #[test]

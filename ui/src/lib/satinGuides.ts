@@ -8,17 +8,10 @@
 import { useStore } from "../store";
 import type { DesignObject, SatinParams, StitchDocument, SubPath, Vec2 } from "../types";
 import { flattenSubPath } from "./bezier";
+import { add, len, mul, norm, sub } from "./vec";
 
 export type Guide = [Vec2, Vec2];
 
-const sub = (a: Vec2, b: Vec2): Vec2 => [a[0] - b[0], a[1] - b[1]];
-const add = (a: Vec2, b: Vec2): Vec2 => [a[0] + b[0], a[1] + b[1]];
-const mul = (a: Vec2, k: number): Vec2 => [a[0] * k, a[1] * k];
-const len = (a: Vec2) => Math.hypot(a[0], a[1]);
-const norm = (a: Vec2): Vec2 => {
-  const l = len(a);
-  return l < 1e-12 ? [0, 0] : [a[0] / l, a[1] / l];
-};
 
 export const isSatin = (o: DesignObject | undefined): o is DesignObject & { stitch: { type: "satin" } & SatinParams } => o?.stitch.type === "satin";
 

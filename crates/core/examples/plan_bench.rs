@@ -226,33 +226,11 @@ fn suite(dir: &PathBuf, only: Option<&str>) -> Result<Vec<Case>, String> {
 
 fn thread(i: usize) -> Thread {
     let c = ["#c8102e", "#1f4e9c", "#f2b300", "#2e8b57", "#6b3fa0", "#e87722"][i % 6];
-    Thread { id: format!("t{i}"), name: format!("T{i}"), color: c.into(), brand: String::new(), code: String::new(), weight: None, min_stitch: None }
+    Thread::new(format!("t{i}"), format!("T{i}"), c)
 }
 
 fn object(id: String, thread: usize, paths: Vec<SubPath>, stitch: StitchParams) -> Object {
-    Object {
-        id: id.clone(),
-        name: id,
-        thread: format!("t{thread}"),
-        visible: true,
-        locked: false,
-        paths,
-        stitch,
-        trim_after: false,
-        stop_after: false,
-        ties: Default::default(),
-        force_lock: false,
-        min_stitch: None,
-        min_jump: None,
-        clone: None,
-        hidden: None,
-        patterns: vec![],
-        start: None,
-        end: None,
-        lock: None,
-        color_sort_index: None,
-        link: None,
-    }
+    Object::new(id.clone(), format!("t{thread}"), paths, stitch)
 }
 
 fn ellipse(c: Point, rx: f64, ry: f64, n: usize) -> Vec<SubPath> {

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Menu } from "../components/MenuBar";
+import { useDismiss } from "../components/ui";
 import { contextMenu, type MenuItem } from "../components/menuModel";
 import { linkMenu } from "../components/linkMenu";
 import { addSplitLine, draftPlan, splittable } from "../components/SplitTool";
@@ -107,6 +108,8 @@ import { pruneGroups } from "../lib/layerRows";
 import { freshCopies } from "../lib/copies";
 import { transformable } from "../lib/textSettle";
 import { loadFont } from "../lib/fonts";
+import { mapObjects, replaceObject } from "../lib/docEdit";
+import { fitView, zoomAt } from "../lib/view";
 
 /**
  * The box a transform drag works on: round the selected objects it moves
@@ -307,17 +310,7 @@ function keepInView(prev: { w: number; h: number }, w: number, h: number, auto: 
   s.setView(next);
 }
 
-export function fitView(width: number, height: number, box: Box) {
-  const pad = 40;
-  const w = Math.max(10, width - RULER - pad * 2);
-  const h = Math.max(10, height - RULER - pad * 2);
-  const scale = Math.min(w / box.w, h / box.h);
-  return {
-    scale,
-    ox: RULER + pad + (w - box.w * scale) / 2 - box.x * scale,
-    oy: RULER + pad + (h - box.h * scale) / 2 - box.y * scale,
-  };
-}
+export { fitView };
 
 // The viewport is three stacked canvases; these helpers flatten them for
 // screenshots (production sheet) and the stitch-out video recorder.
@@ -1003,7 +996,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
     if (old) {
       // continued path: keep the object, its colour and its settings
       const next: DesignObject = { ...old, paths: o.paths, stitch: o.stitch.type === old.stitch.type ? { ...old.stitch, ...(o.stitch.type === "satin" ? { width: (o.stitch as { width: number }).width } : {}) } as StitchParams : o.stitch };
-      s.commit((doc) => ({ ...doc, objects: doc.objects.map((x) => (x.id === old.id ? next : x)) }));
+      s.commit((doc) => replaceObject(doc, old.id, next));
       s.select([old.id]);
     } else {
       s.addObjects([o]);
@@ -1378,7 +1371,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
           if (hit) {
             if (e.altKey) {
               const next = removeOrientationLine(sat, hit.index);
-              s.commit((doc) => ({ ...doc, objects: doc.objects.map((x) => (x.id === sat.id ? next : x)) }));
+              s.commit((doc) => replaceObject(doc, sat.id, next));
               guideHover.current = null;
               pickLine(null);
               draw();
@@ -1389,7 +1382,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
             // point pairs become guides first (in the same order): then they move like any guide
             const freed = freeSides(sat);
             guideFreedFrom.current = freed !== sat ? s.doc : null;
-            if (freed !== sat) s.liveUpdate((doc) => ({ ...doc, objects: doc.objects.map((x) => (x.id === sat.id ? freed : x)) }));
+            if (freed !== sat) s.liveUpdate((doc) => replaceObject(doc, sat.id, freed));
             dragRef.current =
               hit.end === null
                 ? { kind: "guidemove", id: sat.id, index: hit.index, start: p, orig: guidesOf(freed)[hit.index], moved: false }
@@ -1435,11 +1428,11 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         if (hh) {
           const o = s.doc.objects.find((x) => x.id === hh.objId)!;
           if (hh.kind === "reverse") {
-            s.commit((d) => ({ ...d, objects: d.objects.map((x) => (x.id === o.id ? reverseObject(x, hh) : x)) }));
+            s.commit((d) => mapObjects(d, o.id, (x) => reverseObject(x, hh)));
             return;
           }
           if ((hh.kind === "start" || hh.kind === "end") && e.detail === 2) {
-            s.commit((d) => ({ ...d, objects: d.objects.map((x) => (x.id === o.id ? { ...x, [hh.kind]: undefined } : x)) }));
+            s.commit((d) => mapObjects(d, o.id, (x) => ({ ...x, [hh.kind]: undefined })));
             return;
           }
           s.checkpoint();
@@ -1550,14 +1543,14 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
                   if (part === "p" && e.altKey) {
                     // Alt-click: delete the point (Ctrl too: the pair on both rails of a satin)
                     const next = deleteFromObject(o, si, ni, e.ctrlKey || e.metaKey);
-                    if (next) s.commit((doc) => syncGradientGeometry({ ...doc, objects: doc.objects.map((x) => (x.id === o.id ? next : x)) }, next));
+                    if (next) s.commit((doc) => syncGradientGeometry(replaceObject(doc, o.id, next), next));
                     else s.toast("A path needs at least two points");
                     s.set({ nodeSel: [] });
                     return;
                   }
                   if (part === "p" && e.detail === 2) {
                     const paths = o.paths.map((x, k) => (k === si ? toggleSmooth(x, ni) : x));
-                    s.commit((doc) => syncGradientGeometry({ ...doc, objects: doc.objects.map((x) => (x.id === o.id ? { ...o, paths } : x)) }, { ...o, paths }));
+                    s.commit((doc) => syncGradientGeometry(replaceObject(doc, o.id, { ...o, paths }), { ...o, paths }));
                     return;
                   }
                   if (part === "p") {
@@ -1587,7 +1580,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
             const hit = guideHit(orientationLines(o).lines, p, Math.max(tol, 6 / s.view.scale));
             if (hit && hit.end === null) {
               const next = removeOrientationLine(o, hit.index);
-              s.commit((doc) => ({ ...doc, objects: doc.objects.map((x) => (x.id === o.id ? next : x)) }));
+              s.commit((doc) => replaceObject(doc, o.id, next));
               return;
             }
           }
@@ -2193,7 +2186,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
           return roundCorners(sp, radii, cornerStyle);
         });
         const o = { ...d.orig, paths };
-        s.liveUpdate((doc) => syncGradientGeometry({ ...doc, objects: doc.objects.map((x) => (x.id === o.id ? o : x)) }, o));
+        s.liveUpdate((doc) => syncGradientGeometry(replaceObject(doc, o.id, o), o));
         iRef.current.tooltip = { p, text: `${d.all ? "All corners" : "Corner"} ${r.toFixed(1)} mm · ${cornerStyle}${d.all ? "" : " · Shift: all corners"} · Alt-click a widget: style` };
         draw();
         return;
@@ -2219,7 +2212,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
             n[other] = [orig.p[0] + (dx / l) * len, orig.p[1] + (dy / l) * len];
           }
         }
-        s.liveUpdate((doc) => syncGradientGeometry({ ...doc, objects: doc.objects.map((x) => (x.id === o.id ? o : x)) }, o));
+        s.liveUpdate((doc) => syncGradientGeometry(replaceObject(doc, o.id, o), o));
         return;
       }
       case "shape": {
@@ -2299,7 +2292,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         const paths = [...d.o.paths];
         paths[d.sp] = bendSegment(d.o.paths[d.sp], d.seg, d.t, [p[0] - d.start[0], p[1] - d.start[1]]);
         const o = { ...d.o, paths };
-        s.liveUpdate((doc) => syncGradientGeometry({ ...doc, objects: doc.objects.map((x) => (x.id === o.id ? o : x)) }, o));
+        s.liveUpdate((doc) => syncGradientGeometry(replaceObject(doc, o.id, o), o));
         return;
       }
       case "pen-anchor": {
@@ -2353,7 +2346,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
       case "handle": {
         const res = dragHandle(d.orig, d.h, p, s.view.scale, e.shiftKey);
         d.moved = true;
-        s.liveUpdate((doc) => ({ ...doc, objects: doc.objects.map((o) => (o.id === res.object.id ? res.object : o)) }));
+        s.liveUpdate((doc) => replaceObject(doc, res.object.id, res.object));
         iRef.current.tooltip = { p, text: res.label };
         draw();
         return;
@@ -2562,7 +2555,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
         // a click on a segment adds a point there
         s.checkpoint();
         const r = insertIntoObject(d.o, d.sp, d.seg, d.t, d.both);
-        s.liveUpdate((doc) => syncGradientGeometry({ ...doc, objects: doc.objects.map((x) => (x.id === r.obj.id ? r.obj : x)) }, r.obj));
+        s.liveUpdate((doc) => syncGradientGeometry(replaceObject(doc, r.obj.id, r.obj), r.obj));
         s.set({ nodeSel: [{ id: r.obj.id, sp: d.sp, ni: r.index }] });
         draw();
         return;
@@ -2656,10 +2649,7 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
     const mx = e.clientX - r.left;
     const my = e.clientY - r.top;
     if (e.ctrlKey || e.metaKey || !e.shiftKey) {
-      const k = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015));
-      const scale = Math.max(0.3, Math.min(400, s.view.scale * k));
-      const f = scale / s.view.scale;
-      s.setView({ scale, ox: mx - (mx - s.view.ox) * f, oy: my - (my - s.view.oy) * f });
+      s.setView(zoomAt(s.view, Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), mx, my));
     } else {
       s.setView({ ox: s.view.ox - e.deltaY, oy: s.view.oy - e.deltaX });
     }
@@ -2725,18 +2715,8 @@ const runStitch = (kind: "running" | "triple", length: number): StitchParams => 
   }, []);
   const refEdit = useStore((s) => s.refEdit);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; onObject: boolean; items?: MenuItem[] } | null>(null);
-  // the menu closes on any click elsewhere
-  useEffect(() => {
-    if (!ctxMenu) return;
-    const close = (e: PointerEvent) => !(e.target as HTMLElement).closest(".menu") && setCtxMenu(null);
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && setCtxMenu(null);
-    window.addEventListener("pointerdown", close);
-    window.addEventListener("keydown", esc);
-    return () => {
-      window.removeEventListener("pointerdown", close);
-      window.removeEventListener("keydown", esc);
-    };
-  }, [ctxMenu]);
+  // the menu closes on any click elsewhere, and on Escape (which leaves the selection)
+  useDismiss(!!ctxMenu, () => setCtxMenu(null), [".menu"]);
 
   const tool = useStore((s) => s.tool);
   const cursor =

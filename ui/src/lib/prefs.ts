@@ -1,7 +1,7 @@
 // User preferences that outlive a design: look, hints, nudging, autosave.
 // The view toggles (grid, guides, …) are remembered by the store itself.
 import type { Fabric, OptimizeSteps } from "../types";
-import { safeSetItem } from "./storage";
+import { loadMerged, safeSetItem } from "./storage";
 
 export interface Prefs {
   /** Highlight colour of the interface (hex). */
@@ -65,11 +65,7 @@ export const ACCENTS: { color: string; label: string }[] = [
 const KEY = "filum.prefs";
 
 export function loadPrefs(): Prefs {
-  try {
-    return { ...DEFAULT_PREFS, ...JSON.parse(localStorage.getItem(KEY) ?? "{}") };
-  } catch {
-    return DEFAULT_PREFS;
-  }
+  return loadMerged(KEY, DEFAULT_PREFS);
 }
 
 export function savePrefs(p: Prefs) {

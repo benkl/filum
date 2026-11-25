@@ -9,6 +9,7 @@ import { getChunks, renderPlanPreview, type Theme } from "../canvas/render";
 import { FLAG, type PlanData, type ThreadWeight } from "../types";
 import { threadWidth } from "./materials";
 import { crc32 } from "./zip";
+import { planBounds } from "./planBounds";
 
 export type PictureKind = "realistic" | "simple";
 export type PictureBackground = "transparent" | "white" | "fabric";
@@ -35,20 +36,7 @@ export const PICTURE_DEFAULTS = { dpi: 300, lineWidth: 0.3 };
 
 const THEME: Theme = { canvas: "", grid: "", gridStrong: "", axis: "", ruler: "", rulerText: "", rulerLine: "", hoop: "", select: "", dark: false };
 
-/** Bounds of the needle penetrations (mm). */
-export function planBounds(plan: PlanData): { x: number; y: number; w: number; h: number } | null {
-  let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
-  for (let i = 0; i < plan.flags.length; i++) {
-    if (plan.flags[i] & FLAG.COMMANDS) continue;
-    const x = plan.coords[2 * i];
-    const y = plan.coords[2 * i + 1];
-    if (x < x0) x0 = x;
-    if (x > x1) x1 = x;
-    if (y < y0) y0 = y;
-    if (y > y1) y1 = y;
-  }
-  return x1 >= x0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;
-}
+export { planBounds };
 
 /** One colour block of a plan on its own (print sheets: the detailed views). */
 export function blockPlan(plan: PlanData, block: number): PlanData {

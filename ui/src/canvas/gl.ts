@@ -38,7 +38,7 @@
 
 import { threadSheen, threadWidth } from "../lib/materials";
 import type { Fabric, PlanData, ThreadWeight } from "../types";
-import { FLAG } from "../types";
+import { FLAG, NO_OBJECT } from "../types";
 import type { View } from "../store";
 import { getChunks, type Theme } from "./render";
 
@@ -695,7 +695,7 @@ export class StitchGL {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     const recRows = Math.max(1, Math.ceil(plan.objects.length / 4096));
     const objs = new Float32Array(recRows * 4096).fill(-1);
-    for (let i = 0; i < plan.objects.length; i++) objs[i] = plan.objects[i] === 0xffffffff ? -1 : plan.objects[i];
+    for (let i = 0; i < plan.objects.length; i++) objs[i] = plan.objects[i] === NO_OBJECT ? -1 : plan.objects[i];
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, 4096, recRows, 0, gl.RED, gl.FLOAT, objs);
     this.built = { plan, underlay: showUnderlay, mode, dark: theme.dark, threadW, instances: inst.length / 7, inst: instBuf, entries: tex, depthDen, recObj };
     return this.built;

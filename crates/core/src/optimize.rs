@@ -500,29 +500,7 @@ mod tests {
     use crate::model::*;
 
     fn sq(id: &str, thread: &str, x: f64, y: f64) -> Object {
-        Object {
-            id: id.into(),
-            name: id.into(),
-            thread: thread.into(),
-            visible: true,
-            locked: false,
-            paths: vec![SubPath::polyline(&[pt(x, y), pt(x + 5.0, y), pt(x + 5.0, y + 5.0), pt(x, y + 5.0)], true)],
-            stitch: StitchParams::Fill(FillParams { underlay: false, ..Default::default() }),
-            trim_after: false,
-            stop_after: false,
-            ties: Default::default(),
-            force_lock: false,
-            min_stitch: None,
-            min_jump: None,
-            clone: None,
-            hidden: None,
-            patterns: vec![],
-            start: None,
-            end: None,
-            lock: None,
-            color_sort_index: None,
-            link: None,
-        }
+        Object::new(id, thread, vec![SubPath::polyline(&[pt(x, y), pt(x + 5.0, y), pt(x + 5.0, y + 5.0), pt(x, y + 5.0)], true)], StitchParams::Fill(FillParams { underlay: false, ..Default::default() }))
     }
 
     #[test]
@@ -558,7 +536,7 @@ mod tests {
     }
 
     fn thread(id: &str, color: &str) -> Thread {
-        Thread { id: id.into(), name: id.into(), color: color.into(), brand: "".into(), code: "".into(), weight: None, min_stitch: None }
+        Thread::new(id, id, color)
     }
 
     /// A satin column along a centre line from (x, y), 20 mm long.

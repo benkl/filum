@@ -17,7 +17,7 @@ import { normAngle } from "../lib/geometry";
 import { FABRICS } from "../lib/materials";
 import { HOOP_GROUPS, HOOPS, hoopIndex, hoopOf } from "../lib/hoops";
 import { useStore } from "../store";
-import type { Fabric, StitchType, Tool } from "../types";
+import { FLAG, type Fabric, type StitchType, type Tool } from "../types";
 import { Num } from "./ui";
 
 /** Hoop presets grouped by brand (option values are indices into HOOPS). */
@@ -295,7 +295,7 @@ function statFor(id: string) {
   const plan = s.plan;
   if (!plan || idx < 0) return "";
   let n = 0;
-  for (let i = 0; i < plan.objects.length; i++) if (plan.objects[i] === idx && !(plan.flags[i] & 31)) n++;
+  for (let i = 0; i < plan.objects.length; i++) if (plan.objects[i] === idx && !(plan.flags[i] & FLAG.COMMANDS)) n++;
   return `${n.toLocaleString()} stitches`;
 }
 

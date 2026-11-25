@@ -11,7 +11,7 @@ import { applyMat, objectBounds, unionBoxes } from "../lib/geometry";
 import { useStore } from "../store";
 import type { DesignObject, Vec2 } from "../types";
 import { Dialog, Num, Row, Toggle } from "./ui";
-import { safeSetItem } from "../lib/storage";
+import { loadMerged, safeSetItem } from "../lib/storage";
 
 /** Align / distribute / mirror buttons for the context bar. */
 export function ArrangeButtons({ count }: { count: number }) {
@@ -296,11 +296,7 @@ interface OutlineSettings {
 }
 const OUTLINE_DEFAULTS: OutlineSettings = { kind: "triple", offset: 1.5, width: 3, bridge: 0, outerOnly: false };
 const loadOutline = (): OutlineSettings => {
-  try {
-    return { ...OUTLINE_DEFAULTS, ...JSON.parse(localStorage.getItem(OUTLINE_KEY) ?? "{}") };
-  } catch {
-    return OUTLINE_DEFAULTS;
-  }
+  return loadMerged(OUTLINE_KEY, OUTLINE_DEFAULTS);
 };
 
 /**

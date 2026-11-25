@@ -11,10 +11,10 @@ import { chordsOf, insideRegion, midOf, pointInside, regionPaths, regionsOf, spl
 import { parentOf, withParent } from "./groups";
 import { pruneGroups } from "./layerRows";
 import { tartanLayers } from "./tartan";
+import { lerp } from "./vec";
 
 type Hit = { sp: number; seg: number; t: number; p: Vec2; d: number };
 
-const lerp = (a: Vec2, b: Vec2, t: number): Vec2 => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
 
 function segPoint(sp: SubPath, s: number, t: number): Vec2 {
   const n = sp.nodes.length;

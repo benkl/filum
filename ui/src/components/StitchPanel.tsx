@@ -13,6 +13,8 @@ import { useStore } from "../store";
 import type { DesignObject, StitchParams } from "../types";
 import { FLAG } from "../types";
 import { useEditTargets } from "./editTargets";
+import { mapObjects } from "../lib/docEdit";
+import { planBounds } from "../lib/planBounds";
 
 type St = StitchParams;
 
@@ -404,7 +406,7 @@ export function StylePicker({ o }: { o: DesignObject }) {
     }
     const style = r;
     if (!layered) {
-      st.commit((d) => ({ ...d, objects: d.objects.map((x) => (x.id === o.id ? { ...x, stitch: style } : x)) }));
+      st.commit((d) => mapObjects(d, o.id, (x) => ({ ...x, stitch: style })));
       return;
     }
     // one undo step: the set collapsed, the style on the layer left
@@ -467,21 +469,12 @@ export function StitchPreview({ o }: { o: DesignObject }) {
     const g = c.getContext("2d")!;
     g.clearRect(0, 0, c.width, c.height);
     const { coords, flags, objects } = plan;
-    let x0 = Infinity;
-    let y0 = Infinity;
-    let x1 = -Infinity;
-    let y1 = -Infinity;
-    for (let i = 0; i < flags.length; i++) {
-      if (objects[i] !== index || flags[i] & FLAG.COMMANDS) continue;
-      x0 = Math.min(x0, coords[2 * i]);
-      x1 = Math.max(x1, coords[2 * i]);
-      y0 = Math.min(y0, coords[2 * i + 1]);
-      y1 = Math.max(y1, coords[2 * i + 1]);
-    }
-    if (!isFinite(x0)) {
+    const b = planBounds(plan, (i) => objects[i] === index);
+    if (!b) {
       if (label.current) label.current.textContent = "No stitches";
       return;
     }
+    const [x0, y0, x1, y1] = [b.x, b.y, b.x + b.w, b.y + b.h];
     const pad = 6 * dpr;
     const k = Math.min((c.width - 2 * pad) / Math.max(x1 - x0, 0.1), (c.height - 2 * pad) / Math.max(y1 - y0, 0.1));
     const ox = (c.width - (x1 - x0) * k) / 2 - x0 * k;

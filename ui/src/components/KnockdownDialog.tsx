@@ -10,14 +10,13 @@
 //
 // Both use the same words: reach, keep holes, stitch length, colour.
 
-
 import { useState } from "react";
 import { defaultDesignOptions } from "../lib/geometry";
 import { createKnockdown, DEFAULT_KNOCKDOWN, type JoinStyle, type KnockdownSelectionOptions } from "../lib/knockdown";
 import { useStore } from "../store";
 import type { DesignOptions } from "../types";
-import { Dialog, Num, Row, Toggle } from "./ui";
-import { safeSetItem } from "../lib/storage";
+import { Dialog, Num, Row, Seg, Toggle } from "./ui";
+import { loadMerged, safeSetItem } from "../lib/storage";
 
 type Scope = "design" | "selection";
 let pendingScope: Scope | null = null;
@@ -30,11 +29,7 @@ export function openKnockdown(scope?: Scope) {
 
 const KEY = "filum.knockdown";
 const loadSelection = (): KnockdownSelectionOptions => {
-  try {
-    return { ...DEFAULT_KNOCKDOWN, ...JSON.parse(localStorage.getItem(KEY) ?? "{}") };
-  } catch {
-    return DEFAULT_KNOCKDOWN;
-  }
+  return loadMerged(KEY, DEFAULT_KNOCKDOWN);
 };
 
 const JOINS: [JoinStyle, string][] = [
@@ -42,18 +37,6 @@ const JOINS: [JoinStyle, string][] = [
   ["mitre", "Mitre"],
   ["bevel", "Bevel"],
 ];
-
-function Seg<T extends string | number>({ value, options, onChange }: { value: T; options: [T, string][]; onChange: (v: T) => void }) {
-  return (
-    <div className="seg">
-      {options.map(([k, l]) => (
-        <button key={String(k)} className={value === k ? "on" : ""} onClick={() => onChange(k)}>
-          {l}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 function ColourRow({ value, onChange }: { value: string; onChange: (hex: string) => void }) {
   const fabricColor = useStore((s) => s.fabricColor);

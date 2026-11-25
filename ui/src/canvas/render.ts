@@ -8,6 +8,8 @@ import { paintInteractive, paintUnderlays, type InteractiveOverlay } from "./int
 import { colourGroup, groupPicture } from "./vectorGradient";
 import { transformable } from "../lib/textSettle";
 import type { DensityMode } from "../lib/density";
+import { RULER } from "../lib/view";
+import { planBounds } from "../lib/planBounds";
 
 // Rendering model
 // ---------------
@@ -26,7 +28,8 @@ import type { DensityMode } from "../lib/density";
 // So an animation frame costs O(new stitches + CHUNK) instead of O(all stitches),
 // and hover/marquee/selection redraws never touch the stitches at all.
 
-export const RULER = 22;
+/** The rulers' width (px): lib/view.ts, where the view maths needs it. */
+export { RULER };
 export const CHUNK = 384;
 
 export interface Overlay {
@@ -1238,17 +1241,9 @@ export function renderPlanPreview(
   resetState(ctx);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
-  for (let i = 0; i < plan.flags.length; i++) {
-    if (plan.flags[i] & FLAG.COMMANDS) continue;
-    const x = plan.coords[2 * i];
-    const y = plan.coords[2 * i + 1];
-    if (x < x0) x0 = x;
-    if (y < y0) y0 = y;
-    if (x > x1) x1 = x;
-    if (y > y1) y1 = y;
-  }
-  if (!(x1 > x0) || !(y1 > y0)) return;
+  const b = planBounds(plan);
+  if (!b || !(b.w > 0) || !(b.h > 0)) return;
+  const [x0, y0, x1, y1] = [b.x, b.y, b.x + b.w, b.y + b.h];
   const pad = 14;
   const scale = Math.min((width - 2 * pad) / (x1 - x0), (height - 2 * pad) / (y1 - y0));
   const view = { scale, ox: (width - (x1 - x0) * scale) / 2 - x0 * scale, oy: (height - (y1 - y0) * scale) / 2 - y0 * scale };

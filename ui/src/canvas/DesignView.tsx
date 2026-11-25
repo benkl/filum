@@ -11,32 +11,21 @@ import { threadWidth } from "../lib/materials";
 import { useStore, type View } from "../store";
 import { useShallow } from "zustand/react/shallow";
 import type { PlanData, StitchDocument, ViewMode } from "../types";
-import { FLAG } from "../types";
 import { StitchGL } from "./gl";
 import { readTheme, Renderer, type Theme } from "./render";
+import { fitBox, zoomAt } from "../lib/view";
+import { planBounds } from "../lib/planBounds";
 
 /** What a design covers: its stitches in the stitch views, else its shapes. */
 function contentBox(doc: StitchDocument, plan: PlanData | null, mode: ViewMode): Box | null {
   if (mode !== "vector" && plan) {
-    let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
-    for (let i = 0; i < plan.flags.length; i++) {
-      if (plan.flags[i] & FLAG.COMMANDS) continue;
-      const x = plan.coords[2 * i];
-      const y = plan.coords[2 * i + 1];
-      if (x < x0) x0 = x;
-      if (y < y0) y0 = y;
-      if (x > x1) x1 = x;
-      if (y > y1) y1 = y;
-    }
-    if (x1 >= x0) return { x: x0, y: y0, w: Math.max(x1 - x0, 0.1), h: Math.max(y1 - y0, 0.1) };
+    const b = planBounds(plan);
+    if (b) return { ...b, w: Math.max(b.w, 0.1), h: Math.max(b.h, 0.1) };
   }
   return unionBoxes(doc.objects.filter((o) => o.visible).map(objectBounds));
 }
 
-const fitTo = (b: Box, w: number, h: number, pad: number): View => {
-  const scale = Math.max(0.05, Math.min((w - 2 * pad) / b.w, (h - 2 * pad) / b.h));
-  return { scale, ox: (w - b.w * scale) / 2 - b.x * scale, oy: (h - b.h * scale) / 2 - b.y * scale };
-};
+const fitTo = (b: Box, w: number, h: number, pad: number): View => fitBox(b, w, h, { pad, minScale: 0.05 });
 
 export interface DesignViewProps {
   /** The design (threads, objects, fabric, thread weight). */
@@ -207,10 +196,7 @@ export function DesignView({ doc, plan, mode, fabricColor, showUnderlay = true, 
       const mx = e.clientX - r.left;
       const my = e.clientY - r.top;
       const v = view.current;
-      const k = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015));
-      const scale = Math.max(0.05, Math.min(400, v.scale * k));
-      const f = scale / v.scale;
-      view.current = { scale, ox: mx - (mx - v.ox) * f, oy: my - (my - v.oy) * f };
+      view.current = zoomAt(v, Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), mx, my, 0.05);
       touched();
       draw();
     };

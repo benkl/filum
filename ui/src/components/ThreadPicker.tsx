@@ -5,7 +5,7 @@
 import { Check, ChevronDown, Download, Focus, Plus, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Grip, useMovable } from "./ui";
+import { Grip, useDismiss, useMovable } from "./ui";
 import {
   DEFAULT_CHART,
   SOURCE_LABEL,
@@ -32,7 +32,7 @@ import {
 } from "../lib/threads";
 import { useStore } from "../store";
 import type { Thread } from "../types";
-import { safeSetItem } from "../lib/storage";
+import { loadJson, safeSetItem } from "../lib/storage";
 
 const CHART_KEY = "filum.chart";
 export const lastChart = () => localStorage.getItem(CHART_KEY) ?? DEFAULT_CHART;
@@ -40,11 +40,7 @@ export const setLastChart = (c: string) => safeSetItem(CHART_KEY, c);
 
 const RECENT_CHARTS_KEY = "filum.recentCharts";
 function recentCharts(): string[] {
-  try {
-    return JSON.parse(localStorage.getItem(RECENT_CHARTS_KEY) ?? "[]");
-  } catch {
-    return [];
-  }
+  return loadJson(RECENT_CHARTS_KEY, []);
 }
 const touchChart = (id: string) => safeSetItem(RECENT_CHARTS_KEY, JSON.stringify([id, ...recentCharts().filter((x) => x !== id)].slice(0, 6)));
 
@@ -118,18 +114,7 @@ function ChartMenu({ anchor, value, none, onPick, onClose }: { anchor: HTMLEleme
     setPos({ left, top, maxHeight });
     input.current?.focus();
   }, [anchor]);
-  useEffect(() => {
-    const down = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node) && !anchor.contains(e.target as Node)) onClose();
-    };
-    const key = (e: KeyboardEvent) => e.key === "Escape" && (e.stopPropagation(), onClose());
-    window.addEventListener("pointerdown", down, true);
-    window.addEventListener("keydown", key, true);
-    return () => {
-      window.removeEventListener("pointerdown", down, true);
-      window.removeEventListener("keydown", key, true);
-    };
-  }, [anchor, onClose]);
+  useDismiss(true, onClose, [ref, anchor]);
   const groups = useMemo(() => {
     const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
     const hit = (c: ChartMeta) => words.every((w) => `${c.name} ${c.brand} ${SOURCE_LABEL[c.source]}`.toLowerCase().includes(w));
@@ -387,20 +372,8 @@ function ThreadPopover({ anchor, current, onPick, onClose }: { anchor: HTMLEleme
     const top = below + h > window.innerHeight - 8 ? Math.max(8, r.top - h - 6) : below;
     setPos({ left, top });
   }, [anchor]);
-  useEffect(() => {
-    const down = (e: PointerEvent) => {
-      if ((e.target as Element).closest?.(".chart-menu")) return;
-      if (!ref.current?.contains(e.target as Node) && !anchor.contains(e.target as Node)) onClose();
-    };
-    // Esc closes only the popover (not the selection or the tool behind it)
-    const key = (e: KeyboardEvent) => e.key === "Escape" && (e.stopPropagation(), onClose());
-    window.addEventListener("pointerdown", down, true);
-    window.addEventListener("keydown", key, true);
-    return () => {
-      window.removeEventListener("pointerdown", down, true);
-      window.removeEventListener("keydown", key, true);
-    };
-  }, [anchor, onClose]);
+  // the chart list it opens belongs to it
+  useDismiss(true, onClose, [ref, anchor, ".chart-menu"]);
   const pick = (t: RecentThread) => {
     onPick(threadFor(t));
     onClose();

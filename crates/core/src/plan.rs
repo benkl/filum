@@ -23,19 +23,9 @@ const LOOP_MM: f64 = 1.5;
 /// Bobbin thread against top thread (Madeira: 3–3.5 m bobbin per 5 m top).
 const BOBBIN_SHARE: f64 = 0.65;
 
-pub mod flags {
-    pub const JUMP: u8 = 1;
-    pub const TRIM: u8 = 2;
-    pub const COLOR_CHANGE: u8 = 4;
-    pub const STOP: u8 = 8;
-    pub const END: u8 = 16;
-    /// informational
-    pub const TIE: u8 = 32;
-    pub const UNDERLAY: u8 = 64;
-    pub const TRAVEL: u8 = 128;
-
-    pub const COMMANDS: u8 = JUMP | TRIM | COLOR_CHANGE | STOP | END;
-}
+/// Stitch flags: the machine-file crate's command bits, so a plan's stitches
+/// go into a file as they are (`io.rs`). One definition for both.
+pub use filum_formats::cmd as flags;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Stitch {

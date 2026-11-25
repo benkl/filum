@@ -64,6 +64,7 @@ import { chooseThreadList } from "./ThreadListDialog";
 import { lastChart } from "./ThreadPicker";
 import { compoundSelection, joinSelection, releaseSelection } from "../lib/pathActions";
 import { averageSelectedNodes } from "../lib/nodeActions";
+import { canvasSize, zoomAt } from "../lib/view";
 
 export type MenuItem =
   | {
@@ -87,13 +88,8 @@ export type MenuEntry = Exclude<MenuItem, "-">;
 /** Zoom around the middle of the canvas. */
 export function zoomBy(f: number) {
   const s = useStore.getState();
-  const el = document.querySelector(".canvas-wrap")?.getBoundingClientRect();
-  if (!el) return;
-  const mx = el.width / 2;
-  const my = el.height / 2;
-  const scale = Math.max(0.3, Math.min(400, s.view.scale * f));
-  const k = scale / s.view.scale;
-  s.setView({ scale, ox: mx - (mx - s.view.ox) * k, oy: my - (my - s.view.oy) * k });
+  const size = canvasSize();
+  if (size) s.setView(zoomAt(s.view, f, size.w / 2, size.h / 2));
 }
 
 export const mod = navigator.platform.toLowerCase().includes("mac") ? "⌘" : "Ctrl+";

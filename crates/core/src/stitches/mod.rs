@@ -324,29 +324,7 @@ mod tests {
     use crate::model::*;
 
     fn obj(paths: Vec<SubPath>, stitch: StitchParams, start: Option<[f64; 2]>, end: Option<[f64; 2]>) -> Object {
-        Object {
-            id: "o".into(),
-            name: "o".into(),
-            thread: "t".into(),
-            visible: true,
-            locked: false,
-            paths,
-            stitch,
-            trim_after: false,
-            stop_after: false,
-            ties: Default::default(),
-            force_lock: false,
-            min_stitch: None,
-            min_jump: None,
-            clone: None,
-            hidden: None,
-            patterns: vec![],
-            start,
-            end,
-            lock: None,
-            color_sort_index: None,
-            link: None,
-        }
+        Object { start: start, end: end, ..Object::new("o", "t", paths, stitch) }
     }
 
     fn first_last(runs: &[Run]) -> (Point, Point) {
@@ -440,29 +418,7 @@ mod pattern_tests {
     use crate::model::*;
 
     fn obj(paths: Vec<SubPath>, stitch: StitchParams, patterns: Vec<StitchPattern>) -> Object {
-        Object {
-            id: "o".into(),
-            name: "o".into(),
-            thread: "t".into(),
-            visible: true,
-            locked: false,
-            paths,
-            stitch,
-            trim_after: false,
-            stop_after: false,
-            ties: Default::default(),
-            force_lock: false,
-            min_stitch: None,
-            min_jump: None,
-            patterns,
-            clone: None,
-            hidden: None,
-            start: None,
-            end: None,
-            lock: None,
-            color_sort_index: None,
-            link: None,
-        }
+        Object { patterns: patterns, ..Object::new("o", "t", paths, stitch) }
     }
     fn pts(o: &Object) -> Vec<Point> {
         generate(o, &Fabric::Cotton.profile()).into_iter().flatten().map(|x| x.0).collect()

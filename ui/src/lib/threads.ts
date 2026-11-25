@@ -21,7 +21,7 @@ export { hexToRgb, rgbToHex, normHex, lab, deltaE } from "./colorMath";
 export type { Lab } from "./colorMath";
 import { hexToRgb, rgbToHex, normHex, lab, deltaE, type Lab } from "./colorMath";
 import { remapThreads, threadsOf } from "./copies";
-import { safeSetItem } from "./storage";
+import { loadJson, safeSetItem } from "./storage";
 import { bySewOrder, chartIdFor, myThreadsGpl, ownedKey, paletteBrand, similarMerges, spoolsOfPalette, type ParsedPalette } from "./threadTools";
 export { colourEdit, ownedKey } from "./threadTools";
 
@@ -83,11 +83,7 @@ interface CustomChart {
   entries: { name: string; code: string; color: string }[];
 }
 function customCharts(): CustomChart[] {
-  try {
-    return JSON.parse(localStorage.getItem(CUSTOM_KEY) ?? "[]");
-  } catch {
-    return [];
-  }
+  return loadJson(CUSTOM_KEY, []);
 }
 const customMeta = (): ChartMeta[] => customCharts().map((c) => ({ id: c.id, name: c.name, brand: "Installed", source: "custom", count: c.entries.length }));
 
@@ -105,11 +101,7 @@ export interface OwnedThread {
 }
 const MINE_KEY = "filum.myThreads";
 export function myThreads(): OwnedThread[] {
-  try {
-    return JSON.parse(localStorage.getItem(MINE_KEY) ?? "[]");
-  } catch {
-    return [];
-  }
+  return loadJson(MINE_KEY, []);
 }
 const mineMeta = (): ChartMeta => ({ id: MY_CHART, name: "My threads", brand: "My threads", source: "mine", count: myThreads().length });
 const localMeta = () => [mineMeta(), ...customMeta()];
@@ -331,11 +323,7 @@ const RECENT_KEY = "filum.recentThreads";
 export type RecentThread = Pick<Thread, "name" | "color" | "brand" | "code">;
 
 export function recentThreads(): RecentThread[] {
-  try {
-    return JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]");
-  } catch {
-    return [];
-  }
+  return loadJson(RECENT_KEY, []);
 }
 
 export function pushRecent(t: RecentThread) {

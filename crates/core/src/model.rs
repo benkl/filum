@@ -1589,6 +1589,36 @@ fn yes() -> bool {
 }
 
 impl Object {
+    /// An object with everything else as a new one has it: named after its
+    /// id, visible, unlocked, the machine's locks, no commands or patterns of
+    /// its own. Set the rest with `Object { .., ..Object::new(..) }`.
+    pub fn new(id: impl Into<String>, thread: impl Into<String>, paths: Vec<SubPath>, stitch: StitchParams) -> Object {
+        let id = id.into();
+        Object {
+            name: id.clone(),
+            id,
+            thread: thread.into(),
+            visible: true,
+            locked: false,
+            paths,
+            stitch,
+            trim_after: false,
+            stop_after: false,
+            ties: Ties::default(),
+            force_lock: false,
+            min_stitch: None,
+            min_jump: None,
+            patterns: Vec::new(),
+            clone: None,
+            hidden: None,
+            start: None,
+            end: None,
+            lock: None,
+            color_sort_index: None,
+            link: None,
+        }
+    }
+
     pub fn bounds(&self) -> Rect {
         let mut r = Rect::EMPTY;
         for sp in &self.paths {
@@ -1639,6 +1669,19 @@ impl Document {
 }
 
 impl Thread {
+    /// A thread with no brand, code, weight or minimum stitch of its own.
+    pub fn new(id: impl Into<String>, name: impl Into<String>, color: impl Into<String>) -> Thread {
+        Thread {
+            id: id.into(),
+            name: name.into(),
+            color: color.into(),
+            brand: String::new(),
+            code: String::new(),
+            weight: None,
+            min_stitch: None,
+        }
+    }
+
     pub fn rgb(&self) -> [u8; 3] {
         parse_hex_color(&self.color).unwrap_or([0, 0, 0])
     }
@@ -2111,7 +2154,7 @@ impl Document {
         }
         let id = format!("t{}", self.threads.len() + 1);
         let name = name.map(|s| s.to_string()).unwrap_or_else(|| crate::threads::nearest_name(color));
-        self.threads.push(Thread { id: id.clone(), name, color: hex, brand: String::new(), code: String::new(), weight: None, min_stitch: None });
+        self.threads.push(Thread::new(id.clone(), name, hex));
         id
     }
 

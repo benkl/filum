@@ -11,22 +11,10 @@ import { RAMP_PROFILES, rampMembers, rampOf, removeRamp, selectedRamp, updateRam
 import { useStore } from "../store";
 import { is2D, selectedGradient } from "../lib/gradient";
 import { GradientBarCompact, KindPicker, RowStylePicker } from "./GradientPanel";
-import { Num } from "./ui";
+import { Num, Seg } from "./ui";
 import { GuideActions } from "./SatinGuides";
 
 type DrawTool = "pen" | "freehand" | "satin";
-
-function Seg<T extends string>({ value, options, onChange, label }: { value: T; options: [T, string, string?][]; onChange: (v: T) => void; label: string }) {
-  return (
-    <div className="seg" role="group" aria-label={label}>
-      {options.map(([id, text, title]) => (
-        <button key={id} className={value === id ? "on" : ""} title={title} onClick={() => onChange(id)}>
-          {text}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 export function ToolOptionsBar({ tool }: { tool: DrawTool }) {
   const opts = useStore((s) => s.toolOptions);

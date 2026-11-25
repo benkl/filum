@@ -13,6 +13,26 @@ fn parse_doc(json: &str) -> Result<Document, JsValue> {
     serde_json::from_str(json).map_err(|e| err(format!("invalid document: {e}")))
 }
 
+/// Options as JSON; an empty string means the defaults.
+fn opts<T: serde::de::DeserializeOwned>(json: &str) -> Result<T, JsValue> {
+    serde_json::from_str(if json.trim().is_empty() { "{}" } else { json }).map_err(err)
+}
+
+/// A result as JSON text.
+fn to_json<T: serde::Serialize + ?Sized>(v: &T) -> Result<String, JsValue> {
+    serde_json::to_string(v).map_err(err)
+}
+
+/// A JSON list of object ids.
+fn ids_of(json: &str) -> Result<Vec<String>, JsValue> {
+    serde_json::from_str(json).map_err(err)
+}
+
+/// Rings as smooth paths, for shapes made from others (0.02 mm, corners from 30°).
+fn fit_rings(rings: &[filum_core::geom::Ring]) -> Vec<filum_core::SubPath> {
+    rings.iter().map(|r| filum_core::clip::fit_ring(r, 0.02, 30.0)).collect()
+}
+
 fn set(o: &Object, k: &str, v: &JsValue) {
     let _ = Reflect::set(o, &JsValue::from_str(k), v);
 }
@@ -43,7 +63,7 @@ impl StitchEngine {
     #[wasm_bindgen(js_name = exportPlan)]
     pub fn export_plan(&mut self, doc_json: &str, opts_json: &str) -> Result<JsValue, JsValue> {
         let doc = parse_doc(doc_json)?;
-        let opts: io::ExportOptions = serde_json::from_str(if opts_json.trim().is_empty() { "{}" } else { opts_json }).map_err(err)?;
+        let opts: io::ExportOptions = opts(opts_json)?;
         let plan = io::export_plan(&doc, &mut self.engine, &opts);
         Ok(plan_js(&plan, &doc, false))
     }
@@ -54,7 +74,7 @@ impl StitchEngine {
     #[wasm_bindgen(js_name = densityField)]
     pub fn density_field(&mut self, doc_json: &str, opts_json: &str) -> Result<JsValue, JsValue> {
         let doc = parse_doc(doc_json)?;
-        let opts: filum_core::density::DensityOptions = serde_json::from_str(if opts_json.trim().is_empty() { "{}" } else { opts_json }).map_err(err)?;
+        let opts: filum_core::density::DensityOptions = opts(opts_json)?;
         let plan = self.engine.plan(&doc);
         let f = filum_core::density::density_field(&doc, &plan, &opts);
         let meta = serde_json::json!({ "x0": f.x0, "y0": f.y0, "cell": f.cell, "cols": f.cols, "rows": f.rows, "limits": f.limits, "stats": f.stats, "hotspots": f.hotspots });
@@ -84,15 +104,15 @@ impl StitchEngine {
                 Some(_) => {}
             }
         }
-        serde_json::to_string(&out).map_err(err)
+        to_json(&out)
     }
 
     /// Element info of the objects `ids` (all when empty): JSON `ElementInfo`.
     #[wasm_bindgen(js_name = elementInfo)]
     pub fn element_info(&mut self, doc_json: &str, ids_json: &str) -> Result<String, JsValue> {
         let doc = parse_doc(doc_json)?;
-        let ids: Vec<String> = serde_json::from_str(ids_json).map_err(err)?;
-        serde_json::to_string(&filum_core::info::element_info(&doc, &mut self.engine, &ids)).map_err(err)
+        let ids = ids_of(ids_json)?;
+        to_json(&filum_core::info::element_info(&doc, &mut self.engine, &ids))
     }
 
     /// Apply a thread list (one entry per colour block) to the design's
@@ -102,7 +122,7 @@ impl StitchEngine {
         let doc = parse_doc(doc_json)?;
         let entries: Vec<filum_core::threadlist::ThreadListEntry> = serde_json::from_str(entries_json).map_err(err)?;
         let (document, report) = filum_core::threadlist::apply_thread_list(&doc, &mut self.engine, &entries);
-        serde_json::to_string(&serde_json::json!({ "document": document, "report": report })).map_err(err)
+        to_json(&serde_json::json!({ "document": document, "report": report }))
     }
 
     /// Shapes rebuilt from the stitches of the objects `ids` (Ink/Stitch
@@ -110,27 +130,27 @@ impl StitchEngine {
     #[wasm_bindgen(js_name = stitchOutline)]
     pub fn stitch_outline(&mut self, doc_json: &str, ids_json: &str, params_json: &str) -> Result<String, JsValue> {
         let doc = parse_doc(doc_json)?;
-        let ids: Vec<String> = serde_json::from_str(ids_json).map_err(err)?;
-        let p: filum_core::stitch_outline::OutlineParams = serde_json::from_str(if params_json.trim().is_empty() { "{}" } else { params_json }).map_err(err)?;
+        let ids = ids_of(ids_json)?;
+        let p: filum_core::stitch_outline::OutlineParams = opts(params_json)?;
         let out: Vec<serde_json::Value> = (0..doc.objects.len())
             .filter(|&i| ids.contains(&doc.objects[i].id))
             .map(|i| serde_json::json!({ "id": doc.objects[i].id, "paths": filum_core::stitch_outline::object_outline(&doc, &mut self.engine, i, &p) }))
             .collect();
-        serde_json::to_string(&out).map_err(err)
+        to_json(&out)
     }
 
     /// Optimise stitch order with JSON `OptimizeOptions` (empty: the defaults). Returns JSON `OptimizeReport`.
     pub fn optimize(&mut self, doc_json: &str, opts_json: &str) -> Result<String, JsValue> {
         let doc = parse_doc(doc_json)?;
-        let opts: optimize::OptimizeOptions = serde_json::from_str(if opts_json.trim().is_empty() { "{}" } else { opts_json }).map_err(err)?;
+        let opts: optimize::OptimizeOptions = opts(opts_json)?;
         let r = optimize::optimize(&doc, &mut self.engine, &opts);
-        serde_json::to_string(&r).map_err(err)
+        to_json(&r)
     }
 
     /// Export to a machine format ("dst", "pes", "jef", "exp", "vp3", ...), or "svg"/"json".
     pub fn export(&mut self, doc_json: &str, format: &str, opts_json: &str) -> Result<Uint8Array, JsValue> {
         let doc = parse_doc(doc_json)?;
-        let opts: io::ExportOptions = serde_json::from_str(if opts_json.trim().is_empty() { "{}" } else { opts_json }).map_err(err)?;
+        let opts: io::ExportOptions = opts(opts_json)?;
         let bytes = io::export_with(&doc, &mut self.engine, format, &opts).map_err(err)?;
         Ok(Uint8Array::from(&bytes[..]))
     }
@@ -139,9 +159,9 @@ impl StitchEngine {
     #[wasm_bindgen(js_name = machineColors)]
     pub fn machine_colors(&mut self, doc_json: &str, format: &str, opts_json: &str) -> Result<String, JsValue> {
         let doc = parse_doc(doc_json)?;
-        let opts: io::ExportOptions = serde_json::from_str(if opts_json.trim().is_empty() { "{}" } else { opts_json }).map_err(err)?;
+        let opts: io::ExportOptions = opts(opts_json)?;
         let r = io::machine_colors(&doc, &mut self.engine, format, &opts).map_err(err)?;
-        serde_json::to_string(&r).map_err(err)
+        to_json(&r)
     }
 }
 
@@ -186,7 +206,7 @@ impl Default for StitchEngine {
 #[wasm_bindgen(js_name = importSvg)]
 pub fn import_svg(text: &str) -> Result<String, JsValue> {
     let r = svg::import_svg(text).map_err(err)?;
-    serde_json::to_string(&r).map_err(err)
+    to_json(&r)
 }
 
 /// Outline (union grown by `offset` mm, negative shrinks) of the given objects:
@@ -195,12 +215,12 @@ pub fn import_svg(text: &str) -> Result<String, JsValue> {
 pub fn outline_shapes(doc_json: &str, ids_json: &str, offset: f64, bridge: f64, outer_only: bool, min_area: f64) -> Result<String, JsValue> {
     use filum_core::region::{object_cover, outline_with, OutlineOptions};
     let doc = parse_doc(doc_json)?;
-    let ids: Vec<String> = serde_json::from_str(ids_json).map_err(err)?;
+    let ids = ids_of(ids_json)?;
     let covers: Vec<_> = doc.objects.iter().filter(|o| ids.contains(&o.id)).flat_map(object_cover).collect();
     let rings = outline_with(&covers, &OutlineOptions { offset, bridge, outer_only, min_area });
     // exact polygons fitted back to smooth Béziers (corners stay sharp)
-    let paths: Vec<filum_core::SubPath> = rings.iter().map(|r| filum_core::clip::fit_ring(r, 0.02, 30.0)).collect();
-    serde_json::to_string(&paths).map_err(err)
+    let paths = fit_rings(&rings);
+    to_json(&paths)
 }
 
 /// Shape booleans: unite, minusFront, intersect or exclude the given objects (in
@@ -209,7 +229,7 @@ pub fn outline_shapes(doc_json: &str, ids_json: &str, offset: f64, bridge: f64, 
 pub fn boolean_shapes(doc_json: &str, ids_json: &str, op: &str) -> Result<String, JsValue> {
     use filum_core::region::{boolean, covers_bounds, object_cover, BoolOp};
     let doc = parse_doc(doc_json)?;
-    let ids: Vec<String> = serde_json::from_str(ids_json).map_err(err)?;
+    let ids = ids_of(ids_json)?;
     let op = match op {
         "unite" => BoolOp::Unite,
         "minusFront" => BoolOp::MinusFront,
@@ -223,8 +243,8 @@ pub fn boolean_shapes(doc_json: &str, ids_json: &str, op: &str) -> Result<String
     let res = (b.width().max(b.height()) / 1500.0).clamp(0.03, 0.2);
     let rings = boolean(&objects, op, res);
     // exact polygons fitted back to smooth Béziers (corners stay sharp)
-    let paths: Vec<filum_core::SubPath> = rings.iter().map(|r| filum_core::clip::fit_ring(r, 0.02, 30.0)).collect();
-    serde_json::to_string(&paths).map_err(err)
+    let paths = fit_rings(&rings);
+    to_json(&paths)
 }
 
 /// Shape Builder: the regions of the overlap arrangement of the given objects
@@ -243,7 +263,7 @@ pub fn shape_regions(doc_json: &str, ids_json: &str) -> Result<String, JsValue> 
             })
         })
         .collect();
-    serde_json::to_string(&out).map_err(err)
+    to_json(&out)
 }
 
 /// Shape Builder: merge the given regions into one shape, delete them, or
@@ -252,17 +272,16 @@ pub fn shape_regions(doc_json: &str, ids_json: &str) -> Result<String, JsValue> 
 /// with empty paths are gone.
 #[wasm_bindgen(js_name = shapeBuild)]
 pub fn shape_build(doc_json: &str, ids_json: &str, faces_json: &str, mode: &str) -> Result<String, JsValue> {
-    use filum_core::clip::fit_ring;
     use filum_core::region::{arrangement, subtract_region, union_rings};
     let (objects, ids) = builder_objects(doc_json, ids_json)?;
     let faces = arrangement(&objects);
-    let fit = |rings: &[filum_core::geom::Ring]| rings.iter().map(|r| fit_ring(r, 0.02, 30.0)).collect::<Vec<_>>();
+    let fit = fit_rings;
     if mode == "divide" {
         let parts: Vec<serde_json::Value> = faces
             .iter()
             .map(|f| serde_json::json!({ "owner": ids[*f.owners.last().unwrap()], "paths": fit(&f.rings) }))
             .collect();
-        return serde_json::to_string(&serde_json::json!({ "merged": null, "updates": [], "parts": parts })).map_err(err);
+        return to_json(&serde_json::json!({ "merged": null, "updates": [], "parts": parts }));
     }
     let pick: Vec<usize> = serde_json::from_str(faces_json).map_err(err)?;
     let chosen: Vec<Vec<filum_core::geom::Ring>> = pick.iter().filter_map(|&k| faces.get(k)).map(|f| f.rings.clone()).collect();
@@ -276,14 +295,14 @@ pub fn shape_build(doc_json: &str, ids_json: &str, faces_json: &str, mode: &str)
         .map(|&i| serde_json::json!({ "id": ids[i], "paths": fit(&subtract_region(&objects[i], &cut)) }))
         .collect();
     let merged = if mode == "merge" { Some(fit(&cut)) } else { None };
-    serde_json::to_string(&serde_json::json!({ "merged": merged, "updates": updates, "parts": [] })).map_err(err)
+    to_json(&serde_json::json!({ "merged": merged, "updates": updates, "parts": [] }))
 }
 
 /// The covers of the given objects (stacking order) and their ids.
 fn builder_objects(doc_json: &str, ids_json: &str) -> Result<(Vec<Vec<filum_core::region::Cover>>, Vec<String>), JsValue> {
     use filum_core::region::object_cover;
     let doc = parse_doc(doc_json)?;
-    let ids: Vec<String> = serde_json::from_str(ids_json).map_err(err)?;
+    let ids = ids_of(ids_json)?;
     let chosen: Vec<&filum_core::Object> = doc.objects.iter().filter(|o| ids.contains(&o.id)).collect();
     Ok((chosen.iter().map(|o| object_cover(o)).collect(), chosen.iter().map(|o| o.id.clone()).collect()))
 }
@@ -294,7 +313,7 @@ fn builder_objects(doc_json: &str, ids_json: &str) -> Result<(Vec<Vec<filum_core
 #[wasm_bindgen(js_name = convertShapes)]
 pub fn convert_shapes(op: &str, doc_json: &str, args_json: &str) -> Result<String, JsValue> {
     use serde_json::{json, Value};
-    use filum_core::clip::{fit_ring, Join};
+    use filum_core::clip::Join;
     use filum_core::convert::*;
     use filum_core::geom::{pt, Point};
     use filum_core::stitches::fill::fill_rings;
@@ -360,7 +379,7 @@ pub fn convert_shapes(op: &str, doc_json: &str, args_json: &str) -> Result<Strin
                 frame_only: flag("frameOnly", false),
             };
             let rings = knockdown_shape(&covers, &o);
-            json!(rings.iter().map(|r| fit_ring(r, 0.02, 30.0)).collect::<Vec<_>>())
+            json!(fit_rings(&rings))
         }
         other => return Err(err(format!("unknown conversion {other}"))),
     };
@@ -377,7 +396,7 @@ pub fn export_svg(doc_json: &str) -> Result<String, JsValue> {
 #[wasm_bindgen(js_name = importEmbroidery)]
 pub fn import_embroidery(bytes: &[u8], filename: &str) -> Result<String, JsValue> {
     let doc = io::import(bytes, Some(filename)).map_err(err)?;
-    serde_json::to_string(&doc).map_err(err)
+    to_json(&doc)
 }
 
 /// List supported formats as JSON.
@@ -396,7 +415,7 @@ pub fn meander_tiles() -> String {
 #[wasm_bindgen(js_name = readThreadList)]
 pub fn read_thread_list(bytes: &[u8], filename: &str) -> Result<String, JsValue> {
     let r = filum_core::threadlist::read_thread_list(bytes, filename).map_err(err)?;
-    serde_json::to_string(&r).map_err(err)
+    to_json(&r)
 }
 
 /// Parse a GIMP/Ink/Stitch .gpl thread palette. Returns JSON `Palette`.
@@ -432,7 +451,7 @@ pub fn digitize(bytes: &[u8], opts_json: &str) -> Result<String, JsValue> {
     let opts: filum_core::digitize::DigitizeOptions = serde_json::from_str(opts_json).map_err(err)?;
     let img = decoded(bytes)?;
     let r = filum_core::digitize::digitize_rgba(&img.0, img.1, img.2, &opts);
-    serde_json::to_string(&r).map_err(err)
+    to_json(&r)
 }
 
 /// Quantised colour preview: `{ width, height, rgba: Uint8ClampedArray, regionWidth, regionHeight, regions: Uint32Array, regionLabel / regionReason: Uint8Array, meta: string(JSON{colors,widthMm,heightMm,sourceWidth,sourceHeight}) }`.

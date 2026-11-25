@@ -11,7 +11,7 @@ import { freshCopies, mergeThreads, placeCopies, remapThreads } from "./lib/copi
 import { settleTexts } from "./lib/textSettle";
 import { followGuides } from "./lib/satinSides";
 import { repairLayers } from "./lib/fillLayers";
-import { safeSetItem } from "./lib/storage";
+import { loadJson, safeSetItem } from "./lib/storage";
 import { checkDoc, DOC_VERSION } from "./lib/docCheck";
 import { INKSTITCH_DEFAULTS } from "./lib/machines";
 import type {
@@ -29,14 +29,13 @@ import type {
   Vec2,
   ViewMode,
 } from "./types";
+import { mapObjects } from "./lib/docEdit";
 
 export type StitchPatch = { type?: StitchParams["type"] } & Record<string, unknown>;
 
-export interface View {
-  scale: number; // px per mm
-  ox: number; // screen px of mm origin
-  oy: number;
-}
+/** The canvas view: px per mm and the screen position of the mm origin (lib/view.ts). */
+export type { View } from "./lib/view";
+import type { View } from "./lib/view";
 
 export type DialogName =
   | "calibrate"
@@ -223,7 +222,8 @@ export interface State {
   setViewMode: (m: ViewMode) => void;
   setTheme: (t: "light" | "dark") => void;
   setView: (v: Partial<View>) => void;
-  updateObject: (id: string, patch: Partial<DesignObject>) => void;
+  /** Changes one object or several (`id` a list): `patch` the same for all, or worked out for each. */
+  updateObject: (id: string | string[], patch: Partial<DesignObject> | ((o: DesignObject) => Partial<DesignObject>)) => void;
   /** A stitch change for one object or several (all of the same stitch type, edited together). */
   updateStitch: (id: string | string[], patch: StitchPatch, live?: boolean) => void;
   addObjects: (objs: DesignObject[], threads?: Thread[], groupParents?: Record<string, string>, groupNames?: Record<string, string>) => void;
@@ -258,13 +258,7 @@ let pendingCheckpoint: { doc: StitchDocument; future: StitchDocument[]; saved: b
 /** View toggles remembered between sessions. */
 const VIEW_KEY = "filum.view";
 const VIEW_FIELDS = ["showGrid", "showJumps", "finished", "showUnderlay", "showHidden", "smartGuides", "stitchColors", "fabricColor", "fabricTexture", "fabricAll", "fabricWeave", "densityMode", "foldedGroups"] as const;
-const savedView: Partial<Pick<State, (typeof VIEW_FIELDS)[number]>> = (() => {
-  try {
-    return JSON.parse(localStorage.getItem(VIEW_KEY) ?? "{}");
-  } catch {
-    return {};
-  }
-})();
+const savedView: Partial<Pick<State, (typeof VIEW_FIELDS)[number]>> = loadJson(VIEW_KEY, {});
 const DOC_KEY = "filum.autosave";
 const DIRTY_KEY = "filum.autosave.dirty";
 /** The stitch-out player's speed and follow setting, remembered between sessions. */
@@ -424,8 +418,7 @@ export const useStore = create<State>((set, get) => ({
     set({ theme });
   },
   setView: (v) => set({ view: { ...get().view, ...v } }),
-  updateObject: (id, patch) =>
-    get().commit((d) => ({ ...d, objects: d.objects.map((o) => (o.id === id ? { ...o, ...patch } : o)) })),
+  updateObject: (id, patch) => get().commit((d) => mapObjects(d, id, (o) => ({ ...o, ...(typeof patch === "function" ? patch(o) : patch) }))),
   updateStitch: (id, patch, live) => {
     const ids = new Set(typeof id === "string" ? [id] : id);
     const fn = (d: StitchDocument) => ({

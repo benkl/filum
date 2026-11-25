@@ -5,7 +5,7 @@
 import { ChevronDown, Search, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Grip, useMovable } from "./ui";
+import { Grip, useDismiss, useMovable } from "./ui";
 import { engine } from "../engine/client";
 import type { MeanderPattern, MeanderTile } from "../types";
 
@@ -139,18 +139,7 @@ function MeanderMenu({
     const top = below >= Math.min(360, above) ? r.bottom + 4 : Math.max(8, r.top - 4 - maxHeight);
     setPos({ left, top, maxHeight });
   }, [anchor]);
-  useEffect(() => {
-    const down = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node) && !anchor.contains(e.target as Node)) onClose();
-    };
-    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("pointerdown", down, true);
-    window.addEventListener("keydown", key);
-    return () => {
-      window.removeEventListener("pointerdown", down, true);
-      window.removeEventListener("keydown", key);
-    };
-  }, [anchor, onClose]);
+  useDismiss(true, onClose, [ref, anchor]);
   const s = q.trim().toLowerCase();
   const shown = tiles.filter((t) => !s || t.id.toLowerCase().includes(s) || t.name.toLowerCase().includes(s));
   const lattices = LATTICES.filter((l) => !s || l.name.toLowerCase().includes(s));
