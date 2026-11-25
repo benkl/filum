@@ -26,7 +26,7 @@ import { lockedToast, selectedTextGroup, textLocked, updateText } from "../lib/t
 import { onDownloadsChange } from "../lib/downloadStore";
 import { useStore } from "../store";
 import type { FillParams } from "../types";
-import { Dialog, Num, Row, Section, Slider, Toggle } from "./ui";
+import { Dialog, Num, Row, Section, Seg, Slider, Toggle } from "./ui";
 import { BatchSection, FontSection, VARIANT_LABELS } from "./LetteringTools";
 import { TransformPanel } from "./TransformPanel";
 import { CommandsSection } from "./CommandsSection";
@@ -109,14 +109,7 @@ function LetterFill({ group, spec, fontFill, fontScales }: { group: string; spec
           label="Crosses"
           title={`Keep the font's cross size (more crosses on bigger letters) or grow the crosses with the letters (the designed pattern at every size). This font: ${fontScales ? "grow with the letters" : "keep their size"} (Ink/Stitch's scale cross stitch pattern).`}
         >
-          <div className="seg">
-            <button className={!grow ? "on" : ""} onClick={() => updateText(group, { crossScale: false })}>
-              Font size
-            </button>
-            <button className={grow ? "on" : ""} onClick={() => updateText(group, { crossScale: true })}>
-              Grow with letters
-            </button>
-          </div>
+          <Seg value={!!grow} options={[[false, "Font size"], [true, "Grow with letters"]] as const} onChange={(v) => updateText(group, { crossScale: v })} />
         </Row>
       )}
     </>
@@ -280,44 +273,22 @@ export function TextProperties({ group }: { group: string }) {
         </Row>
         {(spec.align === "block" || spec.align === "blockLetters") && (
           <Row label="One-word lines" title="Block alignment widens the gaps between words; a line of one word can keep its spacing or spread its letters (Ink/Stitch Block, letter spacing)">
-            <div className="seg">
-              <button className={spec.align === "block" ? "on" : ""} onClick={() => updateText(group, { align: "block" })}>
-                Keep
-              </button>
-              <button className={spec.align === "blockLetters" ? "on" : ""} onClick={() => updateText(group, { align: "blockLetters" })}>
-                Spread letters
-              </button>
-            </div>
+            <Seg value={spec.align} options={[["block", "Keep"], ["blockLetters", "Spread letters"]] as const} onChange={(v) => updateText(group, { align: v })} />
           </Row>
         )}
       </Section>
       {spec.path && (
         <Section title="On a path">
           <Row label="Place" title="Where the text sits along the path">
-            <div className="seg">
-              {(
-                [
+            <Seg value={(spec.pathAlign ?? "center")} options={[
                   ["start", "Start"],
                   ["center", "Centre"],
                   ["end", "End"],
                   ["stretch", "Stretch"],
-                ] as const
-              ).map(([v, l]) => (
-                <button key={v} className={(spec.pathAlign ?? "center") === v ? "on" : ""} onClick={() => updateText(group, { pathAlign: v })}>
-                  {l}
-                </button>
-              ))}
-            </div>
+                ] as const} onChange={(v) => updateText(group, { pathAlign: v })} />
           </Row>
           <Row label="Side" title="Letters on top of the path, or below it (the path read backwards)">
-            <div className="seg">
-              <button className={!spec.pathFlip ? "on" : ""} onClick={() => updateText(group, { pathFlip: false })}>
-                Above
-              </button>
-              <button className={spec.pathFlip ? "on" : ""} onClick={() => updateText(group, { pathFlip: true })}>
-                Below
-              </button>
-            </div>
+            <Seg value={!!spec.pathFlip} options={[[false, "Above"], [true, "Below"]] as const} onChange={(v) => updateText(group, { pathFlip: v })} />
           </Row>
           <button className="btn sm ghost" onClick={() => updateText(group, { path: undefined })} title="Back to straight text at the anchor">
             Off the path
@@ -391,20 +362,12 @@ export function TextProperties({ group }: { group: string }) {
             )}
           </Row>
           <Row label="Trims" title="Trim the thread after every letter, word or line (the font's own trims are always kept)">
-            <div className="seg">
-              {(
-                [
+            <Seg value={(spec.trims ?? "never")} options={[
                   ["never", "Never"],
                   ["letter", "Letters"],
                   ["word", "Words"],
                   ["line", "Lines"],
-                ] as const
-              ).map(([v, l]) => (
-                <button key={v} className={(spec.trims ?? "never") === v ? "on" : ""} onClick={() => updateText(group, { trims: v })}>
-                  {l}
-                </button>
-              ))}
-            </div>
+                ] as const} onChange={(v) => updateText(group, { trims: v })} />
           </Row>
           <p className={`hint ${outOfRange ? "warn" : ""}`}>
             Pre-digitized Ink/Stitch embroidery font: every letter carries its own satin columns and underlay.
@@ -417,20 +380,12 @@ export function TextProperties({ group }: { group: string }) {
         )}
         {!outline && emb?.sortable && (
           <Row label="Colour order" title="Sew the font's colours in turn (its colour sort order) within the whole text, each line or each word — fewer colour changes (Ink/Stitch colour sort; the font allows it)">
-            <div className="seg">
-              {(
-                [
+            <Seg value={(spec.colorSort ?? "off")} options={[
                   ["off", "As drawn"],
                   ["all", "Text"],
                   ["line", "Line"],
                   ["word", "Word"],
-                ] as const
-              ).map(([v, l]) => (
-                <button key={v} className={(spec.colorSort ?? "off") === v ? "on" : ""} onClick={() => updateText(group, { colorSort: v })}>
-                  {l}
-                </button>
-              ))}
-            </div>
+                ] as const} onChange={(v) => updateText(group, { colorSort: v })} />
           </Row>
         )}
         {palette && palette.length > 1 ? (

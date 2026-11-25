@@ -10,7 +10,7 @@ import { fabricInfo, threadWeightInfo } from "../lib/materials";
 import { openFile } from "../lib/platform";
 import { blockStats, duration, jobSeconds, PRINT_DEFAULTS, sheetHtml, type PrintSettings, type PrintView } from "../lib/printSheet";
 import { useStore } from "../store";
-import { Dialog, Num, Row, Section, Toggle } from "./ui";
+import { Dialog, Num, Row, Section, Seg, Toggle } from "./ui";
 import "../output.css";
 import { safeSetItem } from "../lib/storage";
 
@@ -180,24 +180,10 @@ export function PrintDialog({ onClose }: { onClose: () => void }) {
               </label>
             ))}
             <Row label="Paper">
-              <div className="seg">
-                <button className={s.paper === "a4" ? "on" : ""} onClick={() => set({ paper: "a4" })}>
-                  A4
-                </button>
-                <button className={s.paper === "letter" ? "on" : ""} onClick={() => set({ paper: "letter" })}>
-                  Letter
-                </button>
-              </div>
+              <Seg value={s.paper} options={[["a4", "A4"], ["letter", "Letter"]] as const} onChange={(v) => set({ paper: v })} />
             </Row>
             <Row label="Pictures" title="Realistic: as sewn · Stitches: every stitch as a line">
-              <div className="seg">
-                <button className={s.realistic ? "on" : ""} onClick={() => set({ realistic: true })}>
-                  Realistic
-                </button>
-                <button className={!s.realistic ? "on" : ""} onClick={() => set({ realistic: false })}>
-                  Stitches
-                </button>
-              </div>
+              <Seg value={!!s.realistic} options={[[true, "Realistic"], [false, "Stitches"]] as const} onChange={(v) => set({ realistic: v })} />
             </Row>
             {s.views.operatorDetailed && (
               <Row label="Thumbnails" title="Size of the colour pictures in the operator detailed view (Ink/Stitch 15–110 mm)">

@@ -97,6 +97,8 @@ export interface SatinParams {
   shortStitchInset: number;
   centerWalk: boolean;
   contourUnderlay: boolean;
+  /** Contour underlay passes, each the first side forward and the second back (absent: 1; foam takes 2). */
+  contourUnderlayRepeats?: number;
   contourInset: number;
   zigzagUnderlay: boolean;
   zigzagUnderlaySpacing: number;
@@ -743,20 +745,8 @@ export interface Connection {
   end: Vec2;
 }
 
-export const FLAG = {
-  JUMP: 1,
-  TRIM: 2,
-  COLOR_CHANGE: 4,
-  STOP: 8,
-  END: 16,
-  TIE: 32,
-  UNDERLAY: 64,
-  TRAVEL: 128,
-  COMMANDS: 1 | 2 | 4 | 8 | 16,
-} as const;
-
-/** `plan.objects` for a record no object sews (a command, the frame moving out): the engine's u32::MAX. */
-export const NO_OBJECT = 0xffffffff;
+/** Stitch flags and the "no object" marker of plan records: from the engine (generated/engine.ts). */
+export { FLAG, NO_OBJECT } from "./generated/engine";
 
 /** An Ink/Stitch meander tile: segments [x1, y1, x2, y2] and repeat vectors, mm at 100 %. */
 export interface MeanderTile {

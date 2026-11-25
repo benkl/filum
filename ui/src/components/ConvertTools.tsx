@@ -11,7 +11,7 @@ import type { DesignObject, SubPath, Vec2 } from "../types";
 import { flattenSubPath } from "../lib/bezier";
 import { patternSatin, SATIN_PATTERNS, type SatinPattern, type ZigzagPattern } from "../lib/convert";
 import { applies, applyPlan, DEFAULT_CONVERT, planConversion, UNDERLAYS, type ConvertId, type ConvertOptions, type ConvertPlan } from "../lib/convertActions";
-import { Dialog, Num, Row, Slider, Toggle, useDismiss } from "./ui";
+import { Dialog, Num, Row, Seg, Slider, Toggle, useDismiss } from "./ui";
 import { safeSetItem } from "../lib/storage";
 
 const KEY = "filum.convert";
@@ -279,34 +279,19 @@ export function ConvertDialog({ onClose }: { onClose: () => void }) {
                 <Num value={o.fillToSatin.pullComp} unit="mm" step={0.05} min={-10} max={10} onChange={(v) => set("fillToSatin", { pullComp: v })} />
               </Row>
               <Row label="Keep" title="What stays of the selection besides the new satins">
-                <div className="seg">
-                  {(
-                    [
+                <Seg value={o.fillToSatin.keep} options={[
                       ["unused", "Unconverted parts", "Parts of the fill no rung crosses stay a fill"],
                       ["none", "Nothing", "Remove the fills and the rungs"],
                       ["fills", "Fills", "Keep the fills, remove the rungs"],
                       ["all", "All", "Keep the fills and the rungs"],
-                    ] as const
-                  ).map(([k, label, title]) => (
-                    <button key={k} title={title} className={o.fillToSatin.keep === k ? "on" : ""} onClick={() => set("fillToSatin", { keep: k })}>
-                      {label}
-                    </button>
-                  ))}
-                </div>
+                    ] as const} onChange={(k) => set("fillToSatin", { keep: k })} />
               </Row>
             </>
           )}
           {id === "fillToStroke" && (
             <>
               <Row label="Stitch as" title="Running stitch along the centre lines, or satins as wide as the shape">
-                <div className="seg">
-                  <button className={o.fillToStroke.output === "running" ? "on" : ""} onClick={() => set("fillToStroke", { output: "running" })}>
-                    Running stitch
-                  </button>
-                  <button className={o.fillToStroke.output === "satin" ? "on" : ""} onClick={() => set("fillToStroke", { output: "satin" })}>
-                    Satin
-                  </button>
-                </div>
+                <Seg value={o.fillToStroke.output} options={[["running", "Running stitch"], ["satin", "Satin"]] as const} onChange={(v) => set("fillToStroke", { output: v })} />
               </Row>
               <Row label="Dead ends under" title="Side branches shorter than this are removed — about the line width of the shape works in most cases">
                 <Slider min={0} max={30} step={0.5} unit="mm" value={o.fillToStroke.deadEnd} onChange={(v) => set("fillToStroke", { deadEnd: v })} />
@@ -396,14 +381,7 @@ export function ConvertDialog({ onClose }: { onClose: () => void }) {
           {id === "breakApart" && (
             <>
               <Row label="Method" title="How overlapping sub-paths are treated">
-                <div className="seg">
-                  <button title="Every sub-path is a shape of its own; shapes inside others become their holes" className={o.breakApart.method === "simple" ? "on" : ""} onClick={() => set("breakApart", { method: "simple" })}>
-                    Simple
-                  </button>
-                  <button title="Overlapping sub-paths cancel out where they overlap" className={o.breakApart.method === "complex" ? "on" : ""} onClick={() => set("breakApart", { method: "complex" })}>
-                    Complex
-                  </button>
-                </div>
+                <Seg value={o.breakApart.method} options={[["simple", "Simple", "Every sub-path is a shape of its own; shapes inside others become their holes"], ["complex", "Complex", "Overlapping sub-paths cancel out where they overlap"]] as const} onChange={(v) => set("breakApart", { method: v })} />
               </Row>
               <Row label="Remove smaller than" title="Shapes and holes smaller than this are removed">
                 <Num value={o.breakApart.minArea} unit="mm²" step={0.5} min={0.05} max={100} onChange={(v) => set("breakApart", { minArea: v })} />

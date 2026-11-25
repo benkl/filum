@@ -5,7 +5,7 @@
 import { ChevronDown, Search, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Grip, useDismiss, useMovable } from "./ui";
+import { Grip, placeNear, useDismiss, useMovable } from "./ui";
 import { engine } from "../engine/client";
 import type { MeanderPattern, MeanderTile } from "../types";
 
@@ -130,14 +130,8 @@ function MeanderMenu({
   const [pos, setPos] = useState({ left: 0, top: 0, maxHeight: 420 });
   const mv = useMovable();
   useLayoutEffect(() => {
-    const r = anchor.getBoundingClientRect();
-    const w = 336;
-    const left = Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w));
-    const below = window.innerHeight - r.bottom - 12;
-    const above = r.top - 12;
-    const maxHeight = Math.min(460, Math.max(below, above));
-    const top = below >= Math.min(360, above) ? r.bottom + 4 : Math.max(8, r.top - 4 - maxHeight);
-    setPos({ left, top, maxHeight });
+    const p = placeNear(anchor.getBoundingClientRect(), 336, { align: "end", maxHeight: 460, minBelow: 360 });
+    setPos({ left: p.left, top: p.top, maxHeight: p.maxHeight! });
   }, [anchor]);
   useDismiss(true, onClose, [ref, anchor]);
   const s = q.trim().toLowerCase();

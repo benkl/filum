@@ -51,7 +51,7 @@ impl StitchEngine {
 
     /// Generate the stitch plan. Returns
     /// `{ coords: Float32Array(x,y,...), flags: Uint8Array, objects: Uint32Array, meta: string(JSON) }`
-    /// where meta = `{ threads, stats, bounds, basting, links, quality, dense }`.
+    /// where meta = `{ threads, stats, basting, links, quality, dense }`.
     pub fn plan(&mut self, doc_json: &str) -> Result<JsValue, JsValue> {
         let doc = parse_doc(doc_json)?;
         let plan = self.engine.plan(&doc);
@@ -166,7 +166,7 @@ impl StitchEngine {
 }
 
 /// A stitch plan as `{ coords: Float32Array(x,y,...), flags: Uint8Array, objects: Uint32Array, meta: string(JSON) }`
-/// where meta = `{ threads, stats, bounds, basting, links, quality, dense }`;
+/// where meta = `{ threads, stats, basting, links, quality, dense }`;
 /// `dense` (with `density`): the places too dense for the fabric, as the
 /// density map finds them (`{ hotspots, limits }`, for Issues).
 fn plan_js(plan: &filum_core::StitchPlan, doc: &Document, density: bool) -> JsValue {
@@ -187,7 +187,7 @@ fn plan_js(plan: &filum_core::StitchPlan, doc: &Document, density: bool) -> JsVa
         let f = filum_core::density::density_field(doc, plan, &Default::default());
         serde_json::json!({ "hotspots": f.hotspots, "limits": f.limits })
     });
-    let meta = serde_json::json!({ "threads": plan.threads, "stats": stats, "bounds": plan.bounds(), "basting": plan.basting, "links": plan.links, "quality": quality, "dense": dense });
+    let meta = serde_json::json!({ "threads": plan.threads, "stats": stats, "basting": plan.basting, "links": plan.links, "quality": quality, "dense": dense });
     let o = Object::new();
     set(&o, "coords", &Float32Array::from(&coords[..]).into());
     set(&o, "flags", &Uint8Array::from(&fl[..]).into());

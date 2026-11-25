@@ -3,6 +3,7 @@
 // record (the same time model as the engine's plan stats).
 
 import { FLAG, type PlanData } from "../types";
+import { JUMP_SECONDS } from "../generated/engine";
 
 export interface TimelineBlock {
   /** Colour block (index into plan.threads). */
@@ -37,7 +38,7 @@ export interface MachineTimes {
 }
 
 /** Seconds a jump takes (the engine's plan stats). */
-const JUMP_S = 0.05;
+const JUMP_S = JUMP_SECONDS;
 
 export function buildTimeline(plan: Pick<PlanData, "flags">, m: MachineTimes): Timeline {
   const { flags } = plan;

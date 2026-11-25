@@ -60,6 +60,7 @@ fn kind(f: u8) -> Kind {
 
 /// One object's share.
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ObjectQuality {
     /// Index of the object in the document.
@@ -77,6 +78,7 @@ pub struct ObjectQuality {
 
 /// Where the needle goes down more often than the fabric takes.
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct HotSpot {
     pub at: [f64; 2],
@@ -95,6 +97,7 @@ pub struct HotSpot {
 
 /// A fill narrower than [`EDGE_RUN_FILL`].
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct NarrowFill {
     pub index: usize,
@@ -103,6 +106,7 @@ pub struct NarrowFill {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct StitchQuality {
     /// Needle drops of the design's objects.

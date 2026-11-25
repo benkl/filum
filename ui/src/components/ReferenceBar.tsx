@@ -6,7 +6,7 @@ import { Digitize } from "../icons/stitch";
 import { pending } from "../lib/actions";
 import { fitReferenceToHoop, referenceBytes, removeReference, updateReference } from "../lib/references";
 import { useStore } from "../store";
-import { Grip, Num, useMovable } from "./ui";
+import { Grip, Num, Seg, useMovable } from "./ui";
 
 export function ReferenceBar({ id }: { id: string }) {
   const r = useStore((s) => s.doc.references?.find((x) => x.id === id));
@@ -41,14 +41,7 @@ export function ReferenceBar({ id }: { id: string }) {
         />
         <span className="stat">{Math.round(r.opacity * 100)} %</span>
       </label>
-      <div className="seg" role="group" aria-label="Placement">
-        <button className={r.placement === "behind" ? "on" : ""} onClick={() => set({ placement: "behind" })} title="Behind the stitches">
-          Behind
-        </button>
-        <button className={r.placement === "over" ? "on" : ""} onClick={() => set({ placement: "over" })} title="Over the stitches, like tracing paper">
-          Over
-        </button>
-      </div>
+      <Seg label="Placement" value={r.placement} options={[["behind", "Behind", "Behind the stitches"], ["over", "Over", "Over the stitches, like tracing paper"]] as const} onChange={(v) => set({ placement: v })} />
       <button className={`icon-btn ${r.grayscale ? "on" : ""}`} onClick={() => set({ grayscale: !r.grayscale })} title="Grey: thread colours stand out against it">
         <span className="ref-grey" />
       </button>

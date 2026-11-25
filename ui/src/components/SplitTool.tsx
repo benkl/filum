@@ -7,6 +7,7 @@ import { Split, Undo2, X } from "lucide-react";
 import { applySplit, planSplit, type SplitPlan } from "../lib/splitSatins";
 import { EMPTY_SPLIT, useStore, type SplitDraft } from "../store";
 import type { DesignObject, StitchDocument, Vec2 } from "../types";
+import { Seg } from "./ui";
 
 /** A fill the tool can split. */
 export const splittable = (o: DesignObject | undefined | null): o is DesignObject => !!o && !o.locked && !o.text && o.stitch.type === "fill" && o.paths.some((sp) => sp.closed);
@@ -85,14 +86,7 @@ export function SplitToolBar() {
         <Split size={14} />
         <span>{shape ? `Split ${shape.name}` : "Split into satins"}</span>
       </span>
-      <div className="seg" role="group" aria-label="A drag draws">
-        <button className={draft.draw === "cut" ? "on" : ""} title="A drag draws a cut line: the shape is cut where it crosses it" onClick={() => setDraft({ draw: "cut" })}>
-          Cut lines
-        </button>
-        <button className={draft.draw === "direction" ? "on" : ""} title="A drag draws a direction line: the part it lies in is sewn that way (or hold Alt)" onClick={() => setDraft({ draw: "direction" })}>
-          Direction lines
-        </button>
-      </div>
+      <Seg label="A drag draws" value={draft.draw} options={[["cut", "Cut lines", "A drag draws a cut line: the shape is cut where it crosses it"], ["direction", "Direction lines", "A drag draws a direction line: the part it lies in is sewn that way (or hold Alt)"]] as const} onChange={(v) => setDraft({ draw: v })} />
       {shape && (
         <span className="stat" title={auto ? "A part without a direction line is sewn across its long side" : undefined}>
           {parts} part{parts === 1 ? "" : "s"}

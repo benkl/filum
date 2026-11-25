@@ -9,7 +9,7 @@ import { optimizeOrder } from "../lib/actions";
 import { optimizeSteps } from "../lib/prefs";
 import { useStore } from "../store";
 import type { OptimizeSteps } from "../types";
-import { useDismiss } from "./ui";
+import { placeNear, useDismiss } from "./ui";
 
 type Step = { id: keyof OptimizeSteps; label: string; hint: string };
 
@@ -118,15 +118,8 @@ function OptimizeMenu({
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const x = Math.min(
-      window.innerWidth - el.offsetWidth - 4,
-      Math.max(4, anchor.right - el.offsetWidth),
-    );
-    const y = Math.min(
-      anchor.bottom + 4,
-      Math.max(4, window.innerHeight - el.offsetHeight - 4),
-    );
-    setPlace({ x, y });
+    const p = placeNear(anchor, el.offsetWidth, { align: "end", margin: 4, height: el.offsetHeight, flip: false });
+    setPlace({ x: p.left, y: p.top });
   }, [anchor]);
   useEffect(() => {
     ref.current

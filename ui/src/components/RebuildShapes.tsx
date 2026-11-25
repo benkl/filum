@@ -8,7 +8,7 @@ import { engine } from "../engine/client";
 import { defaultStitch, pathsToPath2D, uid } from "../lib/geometry";
 import { useStore } from "../store";
 import { FLAG, type DesignObject, type StitchParams, type SubPath } from "../types";
-import { Dialog, Num, Row, Toggle } from "./ui";
+import { Dialog, Num, Row, Seg, Toggle } from "./ui";
 import "../output.css";
 import { loadMerged, safeSetItem } from "../lib/storage";
 import { planBounds } from "../lib/planBounds";
@@ -200,14 +200,7 @@ export function RebuildShapesDialog({ onClose }: { onClose: () => void }) {
             <Num value={p.threshold} unit="mm²" step={1} min={0} max={100} onChange={(v) => set({ threshold: v })} />
           </Row>
           <Row label="Stitch as" title="What the new shapes are stitched as">
-            <div className="seg">
-              <button className={as === "fill" ? "on" : ""} onClick={() => setAs("fill")} title="Fill stitch (a fill keeps its settings)">
-                Fill
-              </button>
-              <button className={as === "running" ? "on" : ""} onClick={() => setAs("running")} title="A running stitch along the outlines">
-                Outline
-              </button>
-            </div>
+            <Seg value={as} options={[["fill", "Fill", "Fill stitch (a fill keeps its settings)"], ["running", "Outline", "A running stitch along the outlines"]] as const} onChange={(v) => setAs(v)} />
           </Row>
           <Row label="Keep original" title="Add the shapes and keep the stitched objects (Ink/Stitch keep original)">
             <Toggle on={keep} onChange={setKeep} />

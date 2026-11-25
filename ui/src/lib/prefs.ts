@@ -2,6 +2,7 @@
 // The view toggles (grid, guides, …) are remembered by the store itself.
 import type { Fabric, OptimizeSteps } from "../types";
 import { loadMerged, safeSetItem } from "./storage";
+import { FABRICS } from "../generated/engine";
 
 export interface Prefs {
   /** Highlight colour of the interface (hex). */
@@ -27,8 +28,8 @@ export interface Prefs {
 /** Optimise's steps when nothing is chosen: all but moving locked objects, keeping to the selection and centre out. */
 export const DEFAULT_OPTIMIZE: OptimizeSteps = { colors: true, travel: true, foamLast: true, ends: true, links: true, locked: false, selectionOnly: false, centerOut: false };
 
-/** Fabrics that are sewn centre out unless you choose otherwise: caps (bottom up too) and the ones that stretch. */
-export const CENTER_OUT_FABRICS: Fabric[] = ["cap", "knit", "fleece", "towel", "pique"];
+/** Fabrics that are sewn centre out unless you choose otherwise: caps (bottom up too) and the ones that stretch (the engine's optimize.rs). */
+export const CENTER_OUT_FABRICS: Fabric[] = (Object.keys(FABRICS) as Fabric[]).filter((f) => FABRICS[f].centerOut);
 
 /** The steps Optimise takes on this fabric, with the defaults filled in. */
 export const optimizeSteps = (p: Pick<Prefs, "optimize">, fabric?: Fabric): OptimizeSteps => ({

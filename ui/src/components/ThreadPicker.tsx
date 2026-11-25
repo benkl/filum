@@ -5,7 +5,7 @@
 import { Check, ChevronDown, Download, Focus, Plus, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Grip, useDismiss, useMovable } from "./ui";
+import { Grip, placeNear, useDismiss, useMovable } from "./ui";
 import {
   DEFAULT_CHART,
   SOURCE_LABEL,
@@ -104,14 +104,8 @@ function ChartMenu({ anchor, value, none, onPick, onClose }: { anchor: HTMLEleme
     };
   }, [list]);
   useLayoutEffect(() => {
-    const r = anchor.getBoundingClientRect();
-    const w = 300;
-    const left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left));
-    const below = window.innerHeight - r.bottom - 12;
-    const above = r.top - 12;
-    const maxHeight = Math.min(420, Math.max(below, above));
-    const top = below >= Math.min(320, above) ? r.bottom + 4 : Math.max(8, r.top - 4 - Math.min(420, maxHeight));
-    setPos({ left, top, maxHeight });
+    const p = placeNear(anchor.getBoundingClientRect(), 300, { maxHeight: 420, minBelow: 320 });
+    setPos({ left: p.left, top: p.top, maxHeight: p.maxHeight! });
     input.current?.focus();
   }, [anchor]);
   useDismiss(true, onClose, [ref, anchor]);
@@ -364,13 +358,7 @@ function ThreadPopover({ anchor, current, onPick, onClose }: { anchor: HTMLEleme
   const recent = useMemo(recentThreads, []);
   const mv = useMovable();
   useLayoutEffect(() => {
-    const r = anchor.getBoundingClientRect();
-    const w = 320;
-    const h = ref.current?.offsetHeight ?? 420;
-    const left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left - w / 2 + r.width / 2));
-    const below = r.bottom + 6;
-    const top = below + h > window.innerHeight - 8 ? Math.max(8, r.top - h - 6) : below;
-    setPos({ left, top });
+    setPos(placeNear(anchor.getBoundingClientRect(), 320, { align: "center", gap: 6, height: ref.current?.offsetHeight ?? 420 }));
   }, [anchor]);
   // the chart list it opens belongs to it
   useDismiss(true, onClose, [ref, anchor, ".chart-menu"]);

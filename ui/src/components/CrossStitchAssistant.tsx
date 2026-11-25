@@ -10,7 +10,7 @@ import { openDigitizer } from "../lib/actions";
 import { flatten, objectBounds, unionBoxes } from "../lib/geometry";
 import { useStore } from "../store";
 import type { CrossKind, DesignObject, FillParams } from "../types";
-import { Dialog, Num, Row, Slider, Toggle } from "./ui";
+import { Dialog, Num, Row, Seg, Slider, Toggle } from "./ui";
 
 export const CROSS_KINDS: [CrossKind, string, string][] = [
   ["cross", "×", "Both diagonals"],
@@ -97,13 +97,7 @@ export function CrossStitchDialog({ onClose }: { onClose: () => void }) {
         </span>
       </Row>
       <Row label="Stitches">
-        <div className="seg">
-          {CROSS_KINDS.map(([k, l, t]) => (
-            <button key={k} title={t} className={kind === k ? "on" : ""} onClick={() => setKind(k)}>
-              {l}
-            </button>
-          ))}
-        </div>
+        <Seg value={kind} options={CROSS_KINDS} onChange={(k) => setKind(k)} />
       </Row>
       <Row label="Coverage" title="How much of a cell must be inside a shape to get a cross">
         <Slider min={10} max={100} step={5} digits={0} unit="%" value={Math.round(coverage * 100)} onChange={(v) => setCoverage(v / 100)} />

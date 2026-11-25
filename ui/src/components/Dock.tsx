@@ -46,7 +46,7 @@ import { HoopOptions } from "./Bars";
 import { HoopShapeRow, MaterialSection } from "./MaterialPanel";
 import { HOOPS, hoopIndex, hoopOf } from "../lib/hoops";
 import { fitHoopToDesign } from "../lib/actions";
-import { Num, PatternInput, Row, Section, Slider, Toggle, useDismiss } from "./ui";
+import { Num, PatternInput, Row, Section, Seg, Slider, Toggle, useDismiss } from "./ui";
 import { Satin3dSection } from "./Satin3dSection";
 import { beansToPasses, formatPattern, parsePattern, passesToBeans } from "../lib/patterns";
 import { defaultRippleGuide, guidePair, isRipple, useAsRippleGuide } from "../lib/rippleGuide";
@@ -984,19 +984,11 @@ function StitchOptions({ o }: { o: DesignObject }) {
                 Rows follow the dashed guide line — drag its points and handles on the canvas.
               </p>
               <Row label="Rows" title="Copies of the guide shifted across (they bunch where it bends), or parallel to it at an even distance — and round its ends (Ink/Stitch guided fill strategies)">
-                <div className="seg">
-                  {(
-                    [
+                <Seg value={(st.guidedStrategy ?? "copy")} options={[
                       ["copy", "Copies"],
                       ["parallel", "Parallel"],
                       ["buffer", "Around"],
-                    ] as const
-                  ).map(([v, l]) => (
-                    <button key={v} className={(st.guidedStrategy ?? "copy") === v ? "on" : ""} onClick={() => up({ guidedStrategy: v })}>
-                      {l}
-                    </button>
-                  ))}
-                </div>
+                    ] as const} onChange={(v) => up({ guidedStrategy: v })} />
               </Row>
               <Row label="Guide">
                 <button
@@ -1060,14 +1052,7 @@ function StitchOptions({ o }: { o: DesignObject }) {
           {st.method === "cross" && (
             <Row label="Cross order" title="Which diagonal goes first (all crosses alike), and how often each is sewn">
               <span className="dz-inline">
-                <div className="seg">
-                  <button className={!st.crossFlip ? "on" : ""} onClick={() => up({ crossFlip: false })} title="Top-left to bottom-right first">
-                    \ then /
-                  </button>
-                  <button className={st.crossFlip ? "on" : ""} onClick={() => up({ crossFlip: true })} title="Bottom-left to top-right first">
-                    / then \
-                  </button>
-                </div>
+                <Seg value={!!st.crossFlip} options={[[false, "\\ then /", "Top-left to bottom-right first"], [true, "/ then \\", "Bottom-left to top-right first"]] as const} onChange={(v) => up({ crossFlip: v })} />
                 <Num value={st.crossThreads ?? 1} step={2} min={1} max={5} digits={0} unit="×" onChange={(v) => up({ crossThreads: Math.max(1, Math.round((v - 1) / 2) * 2 + 1) })} />
               </span>
             </Row>
@@ -1161,21 +1146,13 @@ function StitchOptions({ o }: { o: DesignObject }) {
                 <Slider min={10} max={100} step={5} digits={0} unit="%" value={Math.round((st.crossCoverage ?? 0.5) * 100)} onChange={(v) => up({ crossCoverage: v / 100 })} />
               </Row>
               <Row label="Stitches">
-                <div className="seg">
-                  {(
-                    [
+                <Seg value={(st.crossKind ?? "cross")} options={[
                       ["cross", "×", "Both diagonals"],
                       ["half", "/", "Half cross: one diagonal"],
                       ["upright", "+", "Upright cross"],
                       ["double", "✳", "Double cross: one diagonal, the upright cross, then the other diagonal on top"],
                       ["smyrna", "⁜", "Smyrna cross: the diagonal cross, then the upright cross on top"],
-                    ] as const
-                  ).map(([k, l, t]) => (
-                    <button key={k} title={t} className={(st.crossKind ?? "cross") === k ? "on" : ""} onClick={() => up({ crossKind: k })}>
-                      {l}
-                    </button>
-                  ))}
-                </div>
+                    ] as const} onChange={(k) => up({ crossKind: k })} />
               </Row>
               {st.crossKind === "upright" && (
                 <Row label="Dense" title="A second grid of upright crosses shifted by half a cell — a closed, woven look (Ink/Stitch dense upright cross)">
@@ -2064,28 +2041,14 @@ function RippleSection({ o }: { o: DesignObject }) {
             <Toggle on={r.flipCopies ?? true} onChange={(v) => up({ flipCopies: v })} />
           </Row>
           <Row label="Joins" title="Where copies meet: flat connections, or points (Ink/Stitch join style)">
-            <div className="seg">
-              <button className={!r.joinPoint ? "on" : ""} onClick={() => up({ joinPoint: false })}>
-                Flat
-              </button>
-              <button className={r.joinPoint ? "on" : ""} onClick={() => up({ joinPoint: true })}>
-                Point
-              </button>
-            </div>
+            <Seg value={!!r.joinPoint} options={[[false, "Flat"], [true, "Point"]] as const} onChange={(v) => up({ joinPoint: v })} />
           </Row>
           <Row label="Staggers" title="Needle points shifted from line to line over this many lines (0 = even stitches)">
             <Num value={r.staggers ?? 0} step={1} min={0} max={12} digits={0} onChange={(v) => up({ staggers: Math.round(v) })} />
           </Row>
           {!rails && !guide.length && (
             <Row label="Towards target" title="Without a guide: parallel copies, or copies fanned towards the target (Ink/Stitch)">
-              <div className="seg">
-                <button className={!r.fan ? "on" : ""} onClick={() => up({ fan: false })}>
-                  Parallel
-                </button>
-                <button className={r.fan ? "on" : ""} onClick={() => up({ fan: true })}>
-                  Fan
-                </button>
-              </div>
+              <Seg value={!!r.fan} options={[[false, "Parallel"], [true, "Fan"]] as const} onChange={(v) => up({ fan: v })} />
             </Row>
           )}
           <Row label="Manual points" title="The outline's own points are the stitches — no running stitch in between (Ink/Stitch manual pattern placement)">
@@ -2107,39 +2070,23 @@ function RippleSection({ o }: { o: DesignObject }) {
                 </span>
               </Row>
               <Row label="Scale axes">
-                <div className="seg">
-                  {(
-                    [
+                <Seg value={(r.scaleAxis ?? "both")} options={[
                       ["both", "X Y"],
                       ["x", "X"],
                       ["y", "Y"],
                       ["none", "None"],
-                    ] as const
-                  ).map(([k, l]) => (
-                    <button key={k} className={(r.scaleAxis ?? "both") === k ? "on" : ""} onClick={() => up({ scaleAxis: k })}>
-                      {l}
-                    </button>
-                  ))}
-                </div>
+                    ] as const} onChange={(k) => up({ scaleAxis: k })} />
               </Row>
               <Row label="Turn with guide" title="Copies turn with the guide's direction">
                 <Toggle on={r.rotateRipples ?? true} onChange={(v) => up({ rotateRipples: v })} />
               </Row>
               {satinGuide && (
                 <Row label="Copies at" title="By the line count, at the satin's rungs, or as many as fit without overlapping (Ink/Stitch pattern position)">
-                  <div className="seg">
-                    {(
-                      [
+                  <Seg value={(r.guidePosition ?? "lineCount")} options={[
                         ["lineCount", "Count"],
                         ["rungs", "Rungs"],
                         ["adaptive", "Fit"],
-                      ] as const
-                    ).map(([k, l]) => (
-                      <button key={k} className={(r.guidePosition ?? "lineCount") === k ? "on" : ""} onClick={() => up({ guidePosition: k })}>
-                        {l}
-                      </button>
-                    ))}
-                  </div>
+                      ] as const} onChange={(k) => up({ guidePosition: k })} />
                 </Row>
               )}
               <button className="btn sm ghost" onClick={() => up({ guide: undefined, anchor: undefined })}>

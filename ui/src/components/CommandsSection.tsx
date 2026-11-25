@@ -8,7 +8,7 @@ import { LINK_CHOICES, connectionAfter, describeConnection, linkChoiceOf } from 
 import { useStore } from "../store";
 import { setLinkChoice } from "./linkMenu";
 import type { DesignObject } from "../types";
-import { Num, Row, Section, Toggle } from "./ui";
+import { Num, Row, Section, Seg, Toggle } from "./ui";
 
 /** A value of the object's own, or the machine's (shown dimmed) until set. */
 export function OwnValue({ label, title, value, fallback, onChange }: { label: string; title: string; value: number | undefined; fallback: number; onChange: (v: number | undefined) => void }) {
@@ -83,13 +83,7 @@ export function CommandsSection({ objects }: { objects: DesignObject[] }) {
         <Toggle on={last.stopAfter} onChange={(v) => useStore.getState().updateObject(last.id, { stopAfter: v })} />
       </Row>
       <Row label="Locks" title="Lock stitches where it starts and ends (the shapes are set in Design ▸ Stitch-out)">
-        <div className="seg">
-          {LOCKS.map(([v, l]) => (
-            <button key={v} className={ties === v ? "on" : ""} onClick={() => all({ ties: v === "both" ? undefined : v })}>
-              {l}
-            </button>
-          ))}
-        </div>
+        <Seg value={ties} options={LOCKS} onChange={(v) => all({ ties: v === "both" ? undefined : v })} />
       </Row>
       <Row label="Force lock" title="Lock the end and the next start even when the next object follows without a trim">
         <Toggle on={objects.every((o) => !!o.forceLock)} onChange={(v) => all({ forceLock: v || undefined })} />

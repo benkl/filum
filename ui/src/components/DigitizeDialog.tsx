@@ -1455,13 +1455,7 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
                   )}
                 </Group>
                 <Group title="Stitches" hint={CROSS_KINDS.find((k) => k[0] === cross.kind)?.[2]}>
-                  <div className="seg seg-full">
-                    {CROSS_KINDS.map(([k, l, t]) => (
-                      <button key={k} title={t} className={cross.kind === k ? "on" : ""} onClick={() => setCross({ kind: k })}>
-                        {l}
-                      </button>
-                    ))}
-                  </div>
+                  <Seg full value={cross.kind} options={CROSS_KINDS} onChange={(k) => setCross({ kind: k })} />
                   <Row label="Grid on the cells" title="After adding, show the canvas grid at the cell size">
                     <Toggle on={cross.grid} onChange={(v) => setCross({ grid: v })} />
                   </Row>
@@ -1600,29 +1594,14 @@ export function DigitizeDialog({ onClose }: { onClose: () => void }) {
 
         <div className="dz-main">
           <div className="dz-tabs">
-            <div className="seg">
-              {(
-                [
+            <Seg value={tab} options={[
                   ["original", "Original"],
                   ["colours", "Regions"],
                   ["vector", "Shapes"],
                   ["stitches", "Stitches"],
-                ] as [Tab, string][]
-              ).map(([id, label]) => (
-                <button key={id} className={tab === id ? "on" : ""} onClick={() => setTab(id)}>
-                  {label}
-                </button>
-              ))}
-            </div>
+                ] as [Tab, string][]} onChange={(id) => setTab(id)} />
             {tab === "stitches" && (
-              <div className="seg">
-                <button className={stitchLook === "realistic" ? "on" : ""} onClick={() => setStitchLook("realistic")}>
-                  Realistic
-                </button>
-                <button className={stitchLook === "stitch" ? "on" : ""} onClick={() => setStitchLook("stitch")}>
-                  Stitch
-                </button>
-              </div>
+              <Seg value={stitchLook} options={[["realistic", "Realistic"], ["stitch", "Stitch"]] as const} onChange={(v) => setStitchLook(v)} />
             )}
             <div className="spacer" />
             {busy && (

@@ -90,12 +90,7 @@ pub fn fill_underlay(rings: &[Ring], p: &FillParams, fabric: &FabricProfile) -> 
         return FillUnderlay { edge: p.underlay_edge, passes: manual_passes(p) };
     }
     let w = shape_width(rings);
-    // one step lighter on delicate fabrics, heavier on stretchy ones
-    let (tiny, narrow) = match (fabric.delicate, fabric.stretch) {
-        (true, _) => (3.0, 12.0),
-        (_, true) => (2.0, 6.0),
-        _ => (2.5, 8.0),
-    };
+    let (tiny, narrow) = auto_fill_widths(fabric);
     if w < tiny {
         return FillUnderlay::none();
     }
@@ -106,16 +101,35 @@ pub fn fill_underlay(rings: &[Ring], p: &FillParams, fabric: &FabricProfile) -> 
     FillUnderlay { edge: true, passes }
 }
 
+/// Automatic fill underlay on a fabric: none in a fill narrower than the
+/// first width (mm), only an edge run below the second. One step lighter on
+/// delicate fabrics, heavier on stretchy ones. (The editor reads these from
+/// ui/src/generated/engine.ts.)
+pub fn auto_fill_widths(fabric: &FabricProfile) -> (f64, f64) {
+    match (fabric.delicate, fabric.stretch) {
+        (true, _) => (3.0, 12.0),
+        (_, true) => (2.0, 6.0),
+        _ => (2.5, 8.0),
+    }
+}
+
+/// Automatic satin underlay on a fabric: none below the first width (mm), a
+/// centre walk below the second, a contour below the third, then contour and
+/// zig-zag.
+pub fn auto_satin_widths(fabric: &FabricProfile) -> (f64, f64, f64) {
+    match (fabric.delicate, fabric.stretch) {
+        (true, _) => (1.5, 3.0, 5.0),
+        (_, true) => (1.0, 2.0, 3.0),
+        _ => (1.2, 2.5, 4.0),
+    }
+}
+
 /// The underlay of a satin column of (mean) width `w` on a fabric.
 pub fn satin_underlay(w: f64, p: &SatinParams, fabric: &FabricProfile) -> SatinUnderlay {
     if !p.underlay_auto {
         return SatinUnderlay { center: p.center_walk, contour: p.contour_underlay, zigzag: p.zigzag_underlay };
     }
-    let (none, center, contour) = match (fabric.delicate, fabric.stretch) {
-        (true, _) => (1.5, 3.0, 5.0),
-        (_, true) => (1.0, 2.0, 3.0),
-        _ => (1.2, 2.5, 4.0),
-    };
+    let (none, center, contour) = auto_satin_widths(fabric);
     let s = |center, contour, zigzag| SatinUnderlay { center, contour, zigzag };
     if w < none {
         s(false, false, false)

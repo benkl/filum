@@ -121,14 +121,7 @@ export function ToolOptionsBar({ tool }: { tool: DrawTool }) {
         <span className="sr-only">Width of the next point (scroll or [ ])</span>
         <Num value={opts.satin.width} unit="mm" step={0.1} min={0.3} max={15} onChange={(v) => set("satin", { width: v })} />
       </label>
-      <div className="seg" role="group" aria-label="New satins">
-        <button className={!opts.satin.twoSides ? "on" : ""} title="One line with a width: the column keeps its width (a varying width still gives two sides)" onClick={() => set("satin", { twoSides: false })}>
-          Centre line
-        </button>
-        <button className={opts.satin.twoSides ? "on" : ""} title="Two sides: shape each side on its own with the node tool (A)" onClick={() => set("satin", { twoSides: true })}>
-          Two sides
-        </button>
-      </div>
+      <Seg label="New satins" value={!!opts.satin.twoSides} options={[[false, "Centre line", "One line with a width: the column keeps its width (a varying width still gives two sides)"], [true, "Two sides", "Two sides: shape each side on its own with the node tool (A)"]] as const} onChange={(v) => set("satin", { twoSides: v })} />
       <span className="ctx-help">
         Drag for curves · scroll over a point to change its width · click a segment to add a point · Alt-click to delete · click the first point to close
       </span>
@@ -147,19 +140,11 @@ export function GradientToolBar() {
   const gmode = useStore((s) => s.toolOptions.gradient.mode) ?? "colour";
   const ramped = selectedRamp();
   const modeSeg = (
-    <div className="seg" role="group" aria-label="Gradient type">
-      {(
-        [
+    <Seg label="Gradient type" value={gmode} options={[
           ["colour", "Colour", "Multi-colour gradients with dithering (linear, radial, mesh, points)"],
           ["density", "Density", "Gradient fill: one colour, dense rows opening up along the drag"],
           ["blend", "Blend", "Colour blending: this colour fades out while a second fades in"],
-        ] as const
-      ).map(([id, label, title]) => (
-        <button key={id} title={title} className={gmode === id ? "on" : ""} onClick={() => setOpts("gradient", { mode: id })}>
-          {label}
-        </button>
-      ))}
-    </div>
+        ] as const} onChange={(id) => setOpts("gradient", { mode: id })} />
   );
   if (ramped || gmode !== "colour") return <RampToolBar modeSeg={modeSeg} />;
   const help =
@@ -454,14 +439,7 @@ export function BuilderToolBar() {
         <Combine size={14} />
         <span>{n ? `Shape builder · ${n} shape${n > 1 ? "s" : ""}` : "Shape builder"}</span>
       </span>
-      <div className="seg" role="group" aria-label="Drag across regions to">
-        <button className={mode === "merge" ? "on" : ""} title="Drag across regions to merge them into one shape" onClick={() => set("builder", { mode: "merge" })}>
-          Merge
-        </button>
-        <button className={mode === "delete" ? "on" : ""} title="Drag across regions to delete them (or hold Alt)" onClick={() => set("builder", { mode: "delete" })}>
-          Delete
-        </button>
-      </div>
+      <Seg label="Drag across regions to" value={mode} options={[["merge", "Merge", "Drag across regions to merge them into one shape"], ["delete", "Delete", "Drag across regions to delete them (or hold Alt)"]] as const} onChange={(v) => set("builder", { mode: v })} />
       <div className="vsep" />
       <button className="icon-btn" title="Divide: every overlap region becomes its own shape" disabled={n < 1} onClick={() => void divideSelection()}>
         <BoolIcon op="divide" />

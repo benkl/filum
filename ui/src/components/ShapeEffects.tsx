@@ -11,7 +11,7 @@ import { objectBounds, unionBoxes } from "../lib/geometry";
 import { applyEffect, DEFAULT_EFFECTS, WARPS, type Box, type EffectId, type EffectParams } from "../lib/shapeOps";
 import { useStore } from "../store";
 import type { DesignObject, StitchDocument, SubPath } from "../types";
-import { Dialog, Row, Slider, Toggle } from "./ui";
+import { Dialog, Row, Seg, Slider, Toggle } from "./ui";
 import { safeSetItem } from "../lib/storage";
 
 const KEY = "filum.effects";
@@ -218,14 +218,7 @@ export function ShapeEffectsDialog({ onClose }: { onClose: () => void }) {
                   <Slider min={1} max={40} step={1} digits={0} value={p.zigzag.ridges} onChange={(v) => set("zigzag", { ridges: Math.round(v) })} />
                 </Row>
                 <Row label="Points">
-                  <div className="seg">
-                    <button className={p.zigzag.smooth ? "on" : ""} onClick={() => set("zigzag", { smooth: true })}>
-                      Smooth
-                    </button>
-                    <button className={!p.zigzag.smooth ? "on" : ""} onClick={() => set("zigzag", { smooth: false })}>
-                      Corner
-                    </button>
-                  </div>
+                  <Seg value={!!p.zigzag.smooth} options={[[true, "Smooth"], [false, "Corner"]] as const} onChange={(v) => set("zigzag", { smooth: v })} />
                 </Row>
               </>
             )}
@@ -238,14 +231,7 @@ export function ShapeEffectsDialog({ onClose }: { onClose: () => void }) {
                   <Slider min={0.5} max={20} step={0.5} unit="/cm" value={p.roughen.detail} onChange={(v) => set("roughen", { detail: v })} />
                 </Row>
                 <Row label="Points">
-                  <div className="seg">
-                    <button className={p.roughen.smooth ? "on" : ""} onClick={() => set("roughen", { smooth: true })}>
-                      Smooth
-                    </button>
-                    <button className={!p.roughen.smooth ? "on" : ""} onClick={() => set("roughen", { smooth: false })}>
-                      Corner
-                    </button>
-                  </div>
+                  <Seg value={!!p.roughen.smooth} options={[[true, "Smooth"], [false, "Corner"]] as const} onChange={(v) => set("roughen", { smooth: v })} />
                 </Row>
                 <Row label="Variation">
                   <button className="btn sm" onClick={() => set("roughen", { seed: (p.roughen.seed % 9973) + 1 })}>
@@ -275,14 +261,7 @@ export function ShapeEffectsDialog({ onClose }: { onClose: () => void }) {
                   <Slider min={-100} max={100} step={1} digits={0} unit="%" value={p.warp.bend} onChange={(v) => set("warp", { bend: v })} />
                 </Row>
                 <Row label="Direction">
-                  <div className="seg">
-                    <button className={!p.warp.vertical ? "on" : ""} onClick={() => set("warp", { vertical: false })}>
-                      Horizontal
-                    </button>
-                    <button className={p.warp.vertical ? "on" : ""} onClick={() => set("warp", { vertical: true })}>
-                      Vertical
-                    </button>
-                  </div>
+                  <Seg value={!!p.warp.vertical} options={[[false, "Horizontal"], [true, "Vertical"]] as const} onChange={(v) => set("warp", { vertical: v })} />
                 </Row>
               </>
             )}

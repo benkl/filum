@@ -37,7 +37,7 @@ import {
 import { useStore } from "../store";
 import type { DitherMethod, GradientKind, GradientParams, DesignObject } from "../types";
 import { ThreadPicker } from "./ThreadPicker";
-import { followPointer, Num, Row, Section, Slider } from "./ui";
+import { followPointer, Num, Row, Section, Seg, Slider } from "./ui";
 
 /** Paint a dithered preview of the gradient into a canvas. */
 function paintDither(c: HTMLCanvasElement | null, g: Pick<GradientParams, "stops" | "curve" | "steps" | "dither">, colors: string[], cols: number, rows: number) {
@@ -494,21 +494,7 @@ export function GradientSection({ group }: { group: string }) {
       {straight && (
         <div className="grad-rows">
           <span className="stat">Mix</span>
-          <div className="seg" role="group" aria-label="Mix">
-            <button className={mix === "blend" ? "on" : ""} title="The colours share one set of rows: each row is sewn in one colour at a time, more of them where it is stronger, so the density stays even" onClick={() => up({ mix: "blend" })}>
-              Blend
-            </button>
-            <button
-              className={mix === "rows" ? "on" : ""}
-              title="Every row in one colour, the colours alternating rows through the transition (as Ink/Stitch's linear gradient fill); travel along the outline only"
-              onClick={() => up({ mix: "rows" })}
-            >
-              Rows
-            </button>
-            <button className={mix === "dither" ? "on" : ""} title="The rows are cut into cells, each in one colour: a crisp pixel mix, with a jump at many cell borders" onClick={() => up({ mix: "dither" })}>
-              Dither
-            </button>
-          </div>
+          <Seg label="Mix" value={mix} options={[["blend", "Blend", "The colours share one set of rows: each row is sewn in one colour at a time, more of them where it is stronger, so the density stays even"], ["rows", "Rows", "Every row in one colour, the colours alternating rows through the transition (as Ink/Stitch's linear gradient fill); travel along the outline only"], ["dither", "Dither", "The rows are cut into cells, each in one colour: a crisp pixel mix, with a jump at many cell borders"]] as const} onChange={(v) => up({ mix: v })} />
         </div>
       )}
       {mix === "rows" ? (

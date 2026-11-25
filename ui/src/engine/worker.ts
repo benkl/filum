@@ -18,123 +18,91 @@ import init, {
   readThreadList,
 } from "../wasm/pkg/filum_wasm.js";
 
-type Req = { id: number; op: string; args: unknown[] };
+type Req = { id: number; op: EngineOp; args: unknown[] };
 
 let engine: StitchEngine | null = null;
 const ready = init().then(() => {
   engine = new StitchEngine();
 });
 
+/** An operation's result and the buffers handed over with it (not copied). */
+type Out = { result: unknown; transfer?: Transferable[] };
+const s = (a: unknown[], i: number) => a[i] as string;
+const opt = (a: unknown[], i: number) => (a[i] as string | undefined) ?? "{}";
+const bytes = (a: unknown[], i: number) => a[i] as Uint8Array;
+/** Most operations answer in JSON. */
+const json = (f: (e: StitchEngine, a: unknown[]) => string) => (e: StitchEngine, a: unknown[]): Out => ({ result: JSON.parse(f(e, a)) });
+
+/** A stitch plan: the records as typed arrays, the rest from the JSON meta (crates/wasm/src/lib.rs plan_js). */
+function planOut(r: { coords: Float32Array; flags: Uint8Array; objects: Uint32Array; meta: string }): Out {
+  const meta = JSON.parse(r.meta);
+  return {
+    result: { coords: r.coords, flags: r.flags, objects: r.objects, ...meta, basting: meta.basting ?? null, links: meta.links ?? [], quality: meta.quality ?? null, dense: meta.dense ?? null },
+    transfer: [r.coords.buffer, r.flags.buffer, r.objects.buffer],
+  };
+}
+
+/**
+ * The engine's operations by name (engine/client.ts calls them by these
+ * names; a name that isn't here doesn't compile there).
+ */
+const OPS = {
+  plan: (e: StitchEngine, a: unknown[]) => planOut(e.plan(s(a, 0))),
+  exportPlan: (e: StitchEngine, a: unknown[]) => planOut(e.exportPlan(s(a, 0), opt(a, 1))),
+  densityField: (e: StitchEngine, a: unknown[]): Out => {
+    const r = e.densityField(s(a, 0), opt(a, 1)) as { layers: Float32Array; holes: Float32Array; added: Float32Array; class: Uint8Array; meta: string };
+    return { result: { ...JSON.parse(r.meta), layers: r.layers, holes: r.holes, added: r.added, cls: r.class }, transfer: [r.layers.buffer, r.holes.buffer, r.added.buffer, r.class.buffer] };
+  },
+  stitchedShapes: json((e, a) => e.stitchedShapes(s(a, 0))),
+  elementInfo: json((e, a) => e.elementInfo(s(a, 0), s(a, 1))),
+  applyThreadList: json((e, a) => e.applyThreadList(s(a, 0), s(a, 1))),
+  stitchOutline: json((e, a) => e.stitchOutline(s(a, 0), s(a, 1), s(a, 2))),
+  readThreadList: json((_, a) => readThreadList(bytes(a, 0), s(a, 1))),
+  optimize: json((e, a) => e.optimize(s(a, 0), opt(a, 1))),
+  export: (e: StitchEngine, a: unknown[]): Out => {
+    const out = e.export(s(a, 0), s(a, 1), opt(a, 2));
+    return { result: out, transfer: [out.buffer] };
+  },
+  machineColors: json((e, a) => e.machineColors(s(a, 0), s(a, 1), opt(a, 2))),
+  importSvg: json((_, a) => importSvg(s(a, 0))),
+  exportSvg: (_: StitchEngine, a: unknown[]): Out => ({ result: exportSvg(s(a, 0)) }),
+  importEmbroidery: json((_, a) => importEmbroidery(bytes(a, 0), s(a, 1))),
+  digitize: json((_, a) => digitize(bytes(a, 0), s(a, 1))),
+  digitizePreview: (_: StitchEngine, a: unknown[]): Out => {
+    const r = digitizePreview(bytes(a, 0), s(a, 1)) as {
+      width: number;
+      height: number;
+      rgba: Uint8ClampedArray;
+      regionWidth: number;
+      regionHeight: number;
+      regions: Uint32Array;
+      regionLabel: Uint8Array;
+      regionReason: Uint8Array;
+      meta: string;
+    };
+    const { meta, ...rest } = r;
+    return { result: { ...rest, ...JSON.parse(meta) }, transfer: [r.rgba.buffer, r.regions.buffer, r.regionLabel.buffer, r.regionReason.buffer] };
+  },
+  outlineShapes: json((_, a) => outlineShapes(s(a, 0), s(a, 1), a[2] as number, (a[3] as number) ?? 0, !!a[4], (a[5] as number) ?? 0)),
+  booleanShapes: json((_, a) => booleanShapes(s(a, 0), s(a, 1), s(a, 2))),
+  shapeRegions: json((_, a) => shapeRegions(s(a, 0), s(a, 1))),
+  shapeBuild: json((_, a) => shapeBuild(s(a, 0), s(a, 1), s(a, 2), s(a, 3))),
+  convertShapes: json((_, a) => convertShapes(s(a, 0), s(a, 1), s(a, 2))),
+  formats: json(() => formats()),
+  meanderTiles: (): Out => ({ result: JSON.parse(meanderTiles()).tiles }),
+  parsePalette: json((_, a) => parsePalette(s(a, 0))),
+} satisfies Record<string, (e: StitchEngine, a: unknown[]) => Out>;
+
+/** The names of the engine's operations. */
+export type EngineOp = keyof typeof OPS;
+
 self.onmessage = async (e: MessageEvent<Req>) => {
   const { id, op, args } = e.data;
   try {
     await ready;
-    const eng = engine!;
-    let result: unknown;
-    const transfer: Transferable[] = [];
-    switch (op) {
-      case "plan":
-      case "exportPlan": {
-        const r = (op === "plan" ? eng.plan(args[0] as string) : eng.exportPlan(args[0] as string, (args[1] as string) ?? "{}")) as {
-          coords: Float32Array;
-          flags: Uint8Array;
-          objects: Uint32Array;
-          meta: string;
-        };
-        const meta = JSON.parse(r.meta);
-        result = { coords: r.coords, flags: r.flags, objects: r.objects, threads: meta.threads, stats: meta.stats, basting: meta.basting ?? null, links: meta.links ?? [], quality: meta.quality ?? null, dense: meta.dense ?? null };
-        transfer.push(r.coords.buffer, r.flags.buffer, r.objects.buffer);
-        break;
-      }
-      case "densityField": {
-        const r = eng.densityField(args[0] as string, (args[1] as string) ?? "{}") as { layers: Float32Array; holes: Float32Array; added: Float32Array; class: Uint8Array; meta: string };
-        result = { ...JSON.parse(r.meta), layers: r.layers, holes: r.holes, added: r.added, cls: r.class };
-        transfer.push(r.layers.buffer, r.holes.buffer, r.added.buffer, r.class.buffer);
-        break;
-      }
-      case "stitchedShapes":
-        result = JSON.parse(eng.stitchedShapes(args[0] as string));
-        break;
-      case "elementInfo":
-        result = JSON.parse(eng.elementInfo(args[0] as string, args[1] as string));
-        break;
-      case "applyThreadList":
-        result = JSON.parse(eng.applyThreadList(args[0] as string, args[1] as string));
-        break;
-      case "stitchOutline":
-        result = JSON.parse(eng.stitchOutline(args[0] as string, args[1] as string, args[2] as string));
-        break;
-      case "readThreadList":
-        result = JSON.parse(readThreadList(args[0] as Uint8Array, args[1] as string));
-        break;
-      case "optimize":
-        result = JSON.parse(eng.optimize(args[0] as string, (args[1] as string) ?? "{}"));
-        break;
-      case "export": {
-        const bytes = eng.export(args[0] as string, args[1] as string, (args[2] as string) ?? "{}");
-        result = bytes;
-        transfer.push(bytes.buffer);
-        break;
-      }
-      case "machineColors":
-        result = JSON.parse(eng.machineColors(args[0] as string, args[1] as string, (args[2] as string) ?? "{}"));
-        break;
-      case "importSvg":
-        result = JSON.parse(importSvg(args[0] as string));
-        break;
-      case "exportSvg":
-        result = exportSvg(args[0] as string);
-        break;
-      case "importEmbroidery":
-        result = JSON.parse(importEmbroidery(args[0] as Uint8Array, args[1] as string));
-        break;
-      case "digitize":
-        result = JSON.parse(digitize(args[0] as Uint8Array, args[1] as string));
-        break;
-      case "digitizePreview": {
-        const r = digitizePreview(args[0] as Uint8Array, args[1] as string) as {
-          width: number;
-          height: number;
-          rgba: Uint8ClampedArray;
-          regionWidth: number;
-          regionHeight: number;
-          regions: Uint32Array;
-          regionLabel: Uint8Array;
-          regionReason: Uint8Array;
-          meta: string;
-        };
-        const { meta, ...rest } = r;
-        result = { ...rest, ...JSON.parse(meta) };
-        transfer.push(r.rgba.buffer, r.regions.buffer, r.regionLabel.buffer, r.regionReason.buffer);
-        break;
-      }
-      case "outlineShapes":
-        result = JSON.parse(outlineShapes(args[0] as string, args[1] as string, args[2] as number, (args[3] as number) ?? 0, !!args[4], (args[5] as number) ?? 0));
-        break;
-      case "booleanShapes":
-        result = JSON.parse(booleanShapes(args[0] as string, args[1] as string, args[2] as string));
-        break;
-      case "shapeRegions":
-        result = JSON.parse(shapeRegions(args[0] as string, args[1] as string));
-        break;
-      case "shapeBuild":
-        result = JSON.parse(shapeBuild(args[0] as string, args[1] as string, args[2] as string, args[3] as string));
-        break;
-      case "convertShapes":
-        result = JSON.parse(convertShapes(args[0] as string, args[1] as string, args[2] as string));
-        break;
-      case "formats":
-        result = JSON.parse(formats());
-        break;
-      case "meanderTiles":
-        result = JSON.parse(meanderTiles()).tiles;
-        break;
-      case "parsePalette":
-        result = JSON.parse(parsePalette(args[0] as string));
-        break;
-      default:
-        throw new Error(`unknown op ${op}`);
-    }
+    const run = OPS[op];
+    if (!run) throw new Error(`unknown op ${op}`);
+    const { result, transfer = [] } = run(engine!, args);
     (self as unknown as Worker).postMessage({ id, ok: true, result }, transfer);
   } catch (err) {
     const error = String((err as Error)?.message ?? err);

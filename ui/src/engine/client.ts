@@ -15,6 +15,7 @@ import type {
   ThreadListEntry,
 } from "../types";
 import { cutterOf, uncutTrims } from "../lib/cuts";
+import type { EngineOp } from "./worker";
 
 // Promise-based RPC to the engine worker. Plan requests are coalesced so that
 // rapid edits only ever compute the latest document.
@@ -45,10 +46,8 @@ class EngineClient {
   private worker!: Worker;
   private seq = 0;
   private pending = new Map<number, Pending>();
-  private planBusy = false;
-  private planQueued: { json: string; resolve: (p: PlanData) => void; reject: (e: Error) => void } | null = null;
   /** Latest-wins lanes for side requests (reports, previews): one running, the newest queued. */
-  private lanes = new Map<string, { busy: boolean; queued: { op: string; args: unknown[]; resolve: (v: unknown) => void; reject: (e: Error) => void } | null }>();
+  private lanes = new Map<string, { busy: boolean; queued: { op: EngineOp; args: unknown[]; resolve: (v: unknown) => void; reject: (e: Error) => void } | null }>();
 
   constructor() {
     this.spawn();
@@ -101,7 +100,7 @@ class EngineClient {
   private restarts: number[] = [];
   private broken = false;
 
-  private call<T>(op: string, args: unknown[], transfer: Transferable[] = []): Promise<T> {
+  private call<T>(op: EngineOp, args: unknown[], transfer: Transferable[] = []): Promise<T> {
     const id = ++this.seq;
     if (this.broken) return Promise.reject(new Error("The stitch engine keeps stopping: undo the last change, or reload the app"));
     return new Promise<T>((resolve, reject) => {
@@ -112,7 +111,7 @@ class EngineClient {
 
   /** A side request in its own latest-wins lane: a newer one replaces the queued one
    *  (which rejects with "superseded"), so edits never pile requests up on the worker. */
-  latest<T>(lane: string, op: string, args: unknown[]): Promise<T> {
+  latest<T>(lane: string, op: EngineOp, args: unknown[]): Promise<T> {
     let l = this.lanes.get(lane);
     if (!l) this.lanes.set(lane, (l = { busy: false, queued: null }));
     const state = l;
@@ -147,29 +146,9 @@ class EngineClient {
     return this.latest<{ index: number; paths: SubPath[] }[]>(lane, "stitchedShapes", [engineJson(doc)]);
   }
 
-  /** Latest-wins plan computation. */
+  /** The editor's plan: latest wins (a newer document replaces the one waiting, which rejects with "superseded"). */
   plan(doc: StitchDocument): Promise<PlanData> {
-    const json = engineJson(doc);
-    return new Promise<PlanData>((resolve, reject) => {
-      if (this.planBusy) {
-        this.planQueued?.reject(new Error("superseded"));
-        this.planQueued = { json, resolve, reject };
-        return;
-      }
-      this.runPlan(json, resolve, reject);
-    }).then(withCuts(doc));
-  }
-
-  private runPlan(json: string, resolve: (p: PlanData) => void, reject: (e: Error) => void) {
-    this.planBusy = true;
-    this.call<PlanData>("plan", [json])
-      .then(resolve, reject)
-      .finally(() => {
-        this.planBusy = false;
-        const q = this.planQueued;
-        this.planQueued = null;
-        if (q) this.runPlan(q.json, q.resolve, q.reject);
-      });
+    return this.planLatest("editor", doc);
   }
 
   /** `opts`: crates/core/src/optimize.rs `OptimizeOptions` (absent fields: the defaults). */
@@ -262,7 +241,7 @@ class EngineClient {
       [text],
     );
   }
-  /** Shape conversions (see lib/convertEngine.ts for the typed wrappers). */
+  /** Shape conversions (lib/convertActions.ts and lib/knockdown.ts call them with their own types). */
   convertShapes<T>(op: string, args: object, doc?: StitchDocument) {
     return this.call<T>("convertShapes", [op, doc ? engineJson(doc) : "", JSON.stringify(args)]);
   }

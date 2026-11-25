@@ -17,7 +17,7 @@ import { makeZip } from "../lib/zip";
 import { emptyDoc, useStore } from "../store";
 import type { DesignObject, FormatInfo, Thread } from "../types";
 import { DesignView } from "../canvas/DesignView";
-import { Dialog, Num, Row, Section, Toggle } from "./ui";
+import { Dialog, Num, Row, Section, Seg, Toggle } from "./ui";
 import { safeSetItem } from "../lib/storage";
 
 /** Stitch directions of Ink/Stitch font variants. */
@@ -357,20 +357,12 @@ export function FontInfoDialog({ fontKey, onClose }: { fontKey: string; onClose:
     >
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 300px", gap: 14 }}>
         <div>
-          <div className="seg" style={{ marginBottom: 8 }}>
-            {(
-              [
+          <Seg style={{ marginBottom: 8 }} value={tab} options={[
                 ["info", "Info"],
                 ["settings", "Settings"],
                 ["spacing", "Spacing"],
                 ["kerning", "Kerning"],
-              ] as const
-            ).map(([v, l]) => (
-              <button key={v} className={tab === v ? "on" : ""} onClick={() => setTab(v)}>
-                {l}
-              </button>
-            ))}
-          </div>
+              ] as const} onChange={(v) => setTab(v)} />
           {tab === "info" && (
             <>
               {field("Name", "name")}

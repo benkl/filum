@@ -27,7 +27,11 @@ const BOBBIN_SHARE: f64 = 0.65;
 /// go into a file as they are (`io.rs`). One definition for both.
 pub use filum_formats::cmd as flags;
 
+/// What a jump costs the machine (s): the frame moving without a stitch.
+pub const JUMP_SECONDS: f64 = 0.05;
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Stitch {
     pub x: f64,
     pub y: f64,
@@ -53,6 +57,7 @@ impl Stitch {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct StitchPlan {
     pub stitches: Vec<Stitch>,
     /// Thread for each colour block, in sewing order.
@@ -69,6 +74,7 @@ pub struct StitchPlan {
 
 /// What the plan does between the end of one object and the start of the next.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum ConnectionKind {
     /// Tied off and trimmed (a stop too, with stop after).
@@ -83,6 +89,7 @@ pub enum ConnectionKind {
 
 /// A connection between two consecutive objects of the plan.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Connection {
     /// The objects (indices in the document) it goes from and to.
@@ -100,6 +107,7 @@ pub struct Connection {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct PlanStats {
     pub stitches: usize,
@@ -302,7 +310,7 @@ impl StitchPlan {
         st.seconds = st.stitches as f64 / spm.max(1.0) * 60.0
             + st.trims as f64 * trim_s
             + st.color_changes as f64 * color_s
-            + st.jumps as f64 * 0.05;
+            + st.jumps as f64 * JUMP_SECONDS;
         st
     }
 }

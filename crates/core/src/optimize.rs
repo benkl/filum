@@ -59,19 +59,28 @@ impl OptimizeOptions {
     /// The defaults on a fabric: centre out on caps and the fabrics that
     /// stretch (as the editor's Optimise menu starts).
     pub fn for_fabric(fabric: crate::model::Fabric) -> Self {
-        use crate::model::Fabric::*;
-        OptimizeOptions { center_out: matches!(fabric, Cap | Knit | Fleece | Towel | Pique), ..Default::default() }
+        OptimizeOptions { center_out: center_out_by_default(fabric), ..Default::default() }
     }
+}
+
+/// Fabrics sewn centre out unless chosen otherwise: caps (from the bottom up
+/// too), knits, fleece, towelling and piqué. (The editor reads this from
+/// ui/src/generated/engine.ts.)
+pub fn center_out_by_default(fabric: crate::model::Fabric) -> bool {
+    use crate::model::Fabric::*;
+    matches!(fabric, Cap | Knit | Fleece | Towel | Pique)
 }
 
 /// An end point the optimiser set.
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct EndPoint {
     pub id: String,
     pub end: [f64; 2],
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct OptimizeReport {
     pub order: Vec<String>,

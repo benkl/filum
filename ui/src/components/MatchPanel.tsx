@@ -8,7 +8,7 @@ import { createPortal } from "react-dom";
 import { fitTargetId, loadMatchOptions, myLines, previewFit, saveMatchOptions, useMyThreads, type FitTarget } from "../lib/threads";
 import { MATCH_PRESETS, type MatchOptions } from "../lib/threadMatch";
 import { useStore } from "../store";
-import { Grip, Num, Row, Slider, Toggle, useDismiss, useMovable } from "./ui";
+import { Grip, Num, placeNear, Row, Slider, Toggle, useDismiss, useMovable } from "./ui";
 
 /** The match options, shared by the panel and the fit (localStorage). */
 export function useMatchOptions(): [MatchOptions, (p: Partial<MatchOptions>, preset?: MatchOptions["preset"]) => void] {
@@ -48,9 +48,7 @@ function MatchPanel({ anchor, target, opts, set, onClose }: { anchor: HTMLElemen
   const [preview, setPreview] = useState<Awaited<ReturnType<typeof previewFit>>>(null);
   const mv = useMovable("match");
   useLayoutEffect(() => {
-    const r = anchor.getBoundingClientRect();
-    const w = 360;
-    setPos({ left: Math.max(8, Math.min(window.innerWidth - w - 8, r.left)), top: Math.min(r.bottom + 4, window.innerHeight - 560) });
+    setPos(placeNear(anchor.getBoundingClientRect(), 360, { height: 560, margin: 0, flip: false }));
   }, [anchor]);
   useDismiss(true, onClose, [ref, anchor]);
   // live preview of the fit with these options

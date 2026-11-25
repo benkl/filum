@@ -35,6 +35,7 @@ use crate::region::{object_cover, Cover};
 
 /// A thread's size for the model.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ThreadSpec {
     /// Weight number (No. 40 …).
@@ -70,6 +71,7 @@ pub const BOBBIN_SHARE: f64 = 0.33;
 
 /// What a fabric takes.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct FabricLimits {
     /// The fabric's own weight (g/m²), typical for the kind.
@@ -117,6 +119,7 @@ impl Fabric {
 
 /// How a cell is judged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 #[repr(u8)]
 pub enum DensityClass {
@@ -132,6 +135,7 @@ pub enum DensityClass {
 
 /// A place beyond what the fabric takes.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Hotspot {
     /// Box (mm) and its centre.
@@ -147,6 +151,7 @@ pub struct Hotspot {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct DensityStats {
     /// Stitched area (mm²) and the share of it in each class.
@@ -168,6 +173,7 @@ pub struct DensityStats {
 /// The density of a design, cell by cell (row-major, `cols × rows` cells of
 /// `cell` mm from `x0`, `y0`).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct DensityField {
     pub x0: f64,
@@ -187,6 +193,7 @@ pub struct DensityField {
 
 /// Options of the density model.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", default)]
 pub struct DensityOptions {
     /// Smoothing (mm, Gaussian sigma): the scale density is judged at.

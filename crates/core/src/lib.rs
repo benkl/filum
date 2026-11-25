@@ -32,6 +32,8 @@ pub mod svg;
 pub mod threadlist;
 pub mod threads;
 pub mod vision;
+#[cfg(test)]
+mod engine_types;
 
 pub use assemble::Engine;
 pub use model::*;

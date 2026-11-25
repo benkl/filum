@@ -11,6 +11,7 @@ use crate::model::{Document, StitchParams};
 use crate::plan::{flags, StitchPlan};
 
 #[derive(Debug, Clone, Default, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ObjectInfo {
     pub id: String,
@@ -36,6 +37,7 @@ pub struct ObjectInfo {
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct TotalInfo {
     pub objects: usize,
@@ -56,6 +58,7 @@ pub struct TotalInfo {
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ElementInfo {
     pub objects: Vec<ObjectInfo>,

@@ -202,14 +202,7 @@ export function KnockdownDialog({ onClose }: { onClose: () => void }) {
         )
       }
     >
-      <div className="seg seg-full" style={{ marginBottom: 10 }}>
-        <button className={scope === "design" ? "on" : ""} onClick={() => setScope("design")} title="Automatic: under everything, following every edit">
-          Whole design
-        </button>
-        <button className={scope === "selection" ? "on" : ""} onClick={() => setScope("selection")} title="An editable object under the selected objects">
-          Under the selection
-        </button>
-      </div>
+      <Seg full style={{ marginBottom: 10 }} value={scope} options={[["design", "Whole design", "Automatic: under everything, following every edit"], ["selection", "Under the selection", "An editable object under the selected objects"]] as const} onChange={(v) => setScope(v)} />
       {scope === "design" ? (
         <>
           <DesignKnockdownFields o={options} set={setDesign} />

@@ -10,7 +10,7 @@ import { centerInHoop } from "../lib/actions";
 import { applyMat, objectBounds, unionBoxes } from "../lib/geometry";
 import { useStore } from "../store";
 import type { DesignObject, Vec2 } from "../types";
-import { Dialog, Num, Row, Toggle } from "./ui";
+import { Dialog, Num, Row, Seg, Toggle } from "./ui";
 import { loadMerged, safeSetItem } from "../lib/storage";
 
 /** Align / distribute / mirror buttons for the context bar. */
@@ -180,22 +180,14 @@ export function RepeatDialog({ onClose }: { onClose: () => void }) {
       }
     >
       {!box && <p className="hint warn">Select the objects to repeat first.</p>}
-      <div className="seg" style={{ marginBottom: 10 }}>
-        {(
-          [
+      <Seg style={{ marginBottom: 10 }} value={mode} options={[
             ["wreath", "Wreath"],
             ["kaleidoscope", "Kaleidoscope"],
             ["mirrorH", "Mirror ↔"],
             ["mirrorV", "Mirror ↕"],
             ["mirrorHV", "Mirror 4×"],
             ["grid", "Grid"],
-          ] as [RepeatKind, string][]
-        ).map(([id, label]) => (
-          <button key={id} className={mode === id ? "on" : ""} onClick={() => setMode(id)}>
-            {label}
-          </button>
-        ))}
-      </div>
+          ] as [RepeatKind, string][]} onChange={(id) => setMode(id)} />
       <div style={{ display: "grid", gridTemplateColumns: "1fr 200px", gap: 16, alignItems: "start" }}>
         {grid ? (
           <div>
@@ -212,28 +204,10 @@ export function RepeatDialog({ onClose }: { onClose: () => void }) {
               <Num value={gap[1]} unit="mm" step={0.5} onChange={(v) => setGap([gap[0], v])} />
             </Row>
             <Row label="Order" title="The order the pieces are sewn in">
-              <div className="seg">
-                <button className={order === "rows" ? "on" : ""} onClick={() => setOrder("rows")} title="Every row from left to right">
-                  Row by row
-                </button>
-                <button className={order === "serpentine" ? "on" : ""} onClick={() => setOrder("serpentine")} title="Back along every second row, for shorter jumps">
-                  Serpentine
-                </button>
-              </div>
+              <Seg value={order} options={[["rows", "Row by row", "Every row from left to right"], ["serpentine", "Serpentine", "Back along every second row, for shorter jumps"]] as const} onChange={(v) => setOrder(v)} />
             </Row>
             <Row label="Colours">
-              <div className="seg">
-                <button
-                  className={colours === "byColour" ? "on" : ""}
-                  onClick={() => setColours("byColour")}
-                  title={`Each colour on every piece before the next colour: ${changes.byColour} colour changes`}
-                >
-                  One at a time
-                </button>
-                <button className={colours === "byPiece" ? "on" : ""} onClick={() => setColours("byPiece")} title={`Each piece finished before the next: ${changes.byPiece} colour changes`}>
-                  Piece by piece
-                </button>
-              </div>
+              <Seg value={colours} options={[["byColour", "One at a time", `Each colour on every piece before the next colour: ${changes.byColour} colour changes`], ["byPiece", "Piece by piece", `Each piece finished before the next: ${changes.byPiece} colour changes`]] as const} onChange={(v) => setColours(v)} />
             </Row>
             <Row label="Centre in hoop" title="Move the whole grid, the original too, into the middle of the hoop">
               <Toggle on={centred} onChange={setCentred} />
@@ -253,14 +227,7 @@ export function RepeatDialog({ onClose }: { onClose: () => void }) {
             </Row>
           )}
           <Row label="Centre">
-            <div className="seg">
-              <button className={around === "radius" ? "on" : ""} onClick={() => setAround("radius")}>
-                {rotational ? "Below selection" : "Next to selection"}
-              </button>
-              <button className={around === "hoop" ? "on" : ""} onClick={() => setAround("hoop")}>
-                Hoop centre
-              </button>
-            </div>
+            <Seg value={around} options={[["radius", rotational ? "Below selection" : "Next to selection"], ["hoop", "Hoop centre"]] as const} onChange={(v) => setAround(v)} />
           </Row>
           {around === "radius" && rotational && (
             <Row label="Radius" title="Distance from the selection's centre to the wreath centre">

@@ -23,7 +23,7 @@ Companion documents: [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) (the whole
 - [x] **Drags that can stick**: the gradient panel's drag and the stitch-out player's resize ignore `pointercancel`.
 - [x] **Layers menu "Show all" / "Unlock all"** re-implement `showAll` / `unlockAll` (which also select what they reveal) and print "Ctrl+G" on a Mac: use the shared actions and the platform's key name.
 - [x] **Element Info's removed-stitch count** uses an older copy of the minimum-stitch rule than the plan (no loose turns): one `drops_short` used by both.
-- [ ] **Engine defaults ≠ Ink/Stitch defaults** for fields missing from a file (satin centre walk, zigzag underlay inset; fill max stitch length, underlay inset and stitch length). *Needs a decision*: changing the engine's defaults changes how older files missing those keys sew. Until then: documented, not changed.
+- [x] **Engine defaults ≠ Ink/Stitch defaults** for fields missing from a file (satin centre walk, zigzag underlay inset; fill max stitch length, underlay inset and stitch length). Decided: a setting a document leaves out gets Ink/Stitch's value (`FillParams::ink`, `SatinParams::ink` as the serde defaults); `Default` stays Filum's own for objects the engine makes (the digitizer); new objects in the editor keep Ink/Stitch's table plus the measured deviations. The plan hashes of the test objects (which leave settings out) were recorded anew.
 
 ## Phase 2 — cheap shared building blocks
 
@@ -33,17 +33,17 @@ Each removes copies without changing behaviour.
 - [x] **`Object::new` and `Thread::new`** in `model.rs`: the ~18 full 21-field object literals and ~20 thread literals use them (`..` for the rest). A new field then touches one place.
 - [x] **`lib/vec.ts`**: `sub add mul dot cross len norm lerp dist` once, instead of in about 16 files.
 - [x] **Saved settings**: `loadJson(key, defaults)` and a `useStoredJson` hook in `lib/storage.ts`, and the storage keys in one table, instead of ~40 copies of "parse, merge defaults, catch".
-- [~] **Popovers**: `useDismiss(open, onClose, inside)` (done: eight menus and popovers) and `placeNear(anchor, w, h)` (to do) in `components/ui.tsx` for the thread picker, match panel, meander picker, convert menu, Optimise menu and the context menus.
-- [~] **`Seg`**: one segmented control in `ui.tsx` instead of four local copies (done; the ~80 inline groups move over time).
+- [x] **Popovers**: `useDismiss(open, onClose, inside)` for eight menus and popovers, `placeNear(anchor, w, opts)` for five placements (the shared `Menu` keeps its own, with its submenus' left fallback) in `components/ui.tsx` for the thread picker, match panel, meander picker, convert menu, Optimise menu and the context menus.
+- [x] **`Seg`**: one segmented control in `ui.tsx` instead of four local copies; 43 of the 81 hand-written groups use it. The other 38 are toolbars of icon actions, or groups whose buttons each disable, compute their state or carry an icon: kept as they are.
 - [x] **Object updates**: `replaceObject(doc, next)` and `mapObjects(doc, ids, fn)` in lib, used by the canvas, Dock and the panels (~25 sites).
 - [x] **View maths**: `lib/view.ts` with `fitBox`, `zoomAt` and `focus` (select + bring into view), used by Issues, the density legend, the player and the previews; `planBounds` with a filter instead of four rewrites.
 - [x] **wasm helpers**: `opts<T>()`, `json()` and `selected()` in `crates/wasm/src/lib.rs`.
 
 ## Phase 3 — one source for what Rust and TypeScript share
 
-- [ ] **Constants from the engine**: a small example program writes `ui/src/generated/engine-constants.ts` (flags, automatic underlay widths, stretch and delicate fabrics, centre-out fabrics, jump time, JEF hoops, thread tex table, default design options); `npm test` fails when it is stale.
-- [ ] **Types from the engine**: `ts-rs` on the document, plan meta, quality, density and optimise types, generated into `ui/src/generated/`; `types.ts` extends them with the UI-only fields (references, group names, `routed`, `text`). Two drifts already exist (`contourUnderlayRepeats` only in Rust, `presetSet` only in TS).
-- [ ] **Engine calls**: one typed table of operations shared by `client.ts` and `worker.ts` (JSON by default, typed arrays where needed); the plan meta as one serde struct (and `bounds`, computed and dropped today, either used or not computed).
+- [x] **Constants from the engine**: `crates/core/tests/engine_constants.rs` writes `ui/src/generated/engine.ts` (flags, the no-object marker, jump time, per fabric: stretch, delicate, automatic underlay widths, centre out, limits; thread tex; the design options' defaults) and fails while it is stale. The JEF hoops stay in `machines.ts` (names and frames are the editor's; the sizes are pystitch's).
+- [x] **Types from the engine**: `ts-rs` (a dev-dependency, derived in tests only) writes `ui/src/generated/engine-types.ts` from 83 serde types (`crates/core/src/engine_types.rs`, failing while stale). `ui/src/lib/engineTypes.check.ts` compares 60 of the editor's types with them: a field or choice on one side only fails the typecheck, by name; the editor's own fields are listed with their pair. The two drifts are fixed: the engine keeps `presetSet` (`PresetSet`), the editor knows `contourUnderlayRepeats`. `types.ts` keeps its own interfaces (richer docs, optional fields the editor fills in); moving them onto the generated ones is left for when a type is touched anyway.
+- [x] **Engine calls**: the worker's operations are one table (`OPS`, JSON by default); the client calls them by `EngineOp`, so an unknown name doesn't compile; the editor's plan runs in the client's latest-wins lane instead of a copy of it; the plan meta is spread as it comes and no longer carries the unused `bounds`.
 
 ## Phase 4 — engine helpers (guarded by the plan hashes)
 
@@ -77,7 +77,7 @@ Each removes copies without changing behaviour.
 
 **Phase 0** (2026-11-25): `crates/core/tests/plan_hashes.rs` records 43 plans (every stitch type and method, all of them together, three digitized suite pictures) in `tests/plan_hashes/<os>.txt`; about 20 s. Every engine step since has left them unchanged.
 
-**Phase 1** (2026-11-25): all but the engine defaults, which wait for a decision.
+**Phase 1** (2026-11-25): done; the engine defaults as decided above.
 - The density legend's classes are `dmap-*`; its tick marks show again.
 - `useDismiss` (`components/ui.tsx`) closes the Layers menu, the canvas context menu, the menu bar, the Optimise and Convert menus, the thread, chart, match and meander pickers on a click outside, and on Escape without the key going on to the app (the meander picker cleared the selection).
 - `followPointer` (`components/ui.tsx`) follows five drags and ends them on `pointercancel` too.
@@ -87,3 +87,8 @@ Each removes copies without changing behaviour.
 **Phase 2** (2026-11-25):
 - Rust: `plan::flags` is the formats crate's `cmd`; `Object::new` / `Thread::new` replace 44 full literals (about 300 lines less); the wasm bridge's `opts`, `to_json`, `ids_of` and `fit_rings` replace 30 copies.
 - TypeScript: `NO_OBJECT` and `FLAG.COMMANDS` instead of magic numbers; `lib/vec.ts` instead of the vector helpers in 14 files; `loadJson` / `loadMerged` (`lib/storage.ts`) for 18 of the 30 stored-settings reads (the rest check or migrate what they read); `replaceObject` / `mapObjects` (`lib/docEdit.ts`) for 21 single-object updates and a store `updateObject` for one or many objects; `lib/view.ts` (`fitBox`, `zoomAt`, `fitView`, the `View` type) and `lib/focus.ts` for the canvas, the previews, the menu's zoom, Issues and the density legend; `lib/planBounds.ts` for five copies of the stitch bounds; one `Seg`.
+
+**Phase 2, rest, and Phase 3** (2026-11-25):
+- Engine defaults as decided (phase 1).
+- `placeNear` and `Seg` for 43 groups (`Seg` takes on/off choices, no current choice, extra classes and a style).
+- Constants and types generated from the engine, the editor's types checked against them, the engine calls in one table.

@@ -8,6 +8,7 @@ use crate::geom::{pt, Point, Rect};
 
 /// A cubic-bezier node: anchor plus optional absolute in/out handles.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Node {
     pub p: [f64; 2],
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -26,6 +27,7 @@ impl Node {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct SubPath {
     pub nodes: Vec<Node>,
     #[serde(default)]
@@ -98,6 +100,7 @@ impl SubPath {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", default)]
 pub struct RunningParams {
     /// Stitch length (mm).
@@ -139,6 +142,7 @@ pub struct RunningParams {
 
 /// Zig-zag line: the line sewn as a simple zig-zag of its stroke width.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", default)]
 pub struct ZigzagParams {
     /// Width of the zig-zag (mm).
@@ -159,6 +163,7 @@ impl Default for ZigzagParams {
 
 /// Manual stitch: every node is a needle penetration.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", default)]
 pub struct ManualParams {
     /// Split stitches longer than this (mm, 0 = keep them).
@@ -171,6 +176,7 @@ pub struct ManualParams {
 
 /// Stem stitch (hand embroidery's stem / outline stitch).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", default)]
 pub struct StemParams {
     /// Width of the rope (mm): how far the stitches slant across the line.
@@ -185,6 +191,7 @@ impl Default for StemParams {
 
 /// Patterns of a motif run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum MotifKind {
     #[default]
@@ -198,6 +205,7 @@ pub enum MotifKind {
 
 /// Motif run: a pattern repeated along the line.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", default)]
 pub struct MotifParams {
     pub kind: MotifKind,
@@ -235,6 +243,7 @@ impl Default for RunningParams {
 /// spiral of shrinking copies of the outline (circular ripples), open lines
 /// are stitched back and forth as parallel copies (linear ripples).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", default)]
 pub struct RippleParams {
     /// Number of ripple lines.
@@ -296,6 +305,7 @@ pub struct RippleParams {
 
 /// Which axes ripple copies are scaled on (Ink/Stitch `scale_axis`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum RippleScaleAxis {
     #[default]
@@ -307,6 +317,7 @@ pub enum RippleScaleAxis {
 
 /// Where copies sit along a satin guide (Ink/Stitch `satin_guide_pattern_position`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum RippleGuidePosition {
     #[default]
@@ -364,6 +375,7 @@ impl Default for RippleParams {
 
 /// Which satin rail to reverse (Ink/Stitch `reverse_rails`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum RailReverse {
     /// Reverse the second rail when it runs against the first.
@@ -376,6 +388,7 @@ pub enum RailReverse {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum SatinMethod {
     #[default]
@@ -385,8 +398,11 @@ pub enum SatinMethod {
     Zigzag,
 }
 
+/// A setting a document leaves out gets Ink/Stitch's value (`SatinParams::ink`);
+/// `Default` is Filum's own, for satins the engine makes itself.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", default = "SatinParams::ink")]
 pub struct SatinParams {
     pub method: SatinMethod,
     /// Distance between zigzags (mm).
@@ -482,6 +498,15 @@ pub struct SatinParams {
     pub layered: Option<LayeredOptions>,
 }
 
+impl SatinParams {
+    /// Ink/Stitch's defaults (lib/elements/satin_column.py) where they differ
+    /// from Filum's: no centre walk, and the zig-zag underlay inset at half
+    /// the contour inset. What a document that leaves these out gets.
+    pub fn ink() -> Self {
+        SatinParams { center_walk: false, zigzag_underlay_inset: 0.2, ..Default::default() }
+    }
+}
+
 impl Default for SatinParams {
     fn default() -> Self {
         SatinParams {
@@ -531,6 +556,7 @@ impl Default for SatinParams {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum FillMethod {
     /// Ink/Stitch "tatami fill" (auto fill): parallel staggered rows.
@@ -566,6 +592,7 @@ pub enum FillMethod {
 
 /// A tartan (Ink/Stitch `inkstitch:tartan` settings and tartan fill parameters).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", default)]
 pub struct TartanParams {
     /// Ink/Stitch's palette code: `(colour)width` stripes, `/` a symmetric
@@ -614,6 +641,7 @@ impl Default for TartanParams {
 /// Penetration patterns carved into a tatami fill (program split /
 /// carving): the needle points line up into a pattern that catches the light.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum CarvePattern {
     #[default]
@@ -627,6 +655,7 @@ pub enum CarvePattern {
 
 /// Stitches of a cross-stitch cell.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum CrossKind {
     /// Both diagonals (×).
@@ -646,6 +675,7 @@ pub enum CrossKind {
 /// A direction field on a grid (design mm): row directions in radians
 /// (y down, defined modulo π), row-major `cols × rows` cells of `cell` mm.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", default)]
 pub struct FlowField {
     pub origin: [f64; 2],
@@ -671,6 +701,7 @@ impl FlowField {
 
 /// How a guided fill's rows follow its guide line (Ink/Stitch `guided_fill_strategy`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum GuidedStrategy {
     /// Every row a copy of the guide, shifted across (rows bunch where it bends).
@@ -684,6 +715,7 @@ pub enum GuidedStrategy {
 
 /// The order a tatami sews its rows in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum TatamiRoute {
     /// Every part from its top row down to its bottom row, the parts from
@@ -698,6 +730,7 @@ pub enum TatamiRoute {
 
 /// Lattice the meander fill walks on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum MeanderPattern {
     /// Square grid: classic meander with right-angle turns.
@@ -711,8 +744,11 @@ pub enum MeanderPattern {
 
 // `remote = "Self"`: the derived (de)serializers become inherent functions;
 // the trait impls below wrap them (older documents' contour direction).
+// A setting a document leaves out gets Ink/Stitch's value (`FillParams::ink`);
+// `Default` is Filum's own, for fills the engine makes itself (the digitizer).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default, remote = "Self")]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", default = "FillParams::ink", remote = "Self")]
 pub struct FillParams {
     pub method: FillMethod,
     /// Row direction in degrees (counter-clockwise on screen).
@@ -869,6 +905,7 @@ pub struct FillParams {
 
 /// How the density changes along a ramp: 0 = densest, 1 = sparsest.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum RampProfile {
     #[default]
@@ -902,6 +939,7 @@ impl RampProfile {
 /// A density gradient along a vector (design mm): row spacing `dense` at
 /// `from`, `sparse` at `to` (shaped by the profile), constant beyond.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", default)]
 pub struct DensityRamp {
     pub from: [f64; 2],
@@ -945,6 +983,7 @@ impl DensityRamp {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum GradientKind {
     #[default]
@@ -963,6 +1002,7 @@ pub enum GradientKind {
 
 /// A node of a gradient mesh.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", default)]
 pub struct MeshNode {
     pub p: [f64; 2],
@@ -972,6 +1012,7 @@ pub struct MeshNode {
 
 /// `rows` × `cols` nodes, row by row; four neighbouring nodes span a patch.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", default)]
 pub struct GradientMesh {
     pub rows: u32,
@@ -981,6 +1022,7 @@ pub struct GradientMesh {
 
 /// A colour point of a freeform gradient.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", default)]
 pub struct FreePoint {
     pub p: [f64; 2],
@@ -998,6 +1040,7 @@ impl Default for FreePoint {
 
 /// How a colour changes into the next between two stops.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum TransitionCurve {
     #[default]
@@ -1013,6 +1056,7 @@ pub enum TransitionCurve {
 
 /// How a gradient's colours share the shape.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum GradientMix {
     /// The colours share one set of full-density rows: every stretch of a
@@ -1033,6 +1077,7 @@ pub enum GradientMix {
 
 /// How the colours are mixed where they overlap in the transition (dithered gradients).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum DitherMethod {
     /// Error diffusion (Floyd–Steinberg): the most even mix.
@@ -1049,6 +1094,7 @@ pub enum DitherMethod {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", default)]
 pub struct GradientStop {
     /// Position 0..1 along the gradient.
@@ -1067,6 +1113,7 @@ impl Default for GradientStop {
 /// with the same shape and stitch grid); the layers share every row of the
 /// grid between them, so the total density stays even.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", default)]
 pub struct GradientParams {
     pub kind: GradientKind,
@@ -1141,6 +1188,15 @@ impl<'de> Deserialize<'de> for FillParams {
     }
 }
 
+impl FillParams {
+    /// Ink/Stitch's defaults (lib/elements/fill_stitch.py) where they differ
+    /// from Filum's: 4 mm stitches, underlay with no inset and stitches as
+    /// long as the fill's. What a document that leaves these out gets.
+    pub fn ink() -> Self {
+        FillParams { max_stitch_length: 4.0, underlay_inset: 0.0, underlay_stitch_length: 4.0, ..Default::default() }
+    }
+}
+
 impl Default for FillParams {
     fn default() -> Self {
         FillParams {
@@ -1210,6 +1266,7 @@ impl Default for FillParams {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum TackdownKind {
     None,
@@ -1220,6 +1277,7 @@ pub enum TackdownKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum CoverKind {
     None,
@@ -1234,6 +1292,7 @@ pub enum CoverKind {
 /// columns), denser stitches, caps on the open ends, and a machine stop before
 /// it to lay the foam.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", default)]
 pub struct FoamOptions {
     /// Straight-stitch contour passes: 1 or 2 (more is refused).
@@ -1275,6 +1334,7 @@ impl Default for FoamOptions {
 /// the layer before. The inner layers can be sewn in another thread
 /// (`base_thread`), a special one (metallic) only on top.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", default)]
 pub struct LayeredOptions {
     /// Inner layers: 2 to 4 (5 or more is refused).
@@ -1330,6 +1390,7 @@ impl Default for LayeredOptions {
 /// these fields keeps the earlier values (placement on the edge, zig-zag
 /// tack-down 0.6 mm inside, 3 mm cover): the field defaults below are those.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", default)]
 pub struct AppliqueParams {
     pub placement: bool,
@@ -1408,6 +1469,7 @@ impl Default for AppliqueParams {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum StitchParams {
     /// Shape is shown but not stitched (e.g. appliqué artwork reference).
@@ -1427,6 +1489,7 @@ impl Default for StitchParams {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Object {
     pub id: String,
@@ -1497,6 +1560,7 @@ pub struct Object {
 /// The connection to the next object, chosen by hand (after the NOVAstitch
 /// Designer fork).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum ObjectLink {
     /// Sewn through whatever the distance: running stitches of 2.5 mm at
@@ -1508,6 +1572,7 @@ pub enum ObjectLink {
 
 /// An object's own lock stitches; `None` fields: the machine's.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", default)]
 pub struct LockOverride {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1529,6 +1594,7 @@ pub struct LockOverride {
 /// A satin's settings for its second rail where Ink/Stitch gives two values
 /// ("0.2 0.5": first rail, second rail); `None`: the same as the first.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", default)]
 pub struct SecondRail {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1554,6 +1620,7 @@ pub struct SecondRail {
 /// `interval`-th crossing, after skipping `offset`), shapes leave out the
 /// needle points inside them (row ends and satin edges stay).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct StitchPattern {
     pub paths: Vec<SubPath>,
@@ -1572,6 +1639,7 @@ pub struct StitchPattern {
 
 /// A clone's link to its original (see [`Object::clone`]).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct CloneLink {
     /// The original's id.
@@ -1640,6 +1708,7 @@ impl Object {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Thread {
     pub id: String,
@@ -1706,6 +1775,7 @@ pub fn hex_color(c: [u8; 3]) -> String {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum Fabric {
     #[default]
@@ -1726,6 +1796,7 @@ pub enum Fabric {
 
 /// Fabric-aware defaults: how a fabric modifies compensation, density and underlay.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct FabricProfile {
     /// Extra pull compensation (mm) added to satins and fills: none from the
@@ -1749,6 +1820,23 @@ pub struct FabricProfile {
 }
 
 impl Fabric {
+    /// Every fabric, in the editor's order.
+    pub const ALL: [Fabric; 13] = [
+        Fabric::Cotton,
+        Fabric::Polyester,
+        Fabric::Denim,
+        Fabric::Knit,
+        Fabric::Sheer,
+        Fabric::Felt,
+        Fabric::Towel,
+        Fabric::Cap,
+        Fabric::Fleece,
+        Fabric::Pique,
+        Fabric::Leather,
+        Fabric::Canvas,
+        Fabric::Silk,
+    ];
+
     pub fn profile(self) -> FabricProfile {
         // no pull compensation from the fabric: it comes from the objects'
         // own settings (0 as in Ink/Stitch, or a fabric calibration's numbers)
@@ -1804,6 +1892,7 @@ pub fn thread_density_scale(weight: u32) -> f64 {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum HoopShape {
     #[default]
@@ -1813,6 +1902,7 @@ pub enum HoopShape {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Hoop {
     pub name: String,
@@ -1834,6 +1924,7 @@ impl Default for Hoop {
 
 /// Where an object is locked (Ink/Stitch `ties`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum Ties {
     #[default]
@@ -1845,6 +1936,7 @@ pub enum Ties {
 
 /// Lock stitch shapes (Ink/Stitch `lib/stitch_plan/lock_stitch.py`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum LockStyle {
     /// Half a stitch back and forth along the path (Ink/Stitch's default).
@@ -1862,6 +1954,7 @@ pub enum LockStyle {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", default)]
 pub struct MachineSettings {
     /// Jumps longer than this become trims (mm).
@@ -1900,6 +1993,7 @@ pub struct MachineSettings {
 
 /// What a machine's thread cutter cuts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum Cutter {
     /// Every trim command.
@@ -1933,6 +2027,7 @@ impl Default for MachineSettings {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum Basting {
     #[default]
@@ -1945,6 +2040,7 @@ pub enum Basting {
 
 /// Whether an object hides the stitching under it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum CoverMode {
     /// By the design's rules (width, row spacing, texture, appliqué).
@@ -1958,6 +2054,7 @@ pub enum CoverMode {
 
 /// An object's own setting for hidden stitching.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", default)]
 pub struct HiddenRule {
     /// Does it hide what's under it?
@@ -1966,9 +2063,19 @@ pub struct HiddenRule {
     pub keep: bool,
 }
 
+/// The editor's sets of starting values for new objects (`DesignOptions::preset_set`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub enum PresetSet {
+    Filum,
+    Nova,
+}
+
 /// Design-wide stitch processing applied when the plan is built
 /// (non-destructive: the objects themselves are not changed).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", default)]
 pub struct DesignOptions {
     /// Remove fill stitching hidden under objects stacked on top (remove overlaps).
@@ -2008,6 +2115,11 @@ pub struct DesignOptions {
     /// all along is sewn through instead of trimmed (branching; not in
     /// Ink/Stitch). Off: trimmed as Ink/Stitch does.
     pub hidden_travel: bool,
+    /// The editor's starting values for new satins and fills on this fabric
+    /// (ui/src/lib/fabricPresets.ts); none: Ink/Stitch's. The engine only
+    /// keeps it, so a document it returns still has it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preset_set: Option<PresetSet>,
     /// Knockdown (laydown stitch): a light net sewn first under the
     /// whole design to flatten the nap of towels, fleece and fur, so the
     /// embroidery does not sink in.
@@ -2053,6 +2165,7 @@ impl Default for DesignOptions {
             thread_weight: 40,
             avoid_holes: true,
             hidden_travel: true,
+            preset_set: None,
             knockdown: false,
             knockdown_offset: 2.0,
             knockdown_spacing: 2.0,
@@ -2068,6 +2181,7 @@ impl Default for DesignOptions {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Document {
     #[serde(default = "doc_version")]
@@ -2097,6 +2211,7 @@ pub struct Document {
 
 /// A thread's original colour (its "need") before fitting.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ThreadSource {
     pub name: String,
@@ -2170,6 +2285,22 @@ impl Document {
 #[cfg(test)]
 mod contour_direction_tests {
     use super::*;
+
+    #[test]
+    fn settings_a_document_leaves_out_are_ink_stitch_ones() {
+        // a fill and a satin with no settings at all: Ink/Stitch's values
+        let f: FillParams = serde_json::from_str("{}").unwrap();
+        assert_eq!((f.max_stitch_length, f.underlay_inset, f.underlay_stitch_length), (4.0, 0.0, 4.0));
+        let s: SatinParams = serde_json::from_str("{}").unwrap();
+        assert_eq!((s.center_walk, s.zigzag_underlay_inset), (false, 0.2));
+        // what a document says wins, and Filum's own defaults stay for objects the engine makes
+        let f: FillParams = serde_json::from_str(r#"{"maxStitchLength":3.5}"#).unwrap();
+        assert_eq!(f.max_stitch_length, 3.5);
+        assert_eq!((FillParams::default().max_stitch_length, SatinParams::default().center_walk), (3.0, true));
+        // everything else is the same either way
+        assert_eq!(FillParams { max_stitch_length: 3.0, underlay_inset: 0.3, underlay_stitch_length: 3.0, ..FillParams::ink() }, FillParams::default());
+        assert_eq!(SatinParams { center_walk: true, zigzag_underlay_inset: 0.6, ..SatinParams::ink() }, SatinParams::default());
+    }
 
     fn fill(json: &str) -> FillParams {
         match serde_json::from_str::<StitchParams>(json).unwrap() {

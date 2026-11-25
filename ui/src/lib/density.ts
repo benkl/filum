@@ -13,6 +13,7 @@
 // re-judges the same stitches.
 
 import type { DensityField, DensityStats, FabricLimits, Vec2 } from "../types";
+import { FABRICS } from "../generated/engine";
 
 export type DensityMode = "coverage" | "holes" | "stiffness";
 
@@ -38,7 +39,7 @@ const RED: [number, number, number] = [239, 68, 68];
 const MAGENTA: [number, number, number] = [192, 38, 211];
 export const THIN_BLUE: [number, number, number] = [59, 130, 246];
 
-const DEFAULT_LIMITS: FabricLimits = { gsm: 130, holesHeavy: 10, holesMax: 17, layersHeavy: 2.4, layersMax: 3.8, layersMin: 0.6, stiffRatio: 1.5 };
+const DEFAULT_LIMITS: FabricLimits = FABRICS.cotton.limits;
 
 const fmt = (v: number) => (v >= 10 ? v.toFixed(0) : v.toFixed(1).replace(/\.0$/, ""));
 

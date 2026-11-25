@@ -7,7 +7,7 @@ import { useState } from "react";
 import { parsePalette, paletteCode, paletteProblem, patchTartan, swatchCss, syncTartan, tartanColors, tartanMirrored, type TartanStripe } from "../lib/tartan";
 import { useStore } from "../store";
 import type { TartanParams } from "../types";
-import { Num, Row, Section, Slider, Toggle } from "./ui";
+import { Num, Row, Section, Seg, Slider, Toggle } from "./ui";
 
 export function TartanSection({ t }: { t: TartanParams }) {
   const set = (patch: Partial<TartanParams>) => {
@@ -34,14 +34,7 @@ export function TartanSection({ t }: { t: TartanParams }) {
         {colours.length} thread colour{colours.length === 1 ? "" : "s"}, each sewn as its own layer.
       </p>
       {!equal && (
-        <div className="seg" style={{ marginBottom: 6 }}>
-          <button className={side === "warp" ? "on" : ""} onClick={() => setSide("warp")}>
-            Warp
-          </button>
-          <button className={side === "weft" ? "on" : ""} onClick={() => setSide("weft")}>
-            Weft
-          </button>
-        </div>
+        <Seg style={{ marginBottom: 6 }} value={side} options={[["warp", "Warp"], ["weft", "Weft"]] as const} onChange={(v) => setSide(v)} />
       )}
       <div className="tartan-stripes">
         {stripes.map((s, i) => (

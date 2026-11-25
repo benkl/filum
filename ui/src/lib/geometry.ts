@@ -13,6 +13,7 @@ import type {
 } from "../types";
 import { FILUM_NEW_FILL, INK_FILL_METHODS, INK_RUNNING, INK_SATIN, INK_TATAMI } from "./inkDefaults";
 import { dist } from "./vec";
+import { DESIGN_OPTIONS } from "../generated/engine";
 
 export const uid = (p = "o") => `${p}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
@@ -66,31 +67,8 @@ export const defaultApplique = (): AppliqueParams => ({
   stops: true,
 });
 
-export const defaultDesignOptions = (): DesignOptions => ({
-  removeOverlaps: false,
-  overlapMargin: 0.6,
-  coverMinWidth: 1.5,
-  coverMaxSpacing: 1.0,
-  texturedCovers: false,
-  appliqueCovers: true,
-  minFragment: 2.0,
-  keepUnderlay: false,
-  trimRunning: false,
-  basting: "none",
-  bastingMargin: 6,
-  bastingLength: 5,
-  threadWeight: 40,
-  avoidHoles: true,
-  hiddenTravel: true,
-  knockdown: false,
-  knockdownOffset: 2,
-  knockdownSpacing: 2,
-  knockdownLength: 4,
-  knockdownLayers: 2,
-  knockdownAngle: 45,
-  knockdownColor: "",
-  knockdownHoles: false,
-});
+/** A new design's options: the engine's defaults (generated/engine.ts). */
+export const defaultDesignOptions = (): DesignOptions => ({ ...DESIGN_OPTIONS });
 
 export function defaultStitch(type: StitchParams["type"], prev?: StitchParams): StitchParams {
   switch (type) {

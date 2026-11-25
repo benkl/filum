@@ -13,7 +13,7 @@ import { cleanFileName, exportChecks, MACHINES, machineById, pickFrame, presetBy
 import { inHoop, ovalNorm } from "../lib/materials";
 import { useStore } from "../store";
 import { FLAG, type ExportOptions, type FormatInfo, type MachineColorInfo, type PlanData } from "../types";
-import { Dialog, fmtTime, Num } from "./ui";
+import { Dialog, fmtTime, Num, Seg } from "./ui";
 import { FrameButtons, MachineOptions } from "./MachineOptions";
 import { cutterOf, DEFAULT_CUT_OVER, uncutTrims } from "../lib/cuts";
 import { safeSetItem } from "../lib/storage";
@@ -329,14 +329,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
 
           <section className="xp-sec">
             <h4>Format</h4>
-            <div className="seg seg-full xp-mode">
-              <button className={!zipMode ? "on" : ""} onClick={() => setZipMode(false)} title="Save one file">
-                One file
-              </button>
-              <button className={zipMode ? "on" : ""} onClick={() => setZipMode(true)} title="Several formats, the thread list and pictures in one ZIP (Ink/Stitch ZIP export)">
-                Several · ZIP
-              </button>
-            </div>
+            <Seg full className="xp-mode" value={!!zipMode} options={[[false, "One file", "Save one file"], [true, "Several · ZIP", "Several formats, the thread list and pictures in one ZIP (Ink/Stitch ZIP export)"]] as const} onChange={(v) => setZipMode(v)} />
             <div className="xp-formats">
               {machineFormats.map((f) => {
                 const reads = machine.id === "doc" || machine.formats.includes(f.extension);
@@ -376,14 +369,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             {hasPes && (
               <>
                 <h4>PES version</h4>
-                <div className="seg seg-full">
-                  <button className={pesVersion === 1 ? "on" : ""} onClick={() => setPesVersion(1)} title="What Ink/Stitch writes: colours are entries of Brother's thread table — every Brother machine reads it">
-                    v1 · Brother colours
-                  </button>
-                  <button className={pesVersion === 6 ? "on" : ""} onClick={() => setPesVersion(6)} title="Adds the exact thread list (brand, code, name, colour) for machines and software that read PES 6">
-                    v6 · exact threads
-                  </button>
-                </div>
+                <Seg full value={pesVersion} options={[[1, "v1 · Brother colours", "What Ink/Stitch writes: colours are entries of Brother's thread table — every Brother machine reads it"], [6, "v6 · exact threads", "Adds the exact thread list (brand, code, name, colour) for machines and software that read PES 6"]] as const} onChange={(v) => setPesVersion(v)} />
                 <p className="hint">{pesVersion === 1 ? "Most compatible — Brother thread colours." : "Exact threads; older machines may not read v6."}</p>
               </>
             )}

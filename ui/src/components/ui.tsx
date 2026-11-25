@@ -136,23 +136,29 @@ export function ExtLink({ href, children, className, title }: { href: string; ch
  * [value, label, tooltip?]; `label` names the group for screen readers;
  * `full` stretches it over the row.
  */
-export function Seg<T extends string | number>({
+export function Seg<T extends string | number | boolean>({
   value,
   options,
   onChange,
   label,
   full,
   disabled,
+  className,
+  style,
 }: {
-  value: T;
+  /** The current choice; null when none is (a selection that differs). */
+  value: T | null;
   options: readonly (readonly [T, ReactNode, string?])[];
   onChange: (v: T) => void;
   label?: string;
   full?: boolean;
   disabled?: boolean;
+  /** More classes for the group (its place in a layout). */
+  className?: string;
+  style?: React.CSSProperties;
 }) {
   return (
-    <div className={`seg${full ? " seg-full" : ""}${disabled ? " disabled" : ""}`} role="group" aria-label={label}>
+    <div className={`seg${full ? " seg-full" : ""}${disabled ? " disabled" : ""}${className ? ` ${className}` : ""}`} style={style} role="group" aria-label={label}>
       {options.map(([id, text, title]) => (
         <button key={String(id)} className={value === id ? "on" : ""} title={title} disabled={disabled} onClick={() => onChange(id)}>
           {text}
@@ -321,6 +327,33 @@ export function followPointer(on: Window | Element, move: (ev: PointerEvent) => 
   on.addEventListener("pointermove", step);
   on.addEventListener("pointerup", up);
   on.addEventListener("pointercancel", up);
+}
+
+/**
+ * Where a popover `w` px wide goes next to its anchor (a button's rect): left
+ * aligned with it (`start`), right aligned (`end`) or centred, kept `margin`
+ * px inside the window, `gap` px from the anchor.
+ * - Its `height` known: below the anchor, or above when it doesn't fit
+ *   there (`flip`, the default), or moved up just enough (`flip: false`).
+ * - Else it gets a `maxHeight` (at most `maxHeight`): below when at least
+ *   `minBelow` px are free there (or as much as above), else above.
+ */
+export function placeNear(
+  r: DOMRect,
+  w: number,
+  { align = "start", gap = 4, margin = 8, height, maxHeight = Infinity, minBelow = 0, flip = true }: { align?: "start" | "end" | "center"; gap?: number; margin?: number; height?: number; maxHeight?: number; minBelow?: number; flip?: boolean } = {},
+): { left: number; top: number; maxHeight?: number } {
+  const x = align === "start" ? r.left : align === "end" ? r.right - w : r.left + r.width / 2 - w / 2;
+  const left = Math.max(margin, Math.min(window.innerWidth - w - margin, x));
+  if (height != null) {
+    const below = r.bottom + gap;
+    if (!flip) return { left, top: Math.min(below, Math.max(margin, window.innerHeight - height - margin)) };
+    return { left, top: below + height > window.innerHeight - margin ? Math.max(margin, r.top - height - gap) : below };
+  }
+  const room = window.innerHeight - r.bottom - gap - margin;
+  const above = r.top - gap - margin;
+  const mh = Math.min(maxHeight, Math.max(room, above));
+  return { left, top: room >= Math.min(minBelow, above) ? r.bottom + gap : Math.max(margin, r.top - gap - mh), maxHeight: mh };
 }
 
 /** What doesn't count as outside a popover: an element (its anchor), a ref (the popover) or a CSS selector (".menu" for its submenus). */
