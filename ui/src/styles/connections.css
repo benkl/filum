@@ -1,0 +1,15 @@
+/* ---------------------------------------------------------------- connections (after it) */
+.cmd-now {
+  margin: calc(-1 * var(--sp-1)) 0 var(--sp-2);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+.cmd-now.warn {
+  color: var(--warning-text);
+}
+.layer .link-mark {
+  color: var(--muted);
+}
+.layer .link-mark.manual {
+  color: var(--accent-text);
+}

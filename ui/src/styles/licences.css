@@ -1,0 +1,89 @@
+/* ---------------------------------------------------------------- licences */
+.lic-tabs {
+  flex-wrap: wrap;
+}
+.lic-list {
+  max-height: 54vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.lic-row + .lic-row {
+  border-top: 1px solid var(--border);
+}
+.lic-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1-5);
+  padding: var(--sp-1-5) var(--sp-2-5);
+  background: none;
+  border: 0;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-md);
+  text-align: left;
+  cursor: pointer;
+}
+.lic-head:hover {
+  background: var(--accent-soft);
+}
+.lic-ver {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+.lic-spacer {
+  flex: 1;
+}
+.lic-badge {
+  font-size: var(--fs-xs);
+  padding: 1px var(--sp-2);
+  border-radius: var(--r-full);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lic-body {
+  padding: 0 var(--sp-3) var(--sp-2-5) 29px;
+}
+.lic-body h4 {
+  margin: var(--sp-2) 0 var(--sp-1);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.lic-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-3-5);
+  margin: 0 0 var(--sp-1-5);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.lic-meta a {
+  color: var(--select);
+}
+.lic-body pre,
+.lic-full {
+  max-height: 260px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+  padding: var(--sp-2) var(--sp-2-5);
+  margin: 0;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.lic-full {
+  max-height: 40vh;
+}
+.lic-app p {
+  margin: var(--sp-1) var(--sp-0-5) var(--sp-2-5);
+  font-size: var(--fs-md);
+  line-height: 1.5;
+}

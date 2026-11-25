@@ -1,0 +1,209 @@
+/* ---------------- thread manager: fitting ---------------- */
+.tm-stats {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+.tm-stats span {
+  padding: var(--sp-0-5) var(--sp-2);
+  border-radius: var(--r-full);
+  background: var(--bg-2);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.tm-stats b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.tm-stats .fitted {
+  background: color-mix(in srgb, var(--select) 13%, transparent);
+  color: var(--select);
+}
+.tm-stats .fitted b {
+  color: var(--select);
+}
+/* sew sequence: sewn spools on top, the original colours they carry below */
+.fit-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-1-5);
+  margin: var(--sp-2) 0 var(--sp-2);
+  padding: var(--sp-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+}
+.fit-strip.two {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+.fs-labels {
+  display: grid;
+  grid-template-rows: 26px 12px;
+  gap: var(--sp-1);
+  padding-left: var(--sp-1);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.fs-labels span {
+  display: flex;
+  align-items: center;
+}
+.fs-blocks {
+  display: flex;
+  gap: var(--sp-0-5);
+  min-width: 0;
+}
+.fs-block {
+  flex: 1 1 0;
+  min-width: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  border-radius: var(--r-sm);
+}
+.fs-block.on {
+  box-shadow: 0 0 0 2px var(--select);
+}
+.fs-spool {
+  position: relative;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-bold);
+  font-variant-numeric: tabular-nums;
+  box-shadow: inset 0 0 0 1px var(--swatch-edge-soft);
+  cursor: pointer;
+}
+.fs-merged {
+  position: absolute;
+  top: 1px;
+  right: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  font-size: var(--fs-3xs);
+  font-style: normal;
+  opacity: 0.85;
+}
+.fs-needs {
+  display: flex;
+  gap: 1px;
+  height: 12px;
+}
+.fs-needs button {
+  flex: 1 1 0;
+  min-width: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-xs);
+  box-shadow: inset 0 0 0 1px var(--swatch-edge-soft);
+  cursor: pointer;
+}
+.fs-needs button.on {
+  box-shadow: 0 0 0 1.5px var(--select);
+}
+.fs-needs button.far {
+  background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--mark-removed) 70%, transparent) 0 1.5px, transparent 1.5px 4px) !important;
+}
+.tm-fitbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1-5);
+  margin-bottom: var(--sp-2);
+  padding: var(--sp-1-5) var(--sp-2);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+}
+.tm-fit-label {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+}
+.tm-fitbar .select {
+  max-width: 260px;
+}
+.tm-quality {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.tm-quality b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.tm-quality b.far,
+.tm-fit b.far {
+  color: var(--danger-text);
+}
+.tm-report {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  margin-bottom: var(--sp-2);
+  padding: var(--sp-2) 30px var(--sp-2) var(--sp-2-5);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--success) 10%, var(--bg-3));
+  font-size: var(--fs-sm);
+}
+.tm-report.warn {
+  background: color-mix(in srgb, var(--warning) 12%, var(--bg-3));
+}
+.tm-report > span:first-of-type {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-weight: var(--fw-semibold);
+}
+.tm-report .icon-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border: 0;
+}
+.tm-far {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-0-5) var(--sp-3);
+  color: var(--muted);
+}
+.tm-far span {
+  color: var(--text);
+}
+.tm-far b {
+  color: var(--warning-text);
+}
+.tm-fit {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+.tm-fit > i {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--r-xs);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 25%, transparent);
+}
+.tm-fit b {
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.tm-fit .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-0-5);
+}
+.tm-fit .icon-btn {
+  width: 20px;
+  height: 20px;
+  border: 0;
+}

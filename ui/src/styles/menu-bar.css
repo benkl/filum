@@ -1,0 +1,171 @@
+/* ---------------- menu bar ---------------- */
+.menubar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-0-5);
+  padding: 0 0 0 var(--sp-2);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  min-width: 0;
+  user-select: none;
+}
+/* desktop: the menu bar is the window's title bar */
+.app-mark {
+  width: 16px;
+  height: 16px;
+  margin-right: var(--sp-1-5);
+  flex: none;
+}
+.title-drag {
+  flex: 1;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  padding: 0 var(--sp-3);
+  overflow: hidden;
+}
+.menubar.inactive .menu-btn,
+.menubar.inactive .icon-btn,
+.menubar.inactive .app-mark {
+  opacity: 0.55;
+}
+.win-controls {
+  display: flex;
+  align-self: stretch;
+  flex: none;
+  margin-left: var(--sp-1);
+}
+.win-btn {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--text);
+}
+.win-btn:hover {
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+.win-btn:active {
+  background: color-mix(in srgb, var(--text) 16%, transparent);
+}
+.win-btn.close:hover {
+  background: var(--win-close);
+  color: var(--on-solid);
+}
+.win-btn.close:active {
+  background: var(--win-close-active);
+  color: var(--on-solid);
+}
+.menubar.inactive .win-btn {
+  color: var(--muted);
+}
+.menubar .menu-btn {
+  background: none;
+  border: 0;
+  padding: var(--sp-0-5) var(--sp-2);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-md);
+}
+.menubar .menu-btn:hover,
+.menubar .menu-btn.open {
+  background: var(--bg-2);
+}
+.menubar .sep {
+  width: 1px;
+  height: 14px;
+  background: var(--border);
+  margin: 0 var(--sp-1-5);
+}
+.menu {
+  position: fixed;
+  z-index: var(--z-menu);
+  min-width: 230px;
+  padding: var(--sp-1);
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow);
+}
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: var(--sp-1) var(--sp-2);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  text-align: left;
+  font-size: var(--fs-md);
+}
+.menu-item:hover:not(:disabled),
+.menu-item:focus-visible,
+.menu-item.sub-open {
+  background: var(--accent);
+  color: var(--accent-fg);
+  outline: none;
+}
+.menu-item.sub-open .kbd,
+.menu-item:focus-visible .kbd {
+  color: inherit;
+  opacity: 0.85;
+}
+.menu-item .sub-arrow {
+  margin-left: auto;
+  opacity: 0.6;
+}
+.menu-item .kbd + .sub-arrow {
+  margin-left: var(--sp-1-5);
+}
+.menu-sub {
+  min-width: 200px;
+}
+.menu-item:hover:not(:disabled) .kbd {
+  color: inherit;
+  opacity: 0.85;
+}
+.menu-item:disabled {
+  opacity: var(--disabled);
+  cursor: default;
+}
+.menu-item .kbd {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+.menu-item .check {
+  width: 15px;
+  flex: none;
+  display: inline-flex;
+  justify-content: center;
+}
+.menu-item .check svg {
+  opacity: 0.85;
+}
+.menu-sep {
+  height: 1px;
+  margin: var(--sp-1) var(--sp-1-5);
+  background: var(--border);
+}
+/* a heading over a group of items, and a closing remark (a menu of toggles that stays open) */
+.menu-label {
+  padding: var(--sp-1-5) var(--sp-2) var(--sp-0-5);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+}
+.menu-note {
+  margin: var(--sp-1) var(--sp-2) var(--sp-0-5);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+}
+.optimize-menu {
+  width: 240px;
+}

@@ -1,0 +1,31 @@
+/* ---------------------------------------------------------------- arrange */
+.repeat-preview {
+  width: 200px;
+  height: 200px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.repeat-preview polygon {
+  fill: color-mix(in srgb, var(--select) 18%, transparent);
+  stroke: var(--select);
+  stroke-width: 0.4;
+  vector-effect: non-scaling-stroke;
+}
+.repeat-preview polygon.orig {
+  fill: color-mix(in srgb, var(--accent) 45%, transparent);
+  stroke: var(--accent);
+}
+.repeat-preview circle {
+  fill: var(--text);
+}
+.repeat-preview rect.hoop {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 0.6;
+  stroke-dasharray: 3 2;
+  vector-effect: non-scaling-stroke;
+}
+.repeat-preview text {
+  fill: var(--text);
+}

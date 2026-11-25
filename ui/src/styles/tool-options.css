@@ -1,0 +1,44 @@
+/* ---------------------------------------------------------------- tool options */
+.contextbar .ctx-label {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  margin-left: var(--sp-1);
+}
+.contextbar .ctx-help {
+  font-size: var(--fs-xs);
+  color: var(--faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+.ctx-field.ctx-slider input[type="range"] {
+  width: 90px;
+}
+.ctx-field .ctx-val {
+  min-width: 32px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.font-card .font-meta.warn {
+  color: var(--warning-text);
+  font-weight: var(--fw-semibold);
+}
+.font-card.to-download .font-preview {
+  background: var(--bg-2);
+  border: 1px dashed var(--border-strong);
+  color: var(--muted);
+}
+.font-card.to-download:hover .font-preview {
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+.font-dl {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1-5);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+}

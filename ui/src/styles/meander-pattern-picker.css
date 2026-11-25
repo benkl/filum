@@ -1,0 +1,79 @@
+/* ---------------- meander pattern picker ---------------- */
+.meander-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--sp-1-5) 0 var(--sp-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-3);
+  font-size: var(--fs-md);
+  text-align: left;
+}
+.meander-pick:hover,
+.meander-pick.on {
+  border-color: var(--select);
+}
+.meander-pick .mp-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.meander-pick > svg:last-child {
+  flex: none;
+  color: var(--muted);
+}
+.tile-preview {
+  flex: none;
+  display: block;
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+  color: var(--text);
+}
+.meander-menu {
+  width: 336px;
+}
+.mm-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--sp-1);
+  padding: var(--sp-0-5) var(--sp-0-5) var(--sp-1-5);
+}
+.mm-grid button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-0-5);
+  padding: var(--sp-1) var(--sp-0-5) var(--sp-1);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: none;
+  font-size: var(--fs-2xs);
+  color: var(--muted);
+  min-width: 0;
+}
+.mm-grid button span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mm-grid button:hover {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  color: var(--text);
+}
+.mm-grid button.on {
+  border-color: var(--select);
+  background: color-mix(in srgb, var(--select) 12%, transparent);
+  color: var(--text);
+  font-weight: var(--fw-semibold);
+}
+.dz-pane .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}

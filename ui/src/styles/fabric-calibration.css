@@ -1,0 +1,468 @@
+/* ---------------- fabric calibration ---------------- */
+/* three steps over one swatch: a live preview, a diagram that points at the
+   measurement being typed, and the result as before / after cards */
+.mt-fabric {
+  display: flex;
+  gap: var(--sp-1);
+  width: 100%;
+}
+.mt-fabric .select {
+  flex: 1;
+  min-width: 0;
+}
+.mt-fabric .icon-btn {
+  flex: none;
+  width: 24px;
+  border: 1px solid var(--border);
+}
+.mt-fabric .icon-btn.on {
+  border-color: var(--accent);
+}
+.cal-top {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-3);
+}
+.cal-intro {
+  flex: 1;
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-md);
+  line-height: 1.5;
+}
+.cal-fabric {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1-5);
+  flex: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 260px;
+  color: var(--muted);
+}
+.cal-fabric .select {
+  min-width: 130px;
+}
+.cal-state {
+  width: 100%;
+  font-size: var(--fs-xs);
+  text-align: right;
+}
+.cal-state.on {
+  color: var(--hoop);
+}
+.cal-steps {
+  display: flex;
+  gap: var(--sp-1);
+  margin: 0 0 var(--sp-3-5);
+  padding: var(--sp-1);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  list-style: none;
+}
+.cal-steps li {
+  flex: 1;
+}
+.cal-steps button {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  height: 30px;
+  padding: 0 var(--sp-2-5);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--muted);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
+}
+.cal-steps button:hover {
+  color: var(--text);
+}
+.cal-steps button.on {
+  background: var(--bg-3);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+.cal-dot {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--border);
+  color: var(--text);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+.cal-steps .on .cal-dot {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.cal-steps .done .cal-dot {
+  background: var(--hoop);
+  color: var(--on-solid);
+}
+.cal-grid {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: var(--sp-4-5);
+  align-items: start;
+}
+.cal-preview,
+.cal-diagram {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--canvas);
+  overflow: hidden;
+}
+.cal-preview {
+  aspect-ratio: 1;
+}
+.cal-preview > div {
+  position: absolute;
+  inset: 0;
+}
+.cal-size {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  padding: var(--sp-0-5) var(--sp-2);
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--bg-3) 85%, transparent);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+.cal-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2-5);
+  min-width: 0;
+}
+.cal-lead {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-1-5);
+  margin: 0;
+  font-size: var(--fs-md);
+  line-height: 1.5;
+}
+.cal-lead svg {
+  flex: none;
+  margin-top: var(--sp-1);
+  color: var(--accent-text);
+}
+.cal-check {
+  display: grid;
+  gap: var(--sp-1-5);
+  margin: 0;
+  padding: var(--sp-2-5) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  list-style: none;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.cal-check b {
+  display: inline-block;
+  min-width: 64px;
+  color: var(--text);
+  font-weight: var(--fw-semibold);
+}
+.cal-download {
+  display: flex;
+  gap: var(--sp-1-5);
+}
+.cal-download .select {
+  height: 26px;
+}
+.cal-side .hint {
+  padding: 0;
+}
+/* the diagram */
+.cal-diagram {
+  padding: 0 0 26px;
+}
+.cal-diagram svg {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+}
+.cal-hoop {
+  fill: var(--bg-3);
+  stroke: var(--hoop);
+  stroke-width: 0.5;
+  stroke-dasharray: 2 1.4;
+}
+.cal-diagram pattern path {
+  stroke: var(--muted);
+  stroke-width: 0.35;
+}
+.cal-piece > ellipse,
+.cal-piece > rect {
+  stroke: var(--muted);
+  stroke-width: 0.4;
+  transition: stroke var(--dur-fast) var(--ease);
+}
+.cal-piece text {
+  fill: var(--muted);
+  font-size: 5px;
+  font-weight: var(--fw-bold);
+}
+.cal-piece.done > ellipse,
+.cal-piece.done > rect {
+  stroke: var(--hoop);
+}
+.cal-piece.on > ellipse,
+.cal-piece.on > rect {
+  stroke: var(--accent);
+  stroke-width: 0.7;
+}
+.cal-piece.on text {
+  fill: var(--accent);
+}
+.cal-dim line {
+  stroke: var(--accent);
+  stroke-width: 0.5;
+}
+.cal-dim text {
+  font-size: 3.6px;
+  font-weight: var(--fw-semibold);
+}
+.cal-legend {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 6px;
+  margin: 0;
+  color: var(--faint);
+  font-size: var(--fs-xs);
+  text-align: center;
+}
+/* the measurements */
+.cal-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 4px;
+  font-size: var(--fs-sm);
+}
+.cal-table thead th {
+  padding: 0 var(--sp-1) var(--sp-0-5);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  text-align: left;
+}
+.cal-table tbody th {
+  padding: 0 var(--sp-2) 0 0;
+  font-weight: var(--fw-medium);
+  text-align: left;
+  white-space: nowrap;
+  vertical-align: top;
+  line-height: 28px;
+}
+.cal-table td {
+  padding: 0 var(--sp-1);
+  vertical-align: top;
+}
+.cal-table tr.on th {
+  color: var(--accent-text);
+}
+.cal-letter {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-right: var(--sp-2);
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+  font-weight: var(--fw-bold);
+  line-height: 1;
+}
+tr.on .cal-letter {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.cal-pname {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+.cal-pname svg {
+  color: var(--muted);
+}
+.cal-field {
+  position: relative;
+  display: block;
+}
+.cal-field .input {
+  width: 100%;
+  height: 28px;
+  padding-right: 30px;
+  font-family: var(--mono);
+  font-size: var(--fs-md);
+  text-align: right;
+}
+.cal-field .input::placeholder {
+  color: var(--faint);
+}
+.cal-field.odd .input {
+  border-color: var(--warning);
+}
+.cal-unit {
+  position: absolute;
+  right: 8px;
+  top: 7px;
+  color: var(--faint);
+  font-size: var(--fs-xs);
+  pointer-events: none;
+}
+.cal-diff {
+  display: block;
+  padding: var(--sp-0-5) var(--sp-0-5) 0;
+  color: var(--faint);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+.cal-diff.in {
+  color: var(--cut-text);
+}
+.cal-diff.out {
+  color: var(--info-text);
+}
+.cal-diff.same {
+  color: var(--hoop);
+}
+/* the result */
+.cal-result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2-5);
+}
+.cal-empty {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: var(--sp-2-5) var(--sp-3);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  color: var(--muted);
+  font-size: var(--fs-md);
+}
+.cal-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-2-5);
+}
+.cal-card {
+  padding: var(--sp-3) var(--sp-3-5);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--bg-3);
+}
+.cal-card.empty {
+  background: var(--bg-2);
+}
+.cal-card h4 {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-md);
+}
+.cal-card h4 svg {
+  color: var(--accent-text);
+}
+.cal-card .hint {
+  padding: 0;
+}
+.cal-card dl {
+  display: grid;
+  gap: var(--sp-2-5);
+  margin: 0;
+}
+.cal-card dt {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.cal-card dd {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: var(--sp-0-5) 0 0;
+}
+.cal-card dd b {
+  font-size: var(--fs-2xl);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.cal-was {
+  color: var(--faint);
+  font-size: var(--fs-xs);
+}
+.cal-why {
+  margin: var(--sp-0-5) 0 0;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+.cal-note {
+  display: flex;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: var(--sp-2) var(--sp-2-5);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--warning) 12%, var(--bg-3));
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+.cal-note svg {
+  flex: none;
+  margin-top: var(--sp-0-5);
+  color: var(--warning-text);
+}
+.cal-apply {
+  padding: var(--sp-2-5) var(--sp-3);
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+.cal-apply p {
+  margin: 0;
+}
+.cal-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+  font-weight: var(--fw-medium);
+}
+.cal-toggle input {
+  accent-color: var(--accent);
+}
+@media (max-width: 760px) {
+  .cal-top,
+  .cal-grid,
+  .cal-cards {
+    display: flex;
+    flex-direction: column;
+  }
+  .cal-fabric {
+    max-width: none;
+    justify-content: flex-start;
+  }
+  .cal-state {
+    text-align: left;
+  }
+  .cal-preview,
+  .cal-diagram {
+    width: 100%;
+  }
+}

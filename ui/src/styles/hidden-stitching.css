@@ -1,0 +1,264 @@
+/* ---------------- hidden stitching ---------------- */
+/* Design ▸ Hidden stitching and Selection ▸ Hidden stitching: a savings card,
+   grouped rules, and the objects that lose stitches */
+.hs-off {
+  padding: var(--sp-0-5) var(--sp-0-5) var(--sp-2);
+}
+.hs-off .btn {
+  margin-top: var(--sp-1-5);
+}
+.hs-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: var(--sp-0-5) 0 var(--sp-2);
+  padding: var(--sp-2-5) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-3);
+}
+.hs-summary.none {
+  background: var(--bg-2);
+}
+.hs-big {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.hs-big b {
+  color: var(--text);
+  font-size: var(--fs-2xl);
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.01em;
+}
+.hs-pct {
+  margin-left: var(--sp-1);
+  padding: 1px var(--sp-1-5);
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--hoop) 16%, transparent);
+  color: var(--hoop);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+}
+.hs-wait {
+  color: var(--faint);
+}
+.hs-bar {
+  height: 6px;
+  border-radius: var(--r-xs);
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--cut) 45%, transparent) 0 2px, transparent 2px 5px), var(--bg-2);
+  overflow: hidden;
+}
+.hs-bar i {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-xs);
+  background: var(--accent);
+}
+.hs-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+.hs-show {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-left: auto;
+  height: 22px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  background: var(--bg-3);
+  color: var(--text);
+  font-size: var(--fs-xs);
+}
+.hs-show.on {
+  border-color: var(--cut);
+  background: color-mix(in srgb, var(--cut) 10%, var(--bg-3));
+  color: var(--cut-text);
+}
+.hs-sub {
+  margin: var(--sp-3) 0 var(--sp-1);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.hs-suggest {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin: 0 0 var(--sp-1-5);
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-full);
+  background: none;
+  color: var(--accent-text);
+  font-size: var(--fs-xs);
+}
+.hs-suggest:hover {
+  border-style: solid;
+  background: var(--accent-soft);
+}
+.hs-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-1-5);
+  margin: var(--sp-0-5) 0 var(--sp-1-5);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+.hs-note svg {
+  flex: none;
+  margin-top: var(--sp-0-5);
+}
+.hs-seg {
+  width: 100%;
+}
+.hs-seg button {
+  flex: 1;
+}
+.hs-reset {
+  margin: var(--sp-0-5) 0 0 auto;
+  display: flex;
+}
+.hs-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-0-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hs-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-0-5);
+  border-radius: var(--r-sm);
+}
+.hs-list li.on {
+  background: var(--accent-soft);
+}
+.hs-obj {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-1-5);
+  height: 28px;
+  padding: 0 var(--sp-1-5) var(--sp-1);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--text);
+  font-size: var(--fs-sm);
+  text-align: left;
+}
+.hs-obj:hover {
+  background: var(--bg-2);
+}
+.hs-obj svg {
+  color: var(--muted);
+}
+.hs-sw {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 22%, transparent);
+}
+.hs-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.hs-cut {
+  color: var(--cut-text);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+.hs-mini {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 3px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--bg-2);
+}
+.hs-mini i {
+  display: block;
+  height: 100%;
+  border-radius: 1px;
+  background: var(--cut);
+}
+.hs-keep {
+  flex: none;
+  width: 24px;
+  opacity: 0;
+}
+.hs-list li:hover .hs-keep,
+.hs-keep:focus-visible {
+  opacity: 1;
+}
+.hs-overrides {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  margin-top: var(--sp-2);
+}
+.hs-overrides .hs-note {
+  width: 100%;
+  margin: 0;
+}
+.hs-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  max-width: 100%;
+  height: 22px;
+  padding: 0 var(--sp-2) 0 var(--sp-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  background: var(--bg-3);
+  color: var(--text);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+.hs-chip i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+.hs-chip span {
+  color: var(--muted);
+}
+.hs-verdict {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-1-5);
+  margin: 0 0 var(--sp-2);
+  padding: var(--sp-1-5) var(--sp-2);
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+.hs-verdict svg {
+  flex: none;
+  margin-top: var(--sp-0-5);
+}
+.hs-verdict.yes svg,
+.hs-verdict.wide svg {
+  color: var(--hoop);
+}

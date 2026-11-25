@@ -1,0 +1,138 @@
+/* ---------------------------------------------------------------- shape effects */
+.fx {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: var(--sp-4);
+}
+.fx-list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-1-5);
+  align-content: start;
+}
+.fx-card,
+.fx-warps button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1-5) var(--sp-1) var(--sp-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-3);
+  color: var(--text);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+.fx-card svg,
+.fx-warps svg {
+  width: 52px;
+  height: 52px;
+  overflow: visible;
+}
+.fx-card path,
+.fx-warps path {
+  fill: var(--accent-soft);
+  stroke: var(--text);
+  stroke-width: 0.9;
+  stroke-linejoin: round;
+}
+.fx-card.on,
+.fx-warps button.on {
+  border-color: var(--select);
+  box-shadow: 0 0 0 1px var(--select);
+}
+.fx-card.on path,
+.fx-warps button.on path {
+  stroke: var(--select);
+}
+.fx-params h3 {
+  margin: var(--sp-0-5) 0 var(--sp-0-5);
+  font-size: var(--fs-xl);
+}
+.fx-params .hint {
+  margin-top: 0;
+}
+.fx-warps {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--sp-1);
+  margin-bottom: var(--sp-2);
+}
+.fx-warps svg {
+  width: 34px;
+  height: 34px;
+}
+.fx-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1-5);
+  font-size: var(--fs-md);
+}
+@media (max-width: 760px) {
+  .fx {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* digitizer recognition */
+.dz-ai {
+  display: flex;
+  gap: var(--sp-1);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-1-5);
+}
+.dz-masks {
+  display: flex;
+  gap: var(--sp-1);
+  flex-wrap: wrap;
+  margin: var(--sp-1) 0;
+}
+.dz-masks .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding-right: var(--sp-0-5);
+}
+.dz-masks .chip.keep {
+  border-color: var(--success);
+  color: var(--success-text);
+}
+.dz-masks .chip.remove {
+  border-color: var(--danger);
+  color: var(--danger-text);
+}
+.dz-masks .chip.separate {
+  border-color: var(--warning);
+  color: var(--warning-text);
+}
+.dz-masks .chip.erase {
+  border-color: var(--erase);
+  color: var(--erase);
+}
+.dz-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-0-5);
+  margin-top: var(--sp-1);
+}
+.dz-textline {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1-5);
+  font-size: var(--fs-sm);
+}
+.dz-textline span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dz-textline i {
+  font-style: normal;
+  font-size: var(--fs-xs);
+}
+.dz-colours {
+  margin-top: 0;
+}

@@ -1,0 +1,120 @@
+/* ---------------- dialogs ---------------- */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dialog);
+  display: grid;
+  place-items: center;
+  background: var(--scrim);
+  backdrop-filter: blur(2px);
+}
+.dialog {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.dialog.wide {
+  width: min(860px, calc(100vw - 32px));
+}
+.dialog-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2-5);
+  padding: var(--sp-4) var(--sp-4-5) var(--sp-2-5);
+}
+.dialog-head h2 {
+  margin: 0;
+  font-size: var(--fs-2xl);
+  font-weight: var(--fw-semibold);
+}
+.dialog-body {
+  padding: var(--sp-1) var(--sp-4-5) var(--sp-4);
+  overflow-y: auto;
+}
+.dialog-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4-5);
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+.fmt {
+  padding: var(--sp-2-5);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-3);
+  text-align: left;
+}
+.fmt b {
+  display: block;
+  font-size: var(--fs-lg);
+  letter-spacing: 0.02em;
+}
+.fmt span {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.fmt.on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-2);
+  margin: var(--sp-3) 0;
+}
+.stat-card {
+  padding: var(--sp-2) var(--sp-2-5);
+  border-radius: var(--r-md);
+  background: var(--bg);
+}
+.stat-card .v {
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.stat-card .k {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+table.threads {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-md);
+}
+table.threads td,
+table.threads th {
+  padding: var(--sp-1-5) var(--sp-1-5);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+table.threads th {
+  color: var(--muted);
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.field {
+  display: grid;
+  gap: var(--sp-1);
+  margin: var(--sp-2-5) 0;
+}
+.field > span {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+textarea.input {
+  height: 64px;
+  padding: var(--sp-1-5) var(--sp-2);
+  resize: vertical;
+  font-size: var(--fs-xl);
+}

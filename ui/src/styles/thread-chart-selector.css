@@ -1,0 +1,171 @@
+/* ---------------- thread chart selector ---------------- */
+.chart-select {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: 24px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0 var(--sp-1) 0 var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg-3);
+  font-size: var(--fs-md);
+  text-align: left;
+}
+.chart-head .chart-select {
+  flex: 0 1 48%;
+}
+.chart-select:hover,
+.chart-select.on {
+  border-color: var(--select);
+}
+.chart-select .cs-name,
+.cm-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chart-select svg {
+  flex: none;
+  color: var(--muted);
+}
+.src-tag {
+  flex: none;
+  min-width: 18px;
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-2xs);
+  font-style: normal;
+  font-weight: var(--fw-bold);
+  line-height: 15px;
+  text-align: center;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--text) 9%, transparent);
+}
+.src-tag.embroiderynerd {
+  color: var(--warning-text);
+  background: color-mix(in srgb, var(--warning) 20%, transparent);
+}
+.src-tag.madeira {
+  color: var(--success-text);
+  background: color-mix(in srgb, var(--success) 18%, transparent);
+}
+.src-tag.custom {
+  color: var(--select);
+  background: color-mix(in srgb, var(--select) 16%, transparent);
+}
+.chart-menu,
+.meander-menu {
+  position: fixed;
+  z-index: var(--z-picker);
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1-5);
+  padding: var(--sp-2);
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+}
+.chart-menu .chart-search,
+.meander-menu .chart-search {
+  flex: none;
+  height: 28px;
+}
+.cm-list,
+.mm-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0 -4px;
+  padding: 0 var(--sp-1);
+}
+.cm-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--sp-1-5) var(--sp-1-5) var(--sp-1);
+  background: var(--bg-3);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.cm-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1-5);
+  width: 100%;
+  height: 26px;
+  padding: 0 var(--sp-1-5) 0 var(--sp-2-5);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  font-size: var(--fs-md);
+  text-align: left;
+  cursor: pointer;
+}
+.cm-row:hover,
+.cm-row:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+}
+.cm-row.on {
+  background: color-mix(in srgb, var(--select) 16%, transparent);
+  font-weight: var(--fw-semibold);
+}
+.cm-count {
+  flex: none;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--faint);
+}
+.cm-del {
+  width: 20px;
+  height: 20px;
+  border: 0;
+  opacity: 0.6;
+}
+.cm-del:hover {
+  opacity: 1;
+  color: var(--accent-text);
+}
+.cm-more {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  margin: var(--sp-0-5) 0 var(--sp-1-5);
+  padding: var(--sp-2) var(--sp-2-5);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  text-align: left;
+}
+.cm-more b {
+  color: var(--accent-text);
+  font-weight: var(--fw-semibold);
+}
+.cm-more:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.cm-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding-top: var(--sp-1-5);
+  border-top: 1px solid var(--border);
+}
+.cm-foot .stat {
+  font-size: var(--fs-xs);
+}

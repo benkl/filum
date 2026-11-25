@@ -1,0 +1,140 @@
+/* ---------------------------------------------------------------- transform */
+.transform-panel.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+.tp-top {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+}
+.refgrid {
+  display: grid;
+  grid-template-columns: repeat(3, 12px);
+  gap: var(--sp-1);
+  padding: var(--sp-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.refgrid button {
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-3);
+  border-radius: var(--r-2xs);
+  cursor: pointer;
+}
+.refgrid button.on {
+  background: var(--select);
+  border-color: var(--select);
+}
+.tp-fields {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-1) var(--sp-1-5);
+}
+.tp-field {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.tp-field > span:first-child {
+  min-width: 12px;
+}
+.tp-lock.on {
+  color: var(--select);
+}
+.tp-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-top: var(--sp-1-5);
+}
+.tp-sep {
+  flex: 1;
+}
+
+/* gradient types: small previews */
+.grad-kinds {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--sp-1);
+  margin: var(--sp-0-5) 0 var(--sp-1-5);
+}
+.grad-kinds button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-0-5);
+  padding: var(--sp-1) var(--sp-0-5) var(--sp-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-3);
+  color: var(--text);
+  font-size: var(--fs-2xs);
+  cursor: pointer;
+}
+.grad-kinds button svg {
+  width: 24px;
+  height: 16px;
+  color: var(--muted);
+}
+.grad-kinds button.on {
+  border-color: var(--select);
+  box-shadow: 0 0 0 1px var(--select);
+}
+.grad-kinds button.on svg {
+  color: var(--select);
+}
+.grad-kinds.compact {
+  display: inline-grid;
+  margin: 0;
+  gap: var(--sp-0-5);
+}
+.grad-kinds.compact button {
+  padding: var(--sp-0-5) var(--sp-1);
+}
+.grad-kinds.compact button svg {
+  width: 20px;
+  height: 14px;
+}
+.grad-preview {
+  display: block;
+  width: 100%;
+  margin: var(--sp-0-5) 0 var(--sp-1-5);
+  border-radius: var(--r-md);
+  background: repeating-conic-gradient(var(--bg-3) 0 25%, var(--bg-2, transparent) 0 50%) 0 0 / 12px 12px;
+  border: 1px solid var(--border);
+}
+.grad-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  margin: 0 0 var(--sp-1-5);
+}
+.grad-colors button {
+  min-width: 26px;
+  height: 20px;
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-full);
+  border: 1px solid var(--swatch-edge);
+  color: var(--on-solid);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  text-shadow: 0 0 2px var(--halo-dark);
+  cursor: pointer;
+}
+.grad-colors button.on {
+  outline: 2px solid var(--select);
+  outline-offset: 1px;
+}
+.thread-pick.disabled {
+  opacity: 0.45;
+}
+.dither-card.tall canvas {
+  height: 34px;
+}

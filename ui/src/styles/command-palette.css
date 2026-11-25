@@ -1,0 +1,138 @@
+/* ---------------- command palette ---------------- */
+.palette-back {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-popover);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 12vh;
+  background: var(--scrim-soft);
+}
+.palette {
+  width: min(620px, calc(100vw - 32px));
+  max-height: 64vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.palette-input {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2-5);
+  padding: var(--sp-3) var(--sp-3-5);
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+}
+.palette-input input {
+  flex: 1;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--text);
+  font-size: var(--fs-xl);
+}
+.palette-list {
+  overflow-y: auto;
+  padding: var(--sp-1-5);
+}
+.palette-item {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-0-5) var(--sp-2-5);
+  width: 100%;
+  padding: var(--sp-2) var(--sp-2-5);
+  border: 0;
+  border-radius: var(--r-md);
+  background: none;
+  text-align: left;
+  color: var(--text);
+}
+.palette-item .pl-label {
+  font-size: var(--fs-md);
+}
+.palette-item .pl-icon {
+  grid-row: 1 / span 2;
+  display: inline-flex;
+  opacity: 0.8;
+}
+.palette-item .pl-path {
+  grid-column: 2;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.palette-item .kbd {
+  grid-row: 1 / span 2;
+  grid-column: 3;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.palette-item.on {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.palette-item.on .pl-path,
+.palette-item.on .kbd {
+  color: inherit;
+  opacity: 0.8;
+}
+.palette-item:disabled {
+  opacity: var(--disabled);
+}
+.palette-item mark {
+  background: none;
+  color: inherit;
+  font-weight: var(--fw-bold);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.palette-empty {
+  padding: var(--sp-4-5);
+  text-align: center;
+  color: var(--muted);
+}
+.palette-foot {
+  display: flex;
+  gap: var(--sp-3-5);
+  padding: var(--sp-2) var(--sp-3-5);
+  border-top: 1px solid var(--border);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+/* keyboard shortcuts, grouped */
+.shortcut-groups {
+  display: grid;
+  gap: var(--sp-3-5);
+}
+.shortcut-groups h4 {
+  margin: 0 0 var(--sp-1);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.shortcuts {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-md);
+}
+.shortcuts td {
+  padding: var(--sp-1) 0;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.shortcuts td:first-child {
+  width: 1%;
+  white-space: nowrap;
+  padding-right: var(--sp-4);
+}

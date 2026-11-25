@@ -1,0 +1,123 @@
+/* ---------------- digitizer region editor ---------------- */
+.region-editor {
+  position: relative;
+}
+.region-editor canvas {
+  display: block;
+}
+.region-tip {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-0-5);
+  max-width: 230px;
+  padding: var(--sp-1-5) var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--bg-3) 94%, transparent);
+  box-shadow: var(--shadow);
+  font-size: var(--fs-sm);
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+}
+.rt-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1-5);
+  min-width: 0;
+}
+.rt-head i {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--r-xs);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 25%, transparent);
+}
+.rt-head i.none {
+  background: repeating-conic-gradient(var(--bg-2) 0 25%, var(--bg-3) 0 50%) 0 0 / 6px 6px;
+}
+.rt-head b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rt-state {
+  flex: none;
+  margin-left: auto;
+  padding: 0 var(--sp-1-5);
+  border-radius: var(--r-md);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  line-height: 16px;
+  white-space: nowrap;
+}
+.rt-state.on {
+  color: var(--success-text);
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+}
+.rt-state.off {
+  color: var(--danger-text);
+  background: color-mix(in srgb, var(--danger) 13%, transparent);
+}
+.dz-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-3-5);
+  font-size: var(--fs-sm);
+}
+.dz-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+.dz-legend i {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--r-xs);
+}
+.dz-legend i.hatch {
+  border: 1px solid color-mix(in srgb, var(--mark-removed) 60%, transparent);
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--mark-removed) 85%, transparent) 0 1.5px, transparent 1.5px 5px);
+}
+.dz-legend i.keep,
+.dz-legend i.drop {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1.5px var(--on-solid), 0 0 0 2.5px color-mix(in srgb, var(--text) 20%, transparent);
+}
+.dz-legend i.keep {
+  background: var(--success);
+}
+.dz-legend i.drop {
+  background: var(--danger);
+}
+.dz-notice {
+  height: 20px;
+  padding: 0 var(--sp-2);
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--danger) 9%, transparent);
+  color: var(--danger-text);
+  font-size: var(--fs-sm);
+}
+.dz-notice:hover {
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+}
+.dz-removed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1-5);
+  margin-top: var(--sp-0-5);
+  padding: var(--sp-2) var(--sp-2);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  font-size: var(--fs-sm);
+}
+.dz-cover i.all {
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--mark-removed) 50%, transparent) 0 1.5px, transparent 1.5px 4px);
+}

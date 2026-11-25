@@ -1,0 +1,120 @@
+/* ---------------- context bar ---------------- */
+.contextbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-2-5);
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: var(--fs-md);
+  overflow: hidden;
+}
+.contextbar .obj-name {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--text);
+  font-weight: var(--fw-semibold);
+  min-width: 0;
+  max-width: 220px;
+}
+.contextbar .obj-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--bg-3);
+}
+.seg button {
+  display: inline-grid;
+  place-items: center;
+  grid-auto-flow: column;
+  gap: var(--sp-1);
+  min-width: 28px;
+  height: var(--control-sm);
+  /* a segment's label stays on one line */
+  white-space: nowrap;
+  padding: 0 var(--sp-1-5);
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+.seg button + button {
+  border-left: 1px solid var(--border);
+}
+.seg button.on {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.ctx-field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1-5);
+  height: 24px;
+  padding: 0 var(--sp-1-5);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-3);
+  color: var(--muted);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.issue-topic {
+  margin-right: var(--sp-1);
+  vertical-align: -1px;
+  opacity: 0.6;
+}
+.ctx-field > svg {
+  flex: none;
+  color: var(--muted);
+}
+.sel-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1-5);
+  color: var(--muted);
+}
+.sel-icon .select {
+  color: var(--text);
+}
+.row > label svg {
+  flex: none;
+  margin-right: var(--sp-1);
+  vertical-align: -2px;
+  opacity: 0.7;
+}
+.ctx-field input {
+  width: 52px;
+  border: 0;
+  background: none;
+  text-align: right;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.ctx-field input:focus {
+  outline: none;
+}
+.vsep {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+}
+.swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--swatch-edge);
+  flex: none;
+}

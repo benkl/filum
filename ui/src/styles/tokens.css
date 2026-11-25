@@ -1,0 +1,207 @@
+/* ==========================================================================
+   Design tokens (ui/scripts/check-design.mjs keeps the stylesheet on them).
+   Components use these, never raw values: colour by role, type from the ramp,
+   space on the 4 px grid (2 px half-steps), corners, elevation, motion and
+   layers from their scales.
+   ========================================================================== */
+
+/* ---- colour: light (the default) ---- */
+:root,
+[data-theme="light"] {
+  /* surfaces, back to front */
+  --bg: #e8e8e5;
+  --bg-2: #f1f1ee;
+  --bg-3: #fbfbf9;
+  --panel: #ececea;
+  --canvas: #efefec;
+  --border: #d2d2cc;
+  --border-strong: #bdbdb6;
+  /* text: primary, secondary (AA 4.5:1 on every surface), tertiary (3:1, units and indices) */
+  --text: #303231;
+  --muted: #646665;
+  --faint: #818381;
+  /* brand */
+  --accent: #7c3aed;
+  --accent-hover: #6a32cc;
+  --accent-soft: rgba(124, 58, 237, 0.1);
+  --accent-fg: #ffffff;
+  --accent-text: #7c3aed;
+  --select: #7c3aed;
+  /* status: base for fills, borders and icons; -text for words (AA); -strong for solid fills under white */
+  --success: #2e9d5b;
+  --success-text: #1e6f40;
+  --success-strong: #24704d;
+  --warning: #d98a1e;
+  --warning-text: #8a5206;
+  --danger: #d0453a;
+  --danger-text: #b8352b;
+  --danger-strong: #a3192f;
+  --info: #3d93f0;
+  --info-text: #1d4fd8;
+  /* cut: stitching that is removed (hidden stitching, fabric pulled in) */
+  --cut: #d64020;
+  --cut-text: #b0390a;
+  /* the digitizer's erase mask */
+  --erase: #7a5cc9;
+  /* paper: specimens drawn black on white (font previews) */
+  --paper: #ffffff;
+  --paper-text: #222222;
+  /* canvas */
+  --hoop: #3f9a6e;
+  --grid: rgba(40, 40, 30, 0.07);
+  --grid-strong: rgba(40, 40, 30, 0.14);
+  --axis: rgba(40, 40, 30, 0.55);
+  --ruler: #e3e3df;
+  --ruler-text: #6d6f6e;
+  --ruler-line: #c2c2bb;
+  /* elevation */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 10px 30px rgba(30, 25, 20, 0.16), 0 2px 6px rgba(30, 25, 20, 0.08);
+  --shadow: var(--shadow-lg);
+  /* the inverse surface's outline: none needed on a light page */
+  --inverse-edge: transparent;
+  --is-dark: 0;
+  color-scheme: light;
+}
+
+/* ---- colour: dark ---- */
+[data-theme="dark"] {
+  --bg: #252525;
+  --bg-2: #2e2e2e;
+  --bg-3: #353535;
+  --panel: #262626;
+  --canvas: #1c1c1c;
+  --border: #383838;
+  --border-strong: #4a4a4a;
+  --text: #dddddd;
+  --muted: #a0a0a0;
+  --faint: #808080;
+  --accent: #8a4fef;
+  --accent-hover: #7c3aed;
+  --accent-soft: rgba(124, 58, 237, 0.2);
+  --accent-fg: #ffffff;
+  --accent-text: #b08cf6;
+  --select: #a375f2;
+  --success: #3fb878;
+  --success-text: #6fd6a2;
+  --success-strong: #24704d;
+  --warning: #e0a106;
+  --warning-text: #f5c35a;
+  --danger: #e5534b;
+  --danger-text: #ff8a80;
+  --danger-strong: #a3192f;
+  --info: #60a5fa;
+  --info-text: #93c5fd;
+  --cut: #e8590c;
+  --cut-text: #fb923c;
+  --erase: #a58bf0;
+  --paper: #1d1d1d;
+  --paper-text: #e6e6e6;
+  --hoop: #4caf7d;
+  --grid: rgba(255, 255, 255, 0.045);
+  --grid-strong: rgba(255, 255, 255, 0.1);
+  --axis: rgba(255, 255, 255, 0.35);
+  --ruler: #232323;
+  --ruler-text: #8c8c8c;
+  --ruler-line: #3d3d3d;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+  /* the inverse surface is dark too: a hairline keeps it off the panels */
+  --inverse-edge: rgba(255, 255, 255, 0.16);
+  --is-dark: 1;
+  color-scheme: dark;
+}
+
+/* ---- type, space, shape, size, motion, layers (both themes) ---- */
+:root {
+  --font: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* type ramp: body is md (13 px) */
+  --fs-3xs: 9px;
+  --fs-2xs: 10px;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-lg: 14px;
+  --fs-xl: 16px;
+  --fs-2xl: 18px;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  /* space: the 4 px grid with 2 px half-steps (the name is the step: 2.5 = 10 px) */
+  --sp-0-5: 2px;
+  --sp-1: 4px;
+  --sp-1-5: 6px;
+  --sp-2: 8px;
+  --sp-2-5: 10px;
+  --sp-3: 12px;
+  --sp-3-5: 14px;
+  --sp-4: 16px;
+  --sp-4-5: 18px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  /* corners */
+  --r-2xs: 2px;
+  --r-xs: 3px;
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 10px;
+  --r-full: 999px;
+  /* control heights */
+  --control-sm: 22px;
+  --control-md: 24px;
+  --control-lg: 26px;
+  /* motion: one curve; fast for hovers, base for things that move */
+  --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --dur-instant: 80ms;
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  /* panels that slide open (the stitch-out player) */
+  --dur-slide: 240ms;
+  /* hover intent: wait this long before revealing a hover-only affordance */
+  --delay-intent: 250ms;
+  /* layers, bottom to top (1 to 9 stay local to a component) */
+  --z-bar: 15;
+  --z-drop: 20;
+  --z-float: 30;
+  --z-dialog: 40;
+  --z-menu: 50;
+  --z-popover: 60;
+  --z-picker: 80;
+  --z-toast: 90;
+  --disabled: 0.45;
+  /* text and marks on any solid colour fill (accent, status, a thread swatch's badge) */
+  --on-solid: #ffffff;
+  /* text on a warning (amber) fill: white fails contrast there */
+  --on-warning: #2b1d02;
+  /* thread swatches and spools: their outline on any colour, the 3D shading of a spool */
+  --swatch-edge: rgba(0, 0, 0, 0.2);
+  --swatch-edge-soft: rgba(0, 0, 0, 0.12);
+  --swatch-shade: rgba(0, 0, 0, 0.12);
+  --swatch-shine: rgba(255, 255, 255, 0.18);
+  --gloss: rgba(255, 255, 255, 0.25);
+  /* behind a dialog (scrim) and a light one (the command palette) */
+  --scrim: rgba(20, 16, 14, 0.38);
+  --scrim-soft: rgba(20, 16, 14, 0.18);
+  /* a dark ring or halo that reads on any colour (gradient stops, handles) */
+  --ring-dark: rgba(0, 0, 0, 0.5);
+  --halo-dark: rgba(0, 0, 0, 0.8);
+  /* marks drawn on pictures and previews: the digitizer's region kinds and what it removes */
+  --mark-blue: rgb(59, 130, 246);
+  --mark-green: rgb(34, 197, 94);
+  --mark-amber: rgb(245, 158, 11);
+  --mark-red: rgb(239, 68, 68);
+  --mark-green-strong: rgb(22, 163, 74);
+  --mark-amber-strong: rgb(217, 119, 6);
+  --mark-red-strong: rgb(220, 38, 38);
+  --mark-removed: rgb(214, 48, 64);
+  /* inverse surface: toasts and readout pills (outlined by --inverse-edge) */
+  --inverse: #2a2a2a;
+  --inverse-fg: #f1f1f1;
+  /* platform chrome: the desktop window's close button */
+  --win-close: #c42b1c;
+  --win-close-active: #b22a1b;
+}

@@ -1,0 +1,89 @@
+/* ---------------------------------------------------------------- gradient */
+.grad-panel {
+  margin: var(--sp-0-5) 0 var(--sp-1-5);
+}
+.grad-bar-wrap {
+  position: relative;
+  height: 44px;
+  margin: var(--sp-1) var(--sp-2) var(--sp-1-5);
+}
+.grad-bar {
+  position: absolute;
+  inset: 0 0 14px 0;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  cursor: copy;
+}
+.grad-bar canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+}
+.grad-stop {
+  position: absolute;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  border-radius: 50% 50% 50% 50%;
+  border: 2px solid var(--on-solid);
+  box-shadow: 0 0 0 1px var(--ring-dark);
+  cursor: ew-resize;
+  padding: 0;
+}
+.grad-stop.on {
+  box-shadow: 0 0 0 2px var(--select);
+}
+.grad-mid {
+  position: absolute;
+  top: 28px;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  transform: rotate(45deg);
+  background: var(--bg-3);
+  border: 1px solid var(--muted);
+  cursor: ew-resize;
+  padding: 0;
+}
+.grad-stop-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  margin: var(--sp-1) 0 var(--sp-2);
+}
+.grad-stop-row {
+  display: flex;
+  gap: var(--sp-1-5);
+  align-items: center;
+}
+.dither-cards {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--sp-1);
+  margin: var(--sp-1-5) 0 var(--sp-2);
+}
+.dither-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-0-5);
+  padding: var(--sp-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-3);
+  color: var(--text);
+  font-size: var(--fs-2xs);
+  cursor: pointer;
+}
+.dither-card canvas {
+  width: 100%;
+  height: 18px;
+  border-radius: var(--r-xs);
+  image-rendering: pixelated;
+}
+.dither-card.on {
+  border-color: var(--select);
+  box-shadow: 0 0 0 1px var(--select);
+}

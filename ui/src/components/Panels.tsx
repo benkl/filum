@@ -33,7 +33,9 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import { Applique, BatchLettering, EmbroideryMachine, Fabric as FabricIcon, Hoop, LockStitch, Spool, StitchFill, StitchProcessing, StitchRunning, StitchSatin, TextArc } from "../icons/stitch";
 import { clamp, DEFAULT_LAYOUT, LIMITS, type Layout } from "../lib/layout";
 import { useStore } from "../store";
-import { FoldAllGroups, IssuesPanel, LayersPanel, PropertiesPanel, ScenePanel, useIssueCount } from "./Dock";
+import { PropertiesPanel, ScenePanel } from "./Dock";
+import { IssuesPanel, useIssueCount } from "./IssuesPanel";
+import { FoldAllGroups, LayersPanel } from "./LayersPanel";
 import { ElementInfoSection } from "./ElementInfo";
 import { followPointer, openSection, SectionScope } from "./ui";
 

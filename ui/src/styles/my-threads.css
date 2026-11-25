@@ -1,0 +1,109 @@
+/* ---------------- My threads ---------------- */
+.chart-grid button.owned {
+  position: relative;
+}
+.chart-grid button.owned::after {
+  content: "✓";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  line-height: 1;
+  color: currentColor;
+}
+.src-tag.mine {
+  color: var(--accent-text);
+  background: var(--accent-soft);
+}
+.tm-side {
+  flex: none;
+}
+.mine {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-height: 0;
+}
+/* the shared search field grows along rows; in this column it keeps its height */
+.mine .chart-search {
+  flex: none;
+  height: 28px;
+}
+.mine-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-0-5);
+}
+.mine-head .seg button {
+  display: inline-flex;
+  gap: var(--sp-1);
+  padding: 0 var(--sp-2);
+}
+.mine-empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-1-5);
+  padding: 26px var(--sp-3);
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--r-lg);
+  color: var(--muted);
+  font-size: var(--fs-md);
+  text-align: center;
+}
+.mine-empty b {
+  color: var(--text);
+  font-size: var(--fs-md);
+}
+.mine-empty .dz-inline {
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: var(--sp-1);
+}
+.mine-list {
+  flex: 1;
+  min-height: 120px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.mine-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: 28px;
+  padding: 0 var(--sp-1) 0 var(--sp-1-5);
+  border-radius: var(--r-md);
+  font-size: var(--fs-md);
+  cursor: pointer;
+}
+.mine-row:hover {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+.mine-row > i {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-sm);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 22%, transparent);
+}
+.mine-row .mr-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mine-row .icon-btn {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  opacity: 0;
+}
+.mine-row:hover .icon-btn {
+  opacity: 0.7;
+}
+.mine-row .icon-btn:hover {
+  opacity: 1;
+  color: var(--accent-text);
+}

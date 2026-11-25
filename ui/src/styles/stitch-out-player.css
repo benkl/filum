@@ -1,0 +1,605 @@
+/* ---------------- stitch-out player ---------------- */
+/* a timeline of the colour blocks between the canvas and the bottom bar:
+   one lane per block in sew order, a colour-sequence ribbon on the ruler,
+   the needle as a line; it zooms (Ctrl+wheel) and scrolls both ways */
+.stitchout {
+  grid-row: 2;
+  position: relative;
+  display: grid;
+  grid-template-rows: 40px minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+  transition: height var(--dur-base) var(--ease);
+}
+/* the player slides up out of the bottom bar, and back into it */
+.stitchout.opening,
+.stitchout.closing {
+  overflow: hidden;
+}
+.stitchout.opening {
+  animation: so-open var(--dur-slide) var(--ease);
+}
+.stitchout.closing {
+  animation: so-close var(--dur-slide) var(--ease) forwards;
+  pointer-events: none;
+}
+@keyframes so-open {
+  from {
+    height: 0;
+  }
+}
+@keyframes so-close {
+  to {
+    height: 0;
+  }
+}
+.so-grip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -3px;
+  height: 6px;
+  cursor: ns-resize;
+  z-index: 8;
+}
+.so-grip::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 1px;
+  width: 36px;
+  height: 4px;
+  margin-left: -18px;
+  border-radius: var(--r-2xs);
+  background: var(--border-strong);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+.so-grip:hover::after {
+  opacity: 1;
+}
+/* the head */
+.so-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2-5);
+  padding: 0 var(--sp-2) 0 var(--sp-2-5);
+  min-width: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  overflow: hidden;
+  container-type: inline-size;
+}
+.so-head > * {
+  flex: none;
+}
+.so-transport,
+.so-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: var(--sp-0-5);
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  background: var(--bg-3);
+}
+.so-transport button,
+.so-zoom button {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 24px;
+  border: 0;
+  border-radius: var(--r-full);
+  background: none;
+  color: var(--text);
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+.so-transport button:hover,
+.so-zoom button:hover:not(:disabled) {
+  background: var(--bg-2);
+}
+.so-zoom button:disabled {
+  opacity: 0.35;
+}
+.so-transport .so-play {
+  width: 32px;
+  height: 28px;
+  margin: -2px var(--sp-0-5);
+  background: var(--accent);
+  color: var(--accent-fg);
+  box-shadow: 0 2px 8px -2px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+.so-transport .so-play:hover {
+  background: var(--accent-hover);
+  transform: scale(1.04);
+}
+.so-transport .so-play:active {
+  transform: scale(0.96);
+}
+.so-zoom .so-zoom-v {
+  width: auto;
+  min-width: 34px;
+  padding: 0 var(--sp-1);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.so-readout {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2-5);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.so-count b {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.01em;
+}
+.so-count span,
+.so-clock span {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.so-pct {
+  padding: 1px var(--sp-1-5);
+  border-radius: var(--r-full);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+}
+.so-clock {
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+}
+.so-left {
+  color: var(--faint);
+  font-size: var(--fs-xs);
+}
+.so-now {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1-5);
+  flex: 0 1 auto !important;
+  min-width: 0;
+  height: 24px;
+  padding: 0 var(--sp-2) 0 var(--sp-1-5);
+  border-radius: var(--r-full);
+  background: var(--bg-2);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+.so-now i {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 22%, transparent);
+}
+.so-now-n {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.so-now-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.so-grad {
+  flex: none;
+  color: var(--accent-text);
+}
+.so-speed {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: 26px;
+  padding: 0 var(--sp-1) 0 var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  background: var(--bg-3);
+  color: var(--muted);
+}
+.so-speed select {
+  height: 22px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+.so-head .icon-btn {
+  border-radius: var(--r-full);
+}
+@container (max-width: 980px) {
+  .so-left,
+  .so-pct {
+    display: none;
+  }
+}
+@container (max-width: 820px) {
+  .so-now-name,
+  .so-speed svg {
+    display: none;
+  }
+}
+@container (max-width: 700px) {
+  .so-now,
+  .so-clock {
+    display: none;
+  }
+}
+@container (max-width: 560px) {
+  .so-zoom {
+    display: none;
+  }
+}
+/* the body: labels stay left, the ruler stays on top */
+.so-body {
+  display: grid;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
+}
+.so-labels {
+  position: sticky;
+  left: 0;
+  z-index: 6;
+  border-right: 1px solid var(--border);
+  background: var(--panel);
+}
+.so-corner {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 30px;
+  padding: 0 var(--sp-2-5) 0 var(--sp-3-5);
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--faint);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+.so-corner span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+.so-label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  height: var(--so-row);
+  padding: 0 var(--sp-2-5) 0 var(--sp-3-5);
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: var(--fs-sm);
+  text-align: left;
+}
+.so-label:hover {
+  background: var(--bg-2);
+}
+.so-label.on {
+  background: var(--accent-soft);
+}
+.so-label.on::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 0 var(--r-xs) var(--r-xs) 0;
+  background: var(--accent);
+}
+.so-sw {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 22%, transparent);
+}
+.so-label.done .so-sw {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--text) 22%, transparent),
+    0 0 0 1.5px var(--panel),
+    0 0 0 2.5px color-mix(in srgb, var(--hoop) 75%, transparent);
+}
+.so-label.done .so-name {
+  color: var(--muted);
+}
+.so-n {
+  min-width: 14px;
+  color: var(--faint);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.so-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.so-meta {
+  flex: none;
+  color: var(--faint);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+/* the colours of one gradient: a bracket down the left edge */
+.so-bracket {
+  position: absolute;
+  left: 5px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-left: 1.5px solid var(--accent);
+}
+.so-bracket.first {
+  top: 8px;
+  border-top: 1.5px solid var(--accent);
+  border-top-left-radius: var(--r-sm);
+}
+.so-bracket.last {
+  bottom: 8px;
+  border-bottom: 1.5px solid var(--accent);
+  border-bottom-left-radius: var(--r-sm);
+}
+/* the track: bars sit between margins so the first and last end markers show */
+.so-track {
+  position: relative;
+  min-width: 0;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+  --so-l: 12px;
+  --so-r: 20px;
+}
+.so-ruler {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  height: 30px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.so-scale {
+  position: absolute;
+  inset: 0 var(--so-r) 0 var(--so-l);
+}
+.so-scale > span {
+  position: absolute;
+  top: 0;
+  height: 22px;
+  padding: var(--sp-1) 0 0 var(--sp-1);
+  border-left: 1px solid var(--ruler-line);
+  color: var(--ruler-text);
+  font-size: var(--fs-2xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.so-ribbon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 4px;
+  height: 4px;
+  border-radius: var(--r-2xs);
+  background: var(--bg-2);
+}
+.so-ribbon i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, var(--c) var(--sewn), color-mix(in srgb, var(--c) 35%, var(--panel)) var(--sewn));
+}
+.so-ribbon i:first-child {
+  border-radius: var(--r-2xs) 0 0 var(--r-2xs);
+}
+.so-ribbon i:last-child {
+  border-radius: 0 var(--r-2xs) var(--r-2xs) 0;
+}
+.so-tipbar {
+  /* a layer of no height pinned to the top: the readout floats over the ruler and the needle */
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  height: 0;
+  margin: 0 var(--so-r) 0 var(--so-l);
+  pointer-events: none;
+}
+.so-hover-tip {
+  position: absolute;
+  top: 5px;
+  margin-left: var(--sp-2);
+}
+.so-hover-tip.flip {
+  transform: translateX(calc(-100% - 18px));
+}
+.so-rows {
+  position: relative;
+  height: calc(var(--rows) * var(--so-row));
+  margin: 0 var(--so-r) 0 var(--so-l);
+}
+.so-lane,
+.so-row {
+  position: absolute;
+  left: calc(-1 * var(--so-l));
+  right: calc(-1 * var(--so-r));
+  height: var(--so-row);
+}
+.so-lane:nth-child(even) {
+  background: color-mix(in srgb, var(--text) 2.5%, transparent);
+}
+.so-lane.on {
+  background: var(--accent-soft);
+}
+.so-row {
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+/* still to sew: the thread colour faded; sewn: the colour itself */
+.so-bar,
+.so-fill {
+  position: absolute;
+  height: var(--so-bar);
+  min-width: 3px;
+  border-radius: var(--r-md);
+}
+.so-bar {
+  top: calc(50% - var(--so-bar) / 2);
+  background: color-mix(in srgb, var(--c) 26%, var(--panel));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 50%, transparent);
+  pointer-events: auto;
+}
+.so-fill {
+  background: var(--c);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--text) 16%, transparent),
+    inset 0 1px 0 var(--gloss);
+  pointer-events: none;
+}
+.so-fill.live {
+  border-top-right-radius: var(--r-2xs);
+  border-bottom-right-radius: var(--r-2xs);
+}
+.so-trim {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 1.5px;
+  margin-left: -0.75px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--text) 50%, transparent);
+  z-index: 1;
+}
+/* the objects in a block's bar: a hairline between them, the name where it fits */
+.so-segs {
+  position: absolute;
+  height: var(--so-bar);
+  z-index: 1;
+}
+.so-seg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  min-width: 2px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  border-radius: var(--r-2xs);
+  cursor: pointer;
+}
+.so-seg + .so-seg {
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--panel) 80%, transparent);
+}
+.so-seg:hover {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 55%, transparent);
+}
+.so-seg.sel {
+  box-shadow:
+    0 0 0 1.5px var(--select),
+    inset 0 0 0 1px color-mix(in srgb, var(--panel) 70%, transparent);
+  z-index: 1;
+}
+.so-seg-name {
+  max-width: calc(100% - 4px);
+  margin-left: 2px;
+  padding: 0 var(--sp-1);
+  overflow: hidden;
+  border-radius: var(--r-2xs);
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  color: var(--text);
+  font-size: var(--fs-2xs);
+  line-height: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.so-seg.sel .so-seg-name {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.so-mark {
+  position: absolute;
+  top: calc(50% - 9px);
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--bg-3);
+  color: var(--muted);
+  box-shadow: var(--shadow-sm);
+  z-index: 2;
+  pointer-events: auto;
+}
+.so-mark.stop {
+  border-color: var(--warning);
+  color: var(--warning-text);
+}
+.so-hover {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: color-mix(in srgb, var(--text) 35%, transparent);
+  pointer-events: none;
+  z-index: 3;
+}
+.so-needle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--select);
+  z-index: 5;
+  pointer-events: none;
+}
+.so-needle span {
+  position: sticky;
+  top: 0;
+  display: block;
+  width: 12px;
+  height: 14px;
+  margin-left: -5px;
+  border-radius: var(--r-xs) var(--r-xs) var(--r-md) var(--r-md);
+  background: var(--select);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--select) 50%, transparent);
+}
+.stitchout.playing .so-needle span {
+  animation: so-pulse 1.2s var(--ease) infinite;
+}
+@keyframes so-pulse {
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--select) 25%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stitchout,
+  .stitchout.playing .so-needle span {
+    transition: none;
+    animation: none;
+  }
+}

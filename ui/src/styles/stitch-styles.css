@@ -1,0 +1,95 @@
+/* ---------------------------------------------------------------- stitch styles */
+.style-picker {
+  margin: var(--sp-0-5) 0 var(--sp-2);
+}
+.style-group-label {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: var(--sp-1-5) 0 var(--sp-1);
+}
+.style-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-1);
+}
+.style-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: var(--sp-1) var(--sp-0-5) var(--sp-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-3);
+  color: var(--text);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+.style-card svg {
+  color: var(--muted);
+}
+.style-card:hover {
+  border-color: var(--border-strong);
+}
+.style-card.on {
+  border-color: var(--select);
+  background: color-mix(in srgb, var(--select) 10%, var(--bg-3));
+}
+.style-card.on svg {
+  color: var(--select);
+}
+.style-extra {
+  display: flex;
+  gap: var(--sp-2-5);
+  align-items: center;
+  margin-top: var(--sp-1);
+}
+.link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  text-decoration: underline dotted;
+  cursor: pointer;
+}
+.link.on {
+  color: var(--select);
+}
+.stitch-preview {
+  position: relative;
+  margin: var(--sp-1) 0 var(--sp-2-5);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--canvas);
+  overflow: hidden;
+}
+.stitch-preview canvas {
+  display: block;
+  width: 100%;
+  height: 92px;
+}
+.stitch-preview-info {
+  position: absolute;
+  right: 6px;
+  bottom: 4px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  background: color-mix(in srgb, var(--canvas) 80%, transparent);
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-sm);
+}
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  margin: var(--sp-0-5) 0 var(--sp-1);
+}
+.presets .chip {
+  height: 21px;
+  font-size: var(--fs-xs);
+  padding: 0 var(--sp-2);
+}

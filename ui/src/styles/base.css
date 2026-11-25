@@ -1,0 +1,62 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font);
+  font-size: var(--fs-md);
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+button:focus-visible,
+select:focus-visible,
+a:focus-visible,
+summary:focus-visible,
+[role="tab"]:focus-visible,
+[tabindex]:focus-visible,
+input[type="checkbox"]:focus-visible,
+input[type="radio"]:focus-visible,
+input[type="range"]:focus-visible {
+  outline: 2px solid var(--select);
+  outline-offset: 1px;
+}
+
+/* reduced motion: nothing slides, fades or pulses (state changes are instant) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+.app {
+  display: grid;
+  grid-template-rows: 32px 38px 32px minmax(0, 1fr) auto;
+  height: 100%;
+  background: var(--bg);
+}
