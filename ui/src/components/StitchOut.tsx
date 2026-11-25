@@ -9,13 +9,16 @@ import { startCapture, stopCapture } from "../canvas/Canvas";
 import { SPEEDS, blockAt, buildTimeline, playRate, speedLabel, tickStep, type Timeline, type TimelineBlock } from "../lib/stitchout";
 import { colorSequence } from "../lib/threads";
 import { useStore } from "../store";
-import type { PlanData } from "../types";
+import { FLAG, type PlanData } from "../types";
 import { fmtTime } from "./ui";
 import { threadTitle } from "./ThreadPicker";
 import { safeSetItem } from "../lib/storage";
 
 // ---------------------------------------------------------------------------
 // Playback
+
+/** A record no object sews (plan.objects). */
+const NO_OBJECT = 0xffffffff;
 
 const timelines = new WeakMap<PlanData, { key: string; tl: Timeline }>();
 
@@ -40,6 +43,15 @@ export function seek(index: number) {
   const total = s.plan?.flags.length ?? 0;
   if (!total) return;
   s.set({ anim: { ...s.anim, playing: false, index: Math.max(0, Math.min(total, Math.round(index))) } });
+}
+
+/** Opens the player without playing: the needle at the end, the whole design sewn. */
+export function openPlayer() {
+  const s = useStore.getState();
+  const total = s.plan?.flags.length ?? 0;
+  if (!total) return;
+  if (s.viewMode === "vector") s.set({ viewMode: "realistic" });
+  s.set({ anim: { ...s.anim, index: s.anim.index ?? total, playing: false } });
 }
 
 /** Opens the player (if closed) and plays from where it is, or from the start once finished. */
@@ -201,7 +213,11 @@ export async function recordVideo() {
 // The panel
 
 const HEIGHT_KEY = "filum.playerHeight";
-const ROW = 26;
+const ROW = 30;
+/** Height of a block's bar: room for its objects' names. */
+const BAR = 16;
+/** An object's part of a bar gets its name from this width (px). */
+const SEG_LABEL_W = 44;
 const RULER = 30;
 const HEAD = 40;
 const LABEL_W = 208;
@@ -233,6 +249,72 @@ interface RowInfo {
   /** The gradient this block is a colour of: its group, the layer's place and how many colours it has. */
   gradient?: { group: string; layer: number; of: number; first: boolean; last: boolean };
 }
+
+/** A stretch of a colour block one object sews (records [start, end)). */
+interface Span {
+  obj: number;
+  start: number;
+  end: number;
+}
+
+/** The objects of each block, in sew order: jumps and commands belong to the object before them. */
+function objectSpans(plan: PlanData, blocks: TimelineBlock[]): Span[][] {
+  return blocks.map((b) => {
+    const out: Span[] = [];
+    let cur: Span | null = null;
+    for (let i = b.start; i < b.end; i++) {
+      const o = plan.objects[i];
+      if (o === NO_OBJECT || plan.flags[i] & (FLAG.JUMP | FLAG.TRIM | FLAG.STOP | FLAG.COLOR_CHANGE | FLAG.END)) {
+        if (cur) cur.end = i + 1;
+        continue;
+      }
+      if (cur && cur.obj === o) cur.end = i + 1;
+      else out.push((cur = { obj: o, start: i, end: i + 1 }));
+    }
+    return out;
+  });
+}
+
+/** Selects an object from the timeline: Shift, Ctrl or ⌘ adds it or takes it out. */
+function selectObject(index: number, add: boolean) {
+  const s = useStore.getState();
+  const id = s.doc.objects[index]?.id;
+  if (!id) return;
+  if (!add) return s.select([id]);
+  s.select(s.selection.includes(id) ? s.selection.filter((x) => x !== id) : [...s.selection, id]);
+}
+
+/** The objects in each block's bar: their names where there is room, the selected ones ringed. */
+const Segments = memo(function Segments({ rows, spans, total, inner, tl }: { rows: RowInfo[]; spans: Span[][]; total: number; inner: number; tl: Timeline }) {
+  const objects = useStore((s) => s.doc.objects);
+  const selection = useStore((s) => s.selection);
+  const sel = useMemo(() => new Set(selection), [selection]);
+  return (
+    <>
+      {rows.map(({ block: b }) => (
+        <div key={b.index} className="so-segs" style={{ top: ROW * b.index + (ROW - BAR) / 2, left: pct(b.start, total), width: pct(b.end - b.start, total) }}>
+          {(spans[b.index] ?? []).map((sp) => {
+            const o = objects[sp.obj];
+            const w = ((sp.end - sp.start) / Math.max(1, total)) * inner;
+            const n = tl.stitchAt[sp.end] - tl.stitchAt[sp.start];
+            return (
+              <span
+                key={sp.start}
+                data-obj={o ? sp.obj : undefined}
+                data-start={sp.start}
+                className={`so-seg ${o && sel.has(o.id) ? "sel" : ""}`}
+                style={{ left: pct(sp.start - b.start, b.end - b.start), width: pct(sp.end - sp.start, b.end - b.start) }}
+                title={o ? `${o.name}\n${n.toLocaleString()} stitches\nClick: select · Shift+click: add · Double-click: go to its start` : undefined}
+              >
+                {o && w >= SEG_LABEL_W && <span className="so-seg-name">{o.name}</span>}
+              </span>
+            );
+          })}
+        </div>
+      ))}
+    </>
+  );
+});
 
 /** The parts of the rows that don't move while playing. */
 const Tracks = memo(function Tracks({ rows, total, gap }: { rows: RowInfo[]; total: number; gap: number }) {
@@ -278,6 +360,8 @@ export function StitchOutPanel() {
   const bodyRef = useRef<HTMLDivElement>(null);
   /** Scroll position to apply after a zoom renders (keeps the record under the pointer in place). */
   const pending = useRef<number | null>(null);
+  /** The last click on an object's part of a bar (double-click detection). */
+  const lastClick = useRef<{ start: number; t: number } | null>(null);
   const tl = useMemo(() => (plan ? timelineOf(plan, doc.machine) : null), [plan, doc.machine]);
   const seq = useMemo(() => colorSequence(doc, plan), [doc, plan]);
   const open = index != null;
@@ -390,6 +474,28 @@ export function StitchOutPanel() {
     return out;
   }, [tl, seq, plan, doc.objects]);
 
+  const spans = useMemo(() => (tl && plan ? objectSpans(plan, tl.blocks) : []), [tl, plan]);
+
+  // an object selected elsewhere (the layers, the canvas): its first stretch comes into view
+  const selection = useStore((s) => s.selection);
+  useEffect(() => {
+    const body = bodyRef.current;
+    if (!body || !open || playing || !selection.length || !total) return;
+    const ids = new Set(selection);
+    for (const [k, list] of spans.entries()) {
+      const sp = list.find((x) => ids.has(doc.objects[x.obj]?.id));
+      if (!sp) continue;
+      const top = RULER + ROW * k;
+      if (top < body.scrollTop + RULER || top + ROW > body.scrollTop + body.clientHeight) body.scrollTop = Math.max(0, top - RULER - ROW);
+      const x0 = LABEL_W + PAD_L + (sp.start / total) * inner;
+      const x1 = LABEL_W + PAD_L + (sp.end / total) * inner;
+      if (x1 < body.scrollLeft + LABEL_W || x0 > body.scrollLeft + body.clientWidth) body.scrollLeft = Math.max(0, x0 - LABEL_W - 24);
+      return;
+    }
+    // only when the selection changes, not on every zoom or plan
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selection, open]);
+
   if (phase === "closed" || !tl || !total) return null;
 
   const stitches = tl.stitchAt[total];
@@ -408,17 +514,32 @@ export function StitchOutPanel() {
     const r = el.getBoundingClientRect();
     return Math.max(0, Math.min(total, Math.round(((clientX - r.left) / Math.max(1, r.width)) * total)));
   };
+  // the track scrubs; a click on an object's part of a bar selects it (a drag from there still scrubs)
   const scrubFrom = (e: RPointerEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
     if (e.button !== 0) return;
     e.preventDefault();
     el.setPointerCapture(e.pointerId);
-    seek(recordAt(e.clientX));
-    const move = (ev: PointerEvent) => seek(recordAt(ev.clientX));
-    const up = () => {
+    const seg = (e.target as HTMLElement).closest<HTMLElement>("[data-obj]");
+    const x0 = e.clientX;
+    let scrubbing = !seg;
+    if (scrubbing) seek(recordAt(e.clientX));
+    const move = (ev: PointerEvent) => {
+      if (!scrubbing && Math.abs(ev.clientX - x0) < 4) return;
+      scrubbing = true;
+      seek(recordAt(ev.clientX));
+    };
+    const up = (ev: PointerEvent) => {
       el.removeEventListener("pointermove", move);
       el.removeEventListener("pointerup", up);
       el.removeEventListener("pointercancel", up);
+      if (scrubbing || !seg || ev.type !== "pointerup") return;
+      // the captured pointer sends click and dblclick to the track: a second click on the same part goes to its start
+      const start = Number(seg.dataset.start);
+      const again = lastClick.current && lastClick.current.start === start && ev.timeStamp - lastClick.current.t < 400;
+      lastClick.current = again ? null : { start, t: ev.timeStamp };
+      if (again) seek(start);
+      else selectObject(Number(seg.dataset.obj), ev.shiftKey || ev.ctrlKey || ev.metaKey);
     };
     el.addEventListener("pointermove", move);
     el.addEventListener("pointerup", up);
@@ -456,7 +577,7 @@ export function StitchOutPanel() {
     <section
       className={`stitchout ${playing ? "playing" : ""} ${phase === "opening" || phase === "closing" ? phase : ""}`}
       onAnimationEnd={(e) => e.target === e.currentTarget && setPhase(phase === "closing" ? "closed" : "open")}
-      style={{ height: Math.min(height, fit), ["--so-label" as string]: `${LABEL_W}px`, ["--so-row" as string]: `${ROW}px` }} aria-label="Stitch-out">
+      style={{ height: Math.min(height, fit), ["--so-label" as string]: `${LABEL_W}px`, ["--so-row" as string]: `${ROW}px`, ["--so-bar" as string]: `${BAR}px` }} aria-label="Stitch-out">
       <div className="so-grip" onPointerDown={resizeFrom} title="Drag to resize" />
       <div className="so-head">
         <div className="so-transport" role="group" aria-label="Transport">
@@ -549,7 +670,23 @@ export function StitchOutPanel() {
             </button>
           ))}
         </div>
-        <div className="so-track" onPointerDown={scrubFrom} onPointerMove={(e) => setHover(recordAt(e.clientX))} onPointerLeave={() => setHover(null)}>
+        <div
+          className="so-track"
+          onPointerDown={scrubFrom}
+          onPointerMove={(e) => setHover(recordAt(e.clientX))}
+          onPointerLeave={() => setHover(null)}
+        >
+          {/* the readout under the pointer: its own layer, above the ruler and the needle */}
+          <div className="so-tipbar">
+            {hover != null && hoverRow && (
+              <div className={`readout-pill so-hover-tip ${hover / total > 0.7 ? "flip" : ""}`} style={{ left: pct(hover, total) }}>
+                <i style={{ background: hoverRow.color }} />
+                <b>{tl.stitchAt[hover].toLocaleString()}</b>
+                <span>{fmtTime(tl.secondsAt[hover])}</span>
+                {plan && doc.objects[plan.objects[hover]] && <span className="dim">{doc.objects[plan.objects[hover]].name}</span>}
+              </div>
+            )}
+          </div>
           <div className="so-ruler">
             <div className="so-scale">
               {ticks.map((t) => (
@@ -563,12 +700,6 @@ export function StitchOutPanel() {
                   <i key={b.index} style={{ left: pct(b.start, total), width: pct(b.end - b.start, total), ["--c" as string]: color, ["--sewn" as string]: `${Math.max(0, Math.min(1, (at - b.start) / Math.max(1, b.end - b.start))) * 100}%` }} />
                 ))}
               </div>
-              {hover != null && hoverRow && (
-                <span className={`so-hover-tip ${hover / total > 0.75 ? "flip" : ""}`} style={{ left: pct(hover, total) }}>
-                  <i style={{ background: hoverRow.color }} />
-                  {tl.stitchAt[hover].toLocaleString()} · {fmtTime(tl.secondsAt[hover])}
-                </span>
-              )}
             </div>
           </div>
           <div className="so-rows" ref={rowsRef}>
@@ -581,10 +712,11 @@ export function StitchOutPanel() {
                 <div
                   key={b.index}
                   className={`so-fill ${b.index === cur && at < b.end ? "live" : ""}`}
-                  style={{ top: ROW * b.index + (ROW - 10) / 2, left: pct(b.start, total), width: pct(Math.min(at, b.end) - b.start, total), ["--c" as string]: color }}
+                  style={{ top: ROW * b.index + (ROW - BAR) / 2, left: pct(b.start, total), width: pct(Math.min(at, b.end) - b.start, total), ["--c" as string]: color }}
                 />
               ) : null,
             )}
+            <Segments rows={rows} spans={spans} total={total} inner={inner} tl={tl} />
             {hover != null && <div className="so-hover" style={{ left: pct(hover, total) }} />}
           </div>
           <div className="so-needle" style={{ left: PAD_L + (at / total) * inner }}>

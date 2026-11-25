@@ -2,7 +2,7 @@ import { Focus, Video } from "lucide-react";
 import { Hoop, Spool, StitchOut } from "../icons/stitch";
 import { fit } from "../lib/actions";
 import { pxPerMm, validCalibration } from "../lib/screen";
-import { closePlayer, play, recordVideo, usePlayback } from "./StitchOut";
+import { closePlayer, openPlayer, recordVideo, usePlayback } from "./StitchOut";
 import { useStore } from "../store";
 import { fmtTime } from "./ui";
 import { STITCH_COLORS, colorSequence, threadUsage } from "../lib/threads";
@@ -109,8 +109,8 @@ export function BottomBar() {
       <button
         className={`btn sm ${playerOpen ? "primary" : ""}`}
         disabled={!total}
-        onClick={() => (playerOpen ? closePlayer() : play())}
-        title={playerOpen ? "Close the stitch-out player (Esc)" : "Animate the stitch-out, with a timeline of the colour blocks"}
+        onClick={() => (playerOpen ? closePlayer() : openPlayer())}
+        title={playerOpen ? "Close the stitch-out player (Esc)" : "Open the stitch-out player: a timeline of the colour blocks and the objects in them (Play sews it out)"}
       >
         <StitchOut size={14} /> <span className="bb-label">Animate</span>
       </button>

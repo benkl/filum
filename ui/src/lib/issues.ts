@@ -5,6 +5,7 @@
 import type { DesignObject, PlanData, StitchDocument, Vec2 } from "../types";
 import { FLAG } from "../types";
 import { objectBoundsCached, transformObject, translateMat } from "./geometry";
+import { denseIssues } from "./denseIssues";
 import { rowAngleFor, rowsAlongGradient } from "./gradient";
 import { ovalNorm, threadWeightInfo } from "./materials";
 import { shapeProblems } from "./shapeCheck";
@@ -35,8 +36,8 @@ export interface Issue {
   detail: string;
   at: Vec2;
   /** A one-click fix: `apply` to the object, or to every object `scope` picks
-   *  (all the layers of a gradient). */
-  fix?: { label: string; apply: (o: DesignObject) => DesignObject | null; scope?: (o: DesignObject) => boolean };
+   *  (all the layers of a gradient); or `doc`, a change to the whole design. */
+  fix?: { label: string; apply?: (o: DesignObject) => DesignObject | null; scope?: (o: DesignObject) => boolean; doc?: (d: StitchDocument) => StitchDocument };
 }
 
 const cache = new WeakMap<StitchDocument, { plan: PlanData | null; issues: Issue[] }>();
@@ -434,7 +435,8 @@ export function computeIssues(doc: StitchDocument, plan: PlanData | null): Issue
       fix: { label: "Trim instead", apply: (x) => withLinkChoice(x, "trim") },
     });
   }
-  out.push(...qualityIssues(doc, plan));
+  const quality = qualityIssues(doc, plan);
+  out.push(...quality, ...denseIssues(doc, plan, quality));
   const total = plan?.stats.stitches ?? 0;
   if (total > 100000) out.push({ id: "big", objId: "", level: "info", title: "Very large design", detail: `${total.toLocaleString()} stitches.`, at: [hw / 2, hh / 2] });
   cache.set(doc, { plan, issues: out });

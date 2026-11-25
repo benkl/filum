@@ -70,11 +70,12 @@ const SHORTCUTS: { group: string; rows: [string, string][] }[] = [
   {
     group: "Stitch-out player",
     rows: [
-      ["Animate (bottom bar)", "Open the player and play the stitch-out"],
+      ["Animate (bottom bar)", "Open the player (Play sews the design out)"],
       ["← / →", "One stitch back / forward"],
       ["Shift+← / Shift+→", "Previous / next colour block"],
       ["Home / End", "To the start / the end"],
       ["Click or drag the timeline", "Go to that stitch"],
+      ["Click an object in a colour bar", "Select it (Shift+click adds); double-click goes to its start"],
       ["Ctrl + wheel on the timeline", "Zoom the timeline"],
       ["Esc", "Close the player"],
     ],

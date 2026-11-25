@@ -710,6 +710,8 @@ export interface PlanData {
   links?: Connection[];
   /** Short stitches, holes hit again, hot spots (engine quality.rs). */
   quality?: StitchQuality | null;
+  /** The places too dense for the fabric (the density map's, engine density.rs). */
+  dense?: { hotspots: DensityHotspot[]; limits: FabricLimits | null } | null;
 }
 
 /** Stitch quality read from the plan (crates/core/src/quality.rs). */

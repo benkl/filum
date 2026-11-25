@@ -11,7 +11,7 @@ From top to bottom, the window has:
 5. **Layers / Issues** (left panel): every object in the design, in sew order.
 6. **Canvas**: the hoop and your design, with rulers. The buttons in its top-right corner switch the view.
 7. **Selection / Design** (right panel): the settings for what you've selected, or for the whole design.
-8. **Bottom bar**: the threads in sew order, the stitch count, size and sewing time, **Animate** and **Video**. **Animate** slides the stitch-out player up out of the bar: a timeline of the colour blocks with their trims and thread changes. The canvas makes room for it: when the hoop no longer fits, the view zooms out to keep all of it in sight, and zooms back when the player closes.
+8. **Bottom bar**: the threads in sew order, the stitch count, size and sewing time, **Animate** and **Video**. **Animate** slides the stitch-out player up out of the bar: a timeline of the colour blocks with the objects in them, their trims and thread changes. The canvas makes room for it: when the hoop no longer fits, the view zooms out to keep all of it in sight, and zooms back when the player closes.
 9. **Hints line**: what the mouse and keys do right now. Hold <kbd>Shift</kbd>, <kbd>Ctrl</kbd> or <kbd>Alt</kbd> and it shows only what that key changes.
 
 ## The three views

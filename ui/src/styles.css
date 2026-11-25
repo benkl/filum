@@ -59,6 +59,8 @@
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
   --shadow-lg: 0 10px 30px rgba(30, 25, 20, 0.16), 0 2px 6px rgba(30, 25, 20, 0.08);
   --shadow: var(--shadow-lg);
+  /* the inverse surface's outline: none needed on a light page */
+  --inverse-edge: transparent;
   --is-dark: 0;
   color-scheme: light;
 }
@@ -106,6 +108,8 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
   --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+  /* the inverse surface is dark too: a hairline keeps it off the panels */
+  --inverse-edge: rgba(255, 255, 255, 0.16);
   --is-dark: 1;
   color-scheme: dark;
 }
@@ -173,7 +177,7 @@
   --on-solid: #ffffff;
   /* text on a warning (amber) fill: white fails contrast there */
   --on-warning: #2b1d02;
-  /* inverse surface: toasts */
+  /* inverse surface: toasts and readout pills (outlined by --inverse-edge) */
   --inverse: #2a2a2a;
   --inverse-fg: #f1f1f1;
   /* platform chrome: the desktop window's close button */
@@ -1415,32 +1419,22 @@ input[type="range"]:focus-visible {
 .so-ribbon i:last-child {
   border-radius: 0 var(--r-2xs) var(--r-2xs) 0;
 }
-.so-hover-tip {
-  position: absolute;
-  top: 3px;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  height: 18px;
-  margin-left: var(--sp-1-5);
-  padding: 0 var(--sp-2) 0 var(--sp-1);
-  border-radius: var(--r-full);
-  background: var(--text);
-  color: var(--bg-3);
-  font-size: var(--fs-xs);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+.so-tipbar {
+  /* a layer of no height pinned to the top: the readout floats over the ruler and the needle */
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  height: 0;
+  margin: 0 var(--so-r) 0 var(--so-l);
   pointer-events: none;
 }
-.so-hover-tip.flip {
-  transform: translateX(calc(-100% - 12px));
+.so-hover-tip {
+  position: absolute;
+  top: 5px;
+  margin-left: var(--sp-2);
 }
-.so-hover-tip i {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--bg-3) 40%, transparent);
+.so-hover-tip.flip {
+  transform: translateX(calc(-100% - 18px));
 }
 .so-rows {
   position: relative;
@@ -1469,12 +1463,12 @@ input[type="range"]:focus-visible {
 .so-bar,
 .so-fill {
   position: absolute;
-  height: 10px;
+  height: var(--so-bar);
   min-width: 3px;
   border-radius: var(--r-md);
 }
 .so-bar {
-  top: calc(50% - 5px);
+  top: calc(50% - var(--so-bar) / 2);
   background: color-mix(in srgb, var(--c) 26%, var(--panel));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 50%, transparent);
   pointer-events: auto;
@@ -1499,6 +1493,53 @@ input[type="range"]:focus-visible {
   border-radius: 1px;
   background: color-mix(in srgb, var(--text) 50%, transparent);
   z-index: 1;
+}
+/* the objects in a block's bar: a hairline between them, the name where it fits */
+.so-segs {
+  position: absolute;
+  height: var(--so-bar);
+  z-index: 1;
+}
+.so-seg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  min-width: 2px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  border-radius: var(--r-2xs);
+  cursor: pointer;
+}
+.so-seg + .so-seg {
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--panel) 80%, transparent);
+}
+.so-seg:hover {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 55%, transparent);
+}
+.so-seg.sel {
+  box-shadow:
+    0 0 0 1.5px var(--select),
+    inset 0 0 0 1px color-mix(in srgb, var(--panel) 70%, transparent);
+  z-index: 1;
+}
+.so-seg-name {
+  max-width: calc(100% - 4px);
+  margin-left: 2px;
+  padding: 0 var(--sp-1);
+  overflow: hidden;
+  border-radius: var(--r-2xs);
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  color: var(--text);
+  font-size: var(--fs-2xs);
+  line-height: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.so-seg.sel .so-seg-name {
+  background: var(--accent);
+  color: var(--accent-fg);
 }
 .so-mark {
   position: absolute;
@@ -2215,6 +2256,47 @@ input[type="checkbox"] {
   font-size: var(--fs-xs);
   font-weight: var(--fw-semibold);
 }
+/* readout pill: the values under the pointer, on the inverse surface (like a
+   toast). Parts in order: <i> a colour dot, <b> the main value, then <span>s
+   after a hairline each; .dim a name that may be cut short */
+.readout-pill {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1-5);
+  height: 20px;
+  padding: 0 var(--sp-2) 0 var(--sp-1-5);
+  border-radius: var(--r-full);
+  background: var(--inverse);
+  box-shadow:
+    var(--shadow-sm),
+    0 0 0 1px var(--inverse-edge);
+  color: var(--inverse-fg);
+  font-size: var(--fs-xs);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.readout-pill > i {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--inverse-fg) 40%, transparent);
+}
+.readout-pill > b {
+  font-weight: var(--fw-semibold);
+}
+.readout-pill > span {
+  padding-left: var(--sp-1-5);
+  border-left: 1px solid color-mix(in srgb, var(--inverse-fg) 30%, transparent);
+}
+.readout-pill > .dim {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.8;
+}
 
 /* ---------------- dialogs ---------------- */
 .backdrop {
@@ -2380,7 +2462,9 @@ textarea.input {
   background: var(--inverse);
   color: var(--inverse-fg);
   font-size: var(--fs-md);
-  box-shadow: var(--shadow);
+  box-shadow:
+    var(--shadow),
+    0 0 0 1px var(--inverse-edge);
   animation: toast-in var(--dur-base) var(--ease);
 }
 .toast.error {

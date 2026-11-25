@@ -535,10 +535,11 @@ export function Canvas() {
         plan: shownPlan,
         view,
         mode: s.viewMode,
-        // while the stitch-out plays or is paused, the selection isn't drawn: its
-        // outline would cover what is still to sew (and an imported design's
-        // outline is every stitch, redrawn every frame)
-        selection: s.anim.index == null ? s.selection : [],
+        // while the stitch-out plays, the selection isn't drawn: its outline
+        // would cover what is still to sew (and an imported design's outline is
+        // every stitch, redrawn every frame). Paused, it shows what the
+        // timeline selects
+        selection: s.anim.index == null || !s.anim.playing ? s.selection : [],
         theme: themeRef.current,
         overlay: {
           ...overlayRef.current,

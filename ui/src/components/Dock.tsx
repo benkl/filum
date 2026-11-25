@@ -1937,21 +1937,24 @@ export function IssuesPanel() {
                 {i.detail}
               </span>
             </div>
-            {i.fix && o && (
+            {i.fix && (o || i.fix.doc) && (
               <button
                 className="btn sm"
                 onClick={(e) => {
                   e.stopPropagation();
+                  const { apply, scope, doc: whole } = i.fix!;
                   // a fix may remove the object (null)
                   useStore.getState().commit((d) =>
-                    pruneGroups({
-                      ...d,
-                      objects: d.objects.flatMap((x) => {
-                        if (!(i.fix!.scope ? i.fix!.scope(x) : x.id === o.id)) return [x];
-                        const y = i.fix!.apply(x);
-                        return y ? [y] : [];
-                      }),
-                    }),
+                    whole
+                      ? whole(d)
+                      : pruneGroups({
+                          ...d,
+                          objects: d.objects.flatMap((x) => {
+                            if (!apply || !(scope ? scope(x) : x.id === o?.id)) return [x];
+                            const y = apply(x);
+                            return y ? [y] : [];
+                          }),
+                        }),
                   );
                 }}
               >

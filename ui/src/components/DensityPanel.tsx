@@ -8,6 +8,7 @@ import { fitView } from "../canvas/Canvas";
 import { classShares, CLASS_LABELS, colorAt, DENSITY_MODES, densityAt, densityHover, densityScale, THIN_BLUE } from "../lib/density";
 import { defaultDesignOptions } from "../lib/geometry";
 import { fabricInfo } from "../lib/materials";
+import { fillsStackAt } from "../lib/denseIssues";
 import { useStore } from "../store";
 
 const pct = (v: number) => (v > 0 && v < 0.005 ? "<1" : Math.round(v * 100).toString());
@@ -34,8 +35,8 @@ export function DensityLegend() {
   const shares = f ? classShares(f.stats) : null;
   const spots = f?.hotspots ?? [];
   const fab = fabricInfo(fabric);
-  // fills stacked on fills: Remove hidden stitching takes the layers out
-  const stacked = !removeOverlaps && spots.some((h) => h.objects.filter((i) => objects[i]?.stitch.type === "fill").length >= 2);
+  // fills stacked on fills (not just meeting at their edges): Remove hidden stitching takes the layers out
+  const stacked = !removeOverlaps && spots.some((h) => fillsStackAt(h.objects.map((i) => objects[i]).filter((o) => !!o), h));
 
   const showHot = (k: number) => {
     const h = spots[k];
