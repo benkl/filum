@@ -96,7 +96,7 @@ export function HiddenStitchingSection() {
             <div className="hs-overrides">
               <p className="hs-note">Set by hand:</p>
               {overrides.map(({ x }) => (
-                <button key={x.id} className="hs-chip" onClick={() => useStore.getState().select([x.id])} title="Select it (its own setting is in Selection ▸ Hidden stitching)">
+                <button key={x.id} className="chip sm hs-chip" onClick={() => useStore.getState().select([x.id])} title="Select it (its own setting is in Selection ▸ Hidden stitching)">
                   <i style={{ background: doc.threads.find((t) => t.id === x.thread)?.color }} />
                   {x.name}
                   <span>{[x.hidden?.covers === "always" ? "always hides" : x.hidden?.covers === "never" ? "never hides" : "", x.hidden?.keep ? "keeps its stitches" : ""].filter(Boolean).join(" · ")}</span>

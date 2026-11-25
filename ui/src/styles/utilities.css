@@ -1,0 +1,33 @@
+/* ---------------- utilities ---------------- */
+/* Last, so they hold over the areas' own rules. */
+
+/* text cut short with an ellipsis where it doesn't fit (one line): .ellipsis,
+   and the names and labels that always are */
+.ellipsis,
+.bottombar > .stat,
+.palette-item .pl-path,
+.contextbar .obj-name span,
+.dz-cname,
+.rt-head b,
+.hs-name,
+.font-btn > span:not(.badge),
+.meander-pick .mp-name,
+.mm-grid button span,
+.mine-row .mr-name,
+.dz-textline span,
+.layer .lname,
+.props-head .grow,
+.so-name,
+.so-seg-name,
+.chart-select .cs-name,
+.cm-name,
+.tc-code,
+.ec-name,
+.xp-formats span,
+.xp-models,
+.tc-text b,
+.contextbar .ctx-help {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

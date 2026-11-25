@@ -274,22 +274,6 @@
   font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
-.chip {
-  height: 24px;
-  padding: 0 var(--sp-2-5);
-  border: 1px solid var(--border);
-  border-radius: var(--r-full);
-  background: var(--bg-3);
-  font-size: var(--fs-sm);
-}
-.chip:hover {
-  border-color: var(--border-strong);
-}
-.chip.on {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-fg);
-}
 .dz-colours {
   display: grid;
   gap: var(--sp-0-5);
@@ -323,23 +307,7 @@
   background: none;
 }
 .dz-cname {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: var(--fs-sm);
-}
-.dz-colour .mini {
-  display: grid;
-  place-items: center;
-  width: 18px;
-  height: 20px;
-  border: 0;
-  background: none;
-  color: var(--muted);
-  padding: 0;
-}
-.dz-colour .mini:hover {
-  color: var(--text);
 }
 .dz-main {
   display: grid;
@@ -581,14 +549,6 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sp-0-5);
-}
-.mini-x {
-  border: 0;
-  background: none;
-  color: var(--muted);
-  font-size: var(--fs-xl);
-  line-height: 1;
-  padding: 0 var(--sp-0-5);
 }
 .issue {
   display: grid;

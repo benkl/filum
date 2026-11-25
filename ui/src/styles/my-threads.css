@@ -90,9 +90,6 @@
 .mine-row .mr-name {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .mine-row .icon-btn {
   width: 22px;

@@ -24,9 +24,6 @@
 .cm-name {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .chart-select svg {
   flex: none;
@@ -60,17 +57,10 @@
 }
 .chart-menu,
 .meander-menu {
-  position: fixed;
   z-index: var(--z-picker);
   width: 300px;
-  display: flex;
-  flex-direction: column;
   gap: var(--sp-1-5);
   padding: var(--sp-2);
-  background: var(--bg-3);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow);
 }
 .chart-menu .chart-search,
 .meander-menu .chart-search {

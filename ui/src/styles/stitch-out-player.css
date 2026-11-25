@@ -177,11 +177,8 @@
   white-space: nowrap;
 }
 .so-now i {
-  flex: none;
   width: 12px;
   height: 12px;
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 22%, transparent);
 }
 .so-now-n {
   color: var(--muted);
@@ -307,11 +304,8 @@
   background: var(--accent);
 }
 .so-sw {
-  flex: none;
   width: 12px;
   height: 12px;
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 22%, transparent);
 }
 .so-label.done .so-sw {
   box-shadow:
@@ -332,9 +326,6 @@
 .so-name {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 .so-meta {
   flex: none;
@@ -524,14 +515,11 @@
   max-width: calc(100% - 4px);
   margin-left: 2px;
   padding: 0 var(--sp-1);
-  overflow: hidden;
   border-radius: var(--r-2xs);
   background: color-mix(in srgb, var(--panel) 78%, transparent);
   color: var(--text);
   font-size: var(--fs-2xs);
   line-height: 12px;
-  white-space: nowrap;
-  text-overflow: ellipsis;
   pointer-events: none;
 }
 .so-seg.sel .so-seg-name {

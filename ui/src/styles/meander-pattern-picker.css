@@ -19,9 +19,6 @@
 .meander-pick .mp-name {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .meander-pick > svg:last-child {
   flex: none;
@@ -58,9 +55,6 @@
 }
 .mm-grid button span {
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .mm-grid button:hover {
   background: color-mix(in srgb, var(--text) 6%, transparent);

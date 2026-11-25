@@ -12,10 +12,6 @@
 .swatch-btn {
   display: inline-grid;
   place-items: center;
-  flex: none;
-  padding: 0;
-  border-radius: var(--r-sm);
-  border: 1px solid var(--swatch-edge);
   box-shadow: inset 0 0 0 1px var(--swatch-shine);
   font-size: var(--fs-3xs);
   font-weight: var(--fw-bold);
@@ -53,17 +49,8 @@
   gap: var(--sp-1);
 }
 .thread-pop {
-  position: fixed;
   z-index: var(--z-popover);
   width: 320px;
-  padding: var(--sp-2-5);
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-  background: var(--bg-3);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow);
 }
 .pop-sec {
   display: flex;
@@ -216,9 +203,7 @@
 .tc-swatch {
   width: 30px;
   height: 30px;
-  flex: none;
   border-radius: var(--r-md);
-  border: 1px solid var(--swatch-edge);
   box-shadow: inset 0 -6px 10px var(--swatch-shade), inset 0 4px 8px var(--swatch-shine);
 }
 .tc-text {
@@ -230,9 +215,6 @@
 }
 .tc-text b {
   font-weight: var(--fw-semibold);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .tc-text .stat {
   font-size: var(--fs-xs);
@@ -323,12 +305,10 @@
   width: 40px;
   height: 40px;
   border-radius: var(--r-md);
-  border: 1px solid var(--swatch-edge);
   box-shadow: inset 0 -8px 12px var(--swatch-shade), inset 0 5px 10px var(--swatch-shine);
   font-size: var(--fs-2xs);
   font-weight: var(--fw-bold);
   cursor: pointer;
-  padding: 0;
 }
 .tm-swatch input {
   position: absolute;

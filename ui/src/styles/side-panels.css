@@ -414,11 +414,6 @@ body.resizing-y * {
   border-radius: var(--r-sm);
   background: var(--bg-3);
 }
-.layer .lname {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .layer .lname input {
   width: 100%;
   height: 22px;
@@ -428,17 +423,7 @@ body.resizing-y * {
   padding: 0 var(--sp-1);
 }
 .layer .mini {
-  display: grid;
-  place-items: center;
   width: 18px;
-  height: 20px;
-  border: 0;
-  background: none;
-  color: var(--muted);
-  padding: 0;
-}
-.layer .mini:hover {
-  color: var(--text);
 }
 input[type="checkbox"] {
   accent-color: var(--select);
@@ -459,9 +444,6 @@ input[type="checkbox"] {
 .props-head .grow {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .section {
   border-top: 1px solid var(--border);
@@ -637,15 +619,6 @@ input[type="checkbox"] {
   font-size: var(--fs-sm);
   line-height: 1.45;
   padding: var(--sp-2-5) var(--sp-0-5);
-}
-.badge {
-  display: inline-block;
-  padding: 1px var(--sp-1-5);
-  border-radius: var(--r-full);
-  background: var(--accent-soft);
-  color: var(--accent-text);
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-semibold);
 }
 /* readout pill: the values under the pointer, on the inverse surface (like a
    toast). Parts in order: <i> a colour dot, <b> the main value, then <span>s

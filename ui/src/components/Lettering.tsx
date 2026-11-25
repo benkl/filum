@@ -708,7 +708,7 @@ export function FontPickerDialog({ onClose }: { onClose: () => void }) {
       {tab === "embroidery" && tags.length > 0 && (
         <div className="font-tags">
           {tags.map((t) => (
-            <button key={t} className={`chip ${tag === t ? "on" : ""}`} onClick={() => setTag(tag === t ? null : t)}>
+            <button key={t} className={`chip sm ${tag === t ? "on" : ""}`} onClick={() => setTag(tag === t ? null : t)}>
               {t}
             </button>
           ))}

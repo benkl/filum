@@ -1,0 +1,118 @@
+/* ---------------- shared components ---------------- */
+/* The pieces several areas use: a popover, a small icon button, colour
+   swatches, chips and badges. An area sets only what is its own (size,
+   layer, layout) on top. */
+
+/* a popover: a panel over the editor (pickers, the match panel); menus are
+   .menu, smaller and tighter */
+.popover {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-2-5);
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+}
+
+/* a small icon button in a row or a header (layers, colour lists); .mini-x
+   is its close × */
+.mini,
+.mini-x {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: var(--control-sm);
+  height: var(--control-sm);
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+.mini:hover:not(:disabled),
+.mini-x:hover {
+  background: var(--bg-2);
+  color: var(--text);
+}
+.mini:disabled {
+  opacity: var(--disabled);
+  cursor: default;
+}
+.mini-x {
+  font-size: var(--fs-xl);
+  line-height: 1;
+}
+
+/* colours: a round dot in a line of text, a rounded square for a thread;
+   both outlined, so a pale thread shows on the panel */
+.so-sw,
+.so-now i,
+.hs-sw {
+  flex: none;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--swatch-edge);
+}
+.swatch,
+.dz-order-sw,
+.fl-swatch,
+.swatch-btn,
+.tc-swatch,
+.tm-swatch {
+  flex: none;
+  padding: 0;
+  border: 1px solid var(--swatch-edge);
+  border-radius: var(--r-sm);
+}
+
+/* a chip: a choice or a removable item, a pill (.on: chosen); .sm in a dense list */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: var(--control-md);
+  padding: 0 var(--sp-2-5);
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  background: var(--bg-3);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.chip.sm {
+  height: var(--control-sm);
+  padding: 0 var(--sp-2);
+  font-size: var(--fs-xs);
+}
+.chip:hover {
+  border-color: var(--border-strong);
+}
+.chip.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+
+/* a badge: a short label, not a control (.muted: a quiet one) */
+.badge {
+  display: inline-block;
+  padding: 1px var(--sp-1-5);
+  border-radius: var(--r-full);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+}
+.badge.muted {
+  background: var(--bg-2);
+  color: var(--muted);
+  font-weight: var(--fw-regular);
+}

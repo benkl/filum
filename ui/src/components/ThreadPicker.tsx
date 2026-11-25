@@ -142,7 +142,7 @@ function ChartMenu({ anchor, value, none, onPick, onClose }: { anchor: HTMLEleme
     }
   };
   return createPortal(
-    <div className="chart-menu" ref={ref} style={{ left: pos.left, top: pos.top, maxHeight: pos.maxHeight }}>
+    <div className="popover chart-menu" ref={ref} style={{ left: pos.left, top: pos.top, maxHeight: pos.maxHeight }}>
       <label className="chart-search">
         <Search size={13} />
         <input ref={input} className="input" placeholder={`Search ${total} charts — brand, line, collection`} value={q} onChange={(e) => setQ(e.target.value)} />
@@ -367,7 +367,7 @@ function ThreadPopover({ anchor, current, onPick, onClose }: { anchor: HTMLEleme
     onClose();
   };
   return createPortal(
-    <div className="thread-pop" ref={ref} style={{ ...pos, transform: mv.moved ? `translate(${mv.off[0]}px, ${mv.off[1]}px)` : undefined }} data-movable>
+    <div className="popover thread-pop" ref={ref} style={{ ...pos, transform: mv.moved ? `translate(${mv.off[0]}px, ${mv.off[1]}px)` : undefined }} data-movable>
       <Grip grip={mv.grip} label="Thread" />
       <ChartBrowser near={custom} onPick={(e) => pick({ name: e.name, color: e.color, brand: e.brand, code: e.code })} height={170} />
       <div className="pop-sec">

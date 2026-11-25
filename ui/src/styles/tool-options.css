@@ -7,9 +7,6 @@
 .contextbar .ctx-help {
   font-size: var(--fs-xs);
   color: var(--faint);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   min-width: 0;
   flex: 1;
 }

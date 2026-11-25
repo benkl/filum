@@ -65,9 +65,6 @@
   grid-column: 2;
   font-size: var(--fs-xs);
   color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .palette-item .kbd {
   grid-row: 1 / span 2;

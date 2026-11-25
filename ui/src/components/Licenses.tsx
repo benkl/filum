@@ -66,7 +66,7 @@ function Row({ item, texts, loadText }: { item: Item; texts: Record<string, stri
         <b>{item.name}</b>
         {item.version && <span className="lic-ver">{item.version}</span>}
         <span className="lic-spacer" />
-        <span className="lic-badge">{item.license}</span>
+        <span className="badge muted lic-badge">{item.license}</span>
       </button>
       {open && (
         <div className="lic-body">

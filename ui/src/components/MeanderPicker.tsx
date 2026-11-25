@@ -138,7 +138,7 @@ function MeanderMenu({
   const shown = tiles.filter((t) => !s || t.id.toLowerCase().includes(s) || t.name.toLowerCase().includes(s));
   const lattices = LATTICES.filter((l) => !s || l.name.toLowerCase().includes(s));
   return createPortal(
-    <div className="meander-menu" ref={ref} style={{ ...pos, transform: mv.moved ? `translate(${mv.off[0]}px, ${mv.off[1]}px)` : undefined }} data-movable>
+    <div className="popover meander-menu" ref={ref} style={{ ...pos, transform: mv.moved ? `translate(${mv.off[0]}px, ${mv.off[1]}px)` : undefined }} data-movable>
       <Grip grip={mv.grip} label="Meander pattern" />
       <label className="chart-search">
         <Search size={13} />

@@ -125,9 +125,6 @@
 .dz-textline span {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .dz-textline i {
   font-style: normal;

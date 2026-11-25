@@ -62,7 +62,7 @@ function MatchPanel({ anchor, target, opts, set, onClose }: { anchor: HTMLElemen
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitTargetId(target), opts, doc]);
   return createPortal(
-    <div className="match-panel" ref={ref} style={{ ...pos, transform: mv.moved ? `translate(${mv.off[0]}px, ${mv.off[1]}px)` : undefined }} data-movable>
+    <div className="popover match-panel" ref={ref} style={{ ...pos, transform: mv.moved ? `translate(${mv.off[0]}px, ${mv.off[1]}px)` : undefined }} data-movable>
       <Grip grip={mv.grip} label="Thread matching" />
       <div className="mp-presets">
         {MATCH_PRESETS.map((p) => (
