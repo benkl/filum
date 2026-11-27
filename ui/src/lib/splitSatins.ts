@@ -9,9 +9,13 @@
 // drawn across the shape, stays as it is.
 //
 // The satin of a part: two rails with as many points, each pair a rung (node
-// rungs, Ink/Stitch's convention). The rungs are slices of the part along its
-// direction at every corner of its outline, so every stitch has the direction
-// line's angle; rails never reversed by the engine (reverseRails "none").
+// rungs, Ink/Stitch's convention); rails never reversed by the engine
+// (reverseRails "none"). A part without a counter is a column along its
+// outline (satinColumn.ts): its rails are the two sides between the cuts and
+// its rungs lie across it point by point, so a curved part is sewn along its
+// curve, each direction line a rung where it lies. A part that keeps a counter
+// is sliced along its direction line at every corner of its outline, so every
+// stitch has the line's angle.
 
 import type { DesignObject, SatinParams, StitchDocument, SubPath, Vec2 } from "../types";
 import { presetSetOf, presetValues } from "./fabricPresets";
@@ -19,6 +23,7 @@ import { defaultSatin, uid } from "./geometry";
 import { withParent } from "./groups";
 import { pruneGroups } from "./layerRows";
 import { cutParts, insideRegion, regionRings, regionsOf, ringPoints, type Line, type Region } from "./regions";
+import { columnRails } from "./satinColumn";
 import { add, cross, dot, len, mul, norm as unit, sub } from "./vec";
 
 export type { Line } from "./regions";
@@ -38,9 +43,9 @@ export interface SplitPart {
   outline: Vec2[][];
   /** Rail 1 and rail 2: point k of each make a rung (the stitch direction there). */
   rails: [Vec2[], Vec2[]];
-  /** No direction line in it: sewn across its long side. */
+  /** No direction line in it: sewn across its long side (a part with a counter) or along its outline. */
   auto: boolean;
-  /** The direction meets the outline more than twice somewhere: sewn along the longest stretch only. */
+  /** A part with a counter whose direction meets the outline more than twice somewhere: sewn along the longest stretch only. */
   notOneColumn: boolean;
 }
 
@@ -169,17 +174,25 @@ export function planSplit(doc: Pick<StitchDocument, "objects" | "options" | "fab
   if (!parts.length) return null;
   const overlap = overlapFor(doc);
   for (const cut of input.cuts) parts = cutParts(parts, cut, overlap);
-  const dirs: (Line | null)[] = parts.map(() => null);
+  const dirs: Line[][] = parts.map(() => []);
   for (const l of input.directions) {
     if (!(len(sub(l[1], l[0])) > 1e-9)) continue;
     const k = partOfLine(parts, l);
-    if (k >= 0 && !dirs[k]) dirs[k] = l;
+    if (k >= 0) dirs[k].push(l);
   }
+  // the cuts as the parts' outlines hold them: drawn, and moved half the overlap each way
+  const cutLines = input.cuts.flatMap((c): Line[] => {
+    const n = unit([c[0][1] - c[1][1], c[1][0] - c[0][0]]);
+    return [-1, 0, 1].map((k): Line => [add(c[0], mul(n, (k * overlap) / 2)), add(c[1], mul(n, (k * overlap) / 2))]);
+  });
   const out: SplitPart[] = [];
   parts.forEach((g, k) => {
-    const l = dirs[k];
-    const r = railsOf(g, l ? sub(l[1], l[0]) : autoDirection(g));
-    if (r) out.push({ outline: regionRings(g), rails: r.rails, auto: !l, notOneColumn: !r.oneColumn });
+    const ls = dirs[k];
+    const outline = regionRings(g);
+    const column = columnRails(g, cutLines, ls);
+    if (column) return out.push({ outline, rails: column, auto: !ls.length, notOneColumn: false });
+    const r = railsOf(g, ls.length ? sub(ls[0][1], ls[0][0]) : autoDirection(g));
+    if (r) out.push({ outline, rails: r.rails, auto: !ls.length, notOneColumn: !r.oneColumn });
   });
   return out.length ? { parts: out, overlap } : null;
 }

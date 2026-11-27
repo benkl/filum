@@ -6,6 +6,7 @@ import type { DesignObject, NodeRef, StitchDocument, Vec2 } from "../types";
 import { nodeKey, nodesInBox } from "../lib/nodeOps";
 import { flatten as flattenSub } from "../lib/geometry";
 import { transformable } from "../lib/textSettle";
+import { segmentsCross } from "../lib/polyline";
 
 /**
  * The box a transform drag works on: round the selected objects it moves
@@ -57,10 +58,6 @@ export function hitObject(o: DesignObject, p: Vec2, tol: number): boolean {
 export const isPathObject = (o: DesignObject) =>
   o.stitch.type === "running" || o.stitch.type === "manual" || (o.stitch.type === "satin" && o.paths.length === 1);
 
-export function segmentsCross(a: Vec2, b: Vec2, c: Vec2, d: Vec2) {
-  const o = (p: Vec2, q: Vec2, r: Vec2) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
-  return o(a, b, c) * o(a, b, d) < 0 && o(c, d, a) * o(c, d, b) < 0;
-}
 
 /** Does the segment a→b cross the object's outline? */
 export function crossesObject(o: DesignObject, a: Vec2, b: Vec2) {

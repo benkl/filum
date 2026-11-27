@@ -13,6 +13,7 @@
 import type { DesignObject, PathNode, SubPath, Vec2 } from "../types";
 import { cubicAt, flattenSubPath, isCurved, segmentOf, splitCubic } from "./bezier";
 import { satinRailIndices, uid } from "./geometry";
+import { cumulative, pointAt as at } from "./polyline";
 import { dist, lerp } from "./vec";
 
 export interface AutoSatinOptions {
@@ -28,19 +29,6 @@ export interface AutoSatinOptions {
 }
 
 
-function cumulative(pts: Vec2[]): number[] {
-  const c = [0];
-  for (let i = 1; i < pts.length; i++) c.push(c[i - 1] + dist(pts[i - 1], pts[i]));
-  return c;
-}
-function at(pts: Vec2[], cum: number[], d: number): Vec2 {
-  const total = cum[cum.length - 1];
-  d = Math.max(0, Math.min(total, d));
-  let k = 1;
-  while (k < cum.length - 1 && cum[k] < d) k++;
-  const l = cum[k] - cum[k - 1];
-  return l <= 1e-12 ? pts[k] : lerp(pts[k - 1], pts[k], (d - cum[k - 1]) / l);
-}
 /** The part of a polyline between fractions f0 < f1 of its length. */
 function substring(pts: Vec2[], f0: number, f1: number): Vec2[] {
   const cum = cumulative(pts);
