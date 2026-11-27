@@ -345,9 +345,10 @@ function FillOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: "fi
       )}
       {st.method === "tatami" && (
         <>
-          <Row label="Staggers" title="Rows repeat their needle pattern every N rows">
+          <Row label="Staggers" title={st.rowOffsets?.length ? "Row offsets below set where each row begins" : "Rows repeat their needle pattern every N rows"}>
             <Num value={st.staggers} step={1} min={1} max={12} digits={0} onChange={(v) => up({ staggers: Math.round(v) })} />
           </Row>
+          <TatamiPattern st={st} up={up} />
           <Row label="Gradient end" title="Row spacing at the far end (0 = off) — density gradient across the fill">
             <Num value={st.endRowSpacing} step={0.05} min={0} unit="mm" onChange={(v) => up({ endRowSpacing: v })} />
           </Row>
@@ -485,6 +486,11 @@ function SatinOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: "s
       <Row label="Push comp." title="Pull the column's ends in: satins push the fabric out where they start and end">
         <Num value={st.pushComp ?? 0} step={0.1} min={0} max={3} unit="mm" onChange={(v) => up({ pushComp: v })} />
       </Row>
+      {!st.foam && !st.layered && (
+        <Row label="Bisatin" title="The cover in two columns half as wide, split along the middle: the first sewn to the far end, the second back to the start, over the column's underlay. For columns too wide for one stitch (not in Ink/Stitch)">
+          <Toggle on={!!st.bisatin} onChange={(v) => up({ bisatin: v || undefined })} />
+        </Row>
+      )}
       {st.maxStitchLength > 0 && (
         <>
           <Row label="Split pattern" title="Where long stitches are split: evenly (the points line up), staggered from stitch to stitch, or at a random phase (Ink/Stitch split methods)">
@@ -899,6 +905,53 @@ function ManualOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: "
 }
 
 /** Random stitch length (Ink/Stitch): off, or ± a share of every stitch, with a new pattern on Shuffle. */
+/**
+ * Long-short tatami: 4 and 2 mm in turn, the rows staggered (a quarter of the
+ * pattern each with 4 staggers, so no two of four rows share a needle hole).
+ * The NOVAstitch Designer fork's «Lungo-corto» shifts rows by thirds, which
+ * puts every hole on one 2 mm grid: columns of holes. Check on a test stitch-out.
+ */
+const LONG_SHORT = { lengthPattern: [4, 2], rowOffsets: undefined };
+
+/** Tatami rows in a pattern: stitch lengths in turn and where each row begins (not in Ink/Stitch). */
+function TatamiPattern({ st, up }: { st: Extract<StitchParams, { type: "fill" }>; up: (p: StitchPatch) => void }) {
+  const offsetsShown = st.rowOffsets?.map((v) => Math.round(v * 1000) / 10);
+  const stagger = Array.from({ length: Math.max(1, st.staggers) }, (_, k) => Math.round((100 * k) / Math.max(1, st.staggers)));
+  return (
+    <Section title="Row pattern" defaultOpen={!!(st.lengthPattern?.length || st.rowOffsets?.length)}>
+      {(st.randomLength ?? 0) > 0 && <p className="hint">Random length is on: it decides the stitches instead.</p>}
+      <Presets
+        items={[
+          ["Even", { lengthPattern: undefined, rowOffsets: undefined }, "Every stitch the max stitch length, the rows staggered (Ink/Stitch)"],
+          ["Long-short", LONG_SHORT, "4 and 2 mm in turn, the rows staggered: a woven look"],
+        ]}
+        value={{ lengthPattern: st.lengthPattern?.length ? st.lengthPattern : undefined, rowOffsets: st.rowOffsets?.length ? st.rowOffsets : undefined }}
+        onPick={(v) => up(v)}
+      />
+      <Row label="Lengths" title="Stitch lengths used in turn along each row, e.g. “4 2” for long-short. Empty: the max stitch length">
+        <PatternInput
+          value={st.lengthPattern}
+          placeholder={`${st.maxStitchLength} (even)`}
+          unit="mm"
+          parse={(t) => parsePattern(t, { min: 0.3, max: 12 }).slice(0, 8)}
+          format={formatPattern}
+          onChange={(v) => up({ lengthPattern: v.length ? v : undefined })}
+        />
+      </Row>
+      <Row label="Row offsets" title="Where each row's pattern begins, as a share of the pattern's length, used in turn row after row, e.g. “0 33 67”. Empty: the staggers">
+        <PatternInput
+          value={offsetsShown}
+          placeholder={stagger.join(" ")}
+          unit="%"
+          parse={(t) => parsePattern(t, { min: 0, max: 100 }).slice(0, 8)}
+          format={formatPattern}
+          onChange={(v) => up({ rowOffsets: v.length ? v.map((x) => x / 100) : undefined })}
+        />
+      </Row>
+    </Section>
+  );
+}
+
 function RandomLength({ value, onChange, onShuffle }: { value: number; onChange: (v: number) => void; onShuffle: () => void }) {
   return (
     <Row label="Random length" title="Vary every stitch length by up to this much, with a random start on each line — no lines or moiré across parallel rows (Ink/Stitch random stitch length)">

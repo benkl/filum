@@ -313,7 +313,16 @@ splitMinLength: number,
 /**
  * Every sub-path is its own centre-line column (e.g. satin borders around letters).
  */
-multi: boolean, reverse: boolean, 
+multi: boolean, 
+/**
+ * Bisatin: the cover in two columns half as wide, split along the
+ * middle, the first sewn to the far end and the second back to the
+ * start, over the whole column's underlay; each half has its own pull
+ * compensation, so they overlap in the middle. For columns too wide for
+ * one stitch (not in Ink/Stitch; effepol/NOVAstitch-designer, module n).
+ * Not with 3D.
+ */
+bisatin: boolean, reverse: boolean, 
 /**
  * The second rail's own values where Ink/Stitch gives two ("0.2 0.5").
  */
@@ -400,7 +409,19 @@ endRowSpacing: number, maxStitchLength: number,
 /**
  * Rows repeat their stitch pattern every N rows (tatami stagger).
  */
-staggers: number, pullComp: number, underlay: boolean, 
+staggers: number, 
+/**
+ * Tatami rows: stitch lengths used in turn along a row (mm, e.g. 4, 2:
+ * long and short; empty: every stitch the max stitch length). Not in
+ * Ink/Stitch (effepol/NOVAstitch-designer, module n).
+ */
+lengthPattern: Array<number>, 
+/**
+ * Tatami rows: where each row's pattern begins, as shares of the
+ * pattern's length, used in turn row after row (e.g. 0, ⅓, ⅔; empty:
+ * the staggers). Not in Ink/Stitch.
+ */
+rowOffsets: Array<number>, pullComp: number, underlay: boolean, 
 /**
  * Underlay angle relative to the fill angle (degrees).
  */

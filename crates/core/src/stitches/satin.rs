@@ -678,30 +678,66 @@ pub fn satin_on(paths: &[SubPath], p: &SatinParams, fabric: &crate::model::Fabri
     }
     let Some(geo) = satin_geometry(paths, p) else { return vec![] };
     let mut run: Run = Vec::new();
-    // auto underlay: by the column's mean width
-    let which = if p.underlay_auto {
-        super::underlay::satin_underlay(mean_width(&plot_points_on_rails(&geo, 1.0, 0.0, 0.0)), p, fabric)
+    let back = column_underlay(&geo, p, fabric, &mut run);
+    let covers = if p.bisatin {
+        // two columns half as wide: the first to the far end, the second back
+        let (a, b) = halves(&geo);
+        let (mut ta, mut tb) = (top_layer(&a, p, extra_pull, density), top_layer(&b, p, extra_pull, density));
+        if back { &mut ta } else { &mut tb }.reverse();
+        vec![ta, tb]
     } else {
-        super::underlay::satin_underlay(0.0, p, fabric)
+        let mut top = top_layer(&geo, p, extra_pull, density);
+        // Ink/Stitch plots the cover from the start and sews it backwards
+        if back {
+            top.reverse();
+        }
+        vec![top]
     };
-    // an odd centre walk ends at the far end: the cover runs back from there
-    let back = which.center && p.center_walk_repeats.max(1) % 2 == 1;
-    if back {
-        // the other underlays first (they return to the start), the walk last
-        underlay(&geo, p, super::underlay::SatinUnderlay { center: false, ..which }, &mut run, density);
-        underlay(&geo, p, super::underlay::SatinUnderlay { center: true, contour: false, zigzag: false }, &mut run, density);
-    } else {
-        underlay(&geo, p, which, &mut run, density);
-    }
-    let mut top = top_layer(&geo, p, extra_pull, density);
-    // Ink/Stitch plots the cover from the start and sews it backwards
-    if back {
-        top.reverse();
-    }
-    for q in top {
+    for q in covers.into_iter().flatten() {
         push(&mut run, q, 0);
     }
     vec![run]
+}
+
+/// The column's underlay (auto: by its mean width); true when it ends at the
+/// far end (an odd centre walk), so the cover runs back from there.
+fn column_underlay(geo: &SatinGeometry, p: &SatinParams, fabric: &crate::model::FabricProfile, run: &mut Run) -> bool {
+    let density = fabric.density_scale;
+    let which = if p.underlay_auto {
+        super::underlay::satin_underlay(mean_width(&plot_points_on_rails(geo, 1.0, 0.0, 0.0)), p, fabric)
+    } else {
+        super::underlay::satin_underlay(0.0, p, fabric)
+    };
+    let back = which.center && p.center_walk_repeats.max(1) % 2 == 1;
+    if back {
+        // the other underlays first (they return to the start), the walk last
+        underlay(geo, p, super::underlay::SatinUnderlay { center: false, ..which }, run, density);
+        underlay(geo, p, super::underlay::SatinUnderlay { center: true, contour: false, zigzag: false }, run, density);
+    } else {
+        underlay(geo, p, which, run, density);
+    }
+    back
+}
+
+/// A column split along its middle line: (first rail, middle) and (middle,
+/// second rail), section by section, the middle matched by share of length
+/// as the rails are between two rungs.
+fn halves(geo: &SatinGeometry) -> (SatinGeometry, SatinGeometry) {
+    let (mut a, mut b) = (Vec::new(), Vec::new());
+    for (s0, s1) in &geo.sections {
+        let (c0, c1) = (cumulative_lengths(s0), cumulative_lengths(s1));
+        let (l0, l1) = (c0.last().copied().unwrap_or(0.0), c1.last().copied().unwrap_or(0.0));
+        let n = ((l0.max(l1) / 0.2).ceil() as usize).clamp(1, 4000);
+        let mid: Vec<Point> = (0..=n)
+            .map(|k| {
+                let t = k as f64 / n as f64;
+                point_at(s0, &c0, l0 * t).lerp(point_at(s1, &c1, l1 * t), 0.5)
+            })
+            .collect();
+        a.push((s0.clone(), mid.clone()));
+        b.push((mid, s1.clone()));
+    }
+    (SatinGeometry { sections: a }, SatinGeometry { sections: b })
 }
 
 /// A satin that begins at `start` and ends at `end` where they lie partway
@@ -713,7 +749,8 @@ pub fn satin_on(paths: &[SubPath], p: &SatinParams, fabric: &crate::model::Fabri
 /// at (or near) the column's own ends change nothing.
 pub fn satin_between(paths: &[SubPath], p: &SatinParams, fabric: &crate::model::FabricProfile, start: Option<Point>, end: Option<Point>) -> Vec<Run> {
     let mut runs = satin_on(paths, p, fabric);
-    if (start.is_none() && end.is_none()) || (p.multi && paths.len() > 1) || runs.len() != 1 {
+    // a bisatin ends where it began: no start or end partway along
+    if (start.is_none() && end.is_none()) || (p.multi && paths.len() > 1) || runs.len() != 1 || p.bisatin {
         return runs;
     }
     let Some(geo) = satin_geometry(paths, p) else { return runs };
@@ -1291,5 +1328,61 @@ mod ink_parity_tests {
         assert!(a.dist(pt(0.0, 2.0)) < 1e-9 && b.dist(pt(0.0, 2.0)) < 1e-9, "scaled to meet: {a:?} {b:?}");
         let (a, b) = offset_points(pt(0.0, 0.0), pt(0.0, 4.0), [-6.0, -2.0]);
         assert!(a.dist(b) < 1e-9 && a.dist(pt(0.0, 3.0)) < 1e-9, "in proportion: {a:?} {b:?}");
+    }
+}
+
+#[cfg(test)]
+mod bisatin_tests {
+    use super::*;
+    use crate::geom::pt;
+    use crate::model::Fabric;
+
+    /// A 16 mm wide, 40 mm long column.
+    fn wide() -> Vec<SubPath> {
+        vec![SubPath::polyline(&[pt(0.0, 0.0), pt(40.0, 0.0)], false), SubPath::polyline(&[pt(0.0, 16.0), pt(40.0, 16.0)], false)]
+    }
+    fn run(p: &SatinParams) -> Run {
+        satin_on(&wide(), p, &Fabric::Cotton.profile()).concat()
+    }
+    fn cover(r: &Run) -> Vec<Point> {
+        r.iter().filter(|x| x.1 & flags::UNDERLAY == 0).map(|x| x.0).collect()
+    }
+
+    #[test]
+    fn two_half_columns_back_to_the_start() {
+        let p = SatinParams { bisatin: true, pull_comp: 0.2, max_stitch_length: 0.0, ..Default::default() };
+        let r = run(&p);
+        let top = cover(&r);
+        // every cover stitch lies within one half (plus compensation over the middle)
+        let longest = top.windows(2).map(|w| (w[1].y - w[0].y).abs()).fold(0.0, f64::max);
+        assert!(longest < 8.0 + 0.5, "half-width stitches: {longest}");
+        let (lo, hi): (Vec<Point>, Vec<Point>) = top.iter().partition(|q| q.y < 8.0);
+        assert!(lo.iter().all(|q| q.y > -0.5) && hi.iter().all(|q| q.y < 16.5), "inside the column");
+        // the first half sewn to the far end, the second back to the start
+        let half = top.len() / 2;
+        assert!(top[..half].iter().all(|q| q.y < 8.0 + 0.5) && top[half..].iter().all(|q| q.y > 8.0 - 0.5), "one half, then the other");
+        assert!(top.first().unwrap().x < 1.0 && top.last().unwrap().x < 1.0, "ends where it began: {:?} {:?}", top.first(), top.last());
+        assert!(top[half - 1].x > 39.0 && top[half].x > 39.0, "the second half begins where the first ended");
+        // the halves overlap in the middle by their compensation
+        let reach_lo = top[..half].iter().map(|q| q.y).fold(f64::MIN, f64::max);
+        let reach_hi = top[half..].iter().map(|q| q.y).fold(f64::MAX, f64::min);
+        assert!(reach_lo > 8.0 && reach_hi < 8.0, "they overlap over the middle: {reach_lo} {reach_hi}");
+    }
+
+    #[test]
+    fn one_underlay_for_the_whole_column() {
+        let plain = run(&SatinParams::default());
+        let bi = run(&SatinParams { bisatin: true, ..Default::default() });
+        let under = |r: &Run| r.iter().filter(|x| x.1 & flags::UNDERLAY != 0).copied().collect::<Vec<_>>();
+        assert_eq!(under(&plain), under(&bi), "the same underlay as the column");
+        assert!(cover(&bi).len() > cover(&plain).len(), "two covers");
+    }
+
+    #[test]
+    fn not_over_3d() {
+        let foam = SatinParams { bisatin: true, foam: Some(Default::default()), ..Default::default() };
+        let plain = SatinParams { foam: Some(Default::default()), ..Default::default() };
+        let f = Fabric::Cotton.profile();
+        assert_eq!(super::super::foam::foam(&wide(), &foam, &f), super::super::foam::foam(&wide(), &plain, &f));
     }
 }

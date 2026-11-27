@@ -486,6 +486,13 @@ pub struct SatinParams {
     pub split_min_length: f64,
     /// Every sub-path is its own centre-line column (e.g. satin borders around letters).
     pub multi: bool,
+    /// Bisatin: the cover in two columns half as wide, split along the
+    /// middle, the first sewn to the far end and the second back to the
+    /// start, over the whole column's underlay; each half has its own pull
+    /// compensation, so they overlap in the middle. For columns too wide for
+    /// one stitch (not in Ink/Stitch; effepol/NOVAstitch-designer, module n).
+    /// Not with 3D.
+    pub bisatin: bool,
     pub reverse: bool,
     /// The second rail's own values where Ink/Stitch gives two ("0.2 0.5").
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -547,6 +554,7 @@ impl Default for SatinParams {
             split_random_phase: false,
             split_min_length: 0.0,
             multi: false,
+            bisatin: false,
             reverse: false,
             second_rail: None,
             foam: None,
@@ -759,6 +767,16 @@ pub struct FillParams {
     pub max_stitch_length: f64,
     /// Rows repeat their stitch pattern every N rows (tatami stagger).
     pub staggers: u32,
+    /// Tatami rows: stitch lengths used in turn along a row (mm, e.g. 4, 2:
+    /// long and short; empty: every stitch the max stitch length). Not in
+    /// Ink/Stitch (effepol/NOVAstitch-designer, module n).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub length_pattern: Vec<f64>,
+    /// Tatami rows: where each row's pattern begins, as shares of the
+    /// pattern's length, used in turn row after row (e.g. 0, ⅓, ⅔; empty:
+    /// the staggers). Not in Ink/Stitch.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub row_offsets: Vec<f64>,
     pub pull_comp: f64,
     pub underlay: bool,
     /// Underlay angle relative to the fill angle (degrees).
@@ -1206,6 +1224,8 @@ impl Default for FillParams {
             end_row_spacing: 0.0,
             max_stitch_length: 3.0,
             staggers: 4,
+            length_pattern: Vec::new(),
+            row_offsets: Vec::new(),
             pull_comp: 0.0,
             underlay: true,
             underlay_angle: 90.0,

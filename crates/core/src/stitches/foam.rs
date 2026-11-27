@@ -86,6 +86,7 @@ fn foam_satin(satin: &SatinParams, f: &FoamOptions, width: f64) -> SatinParams {
         spacing: satin.spacing / factor,
         foam: None,
         layered: None,
+        bisatin: false,
         ..satin.clone()
     }
 }

@@ -201,6 +201,77 @@ pub struct TatamiOpts {
     /// Extra rows sewn into the gap at the end of each section before
     /// travelling on (Ink/Stitch `gap_fill_rows`, an even number).
     pub gap_rows: u32,
+    /// Stitch lengths in turn and row offsets (none: Ink/Stitch's even stitches).
+    pub pattern: Option<RowPattern>,
+}
+
+/// Tatami rows in a pattern: stitch lengths used in turn along each row, and
+/// where each row's pattern begins (shares of its length, row after row; none:
+/// the staggers). The needle points lie on one grid per offset, so the pattern
+/// lines up across a fill however its rows are cut. After the NOVAstitch
+/// Designer fork (effepol/NOVAstitch-designer, module n, «varietà»). Up to
+/// [`RowPattern::MAX`] of each, so the options stay a plain copy.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RowPattern {
+    lengths: [f64; RowPattern::MAX],
+    n_lengths: usize,
+    offsets: [f64; RowPattern::MAX],
+    n_offsets: usize,
+}
+
+impl RowPattern {
+    pub const MAX: usize = 8;
+
+    /// The pattern of a fill's settings; none when it sets neither (or nothing
+    /// sewable). Lengths below 0.1 mm are raised to it, as the stitch length.
+    pub fn new(lengths: &[f64], offsets: &[f64], max_len: f64) -> Option<Self> {
+        let mut p = RowPattern { lengths: [0.0; Self::MAX], n_lengths: 0, offsets: [0.0; Self::MAX], n_offsets: 0 };
+        for &l in lengths.iter().filter(|l| l.is_finite() && **l > 0.0).take(Self::MAX) {
+            p.lengths[p.n_lengths] = l.max(0.1);
+            p.n_lengths += 1;
+        }
+        for &o in offsets.iter().filter(|o| o.is_finite()).take(Self::MAX) {
+            p.offsets[p.n_offsets] = o.rem_euclid(1.0);
+            p.n_offsets += 1;
+        }
+        if p.n_lengths == 0 && p.n_offsets == 0 {
+            return None;
+        }
+        if p.n_lengths == 0 {
+            p.lengths[0] = fill_stitch_len(max_len);
+            p.n_lengths = 1;
+        }
+        Some(p)
+    }
+
+    fn lengths(&self) -> &[f64] {
+        &self.lengths[..self.n_lengths]
+    }
+
+    /// Needle points of row `row` strictly between `x0 + gap` and `x1 - gap`, ascending.
+    fn points(&self, row: i64, x0: f64, x1: f64, staggers: u32, gap: f64) -> Vec<f64> {
+        let ls = self.lengths();
+        let period: f64 = ls.iter().sum();
+        let share = if self.n_offsets > 0 { self.offsets[row.rem_euclid(self.n_offsets as i64) as usize] } else { (row as f64 / staggers.max(1) as f64).rem_euclid(1.0) };
+        let shift = share * period;
+        let mut x = shift + ((x0 - shift) / period).floor() * period;
+        let mut out = Vec::new();
+        for i in 0.. {
+            if x >= x1 - gap || out.len() > 100_000 {
+                break;
+            }
+            if x > x0 + gap {
+                out.push(x);
+            }
+            x += ls[i % ls.len()];
+        }
+        out
+    }
+
+    /// The shortest stitch: a point nearer a row's end than 0.3 of it is left out.
+    fn shortest(&self) -> f64 {
+        self.lengths().iter().copied().fold(f64::INFINITY, f64::min)
+    }
 }
 
 thread_local! {
@@ -290,6 +361,19 @@ fn stitch_row(out: &mut Run, y: f64, x0: f64, x1: f64, row_num: i64, max_len: f6
         while d < dist - 0.05 {
             push(out, pt(beg + dir * d, y), f);
             d += max_len * (1.0 + jitter * (rng.next() - 0.5) * 2.0).max(0.1);
+        }
+        if !o.skip_last {
+            push(out, pt(end, y), f);
+        }
+        return;
+    }
+    if let Some(pat) = &o.pattern {
+        let mut xs = pat.points(row_num, x0, x1, staggers, 0.25_f64.min(pat.shortest() * 0.3));
+        if !ltr {
+            xs.reverse();
+        }
+        for x in xs {
+            push(out, pt(x, y), f);
         }
         if !o.skip_last {
             push(out, pt(end, y), f);
@@ -1976,6 +2060,7 @@ fn fill_part(rings: &[Ring], whole: &[Ring], original: &[Ring], p: &FillParams, 
         pull_pct: if tatami_rows { p.pull_comp_pct.clamp(0.0, 1.0) } else { 0.0 },
         no_underpath: !p.underpath,
         gap_rows: if tatami_rows { p.gap_fill_rows.div_ceil(2) * 2 } else { 0 },
+        pattern: if tatami_rows { RowPattern::new(&p.length_pattern, &p.row_offsets, p.max_stitch_length) } else { None },
     };
     let random = if method == FillMethod::Meander || method == FillMethod::Cross { 0.0 } else { p.random_length };
     // where a maze, stipple or sunburst begins: only a start point set by the
@@ -2177,6 +2262,60 @@ mod tests {
 
     fn square(s: f64) -> SubPath {
         SubPath::polyline(&[pt(0.0, 0.0), pt(s, 0.0), pt(s, s), pt(0.0, s)], true)
+    }
+
+    fn row(pattern: Option<RowPattern>, row: i64, ltr: bool) -> Vec<f64> {
+        let mut out: Run = Vec::new();
+        stitch_row(&mut out, 0.0, 0.0, 40.0, row, 3.0, 4, ltr, &TatamiOpts { pattern, ..TatamiOpts::default() }, 0);
+        out.iter().map(|q| q.0.x).collect()
+    }
+
+    #[test]
+    fn rows_in_a_length_pattern() {
+        // long and short in turn
+        let p = RowPattern::new(&[4.0, 2.0], &[], 3.0);
+        let xs = row(p, 0, true);
+        let gaps: Vec<f64> = xs[1..xs.len() - 1].windows(2).map(|w| w[1] - w[0]).collect();
+        assert!(gaps.windows(2).all(|g| (g[0] + g[1] - 6.0).abs() < 1e-9 && (g[0] - 4.0).abs().min((g[0] - 2.0).abs()) < 1e-9), "{gaps:?}");
+        // right to left: the same needle points
+        let mut back = row(p, 0, false);
+        back.reverse();
+        assert_eq!(xs, back);
+        // the staggers shift each row a quarter of the pattern on
+        let next = row(p, 1, true);
+        assert!(next[1..next.len() - 1].iter().all(|x| xs.iter().all(|y| (x - y).abs() > 1e-6)), "row 1 moved on");
+        assert!(row(p, 4, true) == xs, "four staggers: row 4 as row 0");
+    }
+
+    #[test]
+    fn row_offsets_in_turn() {
+        let p = RowPattern::new(&[4.0, 2.0], &[0.0, 1.0 / 3.0, 2.0 / 3.0], 3.0);
+        // row r's needle points: its offset (r × 2 mm, a third of 6 mm) plus 0 or 4, every 6 mm
+        for r in 0..3 {
+            let xs = row(p, r, true);
+            let on_grid = |x: f64| [0.0, 4.0].iter().any(|k| ((x - 2.0 * r as f64 - k).rem_euclid(6.0)).min(6.0 - (x - 2.0 * r as f64 - k).rem_euclid(6.0)) < 1e-9);
+            assert!(xs[1..xs.len() - 1].iter().all(|x| on_grid(*x)), "row {r}: {xs:?}");
+        }
+        assert!(row(p, 0, true) == row(p, 3, true), "the fourth row as the first");
+        // offsets alone: the max stitch length, shifted as set
+        let even = RowPattern::new(&[], &[0.0, 0.5], 3.0);
+        let xs = row(even, 1, true);
+        assert!((xs[1] - 1.5).abs() < 1e-9 && (xs[2] - xs[1] - 3.0).abs() < 1e-9, "{xs:?}");
+    }
+
+    #[test]
+    fn no_pattern_sews_as_ink_stitch() {
+        assert_eq!(RowPattern::new(&[], &[], 3.0), None);
+        assert_eq!(RowPattern::new(&[0.0, -1.0, f64::NAN], &[f64::INFINITY], 3.0), None, "nothing sewable is nothing set");
+        let p = FillParams { length_pattern: vec![], row_offsets: vec![], ..FillParams::default() };
+        let f = crate::model::Fabric::Cotton.profile();
+        assert_eq!(fill_on(&[square(20.0)], &p, &f, None, None), fill_on(&[square(20.0)], &FillParams::default(), &f, None, None));
+        // a pattern changes only the top rows, not the underlay
+        let pat = FillParams { length_pattern: vec![4.0, 2.0], ..FillParams::default() };
+        let under = |r: &[Run]| r.iter().flatten().filter(|x| x.1 & crate::plan::flags::UNDERLAY != 0).copied().collect::<Vec<_>>();
+        let (a, b) = (fill_on(&[square(20.0)], &pat, &f, None, None), fill_on(&[square(20.0)], &FillParams::default(), &f, None, None));
+        assert_eq!(under(&a), under(&b));
+        assert_ne!(a, b);
     }
 
     fn donut() -> Vec<SubPath> {

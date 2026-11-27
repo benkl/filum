@@ -60,7 +60,7 @@ pub fn layered3d(paths: &[SubPath], p: &SatinParams, fabric: &FabricProfile) -> 
     let l = p.layered.clone().unwrap_or_default();
     let n = l.layers.clamp(LAYERED3D_MIN_LAYERS, LAYERED3D_MAX_LAYERS);
     let shrink = if l.shrink_per_layer.is_finite() && l.shrink_per_layer >= 0.0 { l.shrink_per_layer } else { LAYERED3D_SHRINK };
-    let column = SatinParams { layered: None, foam: None, ..p.clone() };
+    let column = SatinParams { layered: None, foam: None, bisatin: false, ..p.clone() };
     let w = width(paths, &column);
     if !w.is_finite() {
         return vec![];

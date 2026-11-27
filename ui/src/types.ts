@@ -143,6 +143,8 @@ export interface SatinParams {
   reverse: boolean;
   /** Every sub-path is its own centre-line column (letter borders). */
   multi?: boolean;
+  /** The cover in two columns half as wide, the second sewn back to the start (wide columns; not in Ink/Stitch, not with 3D). */
+  bisatin?: boolean;
   /** The second rail's own values where Ink/Stitch gives two ("0.2 0.5"). */
   secondRail?: {
     pullComp?: number;
@@ -219,6 +221,10 @@ export interface FillParams {
   endRowSpacing: number;
   maxStitchLength: number;
   staggers: number;
+  /** Tatami rows: stitch lengths used in turn along a row (mm; absent: the max stitch length). Not in Ink/Stitch. */
+  lengthPattern?: number[];
+  /** Tatami rows: where each row's pattern begins, as shares of its length, row after row (absent: the staggers). Not in Ink/Stitch. */
+  rowOffsets?: number[];
   pullComp: number;
   underlay: boolean;
   underlayAngle: number;

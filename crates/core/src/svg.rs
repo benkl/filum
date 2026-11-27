@@ -1118,6 +1118,7 @@ fn ink_satin(ink: &Ink) -> SatinParams {
         foam: None,
         layered: None,
         multi: false,
+        bisatin: false,
     }
 }
 

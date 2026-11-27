@@ -341,11 +341,13 @@ export function computeIssues(doc: StitchDocument, plan: PlanData | null): Issue
     }
     if (st.type === "satin") {
       const w = o.paths.length === 1 ? st.width : undefined;
-      if (w !== undefined && w > 9 && st.maxStitchLength === 0) {
+      // a bisatin's stitches are half the width; 3D satins are wide on purpose
+      const wide = st.foam || st.layered ? null : satinWidth(o);
+      if (wide != null && wide / (st.bisatin ? 2 : 1) > 9 && st.maxStitchLength === 0) {
         add({
           level: "warning",
           title: "Satin too wide",
-          detail: `${w.toFixed(1)} mm stitches can snag and loop. Split them or use a fill.`,
+          detail: `${(wide / (st.bisatin ? 2 : 1)).toFixed(1)} mm stitches can snag and loop. Split them${st.bisatin ? "" : ", sew it as a bisatin (two columns half as wide)"} or use a fill.`,
           at: c,
           fix: { label: "Split at 7 mm", apply: (x) => (x.stitch.type === "satin" ? { ...x, stitch: { ...x.stitch, maxStitchLength: 7 } } : x) },
         });
