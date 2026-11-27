@@ -15,7 +15,7 @@ import { connectionAt } from "../../lib/links";
 import { objectBounds } from "../../lib/geometry";
 import { referenceAt } from "../../lib/references";
 import { rotateHandle } from "../render";
-import { HANDLE_HIT_PX, reverseObject } from "../handles";
+import { handleAt, reverseObject } from "../handles";
 import { modernSpacing, textSpec, updateText } from "../../lib/textOps";
 import { rotateZone, unitIds } from "../transform";
 import { computeIssues } from "../../lib/issues";
@@ -185,7 +185,7 @@ export function downSelect(c: CanvasCtx, tool: "select", s: StoreState, e: RPoin
   switch (tool) {
     case "select": {
       // parameter handles (reverse order: pins are drawn on top)
-      const hh = [...handlesRef.current].reverse().find((h) => dist(h.p, p) < HANDLE_HIT_PX / s.view.scale);
+      const hh = handleAt(handlesRef.current, p, s.view.scale);
       if (hh?.group) {
         const spec = textSpec(hh.group);
         if (!spec) return;

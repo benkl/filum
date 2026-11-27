@@ -276,6 +276,24 @@ export function reverseObject(o: DesignObject, h: Handle): DesignObject {
 }
 
 export const HANDLE_HIT_PX = 8;
+/** A start / end pin is a teardrop with its tip on the point and its letter
+ *  this far above (px, as interactive.ts draws it); the letter takes the
+ *  pointer too, within PIN_HEAD_HIT_PX (effepol/NOVAstitch-designer). */
+const PIN_HEAD_PX = 8 * 1.55;
+const PIN_HEAD_HIT_PX = 11;
+
+/** Does a pointer at `p` (mm) take the handle? */
+export function handleHit(h: Handle, p: Vec2, scale: number): boolean {
+  if (Math.hypot(h.p[0] - p[0], h.p[1] - p[1]) < HANDLE_HIT_PX / scale) return true;
+  if (h.kind !== "start" && h.kind !== "end") return false;
+  return Math.hypot(h.p[0] - p[0], h.p[1] - PIN_HEAD_PX / scale - p[1]) < PIN_HEAD_HIT_PX / scale;
+}
+
+/** The handle under the pointer: the topmost, as they are drawn in order (pins last). */
+export function handleAt(handles: Handle[], p: Vec2, scale: number): Handle | null {
+  for (let i = handles.length - 1; i >= 0; i--) if (handleHit(handles[i], p, scale)) return handles[i];
+  return null;
+}
 
 /** Handles of a selected lettering: arc (bend) above, letter spacing on the right. */
 export function computeTextHandles(objs: DesignObject[], rotation: number, scale: number): Handle[] {

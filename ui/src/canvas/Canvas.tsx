@@ -21,7 +21,7 @@ import { engine, type ShapeRegion } from "../engine/client";
 import { handlePoints, readTheme, Renderer, rotateHandle, type Overlay, type Theme } from "./render";
 import { StitchGL } from "./gl";
 import { threadWidth } from "../lib/materials";
-import { computeHandles, computeTextHandles, HANDLE_HIT_PX, type Handle } from "./handles";
+import { computeHandles, computeTextHandles, handleAt, type Handle } from "./handles";
 import { createTextAt, selectedTextGroup, textSpec } from "../lib/textOps";
 import { members } from "../lib/text";
 import type { InteractiveOverlay } from "./interactive";
@@ -1147,7 +1147,7 @@ export function Canvas() {
         return;
       }
       if (s.tool === "select") {
-        const hh = [...handlesRef.current].reverse().find((h) => dist(h.p, p) < HANDLE_HIT_PX / s.view.scale) ?? null;
+        const hh = handleAt(handlesRef.current, p, s.view.scale);
         const changed = hh?.kind !== iRef.current.hoverHandle?.kind || hh?.objId !== iRef.current.hoverHandle?.objId;
         iRef.current.hoverHandle = hh;
         iRef.current.tooltip = hh ? { p: hh.p, text: HANDLE_HINTS[hh.kind] } : null;
