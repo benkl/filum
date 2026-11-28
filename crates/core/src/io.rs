@@ -1,8 +1,8 @@
 //! File I/O: bridges documents/stitch plans to machine formats
 //! (`filum-formats`), Ink/Stitch SVG and the native JSON project format.
 
-use serde::Serialize;
 use filum_formats as fmts;
+use serde::Serialize;
 
 use crate::assemble::Engine;
 use crate::model::{Document, Object, StitchParams, SubPath, Thread};
@@ -22,13 +22,7 @@ pub struct FormatDescriptor {
 pub fn formats() -> Vec<FormatDescriptor> {
     let mut v: Vec<FormatDescriptor> = fmts::formats()
         .iter()
-        .map(|f| FormatDescriptor {
-            extension: f.extension.to_string(),
-            name: f.name.to_string(),
-            can_read: f.can_read,
-            can_write: f.can_write,
-            machine: true,
-        })
+        .map(|f| FormatDescriptor { extension: f.extension.to_string(), name: f.name.to_string(), can_read: f.can_read, can_write: f.can_write, machine: true })
         .collect();
     v.push(FormatDescriptor { extension: "svg".into(), name: "Ink/Stitch SVG".into(), can_read: true, can_write: true, machine: false });
     v.push(FormatDescriptor { extension: "threadlist".into(), name: "Thread list (Ink/Stitch TXT)".into(), can_read: false, can_write: true, machine: false });
@@ -57,11 +51,7 @@ pub fn plan_to_pattern_at(plan: &StitchPlan, name: &str, origin: Option<[f64; 2]
     fmts::Pattern {
         name: name.to_string(),
         stitches: plan.stitches.iter().map(|s| fmts::Stitch { x: s.x, y: s.y, flags: s.flags }).collect(),
-        threads: plan
-            .threads
-            .iter()
-            .map(|t| fmts::Thread { rgb: t.rgb(), name: t.name.clone(), code: t.code.clone(), brand: t.brand.clone() })
-            .collect(),
+        threads: plan.threads.iter().map(|t| fmts::Thread { rgb: t.rgb(), name: t.name.clone(), code: t.code.clone(), brand: t.brand.clone() }).collect(),
     }
 }
 
@@ -72,7 +62,15 @@ pub fn pattern_to_plan(p: &fmts::Pattern) -> StitchPlan {
             .threads
             .iter()
             .enumerate()
-            .map(|(i, t)| Thread { brand: t.brand.clone(), code: t.code.clone(), ..Thread::new(format!("t{}", i + 1), if t.name.is_empty() { crate::threads::nearest_name(t.rgb) } else { t.name.clone() }, crate::model::hex_color(t.rgb)) })
+            .map(|(i, t)| Thread {
+                brand: t.brand.clone(),
+                code: t.code.clone(),
+                ..Thread::new(
+                    format!("t{}", i + 1),
+                    if t.name.is_empty() { crate::threads::nearest_name(t.rgb) } else { t.name.clone() },
+                    crate::model::hex_color(t.rgb),
+                )
+            })
             .collect(),
         basting: None,
         links: Vec::new(),
@@ -98,11 +96,7 @@ pub fn plan_to_document(plan: &StitchPlan, name: &str) -> Document {
             return;
         }
         let t = plan.threads.get(block).cloned().unwrap_or(Thread::new(format!("t{}", block + 1), "Thread", "#1c1c1c"));
-        let tid = if doc.threads.iter().any(|x| x.id == t.id) {
-            format!("t{}", doc.threads.len() + 1)
-        } else {
-            t.id.clone()
-        };
+        let tid = if doc.threads.iter().any(|x| x.id == t.id) { format!("t{}", doc.threads.len() + 1) } else { t.id.clone() };
         doc.threads.push(Thread { id: tid.clone(), ..t.clone() });
         doc.objects.push(Object {
             id: format!("imp{}", doc.objects.len() + 1),
@@ -275,11 +269,8 @@ pub fn export_with(doc: &Document, engine: &mut Engine, format: &str, opts: &Exp
 
 pub fn import(bytes: &[u8], filename: Option<&str>) -> Result<Document, String> {
     let lower = filename.unwrap_or("").to_ascii_lowercase();
-    let stem = filename
-        .map(|n| n.rsplit(['/', '\\']).next().unwrap_or(n))
-        .map(|n| n.rsplit_once('.').map(|x| x.0).unwrap_or(n))
-        .unwrap_or("Imported")
-        .to_string();
+    let stem =
+        filename.map(|n| n.rsplit(['/', '\\']).next().unwrap_or(n)).map(|n| n.rsplit_once('.').map(|x| x.0).unwrap_or(n)).unwrap_or("Imported").to_string();
     let head = String::from_utf8_lossy(&bytes[..bytes.len().min(512)]).to_string();
     if lower.ends_with(".svg") || head.contains("<svg") {
         let text = std::str::from_utf8(bytes).map_err(|e| e.to_string())?;
@@ -302,7 +293,11 @@ mod origin_tests {
 
     #[test]
     fn the_origin_becomes_zero() {
-        let plan = StitchPlan { stitches: vec![Stitch { x: 10.0, y: 20.0, flags: 0, object: 0 }, Stitch { x: 30.0, y: 40.0, flags: 0, object: 0 }], threads: vec![], ..Default::default() };
+        let plan = StitchPlan {
+            stitches: vec![Stitch { x: 10.0, y: 20.0, flags: 0, object: 0 }, Stitch { x: 30.0, y: 40.0, flags: 0, object: 0 }],
+            threads: vec![],
+            ..Default::default()
+        };
         let at = plan_to_pattern_at(&plan, "t", Some([10.0, 20.0]));
         assert_eq!((at.stitches[0].x, at.stitches[0].y), (0.0, 0.0));
         let centred = plan_to_pattern_at(&plan, "t", None);
@@ -327,7 +322,15 @@ mod origin_tests {
         use crate::model::{Object, StitchParams, SubPath};
         let mut doc = Document {
             threads: vec![Thread { brand: "Madeira".into(), code: "1147".into(), ..Thread::new("a", "Red", "#ff0000") }],
-            objects: vec![Object { stop_after: true, ..Object::new("o", "a", vec![SubPath::polyline(&[crate::geom::pt(0.0, 0.0), crate::geom::pt(3.0, 0.0), crate::geom::pt(6.0, 0.0)], false)], StitchParams::Manual(Default::default())) }],
+            objects: vec![Object {
+                stop_after: true,
+                ..Object::new(
+                    "o",
+                    "a",
+                    vec![SubPath::polyline(&[crate::geom::pt(0.0, 0.0), crate::geom::pt(3.0, 0.0), crate::geom::pt(6.0, 0.0)], false)],
+                    StitchParams::Manual(Default::default()),
+                )
+            }],
             ..Default::default()
         };
         let mut e = Engine::new();

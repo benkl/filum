@@ -143,7 +143,7 @@ export function roundCorners(sp: SubPath, radii: number[] | number, style: Corne
   if (!segs.length) return sp;
   const turn = cornerAngles(sp);
   const lens = segs.map(segLength);
-  const r = (k: number) => (Array.isArray(radii) ? radii[k] ?? 0 : radii);
+  const r = (k: number) => (Array.isArray(radii) ? (radii[k] ?? 0) : radii);
   // trims at the start / end of every segment (arc length)
   const tStart = new Array<number>(segs.length).fill(0);
   const tEnd = new Array<number>(segs.length).fill(0);
@@ -368,7 +368,7 @@ function warpUV(style: WarpStyle, b: number, u: number, v: number): [number, num
     case "wave":
       return [u, v - b * Math.sin(u * Math.PI) * 0.5 * (1 + v) * 0.5 + b * Math.sin(u * Math.PI) * 0.5 * (1 - v) * 0.5];
     case "fish":
-      return [u, v * (1 + b * 0.6 * Math.cos(((u + 0.4) * Math.PI) / 1.4)) ];
+      return [u, v * (1 + b * 0.6 * Math.cos(((u + 0.4) * Math.PI) / 1.4))];
     case "rise":
       return [u, v - b * (Math.sin((u * Math.PI) / 2) * 0.5 + u * 0.25)];
     case "inflate": {
@@ -537,7 +537,13 @@ export function polygonPath(b: Box, sides: number, star = false, inner = 0.5): S
 }
 
 export function shapeToolPath(kind: ShapeKind, b: Box, o: { radius: number; sides: number; inner: number }): SubPath {
-  const base = kind === "rect" ? { closed: true, nodes: [{ p: [b.x, b.y] as Vec2 }, { p: [b.x + b.w, b.y] as Vec2 }, { p: [b.x + b.w, b.y + b.h] as Vec2 }, { p: [b.x, b.y + b.h] as Vec2 }] } : polygonPath(b, o.sides, kind === "star", o.inner);
+  const base =
+    kind === "rect"
+      ? {
+          closed: true,
+          nodes: [{ p: [b.x, b.y] as Vec2 }, { p: [b.x + b.w, b.y] as Vec2 }, { p: [b.x + b.w, b.y + b.h] as Vec2 }, { p: [b.x, b.y + b.h] as Vec2 }],
+        }
+      : polygonPath(b, o.sides, kind === "star", o.inner);
   return o.radius > 0 ? roundCorners(base, o.radius) : base;
 }
 

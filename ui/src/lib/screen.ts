@@ -17,7 +17,8 @@ export const MAX_DEVICE_PX_PER_MM = 95;
 const dpr = () => (typeof window !== "undefined" && window.devicePixelRatio > 0 ? window.devicePixelRatio : 1);
 
 /** A calibration (device px per mm) worth keeping: a finite number in range. */
-export const validCalibration = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= MIN_DEVICE_PX_PER_MM && v <= MAX_DEVICE_PX_PER_MM;
+export const validCalibration = (v: unknown): v is number =>
+  typeof v === "number" && Number.isFinite(v) && v >= MIN_DEVICE_PX_PER_MM && v <= MAX_DEVICE_PX_PER_MM;
 
 /** CSS px per mm: from the calibration (device px per mm) at the current pixel ratio, else 96 dpi. */
 export function pxPerMm(calibrated: number | undefined, ratio = dpr()): number {

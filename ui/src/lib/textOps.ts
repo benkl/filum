@@ -51,9 +51,7 @@ async function withPalette(spec: TextSpec): Promise<TextSpec> {
   if (f.kind !== "embroidery" || f.colors.length < 2) return { ...spec, palette: undefined };
   if (spec.palette && spec.palette.length >= f.colors.length) return spec;
   const s = useStore.getState();
-  const palette = f.colors.map((c, i) =>
-    spec.palette?.[i] ?? (/^#[0-9a-f]{6}$/i.test(c) ? s.ensureThread(c, `${f.name} ${i + 1}`) : spec.thread),
-  );
+  const palette = f.colors.map((c, i) => spec.palette?.[i] ?? (/^#[0-9a-f]{6}$/i.test(c) ? s.ensureThread(c, `${f.name} ${i + 1}`) : spec.thread));
   return { ...spec, palette };
 }
 
@@ -338,14 +336,24 @@ export async function textOnPath(): Promise<string | null> {
   const sp = line.paths.find((p) => p.nodes.length >= 2)!;
   const path = flattenSubPath(sp, 0.1);
   // one undo step, once the lettering is on the line: the line goes with it
-  await queueEdit(group, { path, pathAlign: textSpec(group)?.pathAlign ?? "center" }, false, (d) => ({ ...d, objects: d.objects.filter((o) => o.id !== line.id) }));
+  await queueEdit(group, { path, pathAlign: textSpec(group)?.pathAlign ?? "center" }, false, (d) => ({
+    ...d,
+    objects: d.objects.filter((o) => o.id !== line.id),
+  }));
   return null;
 }
 
 /** Regenerate every lettering that uses a font (after its font info changed). */
 export async function refreshLetterings(fontKey: string): Promise<number> {
   // locked letterings stay as they are
-  const groups = [...new Set(useStore.getState().doc.objects.filter((o) => o.text?.font === fontKey).map((o) => o.text!.group))].filter((g) => !textLocked(g));
+  const groups = [
+    ...new Set(
+      useStore
+        .getState()
+        .doc.objects.filter((o) => o.text?.font === fontKey)
+        .map((o) => o.text!.group),
+    ),
+  ].filter((g) => !textLocked(g));
   let n = 0;
   for (const g of groups) if (await updateText(g, {})) n++;
   return n;

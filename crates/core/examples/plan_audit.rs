@@ -152,7 +152,8 @@ fn exposed(grid: &SegGrid, a: Point, b: Point, i: usize) -> bool {
 
 fn audit(doc: &Document, plan: &StitchPlan, trim_distance: f64) -> Report {
     let s = &plan.stitches;
-    let rings: Vec<Vec<filum_core::geom::Ring>> = doc.objects.iter().map(|o| o.paths.iter().filter(|p| p.closed).map(|p| p.flatten(0.1)).filter(|r| r.len() >= 3).collect()).collect();
+    let rings: Vec<Vec<filum_core::geom::Ring>> =
+        doc.objects.iter().map(|o| o.paths.iter().filter(|p| p.closed).map(|p| p.flatten(0.1)).filter(|r| r.len() >= 3).collect()).collect();
     let grid = SegGrid::new(plan);
     let mut r = Report::default();
     let last_stitch_before = |i: usize| s[..i].iter().rposition(|x| x.is_stitch());
@@ -204,7 +205,10 @@ fn audit(doc: &Document, plan: &StitchPlan, trim_distance: f64) -> Report {
         if st.is(flags::END) && !s[..i].iter().rev().take_while(|x| !x.is_stitch()).any(|x| x.is(flags::TRIM)) {
             r.end_no_trim = true;
         }
-        if st.is(flags::JUMP) && !s[..i].iter().rev().take_while(|x| !x.is_stitch()).any(|x| x.is(flags::TRIM | flags::COLOR_CHANGE | flags::STOP)) && last_stitch_before(i).is_some() {
+        if st.is(flags::JUMP)
+            && !s[..i].iter().rev().take_while(|x| !x.is_stitch()).any(|x| x.is(flags::TRIM | flags::COLOR_CHANGE | flags::STOP))
+            && last_stitch_before(i).is_some()
+        {
             r.jumps_untrimmed += 1;
         }
         if i == 0 || !st.is_stitch() || !s[i - 1].is_stitch() {
@@ -294,7 +298,13 @@ fn svg_of(plan: &StitchPlan, path: &str) {
         x1 = x1.max(x.x);
         y1 = y1.max(x.y);
     }
-    let mut out = format!("<svg xmlns='http://www.w3.org/2000/svg' viewBox='{} {} {} {}' width='1400' style='background:#fff'>", x0 - 2.0, y0 - 2.0, x1 - x0 + 4.0, y1 - y0 + 4.0);
+    let mut out = format!(
+        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='{} {} {} {}' width='1400' style='background:#fff'>",
+        x0 - 2.0,
+        y0 - 2.0,
+        x1 - x0 + 4.0,
+        y1 - y0 + 4.0
+    );
     for i in 1..s.len() {
         if !s[i].is_stitch() || !s[i - 1].is_stitch() {
             continue;
@@ -302,7 +312,11 @@ fn svg_of(plan: &StitchPlan, path: &str) {
         let (a, b) = (s[i - 1].pos(), s[i].pos());
         let connect = s[i - 1].object != s[i].object && a.dist(b) >= CONNECT_MIN;
         let (col, w) = if s[i].is(flags::TRAVEL) || connect {
-            if exposed(&grid, a, b, i) { ("#e0182d", 0.35) } else { ("#3a7bd5", 0.2) }
+            if exposed(&grid, a, b, i) {
+                ("#e0182d", 0.35)
+            } else {
+                ("#3a7bd5", 0.2)
+            }
         } else {
             ("#bbbbbb", 0.12)
         };
@@ -316,14 +330,38 @@ fn main() -> Result<(), String> {
     let args: Vec<String> = std::env::args().collect();
     let dir = PathBuf::from(args.get(1).ok_or("usage: plan_audit <dir of .filum designs>")?);
     let verbose = args.iter().any(|a| a == "--verbose");
-    let mut files: Vec<PathBuf> = std::fs::read_dir(&dir).map_err(|e| e.to_string())?.filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.extension().is_some_and(|e| e == "filum")).collect();
+    let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)
+        .map_err(|e| e.to_string())?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().is_some_and(|e| e == "filum"))
+        .collect();
     files.sort();
     println!(
         "{:<20} {:>5} | {:>5} {:>6} {:>6} {:>6} {:>4} {:>6} | {:>4} {:>4} | {:>5} {:>7} {:>7} | {:>6} {:>6} {:>6} | {:>4} {:>5} {:>5} {:>6}",
-        "design", "trims", "noOff", "noIn", "needl", "inObj", "trvl", "untrJ", "CC", "CCnoTie", "conn", "exposed", "max mm", "trav", "exp", "inside", "long", "short", "max", "across"
+        "design",
+        "trims",
+        "noOff",
+        "noIn",
+        "needl",
+        "inObj",
+        "trvl",
+        "untrJ",
+        "CC",
+        "CCnoTie",
+        "conn",
+        "exposed",
+        "max mm",
+        "trav",
+        "exp",
+        "inside",
+        "long",
+        "short",
+        "max",
+        "across"
     );
     for path in files {
-        let doc: Document = serde_json::from_str(&std::fs::read_to_string(&path).map_err(|e| e.to_string())?).map_err(|e| format!("{}: {e}", path.display()))?;
+        let doc: Document =
+            serde_json::from_str(&std::fs::read_to_string(&path).map_err(|e| e.to_string())?).map_err(|e| format!("{}: {e}", path.display()))?;
         let plan = Engine::new().plan(&doc);
         let r = audit(&doc, &plan, doc.machine.trim_distance);
         let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string();
@@ -360,7 +398,8 @@ fn main() -> Result<(), String> {
             v.sort_by(|a, b| b.total_cmp(a));
             println!("    exposed connections (mm): {:?}", v.iter().map(|x| (x * 10.0).round() / 10.0).collect::<Vec<_>>());
             if !r.inside_by_object.is_empty() {
-                let by: Vec<String> = r.inside_by_object.iter().map(|(o, n)| format!("{}: {n}", doc.objects.get(*o as usize).map_or("?", |x| x.name.as_str()))).collect();
+                let by: Vec<String> =
+                    r.inside_by_object.iter().map(|(o, n)| format!("{}: {n}", doc.objects.get(*o as usize).map_or("?", |x| x.name.as_str()))).collect();
                 println!("    trims inside an object: {}", by.join(", "));
                 let mut g = r.inside_gaps.clone();
                 g.sort_by(|a, b| a.total_cmp(b));
@@ -369,7 +408,13 @@ fn main() -> Result<(), String> {
         }
         // per-axis limits: DST 12.1 mm, EXP and JEF 12.7 mm (one signed byte);
         // PES (PEC long form) and VP3 carry long moves
-        for (ext, f, limit) in [("dst", fmts::Format::Dst, 12.1), ("pes", fmts::Format::Pes, 204.7), ("exp", fmts::Format::Exp, 12.7), ("jef", fmts::Format::Jef, 12.7), ("vp3", fmts::Format::Vp3, 3276.7)] {
+        for (ext, f, limit) in [
+            ("dst", fmts::Format::Dst, 12.1),
+            ("pes", fmts::Format::Pes, 204.7),
+            ("exp", fmts::Format::Exp, 12.7),
+            ("jef", fmts::Format::Jef, 12.7),
+            ("vp3", fmts::Format::Vp3, 3276.7),
+        ] {
             match file_check(&plan, &doc, f) {
                 Ok((st, jm, trims, changes, jumps)) => {
                     let flag = if st > limit + 1e-3 || jm > limit + 1e-3 { "  OVER LIMIT" } else { "" };

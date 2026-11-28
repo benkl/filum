@@ -26,7 +26,13 @@ import { freeSides } from "../../lib/satinSides";
 import { deleteNode } from "../../lib/bezier";
 
 /** The move of a pen or node tool drag. */
-export function movePen(c: CanvasCtx, s: StoreState, d: Extract<Drag, { kind: "corner" | "node" | "pen-new" | "pen-close" | "pen-last" | "bend" | "pen-anchor" | "pen-handle" | "nodes" | "nodemarquee" }>, p: Vec2, e: RPointerEvent) {
+export function movePen(
+  c: CanvasCtx,
+  s: StoreState,
+  d: Extract<Drag, { kind: "corner" | "node" | "pen-new" | "pen-close" | "pen-last" | "bend" | "pen-anchor" | "pen-handle" | "nodes" | "nodemarquee" }>,
+  p: Vec2,
+  e: RPointerEvent,
+) {
   const { draw, iRef, overlayRef, penRef, snapToNode, spaceRef } = c;
   switch (d.kind) {
     case "nodes": {
@@ -41,7 +47,10 @@ export function movePen(c: CanvasCtx, s: StoreState, d: Extract<Drag, { kind: "c
       if (snap) dv = [snap[0] - d.anchor[0], snap[1] - d.anchor[1]];
       overlayRef.current.snap = snap;
       s.liveUpdate(() => syncAll(d.orig, moveNodes(d.orig, d.sel, dv)));
-      iRef.current.tooltip = { p, text: `${d.sel.length > 1 ? `${d.sel.length} points · ` : ""}Δ ${dv[0].toFixed(1)}, ${dv[1].toFixed(1)} mm${snap ? " · snapped" : " · Shift: straight · Ctrl: no snapping"}` };
+      iRef.current.tooltip = {
+        p,
+        text: `${d.sel.length > 1 ? `${d.sel.length} points · ` : ""}Δ ${dv[0].toFixed(1)}, ${dv[1].toFixed(1)} mm${snap ? " · snapped" : " · Shift: straight · Ctrl: no snapping"}`,
+      };
       draw();
       return;
     }
@@ -65,7 +74,10 @@ export function movePen(c: CanvasCtx, s: StoreState, d: Extract<Drag, { kind: "c
       });
       const o = { ...d.orig, paths };
       s.liveUpdate((doc) => syncGradientGeometry(replaceObject(doc, o.id, o), o));
-      iRef.current.tooltip = { p, text: `${d.all ? "All corners" : "Corner"} ${r.toFixed(1)} mm · ${penState.cornerStyle}${d.all ? "" : " · Shift: all corners"} · Alt-click a widget: style` };
+      iRef.current.tooltip = {
+        p,
+        text: `${d.all ? "All corners" : "Corner"} ${r.toFixed(1)} mm · ${penState.cornerStyle}${d.all ? "" : " · Shift: all corners"} · Alt-click a widget: style`,
+      };
       draw();
       return;
     }
@@ -172,7 +184,12 @@ export function movePen(c: CanvasCtx, s: StoreState, d: Extract<Drag, { kind: "c
 }
 
 /** The release of a pen or node tool drag. */
-export function upPen(c: CanvasCtx, s: StoreState, d: Extract<Drag, { kind: "corner" | "nodes" | "nodemarquee" | "pen-new" | "pen-anchor" | "pen-handle" | "bend" | "pen-close" | "pen-last" }>, e: RPointerEvent) {
+export function upPen(
+  c: CanvasCtx,
+  s: StoreState,
+  d: Extract<Drag, { kind: "corner" | "nodes" | "nodemarquee" | "pen-new" | "pen-anchor" | "pen-handle" | "bend" | "pen-close" | "pen-last" }>,
+  e: RPointerEvent,
+) {
   const { draw, finishPen, iRef, insertIntoObject, overlayRef, pick, toMm } = c;
   if (d.kind === "corner") {
     iRef.current.tooltip = null;
@@ -311,7 +328,14 @@ export function downNode(c: CanvasCtx, tool: "node", s: StoreState, e: RPointerE
       // anywhere else: a box selects points (a click decides on release)
       const hit = pick(p);
       // Shift: add to the selected points, Alt: take away from them
-      dragRef.current = { kind: "nodemarquee", a: p, add: e.shiftKey, sub: e.altKey && !e.shiftKey, base: s.nodeSel, hit: hit && !s.selection.includes(hit.id) ? hit : null };
+      dragRef.current = {
+        kind: "nodemarquee",
+        a: p,
+        add: e.shiftKey,
+        sub: e.altKey && !e.shiftKey,
+        base: s.nodeSel,
+        hit: hit && !s.selection.includes(hit.id) ? hit : null,
+      };
       return;
     }
   }

@@ -310,7 +310,15 @@ pub fn optimize(doc: &Document, engine: &mut Engine, opts: &OptimizeOptions) -> 
         let cap = doc.fabric == crate::model::Fabric::Cap;
         bounds
             .iter()
-            .map(|b| if b.is_empty() { f64::INFINITY } else if cap { (b.center().x - c.x).abs() + (all.max_y - b.center().y) } else { b.center().dist(c) })
+            .map(|b| {
+                if b.is_empty() {
+                    f64::INFINITY
+                } else if cap {
+                    (b.center().x - c.x).abs() + (all.max_y - b.center().y)
+                } else {
+                    b.center().dist(c)
+                }
+            })
             .collect()
     } else {
         (0..n).map(|i| i as f64).collect()
@@ -361,7 +369,11 @@ pub fn optimize(doc: &Document, engine: &mut Engine, opts: &OptimizeOptions) -> 
                             best = (d, i);
                         }
                     }
-                    if best.1 == usize::MAX { first(&pool) } else { best.1 }
+                    if best.1 == usize::MAX {
+                        first(&pool)
+                    } else {
+                        best.1
+                    }
                 }
                 _ => first(&pool),
             };
@@ -509,7 +521,12 @@ mod tests {
     use crate::model::*;
 
     fn sq(id: &str, thread: &str, x: f64, y: f64) -> Object {
-        Object::new(id, thread, vec![SubPath::polyline(&[pt(x, y), pt(x + 5.0, y), pt(x + 5.0, y + 5.0), pt(x, y + 5.0)], true)], StitchParams::Fill(FillParams { underlay: false, ..Default::default() }))
+        Object::new(
+            id,
+            thread,
+            vec![SubPath::polyline(&[pt(x, y), pt(x + 5.0, y), pt(x + 5.0, y + 5.0), pt(x, y + 5.0)], true)],
+            StitchParams::Fill(FillParams { underlay: false, ..Default::default() }),
+        )
     }
 
     #[test]
@@ -552,11 +569,14 @@ mod tests {
 
     /// A satin column along a centre line from (x, y), 20 mm long.
     fn column(id: &str, thread: &str, x: f64, y: f64, sp: SatinParams) -> Object {
-        Object { paths: vec![SubPath::polyline(&[pt(x, y), pt(x + 20.0, y)], false)], stitch: StitchParams::Satin(SatinParams { width: 4.0, ..sp }), ..sq(id, thread, x, y) }
+        Object {
+            paths: vec![SubPath::polyline(&[pt(x, y), pt(x + 20.0, y)], false)],
+            stitch: StitchParams::Satin(SatinParams { width: 4.0, ..sp }),
+            ..sq(id, thread, x, y)
+        }
     }
 
     fn four() -> Document {
-        
         Document {
             objects: vec![sq("A", "red", 0.0, 0.0), sq("B", "blue", 30.0, 0.0), sq("C", "red", 60.0, 0.0), sq("D", "blue", 90.0, 0.0)],
             ..Default::default()
@@ -586,7 +606,13 @@ mod tests {
     #[test]
     fn without_grouping_colours_the_blocks_stay() {
         let doc = Document {
-            objects: vec![sq("A", "red", 0.0, 0.0), sq("B", "red", 60.0, 0.0), sq("C", "red", 10.0, 0.0), sq("D", "blue", 100.0, 0.0), sq("E", "red", 20.0, 0.0)],
+            objects: vec![
+                sq("A", "red", 0.0, 0.0),
+                sq("B", "red", 60.0, 0.0),
+                sq("C", "red", 10.0, 0.0),
+                sq("D", "blue", 100.0, 0.0),
+                sq("E", "red", 20.0, 0.0),
+            ],
             ..Default::default()
         };
         let r = optimize(&doc, &mut Engine::new(), &OptimizeOptions { colors: false, ..Default::default() });
@@ -615,10 +641,19 @@ mod tests {
 
     #[test]
     fn a_layered_column_follows_its_inner_thread() {
-        let layered = SatinParams { layered: Some(LayeredOptions { layers: 2, base_thread: Some("blue".into()), ..Default::default() }), width: 8.0, ..Default::default() };
+        let layered = SatinParams {
+            layered: Some(LayeredOptions { layers: 2, base_thread: Some("blue".into()), ..Default::default() }),
+            width: 8.0,
+            ..Default::default()
+        };
         let doc = Document {
             threads: vec![thread("red", "#ff0000"), thread("blue", "#0000ff")],
-            objects: vec![sq("A", "red", 0.0, 0.0), column("L", "red", 30.0, 0.0, SatinParams { width: 8.0, ..layered }), sq("B", "blue", 60.0, 0.0), sq("C", "red", 90.0, 0.0)],
+            objects: vec![
+                sq("A", "red", 0.0, 0.0),
+                column("L", "red", 30.0, 0.0, SatinParams { width: 8.0, ..layered }),
+                sq("B", "blue", 60.0, 0.0),
+                sq("C", "red", 90.0, 0.0),
+            ],
             ..Default::default()
         };
         let r = optimize_order(&doc, &mut Engine::new());
@@ -645,7 +680,10 @@ mod tests {
     #[test]
     fn end_points_towards_the_next_object_shorten_the_jumps() {
         let mut doc = Document::default();
-        let tall = |id: &str, x: f64| Object { paths: vec![SubPath::polyline(&[pt(x, 0.0), pt(x + 10.0, 0.0), pt(x + 10.0, 60.0), pt(x, 60.0)], true)], ..sq(id, "red", 0.0, 0.0) };
+        let tall = |id: &str, x: f64| Object {
+            paths: vec![SubPath::polyline(&[pt(x, 0.0), pt(x + 10.0, 0.0), pt(x + 10.0, 60.0), pt(x, 60.0)], true)],
+            ..sq(id, "red", 0.0, 0.0)
+        };
         doc.objects = vec![tall("A", 0.0), tall("B", 30.0)];
         let without = optimize(&doc, &mut Engine::new(), &OptimizeOptions { ends: false, ..Default::default() });
         let with = optimize_order(&doc, &mut Engine::new());

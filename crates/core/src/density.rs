@@ -169,7 +169,18 @@ fn covers_fabric(st: &StitchParams) -> bool {
         StitchParams::Satin(_) => true,
         StitchParams::Fill(f) => {
             f.ramp.is_none()
-                && matches!(f.method, FillMethod::Tatami | FillMethod::Contour | FillMethod::Spiral | FillMethod::Guided | FillMethod::Flow | FillMethod::Curved | FillMethod::Radial | FillMethod::Circular | FillMethod::Tartan)
+                && matches!(
+                    f.method,
+                    FillMethod::Tatami
+                        | FillMethod::Contour
+                        | FillMethod::Spiral
+                        | FillMethod::Guided
+                        | FillMethod::Flow
+                        | FillMethod::Curved
+                        | FillMethod::Radial
+                        | FillMethod::Circular
+                        | FillMethod::Tartan
+                )
         }
         _ => false,
     }
@@ -499,7 +510,11 @@ mod tests {
     #[test]
     fn overlaps_are_risk_and_sparse_covering_fills_are_thin() {
         let fill = |s: f64| StitchParams::Fill(FillParams { underlay: false, row_spacing: s, ..Default::default() });
-        let stacked = field(&doc(vec![obj("a", square(0.0, 0.0, 20.0), fill(0.18)), obj("b", square(5.0, 5.0, 10.0), fill(0.18)), obj("c", square(7.0, 7.0, 6.0), fill(0.18))]));
+        let stacked = field(&doc(vec![
+            obj("a", square(0.0, 0.0, 20.0), fill(0.18)),
+            obj("b", square(5.0, 5.0, 10.0), fill(0.18)),
+            obj("c", square(7.0, 7.0, 6.0), fill(0.18)),
+        ]));
         assert_eq!(stacked.class[at(&stacked, 12.0, 8.0)], DensityClass::Risk as u8, "three dense fills on top of each other");
         // two default fills with their underlay: heavy, not a risk
         let dflt = || StitchParams::Fill(FillParams::default());

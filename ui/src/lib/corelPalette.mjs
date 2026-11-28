@@ -3,7 +3,11 @@
 // writes the download manifest) and the app (Preferences ▸ Downloads converts
 // the charts on the user's device). Plain JS so Node and the browser load it.
 
-const unescape = (s) => s.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&apos;/g, "'");
+const unescape = (s) =>
+  s
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
 
 /** The palette's title: "Madeira - Polyneon" → { brand: "Madeira", name: "Madeira Polyneon" }. */
 export function corelTitle(xml, fallback) {
@@ -43,6 +47,7 @@ export function corelEntries(xml) {
 /** GIMP palette text (what the app's palette parser and Ink/Stitch read). */
 export function gplText(name, entries) {
   const lines = ["GIMP Palette", `Name: ${name}`, "Columns: 4", "# RGB Value\tColor Name Number"];
-  for (const e of entries) lines.push(`${String(e.rgb[0]).padStart(3)} ${String(e.rgb[1]).padStart(3)} ${String(e.rgb[2]).padStart(3)}\t${e.name} ${e.code}`.trimEnd());
+  for (const e of entries)
+    lines.push(`${String(e.rgb[0]).padStart(3)} ${String(e.rgb[1]).padStart(3)} ${String(e.rgb[2]).padStart(3)}\t${e.name} ${e.code}`.trimEnd());
   return lines.join("\n") + "\n";
 }

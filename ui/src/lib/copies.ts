@@ -24,8 +24,12 @@ export function remapThreads(o: DesignObject, f: (id: string) => string): Design
   return {
     ...o,
     thread: f(o.thread),
-    ...(o.stitch?.type === "satin" && o.stitch.layered?.baseThread ? { stitch: { ...o.stitch, layered: { ...o.stitch.layered, baseThread: f(o.stitch.layered.baseThread) } } } : {}),
-    ...(o.text ? { text: { ...o.text, thread: f(o.text.thread), borderThread: f(o.text.borderThread), ...(o.text.palette ? { palette: o.text.palette.map(f) } : {}) } } : {}),
+    ...(o.stitch?.type === "satin" && o.stitch.layered?.baseThread
+      ? { stitch: { ...o.stitch, layered: { ...o.stitch.layered, baseThread: f(o.stitch.layered.baseThread) } } }
+      : {}),
+    ...(o.text
+      ? { text: { ...o.text, thread: f(o.text.thread), borderThread: f(o.text.borderThread), ...(o.text.palette ? { palette: o.text.palette.map(f) } : {}) } }
+      : {}),
   };
 }
 
@@ -79,7 +83,9 @@ export function freshCopies(
     return map.get(k)!;
   };
   const ids = new Map(objs.map((o) => [o.id, uid()]));
-  const fixed = new Set(doc.objects.flatMap((o) => (o.stitch.type === "fill" ? [o.stitch.gradient?.group, o.stitch.tartan?.group].filter((g): g is string => !!g) : [])));
+  const fixed = new Set(
+    doc.objects.flatMap((o) => (o.stitch.type === "fill" ? [o.stitch.gradient?.group, o.stitch.tartan?.group].filter((g): g is string => !!g) : [])),
+  );
   const whole = (g: string) => objectsIn(doc, g).every((o) => ids.has(o.id));
   const reGroup = (g: string) => (!opts.inPlace || fixed.has(g) || whole(g) ? re(g, "g") : g);
   const parents = copiedParents(doc, objs, reGroup);
@@ -125,7 +131,12 @@ export function freshCopies(
  * Copies moved by `m` (and turned by `rot`): a linked clone that follows a
  * copy moved with it keeps its place relative to that copy.
  */
-export function placeCopies(copies: DesignObject[], m: Mat, rot = 0, tf: (o: DesignObject, m: Mat, rot: number) => DesignObject = transformObject): DesignObject[] {
+export function placeCopies(
+  copies: DesignObject[],
+  m: Mat,
+  rot = 0,
+  tf: (o: DesignObject, m: Mat, rot: number) => DesignObject = transformObject,
+): DesignObject[] {
   const copied = new Set(copies.map((c) => c.id));
   return copies.map((c) => {
     const t = tf(c, m, rot);

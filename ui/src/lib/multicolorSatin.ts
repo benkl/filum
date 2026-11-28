@@ -8,7 +8,6 @@ import { flattenSubPath } from "./bezier";
 import { satinRailIndices, uid } from "./geometry";
 import { lerp } from "./vec";
 
-
 /** A polyline resampled to n points evenly along its length. */
 function resample(pts: Vec2[], n: number): Vec2[] {
   const cum = [0];

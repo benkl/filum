@@ -21,4 +21,3 @@ export function commandScore(query: string, label: string, path: string): number
   }
   return total + (l.startsWith(words[0]) ? 1 : 0);
 }
-

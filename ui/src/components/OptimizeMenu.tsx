@@ -88,11 +88,7 @@ export function OptimizeButton() {
         aria-haspopup="menu"
         aria-expanded={!!at}
         title="What Optimise may change"
-        onClick={(e) =>
-          at
-            ? close()
-            : setAt(e.currentTarget.parentElement!.getBoundingClientRect())
-        }
+        onClick={(e) => (at ? close() : setAt(e.currentTarget.parentElement!.getBoundingClientRect()))}
       >
         <ChevronDown size={13} />
       </button>
@@ -101,13 +97,7 @@ export function OptimizeButton() {
   );
 }
 
-function OptimizeMenu({
-  anchor,
-  onClose,
-}: {
-  anchor: DOMRect;
-  onClose: (focus?: boolean) => void;
-}) {
+function OptimizeMenu({ anchor, onClose }: { anchor: DOMRect; onClose: (focus?: boolean) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const prefs = useStore((s) => s.prefs);
   const selected = useStore((s) => s.selection.length);
@@ -122,21 +112,10 @@ function OptimizeMenu({
     setPlace({ x: p.left, y: p.top });
   }, [anchor]);
   useEffect(() => {
-    ref.current
-      ?.querySelector<HTMLButtonElement>(".menu-item:not(:disabled)")
-      ?.focus({ preventScroll: true });
+    ref.current?.querySelector<HTMLButtonElement>(".menu-item:not(:disabled)")?.focus({ preventScroll: true });
   }, []);
-  const toggle = (id: keyof OptimizeSteps) =>
-    useStore
-      .getState()
-      .setPrefs({ optimize: { ...prefs.optimize, [id]: !steps[id] } });
-  const none =
-    !steps.colors &&
-    !steps.travel &&
-    !steps.centerOut &&
-    !steps.foamLast &&
-    !steps.ends &&
-    !steps.links;
+  const toggle = (id: keyof OptimizeSteps) => useStore.getState().setPrefs({ optimize: { ...prefs.optimize, [id]: !steps[id] } });
+  const none = !steps.colors && !steps.travel && !steps.centerOut && !steps.foamLast && !steps.ends && !steps.links;
   const item = (st: Step, disabled = false) => (
     <button
       key={st.id}
@@ -167,11 +146,7 @@ function OptimizeMenu({
         if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
         e.preventDefault();
         e.stopPropagation();
-        const f = [
-          ...(ref.current?.querySelectorAll<HTMLButtonElement>(
-            ".menu-item:not(:disabled)",
-          ) ?? []),
-        ];
+        const f = [...(ref.current?.querySelectorAll<HTMLButtonElement>(".menu-item:not(:disabled)") ?? [])];
         const k = f.indexOf(document.activeElement as HTMLButtonElement);
         f[(k + (e.key === "ArrowDown" ? 1 : f.length - 1)) % f.length]?.focus();
       }}
@@ -185,9 +160,7 @@ function OptimizeMenu({
       {item(
         {
           ...SCOPE_STEPS[1],
-          label: selected
-            ? `Only the selection (${selected})`
-            : SCOPE_STEPS[1].label,
+          label: selected ? `Only the selection (${selected})` : SCOPE_STEPS[1].label,
         },
         !selected,
       )}
@@ -196,11 +169,7 @@ function OptimizeMenu({
         role="menuitem"
         className="menu-item"
         disabled={none}
-        title={
-          none
-            ? "Tick at least one step above"
-            : "Optimise now with these steps"
-        }
+        title={none ? "Tick at least one step above" : "Optimise now with these steps"}
         onClick={() => {
           onClose();
           optimizeOrder();
@@ -211,9 +180,7 @@ function OptimizeMenu({
         </span>
         Optimise now
       </button>
-      <p className="menu-note">
-        What overlaps keeps its stacking whatever is ticked.
-      </p>
+      <p className="menu-note">What overlaps keeps its stacking whatever is ticked.</p>
     </div>
   );
 }

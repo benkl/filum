@@ -6,7 +6,7 @@
 
 use std::f64::consts::TAU;
 
-use crate::geom::{Point, pt};
+use crate::geom::{pt, Point};
 
 /// Modular interval of angles (whole circle or less than half of it).
 #[derive(Clone, Copy, Debug)]
@@ -401,7 +401,11 @@ pub fn running_stitch_with(points: &[Point], len: &StitchLength, tol: f64, strea
     let mut pos = 0;
     let mut rng = crate::prng::Stream::new(len.seed, stream);
     for curve in path_to_curves(&pts, 2.0 * tol) {
-        let (s, p) = if len.jitter > 0.0 { stitch_curve_random(&curve, &lengths, tol, len.jitter, &mut rng, pos) } else { stitch_curve_pattern(&curve, &lengths, tol, pos) };
+        let (s, p) = if len.jitter > 0.0 {
+            stitch_curve_random(&curve, &lengths, tol, len.jitter, &mut rng, pos)
+        } else {
+            stitch_curve_pattern(&curve, &lengths, tol, pos)
+        };
         pos = p;
         out.extend(s);
     }
@@ -520,7 +524,6 @@ pub fn zigzag_stitch(points: &[Point], spacing: f64, width: f64, pull_comp: f64,
     }
     out
 }
-
 
 #[cfg(test)]
 mod tests {

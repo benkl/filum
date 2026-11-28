@@ -38,7 +38,10 @@ fn flow_fill_with_an_empty_field_finishes() {
         assert!(finite(&p));
     }
     // the triangle falls back to rows that follow its shape
-    let p = plan_within(r#"{"objects":[{"id":"o5","paths":[{"nodes":[{"p":[62.0,0]},{"p":[0,0]},{"p":[0,60.0]}]}],"stitch":{"flow":{},"method":"flow","type":"fill"},"thread":"dup"}]}"#, 60);
+    let p = plan_within(
+        r#"{"objects":[{"id":"o5","paths":[{"nodes":[{"p":[62.0,0]},{"p":[0,0]},{"p":[0,60.0]}]}],"stitch":{"flow":{},"method":"flow","type":"fill"},"thread":"dup"}]}"#,
+        60,
+    );
     assert!(p.stitches.iter().filter(|s| s.is_stitch()).count() > 500);
 }
 
@@ -85,7 +88,9 @@ fn the_frame_comes_back_from_the_stop_position() {
 
 #[test]
 fn optimizing_objects_without_geometry_does_not_panic() {
-    let d = doc(r##"{"threads":[{"id":"t","name":"T","color":"#000000"}],"objects":[{"id":"a","thread":"t","paths":[{"nodes":[{"p":[0,0]},{"p":[10,0]}]}],"stitch":{"type":"running"}},{"id":"b","thread":"t","paths":[],"stitch":{"type":"running"}},{"id":"n","thread":"t","paths":[{"nodes":[]}],"stitch":{"type":"running"}},{"id":"c","thread":"t","paths":[{"nodes":[{"p":[0,5]},{"p":[10,5]}]}],"stitch":{"type":"running"}}]}"##);
+    let d = doc(
+        r##"{"threads":[{"id":"t","name":"T","color":"#000000"}],"objects":[{"id":"a","thread":"t","paths":[{"nodes":[{"p":[0,0]},{"p":[10,0]}]}],"stitch":{"type":"running"}},{"id":"b","thread":"t","paths":[],"stitch":{"type":"running"}},{"id":"n","thread":"t","paths":[{"nodes":[]}],"stitch":{"type":"running"}},{"id":"c","thread":"t","paths":[{"nodes":[{"p":[0,5]},{"p":[10,5]}]}],"stitch":{"type":"running"}}]}"##,
+    );
     let r = filum_core::optimize::optimize_order(&d, &mut Engine::new());
     assert_eq!(r.order.len(), 4);
 }
@@ -126,14 +131,20 @@ fn absurd_split_lengths_and_widths_finish() {
 #[test]
 fn ink_stitch_sized_splits_are_unchanged() {
     // a 4 mm satin split and a 3 mm manual split still split at those lengths
-    let p = plan_within(r#"{"machine":{"ties":false},"objects":[{"id":"o0","paths":[{"nodes":[{"p":[30.0,0]},{"p":[0,0]}]}],"stitch":{"maxLength":3.0,"type":"manual"},"thread":"t0"}]}"#, 60);
+    let p = plan_within(
+        r#"{"machine":{"ties":false},"objects":[{"id":"o0","paths":[{"nodes":[{"p":[30.0,0]},{"p":[0,0]}]}],"stitch":{"maxLength":3.0,"type":"manual"},"thread":"t0"}]}"#,
+        60,
+    );
     let pts: Vec<_> = p.stitches.iter().filter(|s| s.is_stitch()).collect();
     assert_eq!(pts.len(), 11);
 }
 
 #[test]
 fn the_trim_after_an_arrow_lock_is_at_the_needle() {
-    let p = plan_within(r#"{"machine":{"lockEnd":"arrow"},"objects":[{"id":"o1","paths":[{"nodes":[{"p":[55.0,0]},{"p":[0,0]}]}],"stitch":{"type":"running"},"thread":"t0"}]}"#, 60);
+    let p = plan_within(
+        r#"{"machine":{"lockEnd":"arrow"},"objects":[{"id":"o1","paths":[{"nodes":[{"p":[55.0,0]},{"p":[0,0]}]}],"stitch":{"type":"running"},"thread":"t0"}]}"#,
+        60,
+    );
     let k = p.stitches.iter().position(|s| s.is(flags::TRIM)).expect("a trim");
     let last = p.stitches[..k].iter().rev().find(|s| s.is_stitch() || s.is(flags::JUMP)).unwrap();
     assert!((last.x - p.stitches[k].x).abs() < 1e-9 && (last.y - p.stitches[k].y).abs() < 1e-9);
@@ -142,7 +153,8 @@ fn the_trim_after_an_arrow_lock_is_at_the_needle() {
 #[test]
 fn outlines_with_absurd_offsets_do_not_exhaust_memory() {
     for offset in [1e300, f64::INFINITY, f64::NAN, -1e300] {
-        let rings = filum_core::geom::offset_rings(&[vec![filum_core::geom::pt(0.0, 0.0), filum_core::geom::pt(10.0, 0.0), filum_core::geom::pt(10.0, 10.0)]], offset);
+        let rings =
+            filum_core::geom::offset_rings(&[vec![filum_core::geom::pt(0.0, 0.0), filum_core::geom::pt(10.0, 0.0), filum_core::geom::pt(10.0, 10.0)]], offset);
         assert!(rings.iter().flatten().all(|q| q.x.is_finite() && q.y.is_finite()), "{offset}");
     }
 }

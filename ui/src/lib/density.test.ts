@@ -23,7 +23,12 @@ check(c.ticks.some((t) => t.v === 1) && c.ticks.some((t) => t.v === 3), "coverag
 // the same 2.4 layers: heavy on cotton, past the maximum on silk
 const s = densityScale("coverage", silk);
 check(colorAt(s, 2.4)[1] < colorAt(c, 2.4)[1], "silk judges the same stitches denser");
-check(densityScale("holes", cotton).ticks.map((t) => t.v).join() === "10,17", "needle holes: the common tiers on cotton");
+check(
+  densityScale("holes", cotton)
+    .ticks.map((t) => t.v)
+    .join() === "10,17",
+  "needle holes: the common tiers on cotton",
+);
 
 // a 3 × 1 field: thin, ok, risk
 const f: DensityField = {

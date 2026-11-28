@@ -17,9 +17,19 @@ const line = (id: string, y: number, stitch: DesignObject["stitch"]): DesignObje
   trimAfter: false,
   stopAfter: false,
 });
-const ripple = line("r", 0, { type: "running", length: 2.5, tolerance: 0.2, repeats: 1, beanRepeats: 0, ripple: { lines: 5, minScale: 0, spacing: 2, rotation: 0, reverse: false } });
+const ripple = line("r", 0, {
+  type: "running",
+  length: 2.5,
+  tolerance: 0.2,
+  repeats: 1,
+  beanRepeats: 0,
+  ripple: { lines: 5, minScale: 0, spacing: 2, rotation: 0, reverse: false },
+});
 const guide = line("g", 10, { type: "running", length: 2.5, tolerance: 0.2, repeats: 1, beanRepeats: 0 });
-const satin: DesignObject = { ...line("s", 30, { type: "satin" } as DesignObject["stitch"]), paths: [line("a", 30, guide.stitch).paths[0], line("b", 40, guide.stitch).paths[0]] };
+const satin: DesignObject = {
+  ...line("s", 30, { type: "satin" } as DesignObject["stitch"]),
+  paths: [line("a", 30, guide.stitch).paths[0], line("b", 40, guide.stitch).paths[0]],
+};
 
 ok(guidePair([ripple, guide])?.guide.id === "g", "a ripple and a line make a pair");
 ok(guidePair([guide, ripple])?.ripple.id === "r", "in either order");
@@ -34,4 +44,7 @@ const r = next.objects[0].stitch;
 ok(r.type === "running" && r.ripple?.guide?.length === 1 && r.ripple.guide[0].nodes[0].p[1] === 10, "with its line");
 
 const g = defaultRippleGuide(ripple);
-ok(!!g && g.nodes.length === 2 && Math.abs(Math.hypot(g.nodes[1].p[0] - g.nodes[0].p[0], g.nodes[1].p[1] - g.nodes[0].p[1]) - 8) < 1e-9, "a straight guide as long as the copies' spread");
+ok(
+  !!g && g.nodes.length === 2 && Math.abs(Math.hypot(g.nodes[1].p[0] - g.nodes[0].p[0], g.nodes[1].p[1] - g.nodes[0].p[1]) - 8) < 1e-9,
+  "a straight guide as long as the copies' spread",
+);

@@ -8,7 +8,21 @@ import { useStore } from "../store";
 import type { DesignObject, StitchDocument, StitchParams, SubPath, Vec2 } from "../types";
 import { gatherAtTop, groupInfo, isFixedMember, nextGroupName, pruneGroups } from "./layerRows";
 import { chainOf, commonGroup, groupsOf, objectsIn, parentOf, parentsOf, selectedUnits, topGroupOf, withParent } from "./groups";
-import { defaultApplique, defaultFill, defaultRunning, defaultSatin, normAngle, objectBounds, rotateAbout, scaleAbout, transformObject, translateMat, uid, unionBoxes, type Box } from "./geometry";
+import {
+  defaultApplique,
+  defaultFill,
+  defaultRunning,
+  defaultSatin,
+  normAngle,
+  objectBounds,
+  rotateAbout,
+  scaleAbout,
+  transformObject,
+  translateMat,
+  uid,
+  unionBoxes,
+  type Box,
+} from "./geometry";
 import { freshCopies, placeCopies, threadsOf } from "./copies";
 import { layerSetOf, oneLayerEach, pastedStitchDoc, plainGroupOf, plainLayerStitch } from "./fillLayers";
 import { gridDoc, type GridOptions } from "./grid";
@@ -260,9 +274,7 @@ export function makeApplique() {
   s.commit((d) => ({
     ...d,
     objects: d.objects.map((o) =>
-      ids.includes(o.id)
-        ? { ...o, paths: o.paths.filter((p) => p.closed && p.nodes.length >= 3), stitch: { type: "applique", ...defaultApplique() } }
-        : o,
+      ids.includes(o.id) ? { ...o, paths: o.paths.filter((p) => p.closed && p.nodes.length >= 3), stitch: { type: "applique", ...defaultApplique() } } : o,
     ),
   }));
   s.toast(`${ids.length} appliqué${ids.length > 1 ? "s" : ""}: placement → stop → tack-down → stop → cover`, "success");
@@ -292,7 +304,11 @@ const MIN_OUTLINE_AREA = 1;
  */
 export async function outlineObject(doc: StitchDocument, ids: string[], opt: OutlineOptions): Promise<DesignObject | null> {
   if (!ids.length) return null;
-  const shapes: SubPath[] = await engine.outlineShapes(doc, ids, opt.offset, { bridge: opt.bridge ?? 0, outerOnly: !!opt.outerOnly, minArea: MIN_OUTLINE_AREA });
+  const shapes: SubPath[] = await engine.outlineShapes(doc, ids, opt.offset, {
+    bridge: opt.bridge ?? 0,
+    outerOnly: !!opt.outerOnly,
+    minArea: MIN_OUTLINE_AREA,
+  });
   if (!shapes.length) return null;
   const stitch: StitchParams =
     opt.kind === "fill"
@@ -423,7 +439,11 @@ export async function combineShapes(op: ShapeBooleanOp) {
   // identical layers would cancel out (Minus front, Exclude): one shape per set
   const sel = oneLayerEach(picked);
   if (sel.length < 2) return s.toast("Select two or more shapes");
-  const shapes = await engine.booleanShapes(doc, sel.map((o) => o.id), op);
+  const shapes = await engine.booleanShapes(
+    doc,
+    sel.map((o) => o.id),
+    op,
+  );
   if (!shapes.length) return s.toast("The result is empty", "error");
   const style = op === "minusFront" ? sel[0] : sel[sel.length - 1];
   const stitch: StitchParams =
@@ -523,7 +543,12 @@ export function unlockAll() {
 
 /** Objects on the clipboard (with their threads); also put on the system clipboard as text. */
 const CLIP_TAG = "filum/objects:";
-let objectClip: { objects: DesignObject[]; threads: StitchDocument["threads"]; groupParents?: Record<string, string>; groupNames?: Record<string, string> } | null = null;
+let objectClip: {
+  objects: DesignObject[];
+  threads: StitchDocument["threads"];
+  groupParents?: Record<string, string>;
+  groupNames?: Record<string, string>;
+} | null = null;
 let pastes = 0;
 
 /** The selection as clipboard text (and remembered for Paste). */

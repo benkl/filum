@@ -20,8 +20,7 @@ export const MACHINE_EXT = [
 ];
 const IMAGE_EXT = ["png", "jpg", "jpeg", "webp", "bmp", "gif"];
 
-export const fit = (what: "hoop" | "design" | number = "hoop") =>
-  window.dispatchEvent(new CustomEvent("filum:fit", { detail: what }));
+export const fit = (what: "hoop" | "design" | number = "hoop") => window.dispatchEvent(new CustomEvent("filum:fit", { detail: what }));
 
 function loadDoc(doc: StitchDocument, path: string | null) {
   const s = useStore.getState();
@@ -30,7 +29,17 @@ function loadDoc(doc: StitchDocument, path: string | null) {
   if (!checked) throw new Error("not a Filum design");
   if (checked.dropped) s.toast(`${checked.dropped} damaged object${checked.dropped === 1 ? " was" : "s were"} left out`, "error");
   s.setDoc(checked.doc);
-  s.set({ filePath: path, saved: true, past: [], future: [], selection: [], nodeSel: [], gradNodes: [], activeThread: null, anim: { ...s.anim, index: null, playing: false } });
+  s.set({
+    filePath: path,
+    saved: true,
+    past: [],
+    future: [],
+    selection: [],
+    nodeSel: [],
+    gradNodes: [],
+    activeThread: null,
+    anim: { ...s.anim, index: null, playing: false },
+  });
   setTimeout(() => fit("hoop"), 0);
 }
 
@@ -136,9 +145,7 @@ async function pickFile(filters: Parameters<typeof openFile>[0]) {
 }
 
 export async function importFile() {
-  const f = await pickFile([
-    { name: "Artwork & embroidery", extensions: ["svg", ...MACHINE_EXT, ...IMAGE_EXT] },
-  ]);
+  const f = await pickFile([{ name: "Artwork & embroidery", extensions: ["svg", ...MACHINE_EXT, ...IMAGE_EXT] }]);
   if (f) await handleBytes(f.name, f.path, f.bytes, "import");
 }
 
@@ -218,8 +225,18 @@ export async function optimizeOrder() {
   if (!s.doc.objects.length) return;
   const steps = optimizeSteps(s.prefs, s.doc.fabric);
   const only = steps.selectionOnly && s.selection.length ? s.selection : undefined;
-  if (!steps.colors && !steps.travel && !steps.centerOut && !steps.foamLast && !steps.ends && !steps.links) return s.toast("Optimise: every step is switched off (the menu beside the button)", "info");
-  const r = await engine.optimize(s.doc, { colors: steps.colors, travel: steps.travel, foamLast: steps.foamLast, ends: steps.ends, links: steps.links, locked: steps.locked, centerOut: steps.centerOut, selection: only });
+  if (!steps.colors && !steps.travel && !steps.centerOut && !steps.foamLast && !steps.ends && !steps.links)
+    return s.toast("Optimise: every step is switched off (the menu beside the button)", "info");
+  const r = await engine.optimize(s.doc, {
+    colors: steps.colors,
+    travel: steps.travel,
+    foamLast: steps.foamLast,
+    ends: steps.ends,
+    links: steps.links,
+    locked: steps.locked,
+    centerOut: steps.centerOut,
+    selection: only,
+  });
   // applied to the design as it is now: edits made meanwhile stay, new objects go last
   const ends = new Map(r.ends.map((e) => [e.id, e.end]));
   const reset = new Set(r.linksReset);
@@ -290,7 +307,10 @@ function warnIfLargerThanHoop() {
   const box = unionBoxes(s.doc.objects.map(objectBounds));
   const { width, height } = s.doc.hoop;
   if (!box || (box.w <= width + 0.01 && box.h <= height + 0.01)) return;
-  s.toast(`The design (${Math.ceil(box.w)} × ${Math.ceil(box.h)} mm) is larger than the ${width} × ${height} mm hoop: choose a larger hoop, or Fit to design (Design ▸ Hoop)`, "error");
+  s.toast(
+    `The design (${Math.ceil(box.w)} × ${Math.ceil(box.h)} mm) is larger than the ${width} × ${height} mm hoop: choose a larger hoop, or Fit to design (Design ▸ Hoop)`,
+    "error",
+  );
 }
 
 export function centerInHoop() {
@@ -323,7 +343,9 @@ export function cloneSelection() {
   const clones = sel.map((o) => makeClone(o));
   s.addObjects(clones);
   s.select(clones.map((c) => c.id));
-  s.toast(`${clones.length} clone${clones.length > 1 ? "s" : ""}: they follow the original${clones.length > 1 ? "s" : ""} — edit an original to change its clones`);
+  s.toast(
+    `${clones.length} clone${clones.length > 1 ? "s" : ""}: they follow the original${clones.length > 1 ? "s" : ""} — edit an original to change its clones`,
+  );
 }
 
 /**

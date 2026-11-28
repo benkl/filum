@@ -14,15 +14,8 @@ use crate::raw::RawPattern;
 use crate::{Error, Pattern, Thread, WriteOptions};
 
 /// pystitch writer limits; Ink/Stitch writes every format with `full_jump`.
-pub(crate) const SETTINGS: EncodeSettings = EncodeSettings {
-    max_stitch: 127,
-    max_jump: 127,
-    full_jump: true,
-};
-pub(crate) const THREAD_CHANGE: ThreadChange = ThreadChange {
-    needle_set: true,
-    explicit_trim: true,
-};
+pub(crate) const SETTINGS: EncodeSettings = EncodeSettings { max_stitch: 127, max_jump: 127, full_jump: true };
+pub(crate) const THREAD_CHANGE: ThreadChange = ThreadChange { needle_set: true, explicit_trim: true };
 /// pystitch's default `needle_count`: needles are assigned 1, 2, …, 5, 1, …
 pub(crate) const NEEDLE_COUNT: usize = 5;
 const HEADER_SIZE: usize = 0x600;

@@ -23,7 +23,9 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(HERE, "..", "wiki", "images");
 const TMP = "/tmp/filum-shots";
 const URL = process.env.URL || "http://localhost:1420";
-const W = 1440, H = 900, DSF = 1.25;
+const W = 1440,
+  H = 900,
+  DSF = 1.25;
 
 mkdirSync(OUT, { recursive: true });
 mkdirSync(TMP, { recursive: true });
@@ -49,10 +51,11 @@ const select = async (p, name, view = "stitch") => {
   const id = await run(p, `return s.doc.objects.find((o) => o.name === a[0])?.id`, name);
   await run(p, `s.select([a[0]]); useStore.setState({ inspectorTab: "selection" }); s.setViewMode(a[1])`, id, view);
 };
-const emptyDesign = (p) => p.evaluate(async () => {
-  const m = await import("/src/store.ts");
-  m.useStore.getState().setDoc(m.emptyDoc());
-});
+const emptyDesign = (p) =>
+  p.evaluate(async () => {
+    const m = await import("/src/store.ts");
+    m.useStore.getState().setDoc(m.emptyDoc());
+  });
 async function openDigitizer(p) {
   await p.evaluate(async (bytes) => {
     const a = await import("/src/lib/actions.ts");
@@ -83,8 +86,11 @@ const SHOTS = {
   "stitch-out": async (p) => {
     await run(p, `s.setViewMode("realistic")`);
     await waitPlan(p);
-    await run(p, `const n = s.plan?.stitches?.length ?? 20000;
-      useStore.setState({ anim: { playing: false, index: Math.floor(n * 0.55), speed: 1 } })`);
+    await run(
+      p,
+      `const n = s.plan?.stitches?.length ?? 20000;
+      useStore.setState({ anim: { playing: false, index: Math.floor(n * 0.55), speed: 1 } })`,
+    );
   },
   digitize: openDigitizer,
   "digitize-result": async (p) => {
@@ -172,7 +178,10 @@ if (["view-vector", "view-stitch", "view-realistic"].every((n) => names.includes
   const crop = `${Math.round(560 * DSF)}x${Math.round(560 * DSF)}+${Math.round(436 * DSF)}+${Math.round(170 * DSF)}`;
   execFileSync("magick", [
     ...["view-vector", "view-stitch", "view-realistic"].flatMap((n) => ["(", join(OUT, `${n}.webp`), "-crop", crop, "+repage", ")"]),
-    "+append", "-quality", "86", join(OUT, "views.webp"),
+    "+append",
+    "-quality",
+    "86",
+    join(OUT, "views.webp"),
   ]);
   for (const n of ["view-vector", "view-stitch", "view-realistic"]) rmSync(join(OUT, `${n}.webp`));
 }

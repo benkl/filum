@@ -42,8 +42,6 @@ pub fn fill_rings(paths: &[SubPath]) -> Vec<Ring> {
     out
 }
 
-
-
 /// Route from `a` to `b` without leaving the region: straight if possible,
 /// otherwise along the nearest boundary ring. Returns None if impossible.
 pub fn travel_path(rings: &[Ring], a: Point, b: Point) -> Option<Vec<Point>> {
@@ -252,7 +250,11 @@ impl RowPattern {
     fn points(&self, row: i64, x0: f64, x1: f64, staggers: u32, gap: f64) -> Vec<f64> {
         let ls = self.lengths();
         let period: f64 = ls.iter().sum();
-        let share = if self.n_offsets > 0 { self.offsets[row.rem_euclid(self.n_offsets as i64) as usize] } else { (row as f64 / staggers.max(1) as f64).rem_euclid(1.0) };
+        let share = if self.n_offsets > 0 {
+            self.offsets[row.rem_euclid(self.n_offsets as i64) as usize]
+        } else {
+            (row as f64 / staggers.max(1) as f64).rem_euclid(1.0)
+        };
         let shift = share * period;
         let mut x = shift + ((x0 - shift) / period).floor() * period;
         let mut out = Vec::new();
@@ -325,7 +327,11 @@ pub(crate) fn stitch_row_pub(out: &mut Run, y: f64, x0: f64, x1: f64, row_num: i
 /// (`max(max_stitch_length_mm, 0.1 mm)`); a NaN or infinite length, which
 /// would never reach a row's end, falls back to the default 3 mm.
 pub(crate) fn fill_stitch_len(max_len: f64) -> f64 {
-    if max_len.is_finite() { max_len.max(0.1) } else { 3.0 }
+    if max_len.is_finite() {
+        max_len.max(0.1)
+    } else {
+        3.0
+    }
 }
 
 /// Stitch positions along one row (Ink/Stitch `stitch_row` with `adjust_stagger`).
@@ -412,12 +418,7 @@ fn section_entries(s: &Section) -> [(Point, bool, bool); 4] {
     // (entry point, start_at_top, first row left-to-right)
     let f = s.rows.first().unwrap();
     let l = s.rows.last().unwrap();
-    [
-        (pt(f.1, f.0), true, true),
-        (pt(f.2, f.0), true, false),
-        (pt(l.1, l.0), false, true),
-        (pt(l.2, l.0), false, false),
-    ]
+    [(pt(f.1, f.0), true, true), (pt(f.2, f.0), true, false), (pt(l.1, l.0), false, true), (pt(l.2, l.0), false, false)]
 }
 
 /// Where a section is left when it is entered through entry `k` of `section_entries`.
@@ -520,7 +521,20 @@ pub fn tatami_ramp(
         // grows the shape itself, `adjust_shape_for_pull_compensation`)
         let grown = if pull > 1e-6 { offset_rings(&rr, pull) } else { Vec::new() };
         let shape = if grown.is_empty() { &rr } else { &grown };
-        let mut runs = tatami_path(shape, &grating, spacing, max_len, staggers, travel_len, start.map(|p| p.rotate(a)), end.map(|p| p.rotate(a)), frame, no_underpath, o, f);
+        let mut runs = tatami_path(
+            shape,
+            &grating,
+            spacing,
+            max_len,
+            staggers,
+            travel_len,
+            start.map(|p| p.rotate(a)),
+            end.map(|p| p.rotate(a)),
+            frame,
+            no_underpath,
+            o,
+            f,
+        );
         for r in runs.iter_mut() {
             for (p, _) in r.iter_mut() {
                 *p = p.rotate(-a);
@@ -561,8 +575,22 @@ pub fn tatami_ramp(
     // rows go on down from them); of those ready, the nearest
     let above: Vec<Vec<usize>> = if one_way {
         let n = grating.sections.len();
-        let first = |i: usize| -> Option<(f64, f64, f64, i64)> { let r = &grating.sections[i].rows; if down { r.first().copied() } else { r.last().copied() } };
-        let last = |i: usize| -> Option<(f64, f64, f64, i64)> { let r = &grating.sections[i].rows; if down { r.last().copied() } else { r.first().copied() } };
+        let first = |i: usize| -> Option<(f64, f64, f64, i64)> {
+            let r = &grating.sections[i].rows;
+            if down {
+                r.first().copied()
+            } else {
+                r.last().copied()
+            }
+        };
+        let last = |i: usize| -> Option<(f64, f64, f64, i64)> {
+            let r = &grating.sections[i].rows;
+            if down {
+                r.last().copied()
+            } else {
+                r.first().copied()
+            }
+        };
         (0..n)
             .map(|y| match first(y) {
                 Some(fy) => (0..n)
@@ -652,14 +680,25 @@ pub fn tatami_ramp(
             let ready: Vec<usize> = (0..remaining.len()).filter(|&ri| above[remaining[ri]].iter().all(|&x| sewn_sec[x])).collect();
             let ready = if ready.is_empty() { (0..remaining.len()).collect() } else { ready };
             let ks: [usize; 2] = if down { [0, 1] } else { [2, 3] };
-            let cands: Vec<(usize, usize, Point)> = ready.iter().flat_map(|&ri| ks.iter().map(move |&k| (ri, k))).map(|(ri, k)| (ri, k, section_entries(&grating.sections[remaining[ri]])[k].0)).collect();
+            let cands: Vec<(usize, usize, Point)> = ready
+                .iter()
+                .flat_map(|&ri| ks.iter().map(move |&k| (ri, k)))
+                .map(|(ri, k)| (ri, k, section_entries(&grating.sections[remaining[ri]])[k].0))
+                .collect();
             // how far the needle travels to each entry: along the travel
             // routes (an entry no route reaches costs a jump)
             let travel: Vec<f64> = match pos.filter(|_| !run.is_empty()) {
                 Some(p) => {
                     travel_graph(&mut graph, &mut sewn_before);
                     let targets: Vec<Point> = cands.iter().map(|c| c.2).collect();
-                    graph.as_ref().unwrap().routes(p, &targets).into_iter().zip(&targets).map(|(r, t)| r.map_or(1e4 + p.dist(*t), |path| path.windows(2).map(|w| w[0].dist(w[1])).sum())).collect()
+                    graph
+                        .as_ref()
+                        .unwrap()
+                        .routes(p, &targets)
+                        .into_iter()
+                        .zip(&targets)
+                        .map(|(r, t)| r.map_or(1e4 + p.dist(*t), |path| path.windows(2).map(|w| w[0].dist(w[1])).sum()))
+                        .collect()
                 }
                 None => cands.iter().map(|c| pos.map_or(0.0, |p| p.dist(c.2))).collect(),
             };
@@ -875,7 +914,15 @@ pub(crate) const FILL_TOLERANCE: f64 = 0.2;
 /// row ends it is part of the rows (`f`), else travel. Where no route is left
 /// the run ends (a jump). Returns false then.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn sew_travel(runs: &mut Vec<Run>, run: &mut Run, travel: &super::travel::PathTravel, step: &super::travel::PathStep, len: f64, keep_first: bool, f: u8) -> bool {
+pub(crate) fn sew_travel(
+    runs: &mut Vec<Run>,
+    run: &mut Run,
+    travel: &super::travel::PathTravel,
+    step: &super::travel::PathStep,
+    len: f64,
+    keep_first: bool,
+    f: u8,
+) -> bool {
     let super::travel::PathStep::Travel { from, to, from_node, to_node, adjacent } = *step else { return true };
     match travel.route(from, from_node, to, to_node) {
         Some((path, inside)) => {
@@ -885,7 +932,11 @@ pub(crate) fn sew_travel(runs: &mut Vec<Run>, run: &mut Run, travel: &super::tra
             // than Ink/Stitch's tolerance, so no stitch cuts across a hole
             // (from one row to the next close by: one stitch, as Ink/Stitch's
             // tolerance makes it)
-            let pts = if adjacent && !inside && from.dist(to) <= 1.0 { vec![from, to] } else { running_stitch(&path, len, if inside { FILL_TOLERANCE } else { 0.05 }) };
+            let pts = if adjacent && !inside && from.dist(to) <= 1.0 {
+                vec![from, to]
+            } else {
+                running_stitch(&path, len, if inside { FILL_TOLERANCE } else { 0.05 })
+            };
             if run.is_empty() {
                 push(run, from, flag);
             }
@@ -908,7 +959,20 @@ pub(crate) fn sew_travel(runs: &mut Vec<Run>, run: &mut Run, travel: &super::tra
 /// the fill ends where it started (or at `end`). `rr`: the rings with the
 /// rows horizontal.
 #[allow(clippy::too_many_arguments)]
-fn tatami_path(rr: &[Ring], grating: &Grating, spacing: f64, max_len: f64, staggers: u32, travel_len: f64, start: Option<Point>, end: Option<Point>, frame: Option<RampFrame>, no_underpath: bool, o: &TatamiOpts, f: u8) -> Vec<Run> {
+fn tatami_path(
+    rr: &[Ring],
+    grating: &Grating,
+    spacing: f64,
+    max_len: f64,
+    staggers: u32,
+    travel_len: f64,
+    start: Option<Point>,
+    end: Option<Point>,
+    frame: Option<RampFrame>,
+    no_underpath: bool,
+    o: &TatamiOpts,
+    f: u8,
+) -> Vec<Run> {
     use super::travel::{find_stitch_path, PathStep, PathTravel};
     let rows: Vec<(f64, f64, f64, i64)> = grating.sections.iter().flat_map(|s| s.rows.iter().copied()).filter(|r| r.2 - r.1 > 1e-9).collect();
     if rows.is_empty() {
@@ -1272,7 +1336,11 @@ fn spiral_rings(t: &[Iso]) -> Vec<Vec<Point>> {
             c += (w[0] + w[1]) * (0.5 * d);
             l += d;
         }
-        if l > 0.0 { c / l } else { r[0] }
+        if l > 0.0 {
+            c / l
+        } else {
+            r[0]
+        }
     };
     let mut out = Vec::new();
     let mut node = 0;
@@ -1356,13 +1424,19 @@ pub fn contour_ex(rings: &[Ring], spacing: f64, length: f64, spiral: bool, doubl
     // Ink/Stitch: (0, 0) without a start
     let mut pos = start.unwrap_or(Point::ZERO);
     while !polys.is_empty() {
-        let k = (0..polys.len()).min_by(|&a, &b| dist_to_boundary(std::slice::from_ref(&polys[a].0), pos).total_cmp(&dist_to_boundary(std::slice::from_ref(&polys[b].0), pos))).unwrap();
+        let k = (0..polys.len())
+            .min_by(|&a, &b| dist_to_boundary(std::slice::from_ref(&polys[a].0), pos).total_cmp(&dist_to_boundary(std::slice::from_ref(&polys[b].0), pos)))
+            .unwrap();
         let (outer, holes) = polys.swap_remove(k);
         let tree = offset_tree(&outer, &holes, offset, clockwise);
         let path = if spiral {
             let rings = spiral_rings(&tree);
             let p = if double { make_fermat_spiral(&rings, length, pos) } else { make_spiral(&rings, length, pos) };
-            if p.len() < 2 { tree[0].ring.clone() } else { p }
+            if p.len() < 2 {
+                tree[0].ring.clone()
+            } else {
+                p
+            }
         } else {
             inner_to_outer_path(&tree, offset, pos)
         };
@@ -1539,9 +1613,7 @@ fn poisson_disk(rings: &[Ring], r: f64, seed: u64) -> Vec<Point> {
     let mut pts: Vec<Point> = Vec::new();
     let mut active: Vec<usize> = Vec::new();
     let mut rng = Rng(seed | 1);
-    let gi = |p: Point| -> (usize, usize) {
-        (((p.x - b.min_x) / cs) as usize, ((p.y - b.min_y) / cs) as usize)
-    };
+    let gi = |p: Point| -> (usize, usize) { (((p.x - b.min_x) / cs) as usize, ((p.y - b.min_y) / cs) as usize) };
     // seed points: try several random starting points (multiple components)
     for _ in 0..200 {
         let p = pt(b.min_x + rng.unit() * b.width(), b.min_y + rng.unit() * b.height());
@@ -1780,13 +1852,22 @@ fn straight_blend(rings: &[Ring], p: &FillParams, spacing: f64, density: f64, st
 }
 
 #[allow(clippy::too_many_arguments)]
-fn streamlines_sewn(rings: &[Ring], field: &crate::model::FlowField, p: &FillParams, spacing: f64, density: f64, start: Option<Point>, sew: Option<&dyn Fn(&[Point]) -> Vec<Point>>) -> Vec<Run> {
+fn streamlines_sewn(
+    rings: &[Ring],
+    field: &crate::model::FlowField,
+    p: &FillParams,
+    spacing: f64,
+    density: f64,
+    start: Option<Point>,
+    sew: Option<&dyn Fn(&[Point]) -> Vec<Point>>,
+) -> Vec<Run> {
     let a = p.angle.to_radians();
     let frame = p.ramp.as_ref().map(|r| RampFrame::new(r, density, a));
     let share = p.gradient.as_ref().map(|g| super::gradient::ShareGrid::new(g, rings, spacing));
     // a colour blend: this layer's ramp and the other layer's opposite one,
     // sewn as one set of lines at their summed density
-    let other = p.ramp.as_ref().filter(|r| r.additive && r.group.is_some() && share.is_none()).map(|r| crate::model::DensityRamp { reverse: !r.reverse, ..r.clone() });
+    let other =
+        p.ramp.as_ref().filter(|r| r.additive && r.group.is_some() && share.is_none()).map(|r| crate::model::DensityRamp { reverse: !r.reverse, ..r.clone() });
     let other_frame = other.as_ref().map(|r| RampFrame::new(r, density, a));
     // the full row distance (all colours together)
     let row = move |q: Point| {
@@ -1864,7 +1945,13 @@ pub fn fill(
     start: Option<Point>,
     end: Option<Point>,
 ) -> Vec<Run> {
-    let fabric = crate::model::FabricProfile { pull_comp: extra_pull, density_scale: density, force_underlay, underlay_density, ..crate::model::Fabric::Cotton.profile() };
+    let fabric = crate::model::FabricProfile {
+        pull_comp: extra_pull,
+        density_scale: density,
+        force_underlay,
+        underlay_density,
+        ..crate::model::Fabric::Cotton.profile()
+    };
     fill_on(paths, p, &fabric, start, end)
 }
 
@@ -1998,14 +2085,36 @@ fn nearest_point_to(a: &[Ring], b: &[Ring]) -> Point {
 
 /// One island of a fill (or the whole shape): its underlay, then its top.
 /// `whole`: the whole shape (the underlay is chosen by its size).
-fn fill_part(rings: &[Ring], whole: &[Ring], original: &[Ring], p: &FillParams, fabric: &crate::model::FabricProfile, start: Option<Point>, end: Option<Point>) -> Vec<Run> {
+fn fill_part(
+    rings: &[Ring],
+    whole: &[Ring],
+    original: &[Ring],
+    p: &FillParams,
+    fabric: &crate::model::FabricProfile,
+    start: Option<Point>,
+    end: Option<Point>,
+) -> Vec<Run> {
     let (extra_pull, density, underlay_density) = (fabric.pull_comp, fabric.density_scale, fabric.underlay_density);
     let mut runs: Vec<Run> = Vec::new();
     let spacing = (p.row_spacing * density).max(0.1);
     // a gradient's underlay is sewn once, by its first layer
     let plan = super::underlay::fill_underlay(whole, p, fabric);
     let underlay_on = !plan.is_empty() && p.gradient.as_ref().is_none_or(|g| g.layer == 0) && p.tartan.as_ref().is_none_or(|t| t.layer == 0);
-    if underlay_on && matches!(p.method, FillMethod::Tatami | FillMethod::Radial | FillMethod::Contour | FillMethod::Spiral | FillMethod::Meander | FillMethod::Guided | FillMethod::Circular | FillMethod::Flow | FillMethod::Curved | FillMethod::Tartan) {
+    if underlay_on
+        && matches!(
+            p.method,
+            FillMethod::Tatami
+                | FillMethod::Radial
+                | FillMethod::Contour
+                | FillMethod::Spiral
+                | FillMethod::Meander
+                | FillMethod::Guided
+                | FillMethod::Circular
+                | FillMethod::Flow
+                | FillMethod::Curved
+                | FillMethod::Tartan
+        )
+    {
         let inset = if p.underlay_inset > 0.0 { offset_rings(rings, -p.underlay_inset) } else { rings.to_vec() };
         if !inset.is_empty() {
             // edge run first (an edge run under tatami), then the tatami passes
@@ -2092,7 +2201,8 @@ fn fill_part(rings: &[Ring], whole: &[Ring], original: &[Ring], p: &FillParams, 
         // a blended gradient in straight rows
         // (and a colour blend: its two colours share the rows)
         FillMethod::Tatami
-            if p.gradient.as_ref().is_some_and(|g| g.mix == crate::model::GradientMix::Blend) || (p.gradient.is_none() && p.ramp.as_ref().is_some_and(|r| r.additive && r.group.is_some())) =>
+            if p.gradient.as_ref().is_some_and(|g| g.mix == crate::model::GradientMix::Blend)
+                || (p.gradient.is_none() && p.ramp.as_ref().is_some_and(|r| r.additive && r.group.is_some())) =>
         {
             straight_blend(rings, p, spacing, density, top_start, &opts)
         }
@@ -2157,24 +2267,57 @@ fn fill_part(rings: &[Ring], whole: &[Ring], original: &[Ring], p: &FillParams, 
             let gpts = p.guide.as_ref().unwrap().flatten(0.1);
             match super::fields::guide_field(rings, &gpts, p.guided_strategy == crate::model::GuidedStrategy::Buffer) {
                 Some(field) => streamlines(rings, &field, p, spacing, density, top_start),
-                None => tatami(rings, p.angle, spacing, 0.0, false, p.max_stitch_length, p.staggers, p.pull_comp, p.travel_length, top_start, end, None, &opts, 0),
+                None => {
+                    tatami(rings, p.angle, spacing, 0.0, false, p.max_stitch_length, p.staggers, p.pull_comp, p.travel_length, top_start, end, None, &opts, 0)
+                }
             }
         }
         FillMethod::Guided => p
             .guide
             .as_ref()
             .and_then(|g| {
-                super::inkfills::guided(rings, g, spacing, p.max_stitch_length, p.staggers, p.pull_comp + extra_pull * 0.5, p.travel_length, top_start, end, &opts, 0)
+                super::inkfills::guided(
+                    rings,
+                    g,
+                    spacing,
+                    p.max_stitch_length,
+                    p.staggers,
+                    p.pull_comp + extra_pull * 0.5,
+                    p.travel_length,
+                    top_start,
+                    end,
+                    &opts,
+                    0,
+                )
             })
             .unwrap_or_else(|| {
-                tatami(rings, p.angle, spacing, 0.0, false, p.max_stitch_length, p.staggers, p.pull_comp + extra_pull * 0.5, p.travel_length, top_start, end, None, &opts, 0)
+                tatami(
+                    rings,
+                    p.angle,
+                    spacing,
+                    0.0,
+                    false,
+                    p.max_stitch_length,
+                    p.staggers,
+                    p.pull_comp + extra_pull * 0.5,
+                    p.travel_length,
+                    top_start,
+                    end,
+                    None,
+                    &opts,
+                    0,
+                )
             }),
         // the picture's flow; without one the rows follow the shape
         FillMethod::Flow => match p.flow.as_ref().filter(|f| f.is_usable()) {
             Some(field) => streamlines(rings, field, p, spacing, density, top_start),
             // a gradient: the rows follow its colour bands (or cross them)
             None => {
-                let field = p.gradient.as_ref().and_then(|g| super::fields::colour_field(rings, g, -p.angle.to_radians(), p.flow_across)).unwrap_or_else(|| curved_field(rings, p, 1.0));
+                let field = p
+                    .gradient
+                    .as_ref()
+                    .and_then(|g| super::fields::colour_field(rings, g, -p.angle.to_radians(), p.flow_across))
+                    .unwrap_or_else(|| curved_field(rings, p, 1.0));
                 streamlines(rings, &field, p, spacing, density, top_start)
             }
         },
@@ -2200,18 +2343,19 @@ fn fill_part(rings: &[Ring], whole: &[Ring], original: &[Ring], p: &FillParams, 
     // start: sewn backwards when that begins nearer the start (or the end point)
     let top = if matches!(method, FillMethod::Hilbert | FillMethod::Stipple | FillMethod::Radial) { from_the_nearer_end(top, pin, end) } else { top };
     // running-style fills: the path repeated and bean-stitched (Ink/Stitch)
-    let top: Vec<Run> = if matches!(method, FillMethod::Meander | FillMethod::Circular | FillMethod::Contour | FillMethod::Spiral) && (p.repeats > 1 || p.bean_repeats > 0) {
-        top.into_iter()
-            .map(|r| {
-                let pts: Vec<Point> = r.iter().map(|x| x.0).collect();
-                let pts = super::running::repeat_path(&pts, p.repeats.max(1));
-                let pts = super::running::bean_stitch(&pts, p.bean_repeats);
-                pts.into_iter().map(|q| (q, 0u8)).collect()
-            })
-            .collect()
-    } else {
-        top
-    };
+    let top: Vec<Run> =
+        if matches!(method, FillMethod::Meander | FillMethod::Circular | FillMethod::Contour | FillMethod::Spiral) && (p.repeats > 1 || p.bean_repeats > 0) {
+            top.into_iter()
+                .map(|r| {
+                    let pts: Vec<Point> = r.iter().map(|x| x.0).collect();
+                    let pts = super::running::repeat_path(&pts, p.repeats.max(1));
+                    let pts = super::running::bean_stitch(&pts, p.bean_repeats);
+                    pts.into_iter().map(|q| (q, 0u8)).collect()
+                })
+                .collect()
+        } else {
+            top
+        };
     // join underlay end with top start by travelling inside the shape
     if let (Some(last_run), Some(first_top)) = (runs.last_mut(), top.first()) {
         if let (Some(&(a, _)), Some(&(b, _))) = (last_run.last(), first_top.first()) {
@@ -2292,7 +2436,8 @@ mod tests {
         // row r's needle points: its offset (r × 2 mm, a third of 6 mm) plus 0 or 4, every 6 mm
         for r in 0..3 {
             let xs = row(p, r, true);
-            let on_grid = |x: f64| [0.0, 4.0].iter().any(|k| ((x - 2.0 * r as f64 - k).rem_euclid(6.0)).min(6.0 - (x - 2.0 * r as f64 - k).rem_euclid(6.0)) < 1e-9);
+            let on_grid =
+                |x: f64| [0.0, 4.0].iter().any(|k| ((x - 2.0 * r as f64 - k).rem_euclid(6.0)).min(6.0 - (x - 2.0 * r as f64 - k).rem_euclid(6.0)) < 1e-9);
             assert!(xs[1..xs.len() - 1].iter().all(|x| on_grid(*x)), "row {r}: {xs:?}");
         }
         assert!(row(p, 0, true) == row(p, 3, true), "the fourth row as the first");
@@ -2319,10 +2464,12 @@ mod tests {
 
     fn donut() -> Vec<SubPath> {
         let circle = |r: f64| {
-            let pts: Vec<Point> = (0..64).map(|i| {
-                let a = i as f64 / 64.0 * TAU;
-                pt(20.0 + r * a.cos(), 20.0 + r * a.sin())
-            }).collect();
+            let pts: Vec<Point> = (0..64)
+                .map(|i| {
+                    let a = i as f64 / 64.0 * TAU;
+                    pt(20.0 + r * a.cos(), 20.0 + r * a.sin())
+                })
+                .collect();
             SubPath::polyline(&pts, true)
         };
         vec![circle(15.0), circle(6.0)]
@@ -2364,7 +2511,15 @@ mod tests {
         let (sq, field) = flow_square();
         let layer = |l: u32| {
             let g = GradientParams { from: [0.0, 20.0], to: [40.0, 20.0], layer: l, group: "g".into(), ..Default::default() };
-            let p = FillParams { method: FillMethod::Flow, angle: 90.0, row_spacing: 0.5, underlay: false, flow: Some(field.clone()), gradient: Some(g), ..Default::default() };
+            let p = FillParams {
+                method: FillMethod::Flow,
+                angle: 90.0,
+                row_spacing: 0.5,
+                underlay: false,
+                flow: Some(field.clone()),
+                gradient: Some(g),
+                ..Default::default()
+            };
             fill(std::slice::from_ref(&sq), &p, 0.0, 1.0, false, 1.0, None, None)
         };
         let side = |runs: &Vec<Run>| {
@@ -2383,7 +2538,14 @@ mod tests {
         // a radial gradient without a picture field: the rows circle the centre
         let sq = square(40.0);
         let layer = |l: u32| {
-            let g = GradientParams { kind: crate::model::GradientKind::Radial, from: [20.0, 20.0], to: [38.0, 20.0], layer: l, group: "g".into(), ..Default::default() };
+            let g = GradientParams {
+                kind: crate::model::GradientKind::Radial,
+                from: [20.0, 20.0],
+                to: [38.0, 20.0],
+                layer: l,
+                group: "g".into(),
+                ..Default::default()
+            };
             let p = FillParams { method: FillMethod::Flow, angle: 0.0, row_spacing: 0.5, underlay: false, gradient: Some(g), ..Default::default() };
             fill(std::slice::from_ref(&sq), &p, 0.0, 1.0, false, 1.0, None, None)
         };
@@ -2392,12 +2554,19 @@ mod tests {
         let ms = t.elapsed().as_millis();
         // sewn stitches east of the centre run north–south
         let steep = |runs: &Vec<Run>| {
-            let seg: Vec<_> = runs.iter().flat_map(|r| r.windows(2)).filter(|w| w[1].1 == 0 && (w[0].0.x - 32.0).abs() < 3.0 && (w[0].0.y - 20.0).abs() < 3.0 && w[0].0.dist(w[1].0) > 0.5).collect();
+            let seg: Vec<_> = runs
+                .iter()
+                .flat_map(|r| r.windows(2))
+                .filter(|w| w[1].1 == 0 && (w[0].0.x - 32.0).abs() < 3.0 && (w[0].0.y - 20.0).abs() < 3.0 && w[0].0.dist(w[1].0) > 0.5)
+                .collect();
             seg.iter().filter(|w| (w[1].0.y - w[0].0.y).abs() > (w[1].0.x - w[0].0.x).abs()).count() as f64 / seg.len().max(1) as f64
         };
         assert!(steep(&a) + steep(&b) > 1.4, "{} {}", steep(&a), steep(&b));
         // the inner colour in the middle, the outer one outside
-        let mid = |runs: &Vec<Run>| { let v: Vec<_> = runs.iter().flatten().filter(|x| x.1 == 0).collect(); v.iter().filter(|x| x.0.dist(pt(20.0, 20.0)) < 9.0).count() as f64 / v.len().max(1) as f64 };
+        let mid = |runs: &Vec<Run>| {
+            let v: Vec<_> = runs.iter().flatten().filter(|x| x.1 == 0).collect();
+            v.iter().filter(|x| x.0.dist(pt(20.0, 20.0)) < 9.0).count() as f64 / v.len().max(1) as f64
+        };
         assert!(mid(&a) > mid(&b) * 2.0, "{} {}", mid(&a), mid(&b));
         assert!(ms < 2000, "{ms} ms");
         eprintln!("two flow gradient layers: {ms} ms");
@@ -2407,7 +2576,8 @@ mod tests {
     fn flow_follows_a_density_ramp() {
         let (sq, field) = flow_square();
         let ramp = crate::model::DensityRamp { from: [20.0, 0.0], to: [20.0, 40.0], dense: 0.4, sparse: 3.0, ..Default::default() };
-        let p = FillParams { method: FillMethod::Flow, angle: 0.0, row_spacing: 0.4, underlay: false, flow: Some(field), ramp: Some(ramp), ..Default::default() };
+        let p =
+            FillParams { method: FillMethod::Flow, angle: 0.0, row_spacing: 0.4, underlay: false, flow: Some(field), ramp: Some(ramp), ..Default::default() };
         let runs = fill(std::slice::from_ref(&sq), &p, 0.0, 1.0, false, 1.0, None, None);
         let len = |top: bool| -> f64 {
             runs.iter().map(|r| r.windows(2).filter(|w| w[1].1 == 0 && ((w[0].0.y < 20.0) == top)).map(|w| w[0].0.dist(w[1].0)).sum::<f64>()).sum()
@@ -2446,7 +2616,10 @@ mod tests {
         let mut nodes = Vec::new();
         for i in 0..3 {
             for j in 0..3 {
-                nodes.push(crate::model::MeshNode { p: [j as f64 * 10.0, i as f64 * 10.0 - if i == 1 && j == 1 { 4.0 } else { 0.0 }], c: if j == 0 { 0 } else { 1 } });
+                nodes.push(crate::model::MeshNode {
+                    p: [j as f64 * 10.0, i as f64 * 10.0 - if i == 1 && j == 1 { 4.0 } else { 0.0 }],
+                    c: if j == 0 { 0 } else { 1 },
+                });
             }
         }
         let mesh = crate::model::GradientMesh { rows: 3, cols: 3, nodes };
@@ -2521,7 +2694,8 @@ mod tests {
         let a = rows(0.25, 2.5);
         let b = rows(2.5, 0.25);
         let band = |ys: &[f64], y0: f64, y1: f64| ys.iter().filter(|y| **y >= y0 && **y < y1).count() as f64 / (y1 - y0);
-        let (top, mid, bottom) = (band(&a, 0.0, 8.0) + band(&b, 0.0, 8.0), band(&a, 16.0, 24.0) + band(&b, 16.0, 24.0), band(&a, 32.0, 40.0) + band(&b, 32.0, 40.0));
+        let (top, mid, bottom) =
+            (band(&a, 0.0, 8.0) + band(&b, 0.0, 8.0), band(&a, 16.0, 24.0) + band(&b, 16.0, 24.0), band(&a, 32.0, 40.0) + band(&b, 32.0, 40.0));
         for v in [mid, bottom] {
             assert!((v - top).abs() / top < 0.15, "rows/mm {top:.2} {mid:.2} {bottom:.2}");
         }
@@ -2577,11 +2751,32 @@ mod tests {
     #[test]
     fn colours_take_the_shared_lines_as_traced() {
         // a colour whose lines come from the cache sews what it sews traced from scratch
-        let oval: Ring = (0..72).map(|k| { let a = k as f64 / 72.0 * TAU; pt(20.0 + 18.0 * a.cos(), 15.0 + 12.0 * a.sin()) }).collect();
+        let oval: Ring = (0..72)
+            .map(|k| {
+                let a = k as f64 / 72.0 * TAU;
+                pt(20.0 + 18.0 * a.cos(), 15.0 + 12.0 * a.sin())
+            })
+            .collect();
         let paths = vec![SubPath::polyline(&oval, true)];
         let run = |p: &FillParams, start: Option<Point>| fill(&paths, p, 0.0, 1.0, false, 1.0, start, None);
-        let grad = |l: u32| GradientParams { from: [2.0, 15.0], to: [38.0, 15.0], layer: l, group: "g".into(), stops: (0..3).map(|k| crate::model::GradientStop { pos: k as f64 / 2.0, mid: 0.5 }).collect(), ..Default::default() };
-        let ramp = |reverse: bool| crate::model::DensityRamp { from: [2.0, 15.0], to: [38.0, 15.0], dense: 0.4, sparse: 4.0, additive: true, reverse, group: Some("b".into()), ..Default::default() };
+        let grad = |l: u32| GradientParams {
+            from: [2.0, 15.0],
+            to: [38.0, 15.0],
+            layer: l,
+            group: "g".into(),
+            stops: (0..3).map(|k| crate::model::GradientStop { pos: k as f64 / 2.0, mid: 0.5 }).collect(),
+            ..Default::default()
+        };
+        let ramp = |reverse: bool| crate::model::DensityRamp {
+            from: [2.0, 15.0],
+            to: [38.0, 15.0],
+            dense: 0.4,
+            sparse: 4.0,
+            additive: true,
+            reverse,
+            group: Some("b".into()),
+            ..Default::default()
+        };
         for method in [FillMethod::Curved, FillMethod::Tatami] {
             let base = FillParams { method, row_spacing: 0.4, underlay: false, angle: 70.0, ..Default::default() };
             let layers: Vec<Vec<FillParams>> = vec![
@@ -2607,7 +2802,12 @@ mod tests {
     #[test]
     fn gradient_colours_together_cover_evenly() {
         // the colours share one set of rows: no row left out, none on another
-        let oval: Ring = (0..72).map(|k| { let a = k as f64 / 72.0 * TAU; pt(20.0 + 18.0 * a.cos(), 15.0 + 12.0 * a.sin()) }).collect();
+        let oval: Ring = (0..72)
+            .map(|k| {
+                let a = k as f64 / 72.0 * TAU;
+                pt(20.0 + 18.0 * a.cos(), 15.0 + 12.0 * a.sin())
+            })
+            .collect();
         let paths = vec![SubPath::polyline(&oval, true)];
         let rings = vec![oval];
         let sp = 0.4;
@@ -2615,19 +2815,36 @@ mod tests {
         for method in [FillMethod::Curved, FillMethod::Tatami] {
             // a two-colour gradient across the oval
             let grad = |l: u32| GradientParams { from: [2.0, 15.0], to: [38.0, 15.0], layer: l, group: "g".into(), ..Default::default() };
-            let layers: Vec<Vec<Run>> = (0..2).map(|l| run(FillParams { method, row_spacing: sp, underlay: false, angle: 90.0, gradient: Some(grad(l)), ..Default::default() })).collect();
+            let layers: Vec<Vec<Run>> = (0..2)
+                .map(|l| run(FillParams { method, row_spacing: sp, underlay: false, angle: 90.0, gradient: Some(grad(l)), ..Default::default() }))
+                .collect();
             let (holes, crowded) = coverage(&layers, &rings, sp * 0.8, sp * 0.35);
             assert!(holes < 0.005 && crowded < 0.02, "{method:?} gradient: holes {holes:.3}, crowded {crowded:.3}");
             // both colours sew: each takes its side
             assert!(layers.iter().all(|l| l.iter().flatten().filter(|x| x.1 == 0).count() > 200), "{method:?}");
             // a colour blend: two opposite density ramps
-            let ramp = |reverse: bool| crate::model::DensityRamp { from: [2.0, 15.0], to: [38.0, 15.0], dense: sp, sparse: 4.0, additive: true, reverse, group: Some("b".into()), ..Default::default() };
-            let layers: Vec<Vec<Run>> = [false, true].iter().map(|&r| run(FillParams { method, row_spacing: sp, underlay: false, angle: 90.0, ramp: Some(ramp(r)), ..Default::default() })).collect();
+            let ramp = |reverse: bool| crate::model::DensityRamp {
+                from: [2.0, 15.0],
+                to: [38.0, 15.0],
+                dense: sp,
+                sparse: 4.0,
+                additive: true,
+                reverse,
+                group: Some("b".into()),
+                ..Default::default()
+            };
+            let layers: Vec<Vec<Run>> = [false, true]
+                .iter()
+                .map(|&r| run(FillParams { method, row_spacing: sp, underlay: false, angle: 90.0, ramp: Some(ramp(r)), ..Default::default() }))
+                .collect();
             let full = 1.0 / (1.0 / sp + 1.0 / 4.0);
             let (holes, crowded) = coverage(&layers, &rings, full * 0.8, full * 0.35);
             assert!(holes < 0.005 && crowded < 0.02, "{method:?} blend: holes {holes:.3}, crowded {crowded:.3}");
             // the first colour where it is dense, the second where it fades in
-            let left = |runs: &Vec<Run>| { let xs: Vec<f64> = runs.iter().flatten().filter(|x| x.1 == 0).map(|x| x.0.x).collect(); xs.iter().filter(|x| **x < 20.0).count() as f64 / xs.len().max(1) as f64 };
+            let left = |runs: &Vec<Run>| {
+                let xs: Vec<f64> = runs.iter().flatten().filter(|x| x.1 == 0).map(|x| x.0.x).collect();
+                xs.iter().filter(|x| **x < 20.0).count() as f64 / xs.len().max(1) as f64
+            };
             assert!(left(&layers[0]) > 0.6 && left(&layers[1]) < 0.4, "{method:?} blend sides: {} {}", left(&layers[0]), left(&layers[1]));
         }
     }
@@ -2639,8 +2856,19 @@ mod travel_tests {
 
     /// An oval with a hole: rows break, so sections and lines must be joined.
     fn ring_shape() -> (Vec<SubPath>, Vec<Ring>) {
-        let outer: Vec<Point> = (0..64).map(|k| { let a = k as f64 / 64.0 * TAU; pt(20.0 + 18.0 * a.cos(), 20.0 + 14.0 * a.sin()) }).collect();
-        let inner: Vec<Point> = (0..32).rev().map(|k| { let a = k as f64 / 32.0 * TAU; pt(20.0 + 6.0 * a.cos(), 20.0 + 5.0 * a.sin()) }).collect();
+        let outer: Vec<Point> = (0..64)
+            .map(|k| {
+                let a = k as f64 / 64.0 * TAU;
+                pt(20.0 + 18.0 * a.cos(), 20.0 + 14.0 * a.sin())
+            })
+            .collect();
+        let inner: Vec<Point> = (0..32)
+            .rev()
+            .map(|k| {
+                let a = k as f64 / 32.0 * TAU;
+                pt(20.0 + 6.0 * a.cos(), 20.0 + 5.0 * a.sin())
+            })
+            .collect();
         (vec![SubPath::polyline(&outer, true), SubPath::polyline(&inner, true)], vec![outer, inner])
     }
 
@@ -2690,7 +2918,8 @@ mod travel_tests {
     fn alternate_rows_give_every_row_one_colour() {
         let (shape, rings) = ring_shape();
         let layer = |l: u32| {
-            let g = GradientParams { from: [5.0, 20.0], to: [35.0, 20.0], layer: l, group: "g".into(), mix: crate::model::GradientMix::Rows, ..Default::default() };
+            let g =
+                GradientParams { from: [5.0, 20.0], to: [35.0, 20.0], layer: l, group: "g".into(), mix: crate::model::GradientMix::Rows, ..Default::default() };
             // rows across the gradient (vertical)
             let p = FillParams { row_spacing: 0.4, underlay: false, angle: 90.0, gradient: Some(g), ..Default::default() };
             fill(&shape, &p, 0.0, 1.0, false, 1.0, None, None)
@@ -2792,7 +3021,8 @@ mod travel_tests {
         assert!(near_edge, "edge run first");
         assert!(ul.len() > 60, "then the tatami passes");
         // the cross-hatch: underlay stitches at two directions
-        let dirs: Vec<f64> = ul.windows(2).filter(|w| w[0].dist(w[1]) > 1.0).map(|w| (w[1] - w[0]).y.atan2((w[1] - w[0]).x).to_degrees().rem_euclid(180.0)).collect();
+        let dirs: Vec<f64> =
+            ul.windows(2).filter(|w| w[0].dist(w[1]) > 1.0).map(|w| (w[1] - w[0]).y.atan2((w[1] - w[0]).x).to_degrees().rem_euclid(180.0)).collect();
         let near = |a: f64| dirs.iter().filter(|d| (**d - a).abs() < 8.0).count();
         assert!(near(45.0) > 5 && near(135.0) > 5, "45: {} 135: {}", near(45.0), near(135.0));
     }
@@ -2914,35 +3144,50 @@ mod ink_param_tests {
     fn underlay_angle_list() {
         let p = FillParams { row_spacing: 0.5, underlay: true, underlay_angles: vec![30.0, 90.0, 150.0], ..Default::default() };
         let runs = fill(&sq(20.0), &p, 0.0, 1.0, false, 1.0, None, None);
-        let dirs: Vec<f64> = runs.iter().flatten().collect::<Vec<_>>().windows(2).filter(|w| w[0].1 & flags::UNDERLAY != 0 && w[1].1 & flags::UNDERLAY != 0 && w[0].0.dist(w[1].0) > 1.5).map(|w| (w[1].0 - w[0].0).y.atan2((w[1].0 - w[0].0).x).to_degrees().rem_euclid(180.0)).collect();
+        let dirs: Vec<f64> = runs
+            .iter()
+            .flatten()
+            .collect::<Vec<_>>()
+            .windows(2)
+            .filter(|w| w[0].1 & flags::UNDERLAY != 0 && w[1].1 & flags::UNDERLAY != 0 && w[0].0.dist(w[1].0) > 1.5)
+            .map(|w| (w[1].0 - w[0].0).y.atan2((w[1].0 - w[0].0).x).to_degrees().rem_euclid(180.0))
+            .collect();
         // three directions (on screen: angle a → rows at −a)
         for a in [150.0, 90.0, 30.0] {
             assert!(dirs.iter().any(|d| (d - a).abs() < 6.0), "{a}: {:?}", &dirs[..dirs.len().min(12)]);
         }
     }
 
-#[cfg(test)]
-mod random_length_tests {
-    use super::*;
+    #[cfg(test)]
+    mod random_length_tests {
+        use super::*;
 
-    #[test]
-    fn random_lengths_break_the_tatami_grid() {
-        let sq = vec![SubPath::polyline(&[pt(0.0, 0.0), pt(30.0, 0.0), pt(30.0, 30.0), pt(0.0, 30.0)], true)];
-        let lens = |p: &FillParams| -> Vec<f64> {
-            let runs = fill(&sq, p, 0.0, 1.0, false, 1.0, None, None);
-            runs.iter().flat_map(|r| r.windows(2).filter(|w| w[0].1 == 0 && w[1].1 == 0 && (w[0].0.y - w[1].0.y).abs() < 1e-6).map(|w| w[0].0.dist(w[1].0)).collect::<Vec<_>>()).filter(|d| *d > 1.0).collect()
-        };
-        let base = FillParams { underlay: false, angle: 0.0, max_stitch_length: 3.0, ..Default::default() };
-        let even = lens(&base);
-        let full = even.iter().filter(|d| (**d - 3.0).abs() < 1e-6).count();
-        assert!(full as f64 > even.len() as f64 * 0.6, "a plain tatami is mostly full stitches");
-        let rnd = lens(&FillParams { random_length: 20.0, ..base.clone() });
-        let full_r = rnd.iter().filter(|d| (**d - 3.0).abs() < 1e-6).count();
-        assert!((full_r as f64) < rnd.len() as f64 * 0.1, "random: hardly any exactly 3 mm ({full_r} of {})", rnd.len());
-        let big: Vec<&f64> = rnd.iter().filter(|d| **d > 3.6 + 1e-6).collect();
-        assert!(big.is_empty(), "{big:?}");
+        #[test]
+        fn random_lengths_break_the_tatami_grid() {
+            let sq = vec![SubPath::polyline(&[pt(0.0, 0.0), pt(30.0, 0.0), pt(30.0, 30.0), pt(0.0, 30.0)], true)];
+            let lens = |p: &FillParams| -> Vec<f64> {
+                let runs = fill(&sq, p, 0.0, 1.0, false, 1.0, None, None);
+                runs.iter()
+                    .flat_map(|r| {
+                        r.windows(2)
+                            .filter(|w| w[0].1 == 0 && w[1].1 == 0 && (w[0].0.y - w[1].0.y).abs() < 1e-6)
+                            .map(|w| w[0].0.dist(w[1].0))
+                            .collect::<Vec<_>>()
+                    })
+                    .filter(|d| *d > 1.0)
+                    .collect()
+            };
+            let base = FillParams { underlay: false, angle: 0.0, max_stitch_length: 3.0, ..Default::default() };
+            let even = lens(&base);
+            let full = even.iter().filter(|d| (**d - 3.0).abs() < 1e-6).count();
+            assert!(full as f64 > even.len() as f64 * 0.6, "a plain tatami is mostly full stitches");
+            let rnd = lens(&FillParams { random_length: 20.0, ..base.clone() });
+            let full_r = rnd.iter().filter(|d| (**d - 3.0).abs() < 1e-6).count();
+            assert!((full_r as f64) < rnd.len() as f64 * 0.1, "random: hardly any exactly 3 mm ({full_r} of {})", rnd.len());
+            let big: Vec<&f64> = rnd.iter().filter(|d| **d > 3.6 + 1e-6).collect();
+            assert!(big.is_empty(), "{big:?}");
+        }
     }
-}
 }
 
 #[cfg(test)]
@@ -2952,7 +3197,10 @@ mod gap_fill_tests {
     #[test]
     fn gap_rows_repeat_the_last_row_of_a_section_before_travelling() {
         // a U: two arms, sewn as separate sections
-        let u = vec![SubPath::polyline(&[pt(0.0, 0.0), pt(30.0, 0.0), pt(30.0, 30.0), pt(20.0, 30.0), pt(20.0, 10.0), pt(10.0, 10.0), pt(10.0, 30.0), pt(0.0, 30.0)], true)];
+        let u = vec![SubPath::polyline(
+            &[pt(0.0, 0.0), pt(30.0, 0.0), pt(30.0, 30.0), pt(20.0, 30.0), pt(20.0, 10.0), pt(10.0, 10.0), pt(10.0, 30.0), pt(0.0, 30.0)],
+            true,
+        )];
         let base = FillParams { underlay: false, angle: 0.0, row_spacing: 0.5, ..Default::default() };
         let n = |p: &FillParams| fill(&u, p, 0.0, 1.0, false, 1.0, None, None).iter().map(|r| r.len()).sum::<usize>();
         let plain = n(&base);

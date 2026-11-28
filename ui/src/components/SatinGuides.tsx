@@ -40,7 +40,11 @@ export function GuideActions({ compact = false }: { compact?: boolean }) {
         <Sparkles size={12} /> Corners
       </button>
       {n > 0 && (
-        <button className="btn sm ghost" title="Remove all orientation lines: stitches straight across the column again" onClick={() => replace(clearOrientation(o))}>
+        <button
+          className="btn sm ghost"
+          title="Remove all orientation lines: stitches straight across the column again"
+          onClick={() => replace(clearOrientation(o))}
+        >
           <Trash2 size={12} />
         </button>
       )}

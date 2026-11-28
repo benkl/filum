@@ -12,11 +12,24 @@ const check = (ok: boolean, msg: string) => {
 };
 const line = (...pts: Vec2[]): SubPath => ({ closed: false, nodes: pts.map((p) => ({ p })) });
 const run = (id: string, ...paths: SubPath[]): DesignObject =>
-  ({ id, name: id, thread: "t", visible: true, locked: false, paths, stitch: { type: "running", length: 2.5, tolerance: 0.2, repeats: 1, beanRepeats: 0 }, trimAfter: false, stopAfter: false }) as unknown as DesignObject;
+  ({
+    id,
+    name: id,
+    thread: "t",
+    visible: true,
+    locked: false,
+    paths,
+    stitch: { type: "running", length: 2.5, tolerance: 0.2, repeats: 1, beanRepeats: 0 },
+    trimAfter: false,
+    stopAfter: false,
+  }) as unknown as DesignObject;
 
 // the same stroke twice: the second one is reported, all of it on the first
 const twice = lineOverlaps([run("a", line([0, 0], [20, 0])), run("b", line([0, 0.1], [20, 0.1]))]);
-check(twice.length === 1 && twice[0].id === "b" && twice[0].other === "a" && twice[0].share > 0.95, "a stroke drawn twice: the second lies wholly on the first");
+check(
+  twice.length === 1 && twice[0].id === "b" && twice[0].other === "a" && twice[0].share > 0.95,
+  "a stroke drawn twice: the second lies wholly on the first",
+);
 check(twice[0].cut() === null, "cutting out the doubled part leaves nothing of it");
 
 // half of a line on another: that half is cut out, the rest stays

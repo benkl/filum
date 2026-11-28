@@ -49,7 +49,10 @@ ok(!unlinkClone(c).clone, "unlink");
   const t: [number, number, number, number, number, number] = [0, 1, -1, 0, 30, 0];
   const c2 = conjugate(link, t);
   const back = mulMat(mulMat(invMat(t), c2.m), t);
-  ok(back.every((v, i) => Math.abs(v - link.m[i]) < 1e-9), "conjugated link: the same relation in the new place");
+  ok(
+    back.every((v, i) => Math.abs(v - link.m[i]) < 1e-9),
+    "conjugated link: the same relation in the new place",
+  );
   // the store's rule: both transformed by t in one change
   const moved = [transformObject(sq, t, 90), transformObject(makeClone(sq), t, 90)];
   const prev = doc([sq, { ...makeClone(sq), id: moved[1].id }]);

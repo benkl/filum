@@ -143,7 +143,8 @@ function useShortcuts() {
         if (s.tool === "gradient" && s.gradNodes.length) {
           const sg = selectedGradient();
           if (sg && is2D(sg.params.kind)) {
-            if (!removeNodes(sg.group, s.gradNodes)) s.toast(sg.params.kind === "mesh" ? "The mesh border stays — select an inner node" : "A gradient keeps at least one colour point");
+            if (!removeNodes(sg.group, s.gradNodes))
+              s.toast(sg.params.kind === "mesh" ? "The mesh border stays — select an inner node" : "A gradient keeps at least one colour point");
             return;
           }
         }
@@ -264,7 +265,12 @@ function EmptyHint() {
 function PlanningIndicator() {
   const planning = useStore((s) => s.planning);
   const err = useStore((s) => s.planError);
-  if (err) return <div className="planning" style={{ color: "var(--accent)" }}>Engine: {err}</div>;
+  if (err)
+    return (
+      <div className="planning" style={{ color: "var(--accent)" }}>
+        Engine: {err}
+      </div>
+    );
   if (!planning) return null;
   return (
     <div className="planning">

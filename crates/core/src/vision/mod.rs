@@ -28,7 +28,11 @@ pub fn delta_e2000(a: [f64; 3], b: [f64; 3]) -> f64 {
             0.0
         } else {
             let t = y.atan2(x) / rad;
-            if t < 0.0 { t + 360.0 } else { t }
+            if t < 0.0 {
+                t + 360.0
+            } else {
+                t
+            }
         }
     };
     let h1p = hue(a1p, b1);
@@ -54,7 +58,8 @@ pub fn delta_e2000(a: [f64; 3], b: [f64; 3]) -> f64 {
         }
         hpm /= 2.0;
     }
-    let t = 1.0 - 0.17 * ((hpm - 30.0) * rad).cos() + 0.24 * (2.0 * hpm * rad).cos() + 0.32 * ((3.0 * hpm + 6.0) * rad).cos() - 0.2 * ((4.0 * hpm - 63.0) * rad).cos();
+    let t = 1.0 - 0.17 * ((hpm - 30.0) * rad).cos() + 0.24 * (2.0 * hpm * rad).cos() + 0.32 * ((3.0 * hpm + 6.0) * rad).cos()
+        - 0.2 * ((4.0 * hpm - 63.0) * rad).cos();
     let dtheta = 30.0 * (-((hpm - 275.0) / 25.0).powi(2)).exp();
     let rc = 2.0 * (cpm.powi(7) / (cpm.powi(7) + 25f64.powi(7))).sqrt();
     let sl = 1.0 + 0.015 * (lpm - 50.0).powi(2) / (20.0 + (lpm - 50.0).powi(2)).sqrt();

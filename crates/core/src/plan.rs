@@ -307,10 +307,7 @@ impl StitchPlan {
         st.height = b.height();
         st.thread_m = total_len / 1000.0;
         st.bobbin_m = st.thread_m * BOBBIN_SHARE;
-        st.seconds = st.stitches as f64 / spm.max(1.0) * 60.0
-            + st.trims as f64 * trim_s
-            + st.color_changes as f64 * color_s
-            + st.jumps as f64 * JUMP_SECONDS;
+        st.seconds = st.stitches as f64 / spm.max(1.0) * 60.0 + st.trims as f64 * trim_s + st.color_changes as f64 * color_s + st.jumps as f64 * JUMP_SECONDS;
         st
     }
 }
@@ -326,7 +323,17 @@ mod tests {
     #[test]
     fn repeats_every_colour_block() {
         let plan = StitchPlan {
-            stitches: vec![st(0.0, 0.0, flags::JUMP), st(0.0, 0.0, 0), st(1.0, 0.0, 0), st(1.0, 0.0, flags::TRIM), st(1.0, 0.0, flags::COLOR_CHANGE), st(5.0, 5.0, flags::JUMP), st(5.0, 5.0, 0), st(6.0, 5.0, 0), st(6.0, 5.0, flags::END)],
+            stitches: vec![
+                st(0.0, 0.0, flags::JUMP),
+                st(0.0, 0.0, 0),
+                st(1.0, 0.0, 0),
+                st(1.0, 0.0, flags::TRIM),
+                st(1.0, 0.0, flags::COLOR_CHANGE),
+                st(5.0, 5.0, flags::JUMP),
+                st(5.0, 5.0, 0),
+                st(6.0, 5.0, 0),
+                st(6.0, 5.0, flags::END),
+            ],
             threads: vec![],
             ..Default::default()
         };
@@ -335,10 +342,23 @@ mod tests {
         assert_eq!(
             f,
             vec![
-                (0.0, flags::JUMP), (0.0, 0), (1.0, 0), (1.0, flags::TRIM),
-                (10.0, flags::JUMP), (10.0, 0), (11.0, 0), (11.0, flags::TRIM), (11.0, flags::COLOR_CHANGE),
-                (5.0, flags::JUMP), (5.0, 0), (6.0, 0), (6.0, flags::TRIM),
-                (15.0, flags::JUMP), (15.0, 0), (16.0, 0), (16.0, flags::END),
+                (0.0, flags::JUMP),
+                (0.0, 0),
+                (1.0, 0),
+                (1.0, flags::TRIM),
+                (10.0, flags::JUMP),
+                (10.0, 0),
+                (11.0, 0),
+                (11.0, flags::TRIM),
+                (11.0, flags::COLOR_CHANGE),
+                (5.0, flags::JUMP),
+                (5.0, 0),
+                (6.0, 0),
+                (6.0, flags::TRIM),
+                (15.0, flags::JUMP),
+                (15.0, 0),
+                (16.0, 0),
+                (16.0, flags::END),
             ]
         );
         assert_eq!(r.stats(800.0, 0.0, 0.0).stitches, 8);
@@ -348,7 +368,11 @@ mod tests {
 
     #[test]
     fn frames_out_before_stops() {
-        let plan = StitchPlan { stitches: vec![st(1.0, 1.0, 0), st(1.0, 1.0, flags::TRIM), st(1.0, 1.0, flags::STOP), st(2.0, 2.0, flags::JUMP), st(2.0, 2.0, 0)], threads: vec![], ..Default::default() };
+        let plan = StitchPlan {
+            stitches: vec![st(1.0, 1.0, 0), st(1.0, 1.0, flags::TRIM), st(1.0, 1.0, flags::STOP), st(2.0, 2.0, flags::JUMP), st(2.0, 2.0, 0)],
+            threads: vec![],
+            ..Default::default()
+        };
         let r = plan.with_stop_position(Point { x: 50.0, y: -10.0 });
         let f: Vec<(f64, u8)> = r.stitches.iter().map(|s| (s.y, s.flags)).collect();
         assert_eq!(f, vec![(1.0, 0), (1.0, flags::TRIM), (-10.0, flags::JUMP), (-10.0, flags::STOP), (2.0, flags::JUMP), (2.0, 0)]);
@@ -357,10 +381,25 @@ mod tests {
     #[test]
     fn returns_from_the_stop_position_before_sewing_on() {
         // a stitch (not a jump) straight after the stop, then a trim
-        let plan = StitchPlan { stitches: vec![st(1.0, 1.0, 0), st(1.0, 1.0, flags::STOP), st(1.5, 1.0, 0), st(1.5, 1.0, flags::TRIM), st(1.5, 1.0, flags::END)], threads: vec![], ..Default::default() };
+        let plan = StitchPlan {
+            stitches: vec![st(1.0, 1.0, 0), st(1.0, 1.0, flags::STOP), st(1.5, 1.0, 0), st(1.5, 1.0, flags::TRIM), st(1.5, 1.0, flags::END)],
+            threads: vec![],
+            ..Default::default()
+        };
         let r = plan.with_stop_position(Point { x: 50.0, y: -10.0 });
         let f: Vec<(f64, f64, u8)> = r.stitches.iter().map(|s| (s.x, s.y, s.flags)).collect();
-        assert_eq!(f, vec![(1.0, 1.0, 0), (50.0, -10.0, flags::JUMP), (50.0, -10.0, flags::STOP), (1.0, 1.0, flags::JUMP), (1.5, 1.0, 0), (1.5, 1.0, flags::TRIM), (1.5, 1.0, flags::END)]);
+        assert_eq!(
+            f,
+            vec![
+                (1.0, 1.0, 0),
+                (50.0, -10.0, flags::JUMP),
+                (50.0, -10.0, flags::STOP),
+                (1.0, 1.0, flags::JUMP),
+                (1.5, 1.0, 0),
+                (1.5, 1.0, flags::TRIM),
+                (1.5, 1.0, flags::END)
+            ]
+        );
         // no sewn stitch from the stop position into the design
         let mut cur = None::<Point>;
         for s in &r.stitches {

@@ -14,7 +14,6 @@ import { cubicAt, fitPath, flattenSubPath, segmentOf, vdist } from "./bezier";
 import { offsetPolyline } from "./geometry";
 import { add, cross as crossZ, lerp, mul, norm as unit, sub } from "./vec";
 
-
 /** Intersection of segments p1p2 and q1q2 (parameter on p, point), if any. */
 export function segmentHit(p1: Vec2, p2: Vec2, q1: Vec2, q2: Vec2): { t: number; p: Vec2 } | null {
   const r = sub(p2, p1);
@@ -460,7 +459,10 @@ function smoothRails(rails: [Vec2[], Vec2[]], rungs: [Vec2, Vec2][], sharp: Vec2
         newRungs.push(hit ? [rung[k[j]], hit] : rung);
       }
     }
-    paths.push({ closed: false, nodes: nodes.map((n) => ({ p: n.p, ...(n.i && vdist(n.i, n.p) > 1e-9 ? { i: n.i } : {}), ...(n.o && vdist(n.o, n.p) > 1e-9 ? { o: n.o } : {}) })) });
+    paths.push({
+      closed: false,
+      nodes: nodes.map((n) => ({ p: n.p, ...(n.i && vdist(n.i, n.p) > 1e-9 ? { i: n.i } : {}), ...(n.o && vdist(n.o, n.p) > 1e-9 ? { o: n.o } : {}) })),
+    });
   });
   return { paths, rungs: o.pattern === "zigzag" && newRungs.length ? newRungs : rungs };
 }
@@ -492,8 +494,18 @@ const PATTERNS: Record<SatinPattern, { segs: Seg[]; flip: boolean }> = {
   normal: { segs: [L([0, 0], [4, 0]), L([4, 0], [8, 0])], flip: true },
   pearl: {
     segs: [
-      [[0, 0], [0, 0.22], [0.18, 0.4], [0.4, 0.4]],
-      [[0.4, 0.4], [0.62, 0.4], [0.8, 0.22], [0.8, 0]],
+      [
+        [0, 0],
+        [0, 0.22],
+        [0.18, 0.4],
+        [0.4, 0.4],
+      ],
+      [
+        [0.4, 0.4],
+        [0.62, 0.4],
+        [0.8, 0.22],
+        [0.8, 0],
+      ],
     ],
     flip: true,
   },
@@ -502,15 +514,35 @@ const PATTERNS: Record<SatinPattern, { segs: Seg[]; flip: boolean }> = {
   square: { segs: [L([0, 0], [0.2, 0]), L([0.2, 0], [0.4, 0]), L([0.4, 0], [0.47, 0.2]), L([0.47, 0.2], [0.8, 0.2]), L([0.8, 0.2], [0.86, 0])], flip: true },
   wave: {
     segs: [
-      [[0, 0], [0.2, 0.01], [0.29, 0.2], [0.4, 0.2]],
-      [[0.4, 0.2], [0.51, 0.2], [0.58, 0.01], [0.8, 0]],
+      [
+        [0, 0],
+        [0.2, 0.01],
+        [0.29, 0.2],
+        [0.4, 0.2],
+      ],
+      [
+        [0.4, 0.2],
+        [0.51, 0.2],
+        [0.58, 0.01],
+        [0.8, 0],
+      ],
     ],
     flip: true,
   },
   arch: {
     segs: [
-      [[0, 0.25], [0, 0.25], [0.07, 0.05], [0.4, 0.05]],
-      [[0.4, 0.05], [0.7, 0.05], [0.8, 0.25], [0.8, 0.25]],
+      [
+        [0, 0.25],
+        [0, 0.25],
+        [0.07, 0.05],
+        [0.4, 0.05],
+      ],
+      [
+        [0.4, 0.05],
+        [0.7, 0.05],
+        [0.8, 0.25],
+        [0.8, 0.25],
+      ],
     ],
     flip: false,
   },

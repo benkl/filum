@@ -52,11 +52,12 @@ fn line(pts: &[(f64, f64)]) -> Value {
     json!({ "closed": false, "nodes": pts.iter().map(|(x, y)| json!({ "p": [x, y] })).collect::<Vec<_>>() })
 }
 fn circle(cx: f64, cy: f64, r: f64, n: usize) -> Vec<(f64, f64)> {
-    (0..n).map(|i| {
-        let a = i as f64 / n as f64 * std::f64::consts::TAU;
-        (cx + r * a.cos(), cy + r * a.sin())
-    })
-    .collect()
+    (0..n)
+        .map(|i| {
+            let a = i as f64 / n as f64 * std::f64::consts::TAU;
+            (cx + r * a.cos(), cy + r * a.sin())
+        })
+        .collect()
 }
 /// A concave blob with a round hole: rows break, travel has to go round.
 fn blob() -> Vec<Value> {
@@ -105,7 +106,10 @@ fn cases() -> Vec<(String, Object)> {
         ("fill-no-underpath", json!({ "type": "fill", "tatamiRoute": "inkStitch", "underpath": false })),
         ("fill-underlay-skip-last", json!({ "type": "fill", "underlaySkipLast": true })),
         ("fill-carve", json!({ "type": "fill", "carve": "diamonds", "carveSize": 4.0 })),
-        ("fill-guided-no-underpath", json!({ "type": "fill", "method": "guided", "underpath": false, "skipLast": true, "guide": line(&[(0.0, 5.0), (17.0, 18.0), (34.0, 30.0)]) })),
+        (
+            "fill-guided-no-underpath",
+            json!({ "type": "fill", "method": "guided", "underpath": false, "skipLast": true, "guide": line(&[(0.0, 5.0), (17.0, 18.0), (34.0, 30.0)]) }),
+        ),
         ("fill-tartan-settings", json!({ "type": "fill", "method": "tartan", "underpath": false, "skipLast": true, "pullCompPct": 0.1 })),
     ];
     for (name, st) in more_fills {
@@ -115,7 +119,10 @@ fn cases() -> Vec<(String, Object)> {
         out.push((format!("satin-{m}"), object(m, "b", rails(), json!({ "type": "satin", "method": m }))));
     }
     out.push(("satin-centre-line".into(), object("cl", "b", vec![line(&wave(0.0, 4.0))], json!({ "type": "satin", "width": 3.0 }))));
-    out.push(("satin-ring".into(), object("ring", "b", vec![ring(&circle(20.0, 20.0, 15.0, 48)), ring(&circle(20.0, 20.0, 19.0, 48))], json!({ "type": "satin" }))));
+    out.push((
+        "satin-ring".into(),
+        object("ring", "b", vec![ring(&circle(20.0, 20.0, 15.0, 48)), ring(&circle(20.0, 20.0, 19.0, 48))], json!({ "type": "satin" })),
+    ));
     out.push(("satin-foam".into(), object("foam", "b", rails(), json!({ "type": "satin", "foam": {} }))));
     out.push(("satin-layered".into(), object("layered", "b", vec![line(&wave(0.0, 3.0)), line(&wave(9.0, 3.0))], json!({ "type": "satin", "layered": {} }))));
     out.push(("satin-random".into(), object("rnd", "b", rails(), json!({ "type": "satin", "randomWider": 20, "randomSeed": 7 }))));
@@ -188,11 +195,8 @@ fn stitch_plans_are_unchanged() {
         eprintln!("recorded {} plan hashes in {}", now.len(), path.display());
         return;
     }
-    let was: BTreeMap<String, String> = std::fs::read_to_string(&path)
-        .unwrap()
-        .lines()
-        .filter_map(|l| l.split_once(' ').map(|(k, v)| (k.to_string(), v.trim().to_string())))
-        .collect();
+    let was: BTreeMap<String, String> =
+        std::fs::read_to_string(&path).unwrap().lines().filter_map(|l| l.split_once(' ').map(|(k, v)| (k.to_string(), v.trim().to_string()))).collect();
     let changed: Vec<String> = now
         .iter()
         .filter(|(k, v)| was.get(*k) != Some(v))

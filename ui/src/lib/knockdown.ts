@@ -68,7 +68,17 @@ export function knockdownStitch(len: number): { type: "fill" } & FillParams {
 export function knockdownPaths(doc: StitchDocument, ids: string[], o: KnockdownSelectionOptions): Promise<SubPath[]> {
   return engine.convertShapes<SubPath[]>(
     "knockdown",
-    { ids, offset: o.offset, join: o.join, mitreLimit: o.mitreLimit, keepHoles: o.keepHoles, frame: o.frame, frameOffset: o.frameOffset, frameJoin: o.frameJoin, frameOnly: o.frameOnly },
+    {
+      ids,
+      offset: o.offset,
+      join: o.join,
+      mitreLimit: o.mitreLimit,
+      keepHoles: o.keepHoles,
+      frame: o.frame,
+      frameOffset: o.frameOffset,
+      frameJoin: o.frameJoin,
+      frameOnly: o.frameOnly,
+    },
     doc,
   );
 }

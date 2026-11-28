@@ -19,7 +19,14 @@ const tatami = (): StitchParams => ({ type: "fill", method: "tatami", angle: 0, 
 const obj = (id: string, stitch: StitchParams, extra: Partial<DesignObject> = {}): DesignObject =>
   ({ id, name: id, thread: "t", visible: true, locked: false, paths: [line], stitch, trimAfter: false, stopAfter: false, ...extra }) as DesignObject;
 const docOf = (fabric: Fabric, presetSet?: "filum" | "nova", objects: DesignObject[] = []) =>
-  ({ version: 1, objects, threads: [], fabric, hoop: { name: "", width: 100, height: 100 }, options: presetSet ? { presetSet } : undefined }) as unknown as StitchDocument;
+  ({
+    version: 1,
+    objects,
+    threads: [],
+    fabric,
+    hoop: { name: "", width: 100, height: 100 },
+    options: presetSet ? { presetSet } : undefined,
+  }) as unknown as StitchDocument;
 
 // off by default: Ink/Stitch's values, no pull compensation
 check(JSON.stringify(newObjectDefaults(docOf("knit"), {})) === "{}", "no preset: new objects keep Ink/Stitch's values");
@@ -34,7 +41,10 @@ check(!("rowSpacing" in presetValues("filum", "cotton", { ...tatami(), method: "
 
 // NOVAstitch
 const n = newObjectDefaults(docOf("knit", "nova"), {});
-check(near(n.satin?.pullComp, 1) && n.satin?.contourUnderlay === true && near(n.satin?.contourInset, 0.5), "NOVAstitch on knit: 1 mm pull compensation, contour underlay 0.5 mm in");
+check(
+  near(n.satin?.pullComp, 1) && n.satin?.contourUnderlay === true && near(n.satin?.contourInset, 0.5),
+  "NOVAstitch on knit: 1 mm pull compensation, contour underlay 0.5 mm in",
+);
 check(near(n.fill?.pullComp, 1) && near(n.fill?.expand, 0.4), "NOVAstitch on knit: fills 1 mm, 0.4 mm overlap");
 check(presetValues("nova", "knit", satin(1.5)).contourUnderlay === false, "NOVAstitch: no contour underlay on satins under 2 mm");
 check(near(newObjectDefaults(docOf("cotton", "nova"), {}).fill?.expand, 0.2), "NOVAstitch on cotton: 0.2 mm overlap");
@@ -45,7 +55,12 @@ check(near(c.satin?.pullComp, 0.4) && near(c.fill?.pullComp, 0.3), "a calibratio
 check(near(c.fill?.expand, 0.3), "a calibration's expand adds to the preset's overlap");
 
 // the objects already in a design
-const objs = [obj("s", satin(3)), obj("t", tatami()), obj("r", { type: "running", length: 2.5, tolerance: 0.2, repeats: 1, beanRepeats: 0 } as StitchParams), obj("l", satin(3), { locked: true })];
+const objs = [
+  obj("s", satin(3)),
+  obj("t", tatami()),
+  obj("r", { type: "running", length: 2.5, tolerance: 0.2, repeats: 1, beanRepeats: 0 } as StitchParams),
+  obj("l", satin(3), { locked: true }),
+];
 const nova = docOf("pique", "nova", objs);
 check(objectsOffPreset(nova, {}).join() === "s,t", "the satin and the fill differ from the preset; lines and locked objects don't count");
 const applied = applyPresetToObjects(nova, {});
@@ -55,7 +70,10 @@ check(near(st(applied, "t").expand, 0.4) && near(st(applied, "t").rowSpacing, 0.
 check(near(st(applied, "l").pullComp, 0), "a locked object stays as it is");
 check(!objectsOffPreset(applied, {}).length && applyPresetToObjects(applied, {}) === applied, "applied twice: nothing more to do");
 const back = applyPresetToObjects({ ...applied, options: undefined }, {});
-check(near(st(back, "s").pullComp, 0) && st(back, "s").contourUnderlay === false && near(st(back, "t").expand, 0), "back to no preset: Ink/Stitch's values again");
+check(
+  near(st(back, "s").pullComp, 0) && st(back, "s").contourUnderlay === false && near(st(back, "t").expand, 0),
+  "back to no preset: Ink/Stitch's values again",
+);
 
 console.log(failed ? `${failed} FAILED` : "all passed");
 if (failed) throw new Error(`${failed} fabric preset checks failed`);

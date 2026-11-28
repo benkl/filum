@@ -9,7 +9,15 @@ export function hexToRgb(hex: string): [number, number, number] {
   return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
 }
 
-export const rgbToHex = (rgb: number[]) => "#" + rgb.map((c) => Math.round(Math.min(255, Math.max(0, c))).toString(16).padStart(2, "0")).join("");
+export const rgbToHex = (rgb: number[]) =>
+  "#" +
+  rgb
+    .map((c) =>
+      Math.round(Math.min(255, Math.max(0, c)))
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("");
 
 export function normHex(s: string): string | null {
   const m = s.trim().match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
@@ -71,7 +79,8 @@ export function deltaE(a: Lab, b: Lab, kL = 1, kC = 1, kH = 1): number {
     if (Math.abs(h1p - h2p) > 180) hpm += h1p + h2p < 360 ? 360 : -360;
     hpm /= 2;
   }
-  const T = 1 - 0.17 * Math.cos((hpm - 30) * rad) + 0.24 * Math.cos(2 * hpm * rad) + 0.32 * Math.cos((3 * hpm + 6) * rad) - 0.2 * Math.cos((4 * hpm - 63) * rad);
+  const T =
+    1 - 0.17 * Math.cos((hpm - 30) * rad) + 0.24 * Math.cos(2 * hpm * rad) + 0.32 * Math.cos((3 * hpm + 6) * rad) - 0.2 * Math.cos((4 * hpm - 63) * rad);
   const dTheta = 30 * Math.exp(-(((hpm - 275) / 25) ** 2));
   const Rc = 2 * Math.sqrt(Cpm ** 7 / (Cpm ** 7 + 25 ** 7));
   const Sl = 1 + (0.015 * (Lpm - 50) ** 2) / Math.sqrt(20 + (Lpm - 50) ** 2);
@@ -81,4 +90,3 @@ export function deltaE(a: Lab, b: Lab, kL = 1, kC = 1, kH = 1): number {
   const [l, c, hh] = [dLp / (Sl * kL), dCp / (Sc * kC), dHp / (Sh * kH)];
   return Math.sqrt(l ** 2 + c ** 2 + hh ** 2 + Rt * c * hh);
 }
-

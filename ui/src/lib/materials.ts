@@ -172,9 +172,33 @@ export interface ThreadWeightInfo {
 export const THREAD_WEIGHTS: ThreadWeightInfo[] = [
   { weight: 75, label: "No. 75 (extra fine)", spacing: 0.2, needle: "60/8", minText: 2.5, minTextSource: "Madeira Polyneon 75", tex: THREAD_TEX[75] },
   { weight: 60, label: "No. 60 (fine)", spacing: 0.35, needle: "60/8–65/9", minText: 3, minTextSource: "Madeira Polyneon / Classic 60", tex: THREAD_TEX[60] },
-  { weight: 40, label: "No. 40 (standard)", spacing: 0.4, needle: "65/9–75/11", minText: 5, minTextSource: "Melco small-lettering guide (6.4 mm on caps)", tex: THREAD_TEX[40] },
-  { weight: 30, label: "No. 30 (heavy)", spacing: 0.5, needle: "75/11–80/12", minText: 6.3, minTextSource: "no published minimum — scaled from No. 40 by the spacing", tex: THREAD_TEX[30] },
-  { weight: 12, label: "No. 12 (very heavy)", spacing: 0.8, needle: "100/16", minText: 10, minTextSource: "no published minimum — scaled from No. 40 by the spacing", tex: THREAD_TEX[12] },
+  {
+    weight: 40,
+    label: "No. 40 (standard)",
+    spacing: 0.4,
+    needle: "65/9–75/11",
+    minText: 5,
+    minTextSource: "Melco small-lettering guide (6.4 mm on caps)",
+    tex: THREAD_TEX[40],
+  },
+  {
+    weight: 30,
+    label: "No. 30 (heavy)",
+    spacing: 0.5,
+    needle: "75/11–80/12",
+    minText: 6.3,
+    minTextSource: "no published minimum — scaled from No. 40 by the spacing",
+    tex: THREAD_TEX[30],
+  },
+  {
+    weight: 12,
+    label: "No. 12 (very heavy)",
+    spacing: 0.8,
+    needle: "100/16",
+    minText: 10,
+    minTextSource: "no published minimum — scaled from No. 40 by the spacing",
+    tex: THREAD_TEX[12],
+  },
 ];
 
 /**

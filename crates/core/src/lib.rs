@@ -11,14 +11,17 @@
 pub mod prof;
 pub mod assemble;
 pub mod bezfit;
-pub mod locks;
 pub mod clip;
-pub mod density;
 pub mod convert;
-#[cfg(feature = "digitize")] pub mod digitize;
+pub mod density;
+#[cfg(feature = "digitize")]
+pub mod digitize;
+#[cfg(test)]
+mod engine_types;
 pub mod geom;
 pub mod info;
 pub mod io;
+pub mod locks;
 pub mod model;
 pub mod optimize;
 pub mod outline_route;
@@ -32,8 +35,6 @@ pub mod svg;
 pub mod threadlist;
 pub mod threads;
 pub mod vision;
-#[cfg(test)]
-mod engine_types;
 
 pub use assemble::Engine;
 pub use model::*;

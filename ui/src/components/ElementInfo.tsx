@@ -40,13 +40,15 @@ const METHOD: Record<string, string> = {
 };
 /** "streamline" → "Streamline", "linearGradient" → "Linear gradient". */
 const words = (id: string) => (id ? (id[0].toUpperCase() + id.slice(1)).replace(/([a-z])([A-Z])/g, (_, a, b) => `${a} ${b.toLowerCase()}`) : "");
-export const methodLabel = (o: Pick<ObjectInfo, "kind" | "method">) => (o.method ? (METHOD[o.method] ?? `${words(o.method)}${o.kind === "fill" ? " fill" : ""}`) : (KIND[o.kind] ?? words(o.kind)));
+export const methodLabel = (o: Pick<ObjectInfo, "kind" | "method">) =>
+  o.method ? (METHOD[o.method] ?? `${words(o.method)}${o.kind === "fill" ? " fill" : ""}`) : (KIND[o.kind] ?? words(o.kind));
 const mm = (v: number) => v.toFixed(2);
 
 /** Ink/Stitch's export text: one tab-separated line per object. */
 export function infoTable(info: ElementInfo): string {
   let s = "element_id\ttype\tmethod\tdimensions\tstitches\tjumps\tmax_stitch_length\tmin_stitch_length\n";
-  for (const o of info.objects) s += `${o.id}\t${KIND[o.kind] ?? o.kind}\t${methodLabel(o)}\t${mm(o.width)} x ${mm(o.height)}\t${o.stitches}\t${o.jumps}\t${mm(o.maxStitch)}\t${mm(o.minStitch)}\n`;
+  for (const o of info.objects)
+    s += `${o.id}\t${KIND[o.kind] ?? o.kind}\t${methodLabel(o)}\t${mm(o.width)} x ${mm(o.height)}\t${o.stitches}\t${o.jumps}\t${mm(o.maxStitch)}\t${mm(o.minStitch)}\n`;
   return s;
 }
 
@@ -168,7 +170,11 @@ function Panel({ ids }: { ids: string[] }) {
         </>
       )}
       <div className="ei-actions">
-        <button className="btn sm ghost" onClick={copy} title="Copy every object's info as a tab-separated table (Ink/Stitch's element info export) — paste it into a spreadsheet">
+        <button
+          className="btn sm ghost"
+          onClick={copy}
+          title="Copy every object's info as a tab-separated table (Ink/Stitch's element info export) — paste it into a spreadsheet"
+        >
           <Copy size={12} /> Copy table
         </button>
       </div>

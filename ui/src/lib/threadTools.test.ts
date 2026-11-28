@@ -24,28 +24,39 @@ const check = (ok: boolean, msg: string) => {
   const text = myThreadsGpl(mine);
   const lines = text.split("\n");
   check(lines[0] === "GIMP Palette" && lines[1] === "Name: My threads", "export: a GIMP palette named My threads");
-  check(lines.includes(`${FILUM_ENTRY}\tRed\t1147\tMadeira Polyneon`) && lines.includes("200\t 16\t 46\tRed 1147"), "export: the entry as Ink/Stitch writes it, its exact fields in a comment before it");
+  check(
+    lines.includes(`${FILUM_ENTRY}\tRed\t1147\tMadeira Polyneon`) && lines.includes("200\t 16\t 46\tRed 1147"),
+    "export: the entry as Ink/Stitch writes it, its exact fields in a comment before it",
+  );
   check(lines.includes(`${FILUM_ENTRY}\tTab name\t7\tA B`), "export: tabs in a field become spaces");
 
   // what the engine's parse_gpl gives for this text (crates/core/src/threads.rs, gpl_my_threads_round_trip)
   const parsed: ParsedPalette = {
     name: "My threads",
-    entries: mine.map((t) => ({ name: t.name.replace(/\t/g, " "), code: t.code, rgb: [0, 0, 0] as [number, number, number] })).map((e, i) => {
-      const h = mine[i].color.slice(1);
-      return { ...e, rgb: [0, 2, 4].map((k) => parseInt(h.slice(k, k + 2), 16)) as [number, number, number] };
-    }),
+    entries: mine
+      .map((t) => ({ name: t.name.replace(/\t/g, " "), code: t.code, rgb: [0, 0, 0] as [number, number, number] }))
+      .map((e, i) => {
+        const h = mine[i].color.slice(1);
+        return { ...e, rgb: [0, 2, 4].map((k) => parseInt(h.slice(k, k + 2), 16)) as [number, number, number] };
+      }),
     brands: mine.map((t) => t.brand.replace(/\t/g, " ")),
   };
   const back = spoolsOfPalette(parsed, "my-threads.gpl");
   check(back.length === mine.length, "import: every spool");
-  check(back.slice(0, 4).every((t, i) => ownedKey(t) === ownedKey(mine[i]) && t.name === mine[i].name), "import: brand, code, name and colour as exported (no duplicates)");
+  check(
+    back.slice(0, 4).every((t, i) => ownedKey(t) === ownedKey(mine[i]) && t.name === mine[i].name),
+    "import: brand, code, name and colour as exported (no duplicates)",
+  );
   check(back[1].brand === "Gunold 12" && back[1].code === "", "import: a brand with digits, no code");
   check(back[2].brand === "" && back[2].name === "Red 2", "import: no brand stays no brand");
 
   // a plain palette (Ink/Stitch chart, older export): the palette's name is the brand
   const plain = spoolsOfPalette({ name: "Ink/Stitch: Madeira Rayon", entries: [{ name: "", code: "1000", rgb: [40, 41, 42] }] }, "x.gpl");
   check(plain[0].brand === "Madeira Rayon" && plain[0].name === "#28292A", "import: a plain palette's brand is its name, a nameless colour its hex");
-  check(spoolsOfPalette({ name: "My threads", entries: [{ name: "Red", code: "1", rgb: [1, 2, 3] }] }, "x.gpl")[0].brand === "", "import: an old My threads export has no brand");
+  check(
+    spoolsOfPalette({ name: "My threads", entries: [{ name: "Red", code: "1", rgb: [1, 2, 3] }] }, "x.gpl")[0].brand === "",
+    "import: an old My threads export has no brand",
+  );
 }
 
 // --- installed chart ids ------------------------------------------------------------

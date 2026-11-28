@@ -29,13 +29,13 @@ use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use image::{Rgb, RgbImage};
-use serde::Serialize;
 use filum_core::density::{density_field, DensityOptions};
 use filum_core::digitize::{decode_image, digitize_rgba, DigitizeOptions};
 use filum_core::plan::{flags, StitchPlan};
 use filum_core::threads::{delta_e76 as delta_e, rgb_to_lab};
 use filum_core::{io, Document, Engine, StitchParams};
+use image::{Rgb, RgbImage};
+use serde::Serialize;
 
 const PX_MM: f64 = 8.0;
 const FABRIC: [u8; 3] = [236, 233, 226];
@@ -128,13 +128,35 @@ fn main() -> Result<(), String> {
         let doc = Document { name: name.clone(), threads: r.threads.clone(), objects: r.objects.clone(), ..Document::default() };
         if std::env::var("SUITE_DUMP").is_ok() {
             for c in &r.colors {
-                println!("  colour {} {:<14} cover {:>5.1}% bg {} removed {:>5.1}% lines {:>5.1}%", c.hex, c.name, c.coverage * 100.0, c.background, c.removed * 100.0, c.lines * 100.0);
+                println!(
+                    "  colour {} {:<14} cover {:>5.1}% bg {} removed {:>5.1}% lines {:>5.1}%",
+                    c.hex,
+                    c.name,
+                    c.coverage * 100.0,
+                    c.background,
+                    c.removed * 100.0,
+                    c.lines * 100.0
+                );
             }
             for (i, o) in doc.objects.iter().enumerate() {
                 let a: f64 = o.paths.iter().map(|p| filum_core::geom::signed_area(&p.flatten(0.05))).sum();
-                let kind = match &o.stitch { StitchParams::Fill(_) => "fill", StitchParams::Satin(_) => "satin", StitchParams::Running(_) => "run", _ => "other" };
+                let kind = match &o.stitch {
+                    StitchParams::Fill(_) => "fill",
+                    StitchParams::Satin(_) => "satin",
+                    StitchParams::Running(_) => "run",
+                    _ => "other",
+                };
                 let b = o.bounds();
-                println!("  #{i:<3} {kind:<6} {:<22} {:<10} paths {:<3} area {a:>8.1} box {:.1},{:.1}–{:.1},{:.1}", o.name, o.thread, o.paths.len(), b.min_x, b.min_y, b.max_x, b.max_y);
+                println!(
+                    "  #{i:<3} {kind:<6} {:<22} {:<10} paths {:<3} area {a:>8.1} box {:.1},{:.1}–{:.1},{:.1}",
+                    o.name,
+                    o.thread,
+                    o.paths.len(),
+                    b.min_x,
+                    b.min_y,
+                    b.max_x,
+                    b.max_y
+                );
             }
         }
         let mut engine = Engine::new();
@@ -175,7 +197,20 @@ fn main() -> Result<(), String> {
             let (rw, rh) = ((rm.width_mm * PX_MM).ceil() as u32 + 8, (rm.height_mm * PX_MM).ceil() as u32 + 8);
             let rr = render_threads(&rplan, rw, rh, b.min_x - 0.5, b.min_y - 0.5);
             save(&rr, &out.join(format!("{name}.ref-{who}.png")))?;
-            println!("  reference {who:<14} {:>6} st {:>5.0}/cm² {:>2} col {:>3} trims {:>3} jumps short {:>4} long {:>3}/{:<3} layers {:>4.1}  {:.0}×{:.0} mm", rm.stitches, rm.per_cm2, rm.colors, rm.trims, rm.jumps, rm.short_stitches, rm.long_satin, rm.long_stitches, rm.max_layers, rm.width_mm, rm.height_mm);
+            println!(
+                "  reference {who:<14} {:>6} st {:>5.0}/cm² {:>2} col {:>3} trims {:>3} jumps short {:>4} long {:>3}/{:<3} layers {:>4.1}  {:.0}×{:.0} mm",
+                rm.stitches,
+                rm.per_cm2,
+                rm.colors,
+                rm.trims,
+                rm.jumps,
+                rm.short_stitches,
+                rm.long_satin,
+                rm.long_stitches,
+                rm.max_layers,
+                rm.width_mm,
+                rm.height_mm
+            );
             references.push(rm);
         }
         std::fs::write(out.join(format!("{name}.json")), serde_json::to_string_pretty(&m).unwrap()).map_err(|e| e.to_string())?;
@@ -454,10 +489,18 @@ fn compare(src: &(RgbImage, Vec<Option<[u8; 3]>>), plan: &StitchPlan, w: u32, h:
             continue;
         }
         outside[i] = true;
-        if x > 0 { stack.push((x - 1, y)); }
-        if y > 0 { stack.push((x, y - 1)); }
-        if x + 1 < w { stack.push((x + 1, y)); }
-        if y + 1 < h { stack.push((x, y + 1)); }
+        if x > 0 {
+            stack.push((x - 1, y));
+        }
+        if y > 0 {
+            stack.push((x, y - 1));
+        }
+        if x + 1 < w {
+            stack.push((x + 1, y));
+        }
+        if y + 1 < h {
+            stack.push((x, y + 1));
+        }
     }
     let mut diff = RgbImage::from_pixel(w, h, Rgb([255, 255, 255]));
     let (mut de_sum, mut de_n, mut wrong, mut gap, mut spill, mut fg) = (0.0, 0usize, 0usize, 0usize, 0usize, 0usize);
@@ -472,7 +515,11 @@ fn compare(src: &(RgbImage, Vec<Option<[u8; 3]>>), plan: &StitchPlan, w: u32, h:
                 // enclosed background colour: fine either way, judged only for colour if stitched
                 let px = if covered {
                     let d = delta_e(s.unwrap_or([255, 255, 255]), t);
-                    if d > 25.0 { [255, 120, 120] } else { [215, 225, 240] }
+                    if d > 25.0 {
+                        [255, 120, 120]
+                    } else {
+                        [215, 225, 240]
+                    }
                 } else {
                     [235, 240, 250]
                 };
@@ -558,7 +605,12 @@ fn table(m: &Metrics, refs: &[Metrics]) -> String {
         ("trims", |m| m.trims.to_string(), m.trims > 3 * m.colors.max(1) + 6, true),
         ("jumps", |m| m.jumps.to_string(), false, true),
         ("travel", |m| format!("{:.0} mm", m.travel_mm), false, true),
-        ("short < 0.5", |m| format!("{} ({:.1} %)", m.short_stitches, m.short_stitches as f64 / m.stitches.max(1) as f64 * 100.0), m.short_stitches as f64 > 0.03 * m.stitches as f64, true),
+        (
+            "short < 0.5",
+            |m| format!("{} ({:.1} %)", m.short_stitches, m.short_stitches as f64 / m.stitches.max(1) as f64 * 100.0),
+            m.short_stitches as f64 > 0.03 * m.stitches as f64,
+            true,
+        ),
         ("long satin > 7", |m| m.long_satin.to_string(), m.long_satin > 0, true),
         ("long > 12", |m| m.long_stitches.to_string(), m.long_stitches > 0, true),
         ("mean length", |m| format!("{:.2} mm", m.mean_len), false, true),

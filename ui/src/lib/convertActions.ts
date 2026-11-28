@@ -29,7 +29,8 @@ import { withParent } from "./groups";
 import { pruneGroups } from "./layerRows";
 import { connectLines, DEFAULT_CONNECT, type ConnectOptions } from "./connectLines";
 
-export type ConvertId = "fillToSatin" | "fillToStroke" | "satinToStroke" | "satinToRails" | "zigzagToSatin" | "patternSatin" | "breakApart" | "dedupe" | "connectLines";
+export type ConvertId =
+  "fillToSatin" | "fillToStroke" | "satinToStroke" | "satinToRails" | "zigzagToSatin" | "patternSatin" | "breakApart" | "dedupe" | "connectLines";
 
 /** What a conversion does to the document. */
 export interface ConvertPlan {
@@ -98,13 +99,16 @@ export const UNDERLAYS: [UnderlayPreset, string, Partial<SatinParams>, string][]
 // ---------------------------------------------------------------------------
 // What the selection holds
 
-export const isFillObj = (o: DesignObject) => !o.text && (o.stitch.type === "fill" || o.stitch.type === "none") && o.paths.some((sp) => sp.closed && sp.nodes.length >= 3);
+export const isFillObj = (o: DesignObject) =>
+  !o.text && (o.stitch.type === "fill" || o.stitch.type === "none") && o.paths.some((sp) => sp.closed && sp.nodes.length >= 3);
 export const openLines = (o: DesignObject) => o.paths.filter((sp) => sp.nodes.length >= 2 && !sp.closed);
 /** Lines: running stitch (or unstitched) objects, every sub-path a line. */
-export const isLineObj = (o: DesignObject) => !o.text && (o.stitch.type === "running" || o.stitch.type === "manual" || o.stitch.type === "none") && o.paths.some((sp) => sp.nodes.length >= 2);
+export const isLineObj = (o: DesignObject) =>
+  !o.text && (o.stitch.type === "running" || o.stitch.type === "manual" || o.stitch.type === "none") && o.paths.some((sp) => sp.nodes.length >= 2);
 export const isSatinObj = (o: DesignObject) => !o.text && o.stitch.type === "satin" && o.paths.some((sp) => sp.nodes.length >= 2);
 /** Centre-line satins: one line (or one line per sub-path) and a width. */
-export const isCentreSatin = (o: DesignObject) => isSatinObj(o) && o.stitch.type === "satin" && (o.stitch.multi || o.paths.filter((sp) => sp.nodes.length >= 2).length === 1);
+export const isCentreSatin = (o: DesignObject) =>
+  isSatinObj(o) && o.stitch.type === "satin" && (o.stitch.multi || o.paths.filter((sp) => sp.nodes.length >= 2).length === 1);
 
 /** Whether a conversion has something to work on in the selection. */
 export function applies(id: ConvertId, sel: DesignObject[]): boolean {
@@ -250,7 +254,12 @@ export async function planFillToStroke(sel: DesignObject[], o: FillToStrokeOptio
   const select: string[] = [];
   let n = 0;
   for (const f of fills) {
-    const lines = await engine.convertShapes<CentreLineOut[]>("centreLines", { paths: f.paths.filter((sp) => sp.closed), cutLines, deadEnd: o.deadEnd, closeGaps: o.closeGaps });
+    const lines = await engine.convertShapes<CentreLineOut[]>("centreLines", {
+      paths: f.paths.filter((sp) => sp.closed),
+      cutLines,
+      deadEnd: o.deadEnd,
+      closeGaps: o.closeGaps,
+    });
     if (!lines.length) continue;
     const group = lines.length > 1 ? uid("g") : undefined;
     const made = lines.map((l, i) => {
@@ -327,7 +336,10 @@ export async function planZigzagToSatin(sel: DesignObject[], o: ZigzagOptions): 
     const lines = openLines(x).filter((sp) => sp.nodes.length >= 4);
     const made: DesignObject[] = [];
     lines.forEach((sp, i) => {
-      const paths = zigzagToSatin(sp.nodes.map((n) => n.p), o);
+      const paths = zigzagToSatin(
+        sp.nodes.map((n) => n.p),
+        o,
+      );
       if (paths) made.push(derived(x, lines.length > 1 ? `${x.name} ${i + 1}` : `${x.name} (satin)`, paths, satinStitch(x)));
     });
     if (!made.length) continue;
@@ -365,7 +377,8 @@ type BreakOut = { kind: "valid" } | { kind: "removed" } | { kind: "parts"; parts
 export async function planBreakApart(sel: DesignObject[], o: { method: "simple" | "complex"; minArea: number }): Promise<ConvertPlan | string> {
   // a gradient's, tartan's or blend's layers share one shape: split together they'd fall apart
   const fills = sel.filter((x) => isFillObj(x) && !(x.stitch.type === "fill" && (x.stitch.gradient || x.stitch.tartan || x.stitch.ramp?.group)));
-  if (!fills.length) return sel.some(isFillObj) ? "Gradients, tartans and colour blends can't be broken apart: remove them first" : "Select one or more fill shapes";
+  if (!fills.length)
+    return sel.some(isFillObj) ? "Gradients, tartans and colour blends can't be broken apart: remove them first" : "Select one or more fill shapes";
   const replace: Record<string, DesignObject[]> = {};
   const select: string[] = [];
   let valid = 0;
@@ -403,7 +416,9 @@ export async function planBreakApart(sel: DesignObject[], o: { method: "simple" 
   return {
     replace,
     select,
-    summary: [parts ? `${plural(parts, "shape")}` : "", removed ? `${removed} too small, removed` : "", valid ? `${valid} already valid` : ""].filter(Boolean).join(" · "),
+    summary: [parts ? `${plural(parts, "shape")}` : "", removed ? `${removed} too small, removed` : "", valid ? `${valid} already valid` : ""]
+      .filter(Boolean)
+      .join(" · "),
   };
 }
 
@@ -457,7 +472,10 @@ export function planConnectLines(sel: DesignObject[], o: ConnectOptions): Conver
   let bridged = 0;
   let doubled = 0;
   for (const objs of groups.values()) {
-    const r = connectLines(objs.flatMap((x) => x.paths), o);
+    const r = connectLines(
+      objs.flatMap((x) => x.paths),
+      o,
+    );
     pieces += r.pieces;
     made += r.lines;
     bridged += r.bridged;

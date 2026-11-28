@@ -72,7 +72,10 @@ export function DesignView({ doc, plan, mode, fabricColor, showUnderlay = true, 
 
   const box = useMemo(() => contentBox(doc, plan, mode), [doc, plan, mode]);
   // the fabric under the design (realistic view): its box with a margin
-  const fabricArea = useMemo(() => (box ? { x: box.x - box.w * 0.08 - 2, y: box.y - box.h * 0.08 - 2, w: box.w * 1.16 + 4, h: box.h * 1.16 + 4 } : undefined), [box]);
+  const fabricArea = useMemo(
+    () => (box ? { x: box.x - box.w * 0.08 - 2, y: box.y - box.h * 0.08 - 2, w: box.w * 1.16 + 4, h: box.h * 1.16 + 4 } : undefined),
+    [box],
+  );
 
   useLayoutEffect(() => {
     const el = wrap.current;

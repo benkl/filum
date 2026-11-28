@@ -96,7 +96,12 @@ export function MachineSettings() {
                   className="mc-frames"
                   frames={profile.frames}
                   isOn={(f) => hoop.width === f.width && hoop.height === f.height && (hoop.shape ?? "rect") === (f.shape ?? "rect")}
-                  onPick={(f) => commit((d) => ({ ...d, hoop: { name: `${profile.brand} ${f.name}`, width: f.width, height: f.height, ...(f.shape ? { shape: f.shape } : {}) } }))}
+                  onPick={(f) =>
+                    commit((d) => ({
+                      ...d,
+                      hoop: { name: `${profile.brand} ${f.name}`, width: f.width, height: f.height, ...(f.shape ? { shape: f.shape } : {}) },
+                    }))
+                  }
                 />
               </div>
             )}
@@ -157,7 +162,10 @@ export function MachineSettings() {
           <Num value={m.maxStitch} unit="mm" step={0.5} min={2} max={12.7} onChange={(v) => up({ maxStitch: v })} />
         </Row>
       </Section>
-      <Section title="Time estimates" hint="The rated top speed: dense designs with short stitches run slower. A one-needle machine waits for you to rethread at every colour change.">
+      <Section
+        title="Time estimates"
+        hint="The rated top speed: dense designs with short stitches run slower. A one-needle machine waits for you to rethread at every colour change."
+      >
         <Row label="Speed">
           <Num value={m.spm} unit="spm" step={50} min={100} digits={0} onChange={(v) => up({ spm: v })} />
         </Row>
@@ -171,4 +179,3 @@ export function MachineSettings() {
     </>
   );
 }
-

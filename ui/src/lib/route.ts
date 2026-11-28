@@ -17,7 +17,6 @@
 import type { Vec2 } from "../types";
 import { d2, dist } from "./vec";
 
-
 /** Where two segments cross (parameters on both), if they do. */
 function cross(a: Vec2, b: Vec2, c: Vec2, d: Vec2): [number, number] | null {
   const r: Vec2 = [b[0] - a[0], b[1] - a[1]];
@@ -254,4 +253,3 @@ export function routeRunning(lines: Vec2[][], opts: RouteOptions = {}): Vec2[][]
   }
   return out;
 }
-

@@ -11,7 +11,17 @@ const check = (ok: boolean, msg: string) => {
   if (!ok) failed++;
 };
 const obj = (id: string, paths: SubPath[]): DesignObject =>
-  ({ id, name: id, thread: "t", visible: true, locked: false, paths, stitch: { type: "running" }, trimAfter: false, stopAfter: false }) as unknown as DesignObject;
+  ({
+    id,
+    name: id,
+    thread: "t",
+    visible: true,
+    locked: false,
+    paths,
+    stitch: { type: "running" },
+    trimAfter: false,
+    stopAfter: false,
+  }) as unknown as DesignObject;
 const docOf = (...objects: DesignObject[]) => ({ objects }) as unknown as StitchDocument;
 const line = (...pts: Vec2[]): SubPath => ({ nodes: pts.map((p) => ({ p })), closed: false });
 /** Largest distance from points of a to the polyline of b. */
@@ -55,7 +65,15 @@ check(sq3.closed && sq3.nodes.length === 3 && !sq3.nodes.some((n) => n.i || n.o)
 
 {
   const d = docOf(obj("a", [line([0, 0], [5, 0], [10, 0])]), obj("b", [line([0, 5], [5, 5])]));
-  const r = deleteSelectedNodes(d, [{ id: "a", sp: 0, ni: 1 }, { id: "b", sp: 0, ni: 0 }, { id: "b", sp: 0, ni: 1 }], true);
+  const r = deleteSelectedNodes(
+    d,
+    [
+      { id: "a", sp: 0, ni: 1 },
+      { id: "b", sp: 0, ni: 0 },
+      { id: "b", sp: 0, ni: 1 },
+    ],
+    true,
+  );
   check(r.doc.objects.length === 1 && r.doc.objects[0].paths[0].nodes.length === 2 && r.removedObjects === 1, "delete in several objects at once");
 }
 
@@ -67,7 +85,14 @@ check(sq3.closed && sq3.nodes.length === 3 && !sq3.nodes.some((n) => n.i || n.o)
   check(!!s1.i && !!s1.o, "smooth: handles on both sides");
   const c1 = setNodeType(smooth, [{ id: "a", sp: 0, ni: 1 }], "corner").objects[0].paths[0].nodes[1];
   check(!c1.i && !c1.o, "corner: no handles");
-  const curved = setSegmentType(d, [{ id: "a", sp: 0, ni: 0 }, { id: "a", sp: 0, ni: 1 }], "curve").objects[0].paths[0];
+  const curved = setSegmentType(
+    d,
+    [
+      { id: "a", sp: 0, ni: 0 },
+      { id: "a", sp: 0, ni: 1 },
+    ],
+    "curve",
+  ).objects[0].paths[0];
   check(!!curved.nodes[0].o && !!curved.nodes[1].i && !curved.nodes[1].o, "curve: only the segment between the selected points");
   const mid = cubicAt(segmentOf(curved, 0), 0.5);
   check(Math.abs(mid[1]) < 1e-9 && Math.abs(mid[0] - 5) < 1e-9, "a new curve keeps the straight shape until edited");
@@ -78,20 +103,44 @@ check(sq3.closed && sq3.nodes.length === 3 && !sq3.nodes.some((n) => n.i || n.o)
 // break, join, open / close
 {
   const d = docOf(obj("a", [line([0, 0], [5, 0], [10, 0], [15, 0])]));
-  const b = breakAtNodes(d, [{ id: "a", sp: 0, ni: 1 }, { id: "a", sp: 0, ni: 2 }]).objects[0].paths;
+  const b = breakAtNodes(d, [
+    { id: "a", sp: 0, ni: 1 },
+    { id: "a", sp: 0, ni: 2 },
+  ]).objects[0].paths;
   check(b.length === 3 && b.map((p) => p.nodes.length).join() === "2,2,2", "break an open path at two points: three pieces");
   const opened = breakAtNodes(docOf(obj("r", [sq])), [{ id: "r", sp: 0, ni: 2 }]).objects[0].paths[0];
-  check(!opened.closed && opened.nodes.length === 5 && opened.nodes[0].p.join() === "10,10" && opened.nodes[4].p.join() === "10,10", "break a closed path: it opens at that point");
+  check(
+    !opened.closed && opened.nodes.length === 5 && opened.nodes[0].p.join() === "10,10" && opened.nodes[4].p.join() === "10,10",
+    "break a closed path: it opens at that point",
+  );
   check(toggleClosed(d, [{ id: "a", sp: 0, ni: 0 }]).objects[0].paths[0].closed, "close an open path");
   check(!toggleClosed(docOf(obj("r", [sq])), [{ id: "r", sp: 0, ni: 1 }]).objects[0].paths[0].closed, "open a closed path");
   const two = docOf(obj("a", [line([0, 0], [5, 0])]), obj("b", [line([5, 0], [5, 5])]));
-  const j = joinNodes(two, [{ id: "a", sp: 0, ni: 1 }, { id: "b", sp: 0, ni: 0 }]);
+  const j = joinNodes(two, [
+    { id: "a", sp: 0, ni: 1 },
+    { id: "b", sp: 0, ni: 0 },
+  ]);
   check(!j.error && j.doc.objects.length === 1 && j.doc.objects[0].paths[0].nodes.length === 3, "join two paths: coincident ends merge");
   const two2 = docOf(obj("a", [line([0, 0], [5, 0])]), obj("b", [line([0, 1], [0, 6])]));
-  const j2 = joinNodes(two2, [{ id: "a", sp: 0, ni: 0 }, { id: "b", sp: 0, ni: 0 }]).doc.objects[0].paths[0];
+  const j2 = joinNodes(two2, [
+    { id: "a", sp: 0, ni: 0 },
+    { id: "b", sp: 0, ni: 0 },
+  ]).doc.objects[0].paths[0];
   check(j2.nodes.length === 4 && j2.nodes[0].p.join() === "5,0" && j2.nodes[3].p.join() === "0,6", "join start to start: one path reversed, a straight bridge");
-  check(joinNodes(d, [{ id: "a", sp: 0, ni: 0 }, { id: "a", sp: 0, ni: 3 }]).doc.objects[0].paths[0].closed, "join the two ends of one path: it closes");
-  check(!!joinNodes(d, [{ id: "a", sp: 0, ni: 1 }, { id: "a", sp: 0, ni: 3 }]).error, "inner points cannot be joined");
+  check(
+    joinNodes(d, [
+      { id: "a", sp: 0, ni: 0 },
+      { id: "a", sp: 0, ni: 3 },
+    ]).doc.objects[0].paths[0].closed,
+    "join the two ends of one path: it closes",
+  );
+  check(
+    !!joinNodes(d, [
+      { id: "a", sp: 0, ni: 1 },
+      { id: "a", sp: 0, ni: 3 },
+    ]).error,
+    "inner points cannot be joined",
+  );
 }
 
 // move, align
@@ -99,7 +148,14 @@ check(sq3.closed && sq3.nodes.length === 3 && !sq3.nodes.some((n) => n.i || n.o)
   const d = docOf(obj("a", [line([0, 0], [10, 3], [20, 7])]));
   const m = moveNodes(d, [{ id: "a", sp: 0, ni: 1 }], [1, 2]).objects[0].paths[0].nodes;
   check(m[1].p.join() === "11,5" && m[0].p.join() === "0,0", "move only the selected points");
-  const a = alignNodes(d, [{ id: "a", sp: 0, ni: 1 }, { id: "a", sp: 0, ni: 2 }], "h").objects[0].paths[0].nodes;
+  const a = alignNodes(
+    d,
+    [
+      { id: "a", sp: 0, ni: 1 },
+      { id: "a", sp: 0, ni: 2 },
+    ],
+    "h",
+  ).objects[0].paths[0].nodes;
   check(a[1].p[1] === 5 && a[2].p[1] === 5 && a[0].p[1] === 0, "align horizontally on the average");
 }
 
@@ -107,9 +163,23 @@ check(sq3.closed && sq3.nodes.length === 3 && !sq3.nodes.some((n) => n.i || n.o)
 {
   const rail = (y: number) => ({ closed: false, nodes: [{ p: [0, y] as Vec2 }, { p: [10, y] as Vec2 }, { p: [20, y] as Vec2 }] });
   const sat = {
-    id: "s", name: "S", thread: "t", visible: true, locked: false, trimAfter: false, stopAfter: false,
+    id: "s",
+    name: "S",
+    thread: "t",
+    visible: true,
+    locked: false,
+    trimAfter: false,
+    stopAfter: false,
     paths: [rail(0), rail(4), { closed: false, nodes: [{ p: [15, -1] as Vec2 }, { p: [15, 5] as Vec2 }] }],
-    stitch: { type: "satin", guides: [[[5, -1], [5, 5]]] } as unknown as DesignObject["stitch"],
+    stitch: {
+      type: "satin",
+      guides: [
+        [
+          [5, -1],
+          [5, 5],
+        ],
+      ],
+    } as unknown as DesignObject["stitch"],
   } as DesignObject;
   const parts = cutSatinObject(sat, [10, 0.1]);
   check(!!parts && parts.length === 2, "satin cut: two halves");
@@ -117,10 +187,12 @@ check(sq3.closed && sq3.nodes.length === 3 && !sq3.nodes.some((n) => n.i || n.o)
     const xs = (o: DesignObject) => o.paths.slice(0, 2).flatMap((sp) => sp.nodes.map((n) => n.p[0]));
     check(Math.max(...xs(parts[0])) <= 10.01 && Math.min(...xs(parts[1])) >= 9.99, "satin cut: both rails split at x = 10");
     check(parts[0].paths.length === 2 && parts[1].paths.length === 3, "satin cut: the rung goes with its half");
-    check(((parts[0].stitch as { guides?: unknown[] }).guides ?? []).length === 1 && ((parts[1].stitch as { guides?: unknown[] }).guides ?? []).length === 0, "satin cut: the guide goes with its half");
+    check(
+      ((parts[0].stitch as { guides?: unknown[] }).guides ?? []).length === 1 && ((parts[1].stitch as { guides?: unknown[] }).guides ?? []).length === 0,
+      "satin cut: the guide goes with its half",
+    );
   }
 }
 
 console.log(failed ? `${failed} FAILED` : "all passed");
 if (failed) throw new Error(`${failed} node-operation checks failed`);
-

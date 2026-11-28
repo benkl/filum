@@ -63,7 +63,11 @@ export function denseIssues(doc: StitchDocument, plan: PlanData | null, before: 
       h.peakLayers > lim.layersMax
         ? `${h.peakLayers.toFixed(1)} layers of thread here; ${doc.fabric} takes ${lim.layersMax}`
         : `${Math.round(h.peakHoles)} needle holes per mm² here; ${doc.fabric} takes ${Math.round(lim.holesMax)}`;
-    const names = (xs: DesignObject[]) => xs.slice(0, 3).map((x) => x.name).join(", ");
+    const names = (xs: DesignObject[]) =>
+      xs
+        .slice(0, 3)
+        .map((x) => x.name)
+        .join(", ");
     const layered = stacked && fillsStackAt(objs, h);
     const why = layered
       ? `${names(objs.filter((x) => x.stitch.type === "fill"))} lie on top of each other: Remove hidden stitching leaves out what the objects on top cover.`
@@ -78,7 +82,12 @@ export function denseIssues(doc: StitchDocument, plan: PlanData | null, before: 
       detail: `${what}. The embroidery turns stiff, the thread frays and needles break. ${why}`,
       at,
       ...(layered
-        ? { fix: { label: "Remove hidden stitching", doc: (x: StitchDocument) => ({ ...x, options: { ...(x.options ?? defaultDesignOptions()), removeOverlaps: true } }) } }
+        ? {
+            fix: {
+              label: "Remove hidden stitching",
+              doc: (x: StitchDocument) => ({ ...x, options: { ...(x.options ?? defaultDesignOptions()), removeOverlaps: true } }),
+            },
+          }
         : {}),
     });
   }

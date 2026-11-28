@@ -85,7 +85,9 @@
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  box-shadow: 0 0 0 1.5px var(--on-solid), 0 0 0 2.5px color-mix(in srgb, var(--text) 20%, transparent);
+  box-shadow:
+    0 0 0 1.5px var(--on-solid),
+    0 0 0 2.5px color-mix(in srgb, var(--text) 20%, transparent);
 }
 .dz-legend i.keep {
   background: var(--success);

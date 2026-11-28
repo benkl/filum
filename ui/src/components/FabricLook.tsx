@@ -57,7 +57,14 @@ export function FabricLookRows() {
               onClick={() => set({ fabricColor: hex })}
             />
           ))}
-          <input type="color" className="fl-custom" value={color} onChange={(e) => set({ fabricColor: e.target.value })} title="Any colour" aria-label="Custom fabric colour" />
+          <input
+            type="color"
+            className="fl-custom"
+            value={color}
+            onChange={(e) => set({ fabricColor: e.target.value })}
+            title="Any colour"
+            aria-label="Custom fabric colour"
+          />
         </span>
       </Row>
       <Row label="Texture" title="The weave in the realistic view">

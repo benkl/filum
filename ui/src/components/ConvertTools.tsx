@@ -23,7 +23,6 @@ export function openConvert(id: ConvertId) {
   useStore.getState().setDialog("convert");
 }
 
-
 type Icon = { d: string; fill?: boolean; thin?: boolean }[];
 
 export const CONVERSIONS: { id: ConvertId; label: string; menu: string; title: string; icon: Icon }[] = [
@@ -32,21 +31,30 @@ export const CONVERSIONS: { id: ConvertId; label: string; menu: string; title: s
     label: "Fill → satin",
     menu: "Fill to satin…",
     title: "Satin columns from a fill shape and rung lines drawn across it — the outline becomes the rails",
-    icon: [{ d: "M5 9 C9 3 23 3 27 9 L27 23 C23 29 9 29 5 23 Z", fill: true }, { d: "M2 12 L30 12 M2 20 L30 20", thin: true }],
+    icon: [
+      { d: "M5 9 C9 3 23 3 27 9 L27 23 C23 29 9 29 5 23 Z", fill: true },
+      { d: "M2 12 L30 12 M2 20 L30 20", thin: true },
+    ],
   },
   {
     id: "fillToStroke",
     label: "Centre line",
     menu: "Fill to centre line…",
     title: "The centre line (skeleton) of a fill shape, as running stitch or a satin of the shape's width",
-    icon: [{ d: "M4 22 C6 8 12 6 16 6 C22 6 28 12 28 18 L22 20 C21 15 19 12 16 12 C13 12 10 16 10 24 Z", fill: true }, { d: "M7 23 C8 13 12 9 16 9 C21 9 24 14 25 19", thin: true }],
+    icon: [
+      { d: "M4 22 C6 8 12 6 16 6 C22 6 28 12 28 18 L22 20 C21 15 19 12 16 12 C13 12 10 16 10 24 Z", fill: true },
+      { d: "M7 23 C8 13 12 9 16 9 C21 9 24 14 25 19", thin: true },
+    ],
   },
   {
     id: "satinToStroke",
     label: "Satin → run",
     menu: "Satin to centre line…",
     title: "A running stitch along the middle of a satin column",
-    icon: [{ d: "M4 20 C10 8 22 8 28 20 L24 23 C20 14 12 14 8 23 Z", fill: true }, { d: "M6 21.5 C11 11 21 11 26 21.5", thin: true }],
+    icon: [
+      { d: "M4 20 C10 8 22 8 28 20 L24 23 C20 14 12 14 8 23 Z", fill: true },
+      { d: "M6 21.5 C11 11 21 11 26 21.5", thin: true },
+    ],
   },
   {
     id: "satinToRails",
@@ -74,14 +82,20 @@ export const CONVERSIONS: { id: ConvertId; label: string; menu: string; title: s
     label: "Break apart",
     menu: "Break apart fill…",
     title: "Repair a fill (crossing outlines, stray loops) and split it into its separate shapes",
-    icon: [{ d: "M4 6 L14 6 L14 16 L4 16 Z M18 16 L28 16 L28 26 L18 26 Z", fill: true }, { d: "M14 6 L28 26", thin: true }],
+    icon: [
+      { d: "M4 6 L14 6 L14 16 L4 16 Z M18 16 L28 16 L28 26 L18 26 Z", fill: true },
+      { d: "M14 6 L28 26", thin: true },
+    ],
   },
   {
     id: "dedupe",
     label: "Duplicates",
     menu: "Remove duplicated points…",
     title: "Remove points that repeat (or nearly repeat) an earlier point of the path",
-    icon: [{ d: "M4 24 L12 8 L20 20 L28 6", thin: true }, { d: "M10.5 6.5 h3 v3 h-3 Z M18.5 18.5 h3 v3 h-3 Z", fill: true }],
+    icon: [
+      { d: "M4 24 L12 8 L20 20 L28 6", thin: true },
+      { d: "M10.5 6.5 h3 v3 h-3 Z M18.5 18.5 h3 v3 h-3 Z", fill: true },
+    ],
   },
   {
     id: "connectLines",
@@ -123,9 +137,52 @@ const outlineOf = (paths: SubPath[]) => {
 const polyline = (pts: Vec2[]) => pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(2)} ${p[1].toFixed(2)}`).join("");
 
 const ZIGZAGS: { id: ZigzagPattern; label: string; pts: Vec2[]; title: string }[] = [
-  { id: "square", label: "Square", title: "|_|▔|_| — four points per stitch block", pts: [[3, 22], [3, 10], [9, 10], [9, 22], [15, 22], [15, 10], [21, 10], [21, 22], [27, 22], [27, 10]] },
-  { id: "sawtooth", label: "Sawtooth", title: "|/|/| — every point on the other rail", pts: [[3, 22], [6, 10], [10, 22], [13, 10], [17, 22], [20, 10], [24, 22], [27, 10]] },
-  { id: "zigzag", label: "Zig-zag", title: "VVV — the stitches follow the drawn line", pts: [[3, 22], [7, 10], [11, 22], [15, 10], [19, 22], [23, 10], [27, 22]] },
+  {
+    id: "square",
+    label: "Square",
+    title: "|_|▔|_| — four points per stitch block",
+    pts: [
+      [3, 22],
+      [3, 10],
+      [9, 10],
+      [9, 22],
+      [15, 22],
+      [15, 10],
+      [21, 10],
+      [21, 22],
+      [27, 22],
+      [27, 10],
+    ],
+  },
+  {
+    id: "sawtooth",
+    label: "Sawtooth",
+    title: "|/|/| — every point on the other rail",
+    pts: [
+      [3, 22],
+      [6, 10],
+      [10, 22],
+      [13, 10],
+      [17, 22],
+      [20, 10],
+      [24, 22],
+      [27, 10],
+    ],
+  },
+  {
+    id: "zigzag",
+    label: "Zig-zag",
+    title: "VVV — the stitches follow the drawn line",
+    pts: [
+      [3, 22],
+      [7, 10],
+      [11, 22],
+      [15, 10],
+      [19, 22],
+      [23, 10],
+      [27, 22],
+    ],
+  },
 ];
 
 export function ConvertDialog({ onClose }: { onClose: () => void }) {
@@ -255,7 +312,10 @@ export function ConvertDialog({ onClose }: { onClose: () => void }) {
           {error && <p className="hint warn">{error}</p>}
           {id === "fillToSatin" && (
             <>
-              <p className="hint">Select the fill together with lines drawn right across it (rungs): each rung crosses the outline twice and sets the stitch direction there. Where more than two rungs meet one part, the satins end.</p>
+              <p className="hint">
+                Select the fill together with lines drawn right across it (rungs): each rung crosses the outline twice and sets the stitch direction there.
+                Where more than two rungs meet one part, the satins end.
+              </p>
               <p className="hint">
                 Or draw on the canvas:{" "}
                 <button className="link" onClick={() => (useStore.getState().setDialog(null), useStore.getState().setTool("split"))}>
@@ -263,7 +323,10 @@ export function ConvertDialog({ onClose }: { onClose: () => void }) {
                 </button>{" "}
                 (K) — cut lines where to cut, direction lines which way to sew each part.
               </p>
-              <Row label="Start / end at rung" title="Leave out the rounded ends: the satins start and end at the first and last rung (needs at least two rungs)">
+              <Row
+                label="Start / end at rung"
+                title="Leave out the rounded ends: the satins start and end at the first and last rung (needs at least two rungs)"
+              >
                 <Toggle on={o.fillToSatin.skipEndSection} onChange={(v) => set("fillToSatin", { skipEndSection: v })} />
               </Row>
               <Row label="Underlay">
@@ -279,19 +342,34 @@ export function ConvertDialog({ onClose }: { onClose: () => void }) {
                 <Num value={o.fillToSatin.pullComp} unit="mm" step={0.05} min={-10} max={10} onChange={(v) => set("fillToSatin", { pullComp: v })} />
               </Row>
               <Row label="Keep" title="What stays of the selection besides the new satins">
-                <Seg value={o.fillToSatin.keep} options={[
+                <Seg
+                  value={o.fillToSatin.keep}
+                  options={
+                    [
                       ["unused", "Unconverted parts", "Parts of the fill no rung crosses stay a fill"],
                       ["none", "Nothing", "Remove the fills and the rungs"],
                       ["fills", "Fills", "Keep the fills, remove the rungs"],
                       ["all", "All", "Keep the fills and the rungs"],
-                    ] as const} onChange={(k) => set("fillToSatin", { keep: k })} />
+                    ] as const
+                  }
+                  onChange={(k) => set("fillToSatin", { keep: k })}
+                />
               </Row>
             </>
           )}
           {id === "fillToStroke" && (
             <>
               <Row label="Stitch as" title="Running stitch along the centre lines, or satins as wide as the shape">
-                <Seg value={o.fillToStroke.output} options={[["running", "Running stitch"], ["satin", "Satin"]] as const} onChange={(v) => set("fillToStroke", { output: v })} />
+                <Seg
+                  value={o.fillToStroke.output}
+                  options={
+                    [
+                      ["running", "Running stitch"],
+                      ["satin", "Satin"],
+                    ] as const
+                  }
+                  onChange={(v) => set("fillToStroke", { output: v })}
+                />
               </Row>
               <Row label="Dead ends under" title="Side branches shorter than this are removed — about the line width of the shape works in most cases">
                 <Slider min={0} max={30} step={0.5} unit="mm" value={o.fillToStroke.deadEnd} onChange={(v) => set("fillToStroke", { deadEnd: v })} />
@@ -304,7 +382,11 @@ export function ConvertDialog({ onClose }: { onClose: () => void }) {
                   <Toggle on={o.fillToStroke.closeGaps} onChange={(v) => set("fillToStroke", { closeGaps: v })} />
                 </Row>
               )}
-              <p className="hint">{hasCutLines ? "The selected lines cut the shape apart first — use them to split crossings or set where lines end." : "Tip: select lines with the shape to cut it apart first (where lines should end or cross)."}</p>
+              <p className="hint">
+                {hasCutLines
+                  ? "The selected lines cut the shape apart first — use them to split crossings or set where lines end."
+                  : "Tip: select lines with the shape to cut it apart first (where lines should end or cross)."}
+              </p>
             </>
           )}
           {id === "satinToStroke" && (
@@ -314,7 +396,9 @@ export function ConvertDialog({ onClose }: { onClose: () => void }) {
           )}
           {id === "satinToRails" && (
             <>
-              <p className="hint">The satin keeps its width and settings; rungs sit away from sharp corners. Edit the rails and rungs with the node tool (A).</p>
+              <p className="hint">
+                The satin keeps its width and settings; rungs sit away from sharp corners. Edit the rails and rungs with the node tool (A).
+              </p>
               {hasLines && (
                 <Row label="Width of lines" title="Column width for selected running-stitch lines (satins keep theirs)">
                   <Num value={o.satinToRails.width} unit="mm" step={0.1} min={0.3} max={20} onChange={(v) => set("satinToRails", { width: v })} />
@@ -326,7 +410,12 @@ export function ConvertDialog({ onClose }: { onClose: () => void }) {
             <>
               <div className="fx-warps">
                 {ZIGZAGS.map((z) => (
-                  <button key={z.id} title={z.title} className={o.zigzagToSatin.pattern === z.id ? "on" : ""} onClick={() => set("zigzagToSatin", { pattern: z.id })}>
+                  <button
+                    key={z.id}
+                    title={z.title}
+                    className={o.zigzagToSatin.pattern === z.id ? "on" : ""}
+                    onClick={() => set("zigzagToSatin", { pattern: z.id })}
+                  >
                     <svg viewBox="0 0 30 32">
                       <path d={polyline(z.pts)} style={{ fill: "none" }} />
                     </svg>
@@ -351,9 +440,20 @@ export function ConvertDialog({ onClose }: { onClose: () => void }) {
             <>
               <div className="fx-warps">
                 {SATIN_PATTERNS.map((p) => (
-                  <button key={p.id} className={o.patternSatin.pattern === p.id ? "on" : ""} onClick={() => set("patternSatin", { pattern: p.id as SatinPattern })}>
+                  <button
+                    key={p.id}
+                    className={o.patternSatin.pattern === p.id ? "on" : ""}
+                    onClick={() => set("patternSatin", { pattern: p.id as SatinPattern })}
+                  >
                     <svg viewBox="0 0 32 32">
-                      <path d={outlineOf(patternSatin({ closed: false, nodes: [{ p: [1, 16] }, { p: [31, 16] }] }, { pattern: p.id, minWidth: 5, maxWidth: 12, length: 10, stretched: true, rungs: false }) ?? [])} />
+                      <path
+                        d={outlineOf(
+                          patternSatin(
+                            { closed: false, nodes: [{ p: [1, 16] }, { p: [31, 16] }] },
+                            { pattern: p.id, minWidth: 5, maxWidth: 12, length: 10, stretched: true, rungs: false },
+                          ) ?? [],
+                        )}
+                      />
                     </svg>
                     <span>{p.label}</span>
                   </button>
@@ -381,7 +481,16 @@ export function ConvertDialog({ onClose }: { onClose: () => void }) {
           {id === "breakApart" && (
             <>
               <Row label="Method" title="How overlapping sub-paths are treated">
-                <Seg value={o.breakApart.method} options={[["simple", "Simple", "Every sub-path is a shape of its own; shapes inside others become their holes"], ["complex", "Complex", "Overlapping sub-paths cancel out where they overlap"]] as const} onChange={(v) => set("breakApart", { method: v })} />
+                <Seg
+                  value={o.breakApart.method}
+                  options={
+                    [
+                      ["simple", "Simple", "Every sub-path is a shape of its own; shapes inside others become their holes"],
+                      ["complex", "Complex", "Overlapping sub-paths cancel out where they overlap"],
+                    ] as const
+                  }
+                  onChange={(v) => set("breakApart", { method: v })}
+                />
               </Row>
               <Row label="Remove smaller than" title="Shapes and holes smaller than this are removed">
                 <Num value={o.breakApart.minArea} unit="mm²" step={0.5} min={0.05} max={100} onChange={(v) => set("breakApart", { minArea: v })} />
@@ -403,7 +512,9 @@ export function ConvertDialog({ onClose }: { onClose: () => void }) {
               <Row label="Leave out doubled" title="Pieces lying on top of another piece are left out">
                 <Toggle on={o.connectLines.dropDoubled} onChange={(v) => set("connectLines", { dropDoubled: v })} />
               </Row>
-              <p className="hint">Lines of one colour and stitch are connected together. Each piece is sewn once: a network that branches needs a line per pair of loose ends.</p>
+              <p className="hint">
+                Lines of one colour and stitch are connected together. Each piece is sewn once: a network that branches needs a line per pair of loose ends.
+              </p>
             </>
           )}
           {id === "dedupe" && (

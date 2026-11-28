@@ -271,7 +271,9 @@ function pairRails(a: Vec2[], b: Vec2[], directions: Line[], middle: Vec2[] | nu
   const ML = mc[mc.length - 1];
   const reach = Math.max(0.5, ML / 40);
   const T = 1024;
-  const table = Array.from({ length: T + 1 }, (_, k): Vec2 => (middle ? unit(sub(pointAt(middle, mc, (k / T) * ML + reach), pointAt(middle, mc, (k / T) * ML - reach))) : [0, 0]));
+  const table = Array.from({ length: T + 1 }, (_, k): Vec2 =>
+    middle ? unit(sub(pointAt(middle, mc, (k / T) * ML + reach), pointAt(middle, mc, (k / T) * ML - reach))) : [0, 0],
+  );
   // where along the column each sample is, as half a table index
   const fa = sa.map((d) => (d / Math.max(LA, 1e-12)) * (T / 2));
   const fb = sb.map((d) => (d / Math.max(LB, 1e-12)) * (T / 2));
@@ -323,15 +325,14 @@ function pairRails(a: Vec2[], b: Vec2[], directions: Line[], middle: Vec2[] | nu
       from[i * m + j] = way;
     }
   const pairs: [number, number][] = [];
-  for (let i = n - 1, j = m - 1; ; ) {
+  for (let i = n - 1, j = m - 1; ;) {
     pairs.push([sa[i], sb[j]]);
     if (!i && !j) break;
     const w = from[i * m + j];
     if (w === 0) {
       i--;
       j--;
-    }
-    else if (w === 1) i--;
+    } else if (w === 1) i--;
     else j--;
   }
   return { pairs: pairs.reverse(), forced };
@@ -427,7 +428,7 @@ function thin(a: Vec2[], b: Vec2[], keep: boolean[]): Rails {
     const l = dist(s, e);
     return l < 1e-12 ? dist(p, s) : Math.abs(cross(sub(e, s), sub(p, s))) / l;
   };
-  for (let k = 1; k < A.length - 1; ) {
+  for (let k = 1; k < A.length - 1;) {
     const ta = dist(A[k], A[k - 1]) / Math.max(1e-12, dist(A[k + 1], A[k - 1]));
     const tb = dist(B[k], B[k - 1]) / Math.max(1e-12, dist(B[k + 1], B[k - 1]));
     if (!K[k] && off(A[k], A[k - 1], A[k + 1]) < 1e-4 && off(B[k], B[k - 1], B[k + 1]) < 1e-4 && Math.abs(ta - tb) < 0.02) {

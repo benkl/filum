@@ -44,7 +44,8 @@ export function checkDoc(raw: unknown, base: StitchDocument): { doc: StitchDocum
   else if (base.options) doc.options = base.options;
   else delete doc.options;
   // every object's thread exists (a missing one gets the first, or a default)
-  if (!doc.threads.length && unique.length) doc.threads = [{ id: "t1", name: "Thread", color: "#1f2a56", brand: "", code: "" } as StitchDocument["threads"][number]];
+  if (!doc.threads.length && unique.length)
+    doc.threads = [{ id: "t1", name: "Thread", color: "#1f2a56", brand: "", code: "" } as StitchDocument["threads"][number]];
   const ids = new Set(doc.threads.map((t) => t.id));
   const known = (id: unknown): id is string => typeof id === "string" && ids.has(id);
   doc.objects = doc.objects.map((o) => {

@@ -1762,15 +1762,7 @@ impl Document {
 impl Thread {
     /// A thread with no brand, code, weight or minimum stitch of its own.
     pub fn new(id: impl Into<String>, name: impl Into<String>, color: impl Into<String>) -> Thread {
-        Thread {
-            id: id.into(),
-            name: name.into(),
-            color: color.into(),
-            brand: String::new(),
-            code: String::new(),
-            weight: None,
-            min_stitch: None,
-        }
+        Thread { id: id.into(), name: name.into(), color: color.into(), brand: String::new(), code: String::new(), weight: None, min_stitch: None }
     }
 
     pub fn rgb(&self) -> [u8; 3] {
@@ -1845,7 +1837,15 @@ impl Fabric {
     /// (towel, fleece) needs more cover to keep the loops down. Stiffness:
     /// added weight against the fabric's (a default fill adds ≈ 170 g/m²).
     pub fn limits(self) -> FabricLimits {
-        let l = |gsm, holes_heavy, holes_max, layers_heavy, layers_max, layers_min, stiff_ratio| FabricLimits { gsm, holes_heavy, holes_max, layers_heavy, layers_max, layers_min, stiff_ratio };
+        let l = |gsm, holes_heavy, holes_max, layers_heavy, layers_max, layers_min, stiff_ratio| FabricLimits {
+            gsm,
+            holes_heavy,
+            holes_max,
+            layers_heavy,
+            layers_max,
+            layers_min,
+            stiff_ratio,
+        };
         match self {
             Fabric::Cotton => l(130.0, 10.0, 17.0, 2.4, 3.8, 0.6, 1.5),
             Fabric::Polyester => l(110.0, 10.0, 17.0, 2.4, 3.8, 0.6, 1.5),
@@ -2400,7 +2400,8 @@ mod contour_direction_tests {
         assert!(json.contains("\"contourClockwise\":false") && !json.contains("\"clockwise\""), "{json}");
         assert_eq!(fill(&json), p);
         // a whole document
-        let d: Document = serde_json::from_str(r#"{"objects":[{"id":"a","thread":"t","paths":[],"stitch":{"type":"fill","method":"spiral","clockwise":true}}]}"#).unwrap();
+        let d: Document =
+            serde_json::from_str(r#"{"objects":[{"id":"a","thread":"t","paths":[],"stitch":{"type":"fill","method":"spiral","clockwise":true}}]}"#).unwrap();
         let StitchParams::Fill(p) = &d.objects[0].stitch else { panic!() };
         assert!(!p.clockwise);
     }

@@ -31,11 +31,7 @@ function Marked({ text, query }: { text: string; query: string }) {
     if (last && last.on === hit[i]) last.t += text[i];
     else parts.push({ t: text[i], on: hit[i] });
   }
-  return (
-    <>
-      {parts.map((p, i) => (p.on ? <mark key={i}>{p.t}</mark> : <span key={i}>{p.t}</span>))}
-    </>
-  );
+  return <>{parts.map((p, i) => (p.on ? <mark key={i}>{p.t}</mark> : <span key={i}>{p.t}</span>))}</>;
 }
 
 export function CommandPalette({ onClose }: { onClose: () => void }) {
@@ -106,7 +102,10 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
                   <Marked text={c.item.label} query={q} />
                   {c.item.checked ? " ✓" : ""}
                 </span>
-                <span className="pl-path">{c.path.join(" ▸ ")}{c.item.hint ? ` · ${c.item.hint}` : ""}</span>
+                <span className="pl-path">
+                  {c.path.join(" ▸ ")}
+                  {c.item.hint ? ` · ${c.item.hint}` : ""}
+                </span>
                 {c.item.kbd && <span className="kbd">{c.item.kbd}</span>}
               </button>
             ))

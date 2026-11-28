@@ -49,12 +49,7 @@ mod tests {
     #[test]
     fn lines() {
         let p = Pattern {
-            stitches: vec![
-                Stitch::new(0.0, 0.0, 0),
-                Stitch::new(1.0, 0.5, 0),
-                Stitch::new(1.0, 0.5, cmd::TRIM | cmd::COLOR_CHANGE),
-                Stitch::new(2.0, 0.5, 0),
-            ],
+            stitches: vec![Stitch::new(0.0, 0.0, 0), Stitch::new(1.0, 0.5, 0), Stitch::new(1.0, 0.5, cmd::TRIM | cmd::COLOR_CHANGE), Stitch::new(2.0, 0.5, 0)],
             threads: vec![Thread::from_rgb([255, 0, 0]), Thread::from_rgb([0, 0, 255])],
             name: String::new(),
         };

@@ -11,7 +11,11 @@ type Hint = [string[], string];
 const mod = typeof navigator !== "undefined" && /Mac/.test(navigator.platform) ? "⌘" : "Ctrl";
 
 function hintsFor(s: ReturnType<typeof useStore.getState>): Hint[] {
-  if (s.dialog) return [[["Esc"], "Close"], [["Drag"], "Move by the title"]];
+  if (s.dialog)
+    return [
+      [["Esc"], "Close"],
+      [["Drag"], "Move by the title"],
+    ];
   if (s.refEdit)
     return [
       [["Drag"], "Move picture"],
@@ -34,7 +38,13 @@ function hintsFor(s: ReturnType<typeof useStore.getState>): Hint[] {
       [["Esc"], "Close"],
       [["LMB"], "Back to editing"],
     ];
-  if (s.editingText) return [[["Type"], "Edit the text"], [["Enter"], "New line"], [["Esc"], "Finish"], [["Drag", "handles"], "Arch · spacing"]];
+  if (s.editingText)
+    return [
+      [["Type"], "Edit the text"],
+      [["Enter"], "New line"],
+      [["Esc"], "Finish"],
+      [["Drag", "handles"], "Arch · spacing"],
+    ];
   const sel = s.selection.length;
   switch (s.tool) {
     case "select":
@@ -68,7 +78,11 @@ function hintsFor(s: ReturnType<typeof useStore.getState>): Hint[] {
             [[mod, "A"], "Select all"],
           ];
     case "node":
-      if (!sel) return [[["LMB"], "Choose a shape to edit"], [["Esc"], "Back to select"]];
+      if (!sel)
+        return [
+          [["LMB"], "Choose a shape to edit"],
+          [["Esc"], "Back to select"],
+        ];
       return s.nodeSel.length
         ? [
             [["Drag"], `Move ${s.nodeSel.length} point${s.nodeSel.length > 1 ? "s" : ""}`],
@@ -109,7 +123,12 @@ function hintsFor(s: ReturnType<typeof useStore.getState>): Hint[] {
     case "pen":
     case "satin": {
       const satin = s.tool === "satin";
-      const width: Hint[] = satin ? [[["Wheel"], "Width"], [["[", "]"], "Width"]] : [];
+      const width: Hint[] = satin
+        ? [
+            [["Wheel"], "Width"],
+            [["[", "]"], "Width"],
+          ]
+        : [];
       return s.drafting
         ? [
             [["LMB"], "Corner point"],
@@ -137,16 +156,31 @@ function hintsFor(s: ReturnType<typeof useStore.getState>): Hint[] {
             [["Backspace"], "Remove the last point"],
             [["Enter"], "Finish"],
           ]
-        : [[["LMB"], "Start the path"], [["LMB", "path end"], "Continue that path"]];
+        : [
+            [["LMB"], "Start the path"],
+            [["LMB", "path end"], "Continue that path"],
+          ];
     case "freehand":
-      return [[["Drag"], "Draw"], [["Drag", "back to the start"], "Close"]];
+      return [
+        [["Drag"], "Draw"],
+        [["Drag", "back to the start"], "Close"],
+      ];
     case "rect":
     case "ellipse":
-      return [[["Drag"], "Draw"], [["Shift", "Drag"], "Square / regular"]];
+      return [
+        [["Drag"], "Draw"],
+        [["Shift", "Drag"], "Square / regular"],
+      ];
     case "text":
-      return [[["LMB"], "Place lettering"], [["LMB", "lettering"], "Edit it"]];
+      return [
+        [["LMB"], "Place lettering"],
+        [["LMB", "lettering"], "Edit it"],
+      ];
     case "cut":
-      return [[["LMB", "line"], "Split it"], [["Drag", "across a fill"], "Cut it in two"]];
+      return [
+        [["LMB", "line"], "Split it"],
+        [["Drag", "across a fill"], "Cut it in two"],
+      ];
     case "gradient": {
       const m = s.toolOptions.gradient.mode ?? "colour";
       if (m !== "colour" || s.doc.objects.some((o) => s.selection.includes(o.id) && o.stitch.type === "fill" && o.stitch.ramp))
@@ -157,7 +191,12 @@ function hintsFor(s: ReturnType<typeof useStore.getState>): Hint[] {
           [["Drag", "ring"], "Move the open end"],
           [["LMB"], "Select a shape"],
         ];
-      return [[["Drag"], "Gradient across the shape"], [["LMB", "line"], "Add a stop"], [["Alt", "LMB", "stop"], "Remove it"], [["DblClick", "stop"], "Remove it"]];
+      return [
+        [["Drag"], "Gradient across the shape"],
+        [["LMB", "line"], "Add a stop"],
+        [["Alt", "LMB", "stop"], "Remove it"],
+        [["DblClick", "stop"], "Remove it"],
+      ];
     }
     case "guides":
       return sel
@@ -268,7 +307,9 @@ export function StatusHints() {
   if (withMod.length) hints = withMod;
   // nothing held: the plain hints and keyboard commands; mouse + modifier
   // variants appear while the modifier is held
-  const variants = held ? [] : [...new Set(hints.filter(([k]) => k.some((x) => MOUSE.has(x)) && k.some((x) => MODS.includes(x))).map(([k]) => k.find((x) => MODS.includes(x))!))];
+  const variants = held
+    ? []
+    : [...new Set(hints.filter(([k]) => k.some((x) => MOUSE.has(x)) && k.some((x) => MODS.includes(x))).map(([k]) => k.find((x) => MODS.includes(x))!))];
   if (!held) hints = hints.filter(([k]) => !(k.some((x) => MOUSE.has(x)) && k.some((x) => MODS.includes(x))));
   const nav = s.dialog || held ? [] : NAV;
   const n = s.selection.length;

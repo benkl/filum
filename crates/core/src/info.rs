@@ -194,7 +194,8 @@ fn small_removed(engine: &mut Engine, doc: &Document, i: usize) -> usize {
 /// design's stitch plan.
 pub fn element_info(doc: &Document, engine: &mut Engine, ids: &[String]) -> ElementInfo {
     let plan = engine.plan(doc);
-    let chosen: Vec<usize> = (0..doc.objects.len()).filter(|&i| if ids.is_empty() { doc.objects[i].visible } else { ids.contains(&doc.objects[i].id) }).collect();
+    let chosen: Vec<usize> =
+        (0..doc.objects.len()).filter(|&i| if ids.is_empty() { doc.objects[i].visible } else { ids.contains(&doc.objects[i].id) }).collect();
     let mut objects = Vec::new();
     for &i in &chosen {
         let o = &doc.objects[i];

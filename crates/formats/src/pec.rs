@@ -9,15 +9,11 @@
 
 use crate::encoder::{check_size, encode, mm, too_big, Cmd, EncodeSettings, Encoded, Rec};
 use crate::io::{ByteWriter, Reader};
-use crate::palette::{pec_slots, pec_thread, build_unique_palette_keyed};
+use crate::palette::{build_unique_palette_keyed, pec_slots, pec_thread};
 use crate::raw::RawPattern;
 use crate::{Error, Pattern, Thread, WriteOptions};
 
-pub(crate) const SETTINGS: EncodeSettings = EncodeSettings {
-    max_stitch: 2047,
-    max_jump: 2047,
-    full_jump: true,
-};
+pub(crate) const SETTINGS: EncodeSettings = EncodeSettings { max_stitch: 2047, max_jump: 2047, full_jump: true };
 
 const JUMP_CODE: u8 = 0x10;
 const TRIM_CODE: u8 = 0x20;
@@ -247,22 +243,9 @@ fn blank() -> Vec<u8> {
 }
 
 fn draw_scaled(bounds: (i32, i32, i32, i32), points: &[Rec], g: &mut [u8], buffer: f64) {
-    let (left, top, right, bottom) = (
-        bounds.0 as f64,
-        bounds.1 as f64,
-        bounds.2 as f64,
-        bounds.3 as f64,
-    );
-    let dw = if right - left == 0.0 {
-        1.0
-    } else {
-        right - left
-    };
-    let dh = if bottom - top == 0.0 {
-        1.0
-    } else {
-        bottom - top
-    };
+    let (left, top, right, bottom) = (bounds.0 as f64, bounds.1 as f64, bounds.2 as f64, bounds.3 as f64);
+    let dw = if right - left == 0.0 { 1.0 } else { right - left };
+    let dh = if bottom - top == 0.0 { 1.0 } else { bottom - top };
     let gw = ICON_WIDTH as f64;
     let gh = ICON_HEIGHT as f64;
     let scale = ((gw - buffer) / dw).min((gh - buffer) / dh);
@@ -280,12 +263,7 @@ fn draw_scaled(bounds: (i32, i32, i32, i32), points: &[Rec], g: &mut [u8], buffe
 
 fn write_graphics(e: &Encoded, out: &mut Vec<u8>) {
     let bounds = e.bounds();
-    let stitches: Vec<Rec> = e
-        .recs
-        .iter()
-        .copied()
-        .filter(|r| r.cmd == Cmd::Stitch)
-        .collect();
+    let stitches: Vec<Rec> = e.recs.iter().copied().filter(|r| r.cmd == Cmd::Stitch).collect();
     let mut g = blank();
     draw_scaled(bounds, &stitches, &mut g, 4.0);
     out.extend_from_slice(&g);
@@ -326,10 +304,7 @@ pub(crate) fn read(bytes: &[u8]) -> Result<Pattern, Error> {
 /// Maps PEC colour bytes to threads, optionally using a PES thread chart (v5+).
 fn map_colors(color_bytes: &[u8], mut chart: Vec<Thread>) -> Vec<Thread> {
     if chart.is_empty() {
-        return color_bytes
-            .iter()
-            .map(|&b| pec_thread(b as usize))
-            .collect();
+        return color_bytes.iter().map(|&b| pec_thread(b as usize)).collect();
     }
     if chart.len() >= color_bytes.len() {
         return chart;
@@ -342,11 +317,7 @@ fn map_colors(color_bytes: &[u8], mut chart: Vec<Thread>) -> Vec<Thread> {
         let t = match map.iter().find(|(i, _)| *i == idx) {
             Some((_, t)) => t.clone(),
             None => {
-                let t = if chart.is_empty() {
-                    pec_thread(idx)
-                } else {
-                    chart.remove(0)
-                };
+                let t = if chart.is_empty() { pec_thread(idx) } else { chart.remove(0) };
                 map.push((idx, t.clone()));
                 t
             }
@@ -374,12 +345,7 @@ fn signed7(v: u8) -> i32 {
 }
 
 /// Reads the PEC section starting at `start` into `raw`.
-pub(crate) fn read_pec(
-    bytes: &[u8],
-    start: usize,
-    raw: &mut RawPattern,
-    chart: Vec<Thread>,
-) -> Result<(), Error> {
+pub(crate) fn read_pec(bytes: &[u8], start: usize, raw: &mut RawPattern, chart: Vec<Thread>) -> Result<(), Error> {
     let mut r = Reader::at(bytes, start);
     r.seek(start)?;
     r.skip(3)?; // LA:
@@ -393,11 +359,7 @@ pub(crate) fn read_pec(
     r.skip(0xC)?;
     let color_changes = r.u8()? as usize;
     // 0xFF is written for a pattern without colours.
-    let count_colors = if color_changes == 0xFF {
-        0
-    } else {
-        color_changes + 1
-    };
+    let count_colors = if color_changes == 0xFF { 0 } else { color_changes + 1 };
     let color_bytes = r.bytes(count_colors)?.to_vec();
     raw.threads = map_colors(&color_bytes, chart);
     // Header is 512 bytes; the stitch block length lives 2 bytes into the block.
@@ -479,7 +441,15 @@ mod tests {
     fn a_trim_with_no_jump_after_it_is_kept() {
         let rec = |x, cmd| Rec { x, y: 0, cmd };
         let e = Encoded {
-            recs: vec![rec(0, Cmd::Jump), rec(0, Cmd::Stitch), rec(10, Cmd::Stitch), rec(10, Cmd::Trim), rec(10, Cmd::Stitch), rec(20, Cmd::Stitch), rec(20, Cmd::End)],
+            recs: vec![
+                rec(0, Cmd::Jump),
+                rec(0, Cmd::Stitch),
+                rec(10, Cmd::Stitch),
+                rec(10, Cmd::Trim),
+                rec(10, Cmd::Stitch),
+                rec(20, Cmd::Stitch),
+                rec(20, Cmd::End),
+            ],
             threads: Vec::new(),
             name: String::new(),
         };

@@ -46,7 +46,10 @@ export function MulticolorSatin({ o }: { o: DesignObject }) {
         </div>
       ))}
       <div className="mc-actions">
-        <button className="btn sm ghost" onClick={() => setStripes([...stripes, { thread: threads[(stripes.length + 1) % Math.max(1, threads.length)]?.id ?? o.thread, width: 1 }])}>
+        <button
+          className="btn sm ghost"
+          onClick={() => setStripes([...stripes, { thread: threads[(stripes.length + 1) % Math.max(1, threads.length)]?.id ?? o.thread, width: 1 }])}
+        >
           <Plus size={12} /> Stripe
         </button>
         <Row label="Overlap" title="How far each stripe reaches under its neighbour, so no gap opens">

@@ -49,7 +49,17 @@ check(hausdorff(flattenSubPath(s, 0.05), stair) <= 0.45, "it stays within a pixe
 check(Math.hypot(s.nodes[0].p[0], s.nodes[0].p[1]) < 1e-6, "the path still starts where it did");
 
 // a 10 mm square keeps its four corners exactly
-const square: SubPath = { closed: true, nodes: ([[0, 0], [10, 0], [10, 10], [0, 10]] as Vec2[]).map((p) => ({ p })) };
+const square: SubPath = {
+  closed: true,
+  nodes: (
+    [
+      [0, 0],
+      [10, 0],
+      [10, 10],
+      [0, 10],
+    ] as Vec2[]
+  ).map((p) => ({ p })),
+};
 const sq = simplifyForStitching(square);
 check(sq === square, "a clean square is left as it is");
 

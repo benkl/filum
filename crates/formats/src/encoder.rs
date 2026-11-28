@@ -40,11 +40,7 @@ pub(crate) struct EncodeSettings {
 
 /// No length limits (pystitch writers without `MAX_*_DISTANCE`, e.g. TXT, JSON, G-code),
 /// with Ink/Stitch's `full_jump`.
-pub(crate) const UNLIMITED: EncodeSettings = EncodeSettings {
-    max_stitch: i32::MAX / 4,
-    max_jump: i32::MAX / 4,
-    full_jump: true,
-};
+pub(crate) const UNLIMITED: EncodeSettings = EncodeSettings { max_stitch: i32::MAX / 4, max_jump: i32::MAX / 4, full_jump: true };
 
 /// How colour changes are lowered (pystitch `thread_change_command` / `explicit_trim`).
 #[derive(Debug, Clone, Copy, Default)]
@@ -122,10 +118,7 @@ impl Encoded {
 
     /// Thread for block `i`, synthesizing a default if missing.
     pub fn thread(&self, i: usize) -> Thread {
-        self.threads
-            .get(i)
-            .cloned()
-            .unwrap_or_else(|| default_thread(i))
+        self.threads.get(i).cloned().unwrap_or_else(|| default_thread(i))
     }
 }
 
@@ -200,11 +193,7 @@ impl<'a> Encoder<'a> {
     }
 
     fn thread_for(&self, i: usize) -> Thread {
-        self.src
-            .threads
-            .get(i)
-            .cloned()
-            .unwrap_or_else(|| default_thread(i))
+        self.src.threads.get(i).cloned().unwrap_or_else(|| default_thread(i))
     }
 
     /// pystitch `interpolate_gap_stitches`: emits the intermediate records so that
@@ -331,11 +320,7 @@ pub(crate) fn encode_with(p: &Pattern, s: EncodeSettings, long_stitch_as_jumps: 
         thread_index: 0,
     };
     e.run();
-    Encoded {
-        recs: e.recs,
-        threads: e.threads,
-        name: p.name.clone(),
-    }
+    Encoded { recs: e.recs, threads: e.threads, name: p.name.clone() }
 }
 
 #[cfg(test)]
@@ -350,20 +335,10 @@ mod tests {
     #[test]
     fn splits_long_stitches_and_jumps() {
         let p = Pattern {
-            stitches: vec![
-                st(0.0, 0.0, 0),
-                st(30.0, 0.0, 0),
-                st(30.0, 0.0, cmd::TRIM),
-                st(-10.0, 25.0, cmd::JUMP),
-                st(-10.0, 25.0, 0),
-            ],
+            stitches: vec![st(0.0, 0.0, 0), st(30.0, 0.0, 0), st(30.0, 0.0, cmd::TRIM), st(-10.0, 25.0, cmd::JUMP), st(-10.0, 25.0, 0)],
             ..Default::default()
         };
-        let s = EncodeSettings {
-            max_stitch: 121,
-            max_jump: 121,
-            full_jump: false,
-        };
+        let s = EncodeSettings { max_stitch: 121, max_jump: 121, full_jump: false };
         let e = encode(&p, s, false);
         for w in e.recs.windows(2) {
             assert!((w[1].x - w[0].x).abs() <= 121 && (w[1].y - w[0].y).abs() <= 121);
@@ -389,29 +364,14 @@ mod tests {
             threads: vec![Thread::from_rgb([1, 2, 3])],
             ..Default::default()
         };
-        let s = EncodeSettings {
-            max_stitch: 127,
-            max_jump: 127,
-            full_jump: true,
-        };
+        let s = EncodeSettings { max_stitch: 127, max_jump: 127, full_jump: true };
         let e = encode(&p, s, false);
         assert_eq!(e.count(Cmd::ColorChange), 1);
         assert_eq!(e.threads.len(), 2);
         assert_eq!(e.threads[0].rgb, [1, 2, 3]);
         assert_eq!(e.threads[1], default_thread(1));
         // full jump to the first stitch of block 2.
-        let cc = e
-            .recs
-            .iter()
-            .position(|r| r.cmd == Cmd::ColorChange)
-            .unwrap();
-        assert_eq!(
-            e.recs[cc + 1],
-            Rec {
-                x: 20,
-                y: 0,
-                cmd: Cmd::Jump
-            }
-        );
+        let cc = e.recs.iter().position(|r| r.cmd == Cmd::ColorChange).unwrap();
+        assert_eq!(e.recs[cc + 1], Rec { x: 20, y: 0, cmd: Cmd::Jump });
     }
 }

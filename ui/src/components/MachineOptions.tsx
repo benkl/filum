@@ -5,7 +5,11 @@ import { MACHINE_BRANDS, MACHINES, SETTINGS_PRESETS, type Frame } from "../lib/m
 
 function FrameButton({ f, on, onPick }: { f: Frame; on: boolean; onPick: (f: Frame) => void }) {
   return (
-    <button className={on ? "on" : ""} title={`${f.width} × ${f.height} mm${f.shape === "oval" ? " (round / oval)" : ""}${f.note ? ` — ${f.note}` : ""}`} onClick={() => onPick(f)}>
+    <button
+      className={on ? "on" : ""}
+      title={`${f.width} × ${f.height} mm${f.shape === "oval" ? " (round / oval)" : ""}${f.note ? ` — ${f.note}` : ""}`}
+      onClick={() => onPick(f)}
+    >
       <i className={f.shape === "oval" ? "oval" : ""} style={{ aspectRatio: `${f.width} / ${f.height}` }} />
       {f.name}
     </button>
@@ -13,7 +17,17 @@ function FrameButton({ f, on, onPick }: { f: Frame; on: boolean; onPick: (f: Fra
 }
 
 /** A machine's frames as buttons; special-purpose frames in their own group. */
-export function FrameButtons({ frames, isOn, onPick, className = "" }: { frames: Frame[]; isOn: (f: Frame) => boolean; onPick: (f: Frame) => void; className?: string }) {
+export function FrameButtons({
+  frames,
+  isOn,
+  onPick,
+  className = "",
+}: {
+  frames: Frame[];
+  isOn: (f: Frame) => boolean;
+  onPick: (f: Frame) => void;
+  className?: string;
+}) {
   const everyday = frames.filter((f) => !f.note);
   const special = frames.filter((f) => f.note);
   return (

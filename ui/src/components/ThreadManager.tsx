@@ -2,7 +2,26 @@
 // usage and chart matching, a thread chart browser, and bulk tools (match to
 // chart, merge similar, remove unused, sort, import / export palettes).
 
-import { ArrowDownUp, Check, ChevronDown, ChevronUp, Copy, Crosshair, Download, Link2, ListPlus, Lock, RotateCcw, Search, Trash2, Undo2, Unlock, Upload, Replace, X } from "lucide-react";
+import {
+  ArrowDownUp,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Crosshair,
+  Download,
+  Link2,
+  ListPlus,
+  Lock,
+  RotateCcw,
+  Search,
+  Trash2,
+  Undo2,
+  Unlock,
+  Upload,
+  Replace,
+  X,
+} from "lucide-react";
 import { SewOrder, Spool } from "../icons/stitch";
 import { THREAD_WEIGHTS } from "../lib/materials";
 import { MatchButton, useMatchOptions } from "./MatchPanel";
@@ -198,7 +217,12 @@ function ThreadRow({
       </button>
       <div className="tm-main">
         <div className="tm-head">
-          <input className="input tm-name" defaultValue={t.name} key={t.name} onBlur={(e) => e.target.value !== t.name && updateThread(t.id, { name: e.target.value })} />
+          <input
+            className="input tm-name"
+            defaultValue={t.name}
+            key={t.name}
+            onBlur={(e) => e.target.value !== t.name && updateThread(t.id, { name: e.target.value })}
+          />
           <select
             className="input tm-weight"
             value={t.weight ?? ""}
@@ -241,8 +265,20 @@ function ThreadRow({
             }}
             onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
           />
-          <input className="input tm-brand" placeholder="Brand" defaultValue={t.brand} key={`b${t.brand}`} onBlur={(e) => e.target.value !== t.brand && updateThread(t.id, { brand: e.target.value })} />
-          <input className="input tm-code" placeholder="Code" defaultValue={t.code} key={`c${t.code}`} onBlur={(e) => e.target.value !== t.code && updateThread(t.id, { code: e.target.value })} />
+          <input
+            className="input tm-brand"
+            placeholder="Brand"
+            defaultValue={t.brand}
+            key={`b${t.brand}`}
+            onBlur={(e) => e.target.value !== t.brand && updateThread(t.id, { brand: e.target.value })}
+          />
+          <input
+            className="input tm-code"
+            placeholder="Code"
+            defaultValue={t.code}
+            key={`c${t.code}`}
+            onBlur={(e) => e.target.value !== t.code && updateThread(t.id, { code: e.target.value })}
+          />
         </div>
       </div>
       <div className="tm-usage">
@@ -305,7 +341,12 @@ function ThreadRow({
         )}
       </div>
       <div className="tm-actions" onClick={(e) => e.stopPropagation()}>
-        <button type="button" className={`icon-btn ${locked ? "on" : ""}`} title={locked ? "Locked: fitting keeps this spool — click to unlock" : "Lock: fitting keeps this spool"} onClick={() => toggleLock(t.id)}>
+        <button
+          type="button"
+          className={`icon-btn ${locked ? "on" : ""}`}
+          title={locked ? "Locked: fitting keeps this spool — click to unlock" : "Lock: fitting keeps this spool"}
+          onClick={() => toggleLock(t.id)}
+        >
           {locked ? <Lock size={13} /> : <Unlock size={13} />}
         </button>
         <button
@@ -344,7 +385,13 @@ function ThreadRow({
             </option>
           ))}
         </select>
-        <button type="button" className="icon-btn" title={used ? "In use: merge it into another thread instead" : "Delete"} disabled={used} onClick={() => deleteThread(t.id)}>
+        <button
+          type="button"
+          className="icon-btn"
+          title={used ? "In use: merge it into another thread instead" : "Delete"}
+          disabled={used}
+          onClick={() => deleteThread(t.id)}
+        >
           <Trash2 size={14} />
         </button>
       </div>
@@ -401,7 +448,12 @@ function MyThreadsPanel({ selected }: { selected: Thread | null }) {
         <button className="icon-btn" title="Export My threads as a .gpl palette" disabled={!mine.length} onClick={() => exportMyThreads()}>
           <Download size={14} />
         </button>
-        <button className="icon-btn" title="Remove every spool from My threads" disabled={!mine.length} onClick={() => window.confirm(`Remove all ${mine.length} spools from My threads?`) && clearMyThreads()}>
+        <button
+          className="icon-btn"
+          title="Remove every spool from My threads"
+          disabled={!mine.length}
+          onClick={() => window.confirm(`Remove all ${mine.length} spools from My threads?`) && clearMyThreads()}
+        >
           <Trash2 size={14} />
         </button>
       </div>
@@ -409,7 +461,12 @@ function MyThreadsPanel({ selected }: { selected: Thread | null }) {
       {mode === "add" ? (
         <>
           <p className="hint">Click the colours you own — they get a check mark; click again to take them out. Search by code or name.</p>
-          <ChartBrowser markOwned near={selected?.color} height={290} onPick={(e) => toggleMyThread({ name: e.name, code: e.code, brand: e.brand, color: e.color })} />
+          <ChartBrowser
+            markOwned
+            near={selected?.color}
+            height={290}
+            onPick={(e) => toggleMyThread({ name: e.name, code: e.code, brand: e.brand, color: e.color })}
+          />
         </>
       ) : !mine.length ? (
         <div className="mine-empty">
@@ -433,7 +490,13 @@ function MyThreadsPanel({ selected }: { selected: Thread | null }) {
             <div className="chart-near">
               <span className="chart-cap">Closest for {selected.name}</span>
               {closest.map((e) => (
-                <button key={ownedKey(e)} type="button" className="chart-near-item" title={`${e.brand} ${e.code} ${e.name} · ΔE ${e.d.toFixed(1)} (${deltaLabel(e.d)})`} onClick={() => assignChart(selected.id, e)}>
+                <button
+                  key={ownedKey(e)}
+                  type="button"
+                  className="chart-near-item"
+                  title={`${e.brand} ${e.code} ${e.name} · ΔE ${e.d.toFixed(1)} (${deltaLabel(e.d)})`}
+                  onClick={() => assignChart(selected.id, e)}
+                >
                   <i style={{ background: e.color }} />
                   <span>{e.d.toFixed(1)}</span>
                 </button>
@@ -592,10 +655,7 @@ export function ThreadManager({ onClose }: { onClose: () => void }) {
       footer={
         <>
           <span className="tm-similar" title="Merge threads whose colours differ by less than this ΔE (CIEDE2000; 2–3 is barely visible)">
-            <button
-              className="btn"
-              onClick={mergeSimilarColours}
-            >
+            <button className="btn" onClick={mergeSimilarColours}>
               Merge similar
             </button>
             <span className="stat">ΔE &lt;</span>
@@ -653,7 +713,12 @@ export function ThreadManager({ onClose }: { onClose: () => void }) {
       <FitStrip active={sel} onPick={setSel} />
       <div className="tm-fitbar">
         <span className="tm-fit-label">Fit threads to</span>
-        <select className="select" value={target} onChange={(e) => setTarget(e.target.value)} title="Fit to all your spools, one brand or one product line of My threads, or the chart chosen on the right">
+        <select
+          className="select"
+          value={target}
+          onChange={(e) => setTarget(e.target.value)}
+          title="Fit to all your spools, one brand or one product line of My threads, or the chart chosen on the right"
+        >
           <optgroup label="My threads">
             <option value="mine">All my threads ({mine.length})</option>
             {lines.map((b) => [
@@ -675,7 +740,12 @@ export function ThreadManager({ onClose }: { onClose: () => void }) {
           </optgroup>
         </select>
         <MatchButton target={fitTarget} opts={match} set={setMatch} />
-        <button className="btn sm primary" disabled={!doc.threads.length} onClick={() => runFit()} title="Fit every unlocked thread with the matching options, starting from its original colour">
+        <button
+          className="btn sm primary"
+          disabled={!doc.threads.length}
+          onClick={() => runFit()}
+          title="Fit every unlocked thread with the matching options, starting from its original colour"
+        >
           <Replace size={13} /> Fit all
         </button>
         <button className="btn sm" disabled={!selected} onClick={() => selected && runFit([selected.id])} title="Fit only the selected thread">
@@ -687,7 +757,12 @@ export function ThreadManager({ onClose }: { onClose: () => void }) {
             ΔE avg <b>{quality.mean.toFixed(1)}</b> · worst <b className={quality.worst > 6 ? "far" : ""}>{quality.worst.toFixed(1)}</b>
           </span>
         )}
-        <button className="btn sm ghost" disabled={!fittedIds.length} onClick={() => (revertFit(), setReport(null))} title="All threads back to their original colours (also undoes merges)">
+        <button
+          className="btn sm ghost"
+          disabled={!fittedIds.length}
+          onClick={() => (revertFit(), setReport(null))}
+          title="All threads back to their original colours (also undoes merges)"
+        >
           <RotateCcw size={13} /> Revert all{fittedIds.length ? ` (${fittedIds.length})` : ""}
         </button>
       </div>
@@ -758,33 +833,33 @@ export function ThreadManager({ onClose }: { onClose: () => void }) {
             <MyThreadsPanel selected={selected} />
           ) : (
             <>
-          <div className="tm-chart-head">
-            {selected ? (
-              <>
-                <span className="tm-cur" style={{ background: selected.color }} />
-                <span>
-                  Replace <b>{selected.name}</b> with a chart colour
-                </span>
-              </>
-            ) : (
-              <span className="stat">Select a thread to recolour it</span>
-            )}
-          </div>
-          <ChartBrowser
-            chart={chart}
-            onChart={(c) => {
-              setChart(c);
-              setLastChart(c);
-            }}
-            near={selected?.color}
-            height={300}
-            markOwned
-            onPick={(e) => {
-              if (selected) assignChart(selected.id, e);
-              else toast("Select a thread first");
-            }}
-          />
-          <p className="hint">Checked colours are in My threads. Matching uses CIEDE2000 (ΔE &lt; 1 is invisible, &lt; 3 barely visible in thread).</p>
+              <div className="tm-chart-head">
+                {selected ? (
+                  <>
+                    <span className="tm-cur" style={{ background: selected.color }} />
+                    <span>
+                      Replace <b>{selected.name}</b> with a chart colour
+                    </span>
+                  </>
+                ) : (
+                  <span className="stat">Select a thread to recolour it</span>
+                )}
+              </div>
+              <ChartBrowser
+                chart={chart}
+                onChart={(c) => {
+                  setChart(c);
+                  setLastChart(c);
+                }}
+                near={selected?.color}
+                height={300}
+                markOwned
+                onPick={(e) => {
+                  if (selected) assignChart(selected.id, e);
+                  else toast("Select a thread first");
+                }}
+              />
+              <p className="hint">Checked colours are in My threads. Matching uses CIEDE2000 (ΔE &lt; 1 is invisible, &lt; 3 barely visible in thread).</p>
             </>
           )}
         </div>

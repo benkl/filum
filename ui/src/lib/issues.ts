@@ -61,7 +61,12 @@ function statsOf(plan: PlanData, n: number, hw: number, hh: number, oval: boolea
   const { coords, flags, objects } = plan;
   let size = n;
   for (let i = 0; i < objects.length; i++) if (objects[i] !== NO_OBJECT && objects[i] >= size) size = objects[i] + 1;
-  const st: PlanStats = { stitches: new Uint32Array(size), reach: new Float32Array(oval ? size : 0), longest: new Float32Array(size), longestAt: new Float32Array(size * 2) };
+  const st: PlanStats = {
+    stitches: new Uint32Array(size),
+    reach: new Float32Array(oval ? size : 0),
+    longest: new Float32Array(size),
+    longestAt: new Float32Array(size * 2),
+  };
   let pen = false;
   let px = 0;
   let py = 0;
@@ -161,7 +166,14 @@ export function qualityIssues(doc: StitchDocument, plan: PlanData | null): Issue
       title: "Needle holes pile up",
       detail: `${Math.round(h.perMm2)} needle drops per mm² here; ${doc.fabric} takes ${Math.round(q.holeLimit)}. The fabric tears and needles break. ${why}`,
       at: h.at,
-      ...(thin !== undefined ? { fix: { label: "Automatic underlay", apply: (x: DesignObject) => (x.stitch.type === "fill" ? { ...x, stitch: { ...x.stitch, underlayAuto: true } } : x) } } : {}),
+      ...(thin !== undefined
+        ? {
+            fix: {
+              label: "Automatic underlay",
+              apply: (x: DesignObject) => (x.stitch.type === "fill" ? { ...x, stitch: { ...x.stitch, underlayAuto: true } } : x),
+            },
+          }
+        : {}),
     });
   }
   out.push(...underlayIssues(doc, q.narrowFills));
@@ -181,7 +193,14 @@ export function qualityIssues(doc: StitchDocument, plan: PlanData | null): Issue
       title: "Many short stitches",
       detail: `${n} of ${r.drops} stitches are under ${under}: the path turns very often, as a traced or jagged outline does, and every sharp turn is a needle drop. Short stitches pile thread up and break it.${(o.minStitch ?? doc.machine.minStitch) < 0.3 && o.stitch.type === "running" ? ` The shortest stitch is ${o.minStitch ?? doc.machine.minStitch} mm: with Min. stitch at 0.3–0.5 mm (Design ▸ Stitch-out, or the object's Commands) its fine steps are left out too.` : ""}`,
       at: b ? [b.x + b.w / 2, b.y + b.h / 2] : [0, 0],
-      ...(o.text ? {} : { fix: { label: "Simplify for stitching", apply: (x: DesignObject) => ({ ...x, paths: x.paths.map((sp) => (sp.nodes.length >= 3 ? simplifyForStitching(sp) : sp)) }) } }),
+      ...(o.text
+        ? {}
+        : {
+            fix: {
+              label: "Simplify for stitching",
+              apply: (x: DesignObject) => ({ ...x, paths: x.paths.map((sp) => (sp.nodes.length >= 3 ? simplifyForStitching(sp) : sp)) }),
+            },
+          }),
     });
   }
   return out;
@@ -301,7 +320,18 @@ export function computeIssues(doc: StitchDocument, plan: PlanData | null): Issue
     }
 
     const outsideBox = b.x < -0.01 || b.y < -0.01 || b.x + b.w > hw + 0.01 || b.y + b.h > hh + 0.01;
-    const outsideOval = oval && !outsideBox && (reachOf(index) ?? Math.max(...[[b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]].map(([x, y]) => ovalNorm(hw / 2, hh / 2, hw, hh, x, y)))) > 1.0005;
+    const outsideOval =
+      oval &&
+      !outsideBox &&
+      (reachOf(index) ??
+        Math.max(
+          ...[
+            [b.x, b.y],
+            [b.x + b.w, b.y],
+            [b.x, b.y + b.h],
+            [b.x + b.w, b.y + b.h],
+          ].map(([x, y]) => ovalNorm(hw / 2, hh / 2, hw, hh, x, y)),
+        )) > 1.0005;
     if (outsideOval) {
       add({
         level: "error",
@@ -370,7 +400,8 @@ export function computeIssues(doc: StitchDocument, plan: PlanData | null): Issue
         add({
           level: "warning",
           title: "Rows run along the gradient",
-          detail: "Every row is split between the colours, so each colour sews short pieces joined by trims. Rows across the gradient give each colour whole rows.",
+          detail:
+            "Every row is split between the colours, so each colour sews short pieces joined by trims. Rows across the gradient give each colour whole rows.",
           at: c,
           fix: {
             label: "Turn rows across",
@@ -417,10 +448,24 @@ export function computeIssues(doc: StitchDocument, plan: PlanData | null): Issue
     if (!b) return;
     const at: Vec2 = [b.x + b.w / 2, b.y + b.h / 2];
     if (o.stitch.foam && i < lastFlat)
-      out.push({ id: `foamLast:${o.id}`, objId: o.id, level: "warning", title: "3D foam goes last", detail: `${o.name} is sewn over foam, but other objects are sewn after it: they would run over the foam and flatten it. Move it to the end of the sewing order.`, at });
+      out.push({
+        id: `foamLast:${o.id}`,
+        objId: o.id,
+        level: "warning",
+        title: "3D foam goes last",
+        detail: `${o.name} is sewn over foam, but other objects are sewn after it: they would run over the foam and flatten it. Move it to the end of the sewing order.`,
+        at,
+      });
     const w = o.stitch.layered ? satinWidth(o) : null;
     if (w != null && w < LAYERED3D_MIN_WIDTH)
-      out.push({ id: `layeredThin:${o.id}`, objId: o.id, level: "warning", title: "Layered 3D under 6 mm", detail: `The column is ${w.toFixed(1)} mm wide: under ${LAYERED3D_MIN_WIDTH} mm the layers have no room to rise. Widen it or use a plain satin.`, at });
+      out.push({
+        id: `layeredThin:${o.id}`,
+        objId: o.id,
+        level: "warning",
+        title: "Layered 3D under 6 mm",
+        detail: `The column is ${w.toFixed(1)} mm wide: under ${LAYERED3D_MIN_WIDTH} mm the layers have no room to rise. Widen it or use a plain satin.`,
+        at,
+      });
   });
   // a connection sewn through by hand that nothing sewn later covers
   for (const c of plan?.links ?? []) {
@@ -440,7 +485,8 @@ export function computeIssues(doc: StitchDocument, plan: PlanData | null): Issue
   const quality = qualityIssues(doc, plan);
   out.push(...quality, ...denseIssues(doc, plan, quality));
   const total = plan?.stats.stitches ?? 0;
-  if (total > 100000) out.push({ id: "big", objId: "", level: "info", title: "Very large design", detail: `${total.toLocaleString()} stitches.`, at: [hw / 2, hh / 2] });
+  if (total > 100000)
+    out.push({ id: "big", objId: "", level: "info", title: "Very large design", detail: `${total.toLocaleString()} stitches.`, at: [hw / 2, hh / 2] });
   cache.set(doc, { plan, issues: out });
   return out;
 }

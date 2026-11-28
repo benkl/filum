@@ -15,11 +15,7 @@ use crate::{Error, Pattern, WriteOptions};
 
 /// pystitch's writer sets no limits but stores 8-bit deltas, so cap them at the
 /// format's range; Ink/Stitch writes every format with `full_jump`.
-pub(crate) const SETTINGS: EncodeSettings = EncodeSettings {
-    max_stitch: 127,
-    max_jump: 127,
-    full_jump: true,
-};
+pub(crate) const SETTINGS: EncodeSettings = EncodeSettings { max_stitch: 127, max_jump: 127, full_jump: true };
 const HEADER_SIZE: usize = 0x1D78;
 const STITCH_COUNT_OFFSET: usize = 0x32;
 /// pystitch: "Cannot store more than 12 colors in SEW format".

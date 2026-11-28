@@ -180,7 +180,12 @@ function polylinesMeet(a: Vec2[], b: Vec2[]): boolean {
       const d4 = cross(p1, p2, q2);
       if (((d1 > eps && d2 < -eps) || (d1 < -eps && d2 > eps)) && ((d3 > eps && d4 < -eps) || (d3 < -eps && d4 > eps))) return true;
       // an end touching the other segment
-      const on = (o: Vec2, p: Vec2, q: Vec2, d: number) => Math.abs(d) <= eps * Math.max(1, Math.hypot(p[0] - o[0], p[1] - o[1])) && Math.min(o[0], p[0]) - eps <= q[0] && q[0] <= Math.max(o[0], p[0]) + eps && Math.min(o[1], p[1]) - eps <= q[1] && q[1] <= Math.max(o[1], p[1]) + eps;
+      const on = (o: Vec2, p: Vec2, q: Vec2, d: number) =>
+        Math.abs(d) <= eps * Math.max(1, Math.hypot(p[0] - o[0], p[1] - o[1])) &&
+        Math.min(o[0], p[0]) - eps <= q[0] &&
+        q[0] <= Math.max(o[0], p[0]) + eps &&
+        Math.min(o[1], p[1]) - eps <= q[1] &&
+        q[1] <= Math.max(o[1], p[1]) + eps;
       if (on(q1, q2, p1, d1) || on(q1, q2, p2, d2) || on(p1, p2, q1, d3) || on(p1, p2, q2, d4)) return true;
     }
   return false;
@@ -310,7 +315,9 @@ export function transformObject(o: DesignObject, m: Mat, rotationDeg = 0): Desig
         to: applyMat(m, stitch.gradient.to),
         // mesh nodes and freeform points travel with the shape
         ...(stitch.gradient.mesh ? { mesh: { ...stitch.gradient.mesh, nodes: stitch.gradient.mesh.nodes.map((n) => ({ ...n, p: applyMat(m, n.p) })) } } : {}),
-        ...(stitch.gradient.points ? { points: stitch.gradient.points.map((q) => ({ ...q, p: applyMat(m, q.p), spread: Math.max(0.5, q.spread * scale) })) } : {}),
+        ...(stitch.gradient.points
+          ? { points: stitch.gradient.points.map((q) => ({ ...q, p: applyMat(m, q.p), spread: Math.max(0.5, q.spread * scale) })) }
+          : {}),
       },
     };
   // a radial or circular fill's centre is relative to the shape's box (0..1): a move or a
@@ -327,7 +334,8 @@ export function transformObject(o: DesignObject, m: Mat, rotationDeg = 0): Desig
   if (stitch.type === "fill" && stitch.guide) stitch = { ...stitch, guide: transformPaths([stitch.guide], m)[0] };
   if (stitch.type === "fill" && stitch.flow) stitch = { ...stitch, flow: transformFlow(stitch.flow, m) };
   if (stitch.type === "running" && stitch.ripple?.target) stitch = { ...stitch, ripple: { ...stitch.ripple, target: applyMat(m, stitch.ripple.target) } };
-  if (stitch.type === "running" && stitch.ripple?.guide?.length) stitch = { ...stitch, ripple: { ...stitch.ripple, guide: transformPaths(stitch.ripple.guide, m) } };
+  if (stitch.type === "running" && stitch.ripple?.guide?.length)
+    stitch = { ...stitch, ripple: { ...stitch.ripple, guide: transformPaths(stitch.ripple.guide, m) } };
   if (stitch.type === "running" && stitch.ripple?.anchor)
     stitch = { ...stitch, ripple: { ...stitch.ripple, anchor: [applyMat(m, stitch.ripple.anchor[0]), applyMat(m, stitch.ripple.anchor[1])] } };
   // the direction guides (rungs) travel with the rails
@@ -379,12 +387,7 @@ export const nodeCount = (o: DesignObject) => o.paths.reduce((n, p) => n + p.nod
 export function rectPath(x: number, y: number, w: number, h: number): SubPath {
   return {
     closed: true,
-    nodes: [
-      { p: [x, y] },
-      { p: [x + w, y] },
-      { p: [x + w, y + h] },
-      { p: [x, y + h] },
-    ],
+    nodes: [{ p: [x, y] }, { p: [x + w, y] }, { p: [x + w, y + h] }, { p: [x, y + h] }],
   };
 }
 
@@ -650,7 +653,9 @@ export function transformFlow(f: FlowField, m: Mat): FlowField {
   // the transformed grid's bounding box
   const W = f.cols * f.cell;
   const H = f.rows * f.cell;
-  const corners: Vec2[] = [f.origin, [f.origin[0] + W, f.origin[1]], [f.origin[0], f.origin[1] + H], [f.origin[0] + W, f.origin[1] + H]].map((p) => applyMat(m, p as Vec2));
+  const corners: Vec2[] = [f.origin, [f.origin[0] + W, f.origin[1]], [f.origin[0], f.origin[1] + H], [f.origin[0] + W, f.origin[1] + H]].map((p) =>
+    applyMat(m, p as Vec2),
+  );
   const xs = corners.map((p) => p[0]);
   const ys = corners.map((p) => p[1]);
   const x0 = Math.min(...xs);

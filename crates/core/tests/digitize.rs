@@ -329,11 +329,7 @@ fn skip_colours_and_fixed_palette() {
     assert_eq!(r.objects.len(), 1, "red dropped");
     assert!(rgb(&r.objects[0], &r)[2] > 150);
 
-    let fixed = DigitizeOptions {
-        width_mm: 100.0,
-        fixed_colors: vec![[255, 255, 255], [255, 0, 0], [0, 0, 255]],
-        ..Default::default()
-    };
+    let fixed = DigitizeOptions { width_mm: 100.0, fixed_colors: vec![[255, 255, 255], [255, 0, 0], [0, 0, 255]], ..Default::default() };
     let r = img.run(&fixed);
     assert_eq!(r.colors.iter().map(|c| c.rgb).collect::<Vec<_>>(), fixed.fixed_colors);
     let mut cols: Vec<String> = r.threads.iter().map(|t| t.color.clone()).collect();
@@ -410,11 +406,7 @@ fn satin_outline_around_silhouette() {
         assert_eq!(rgb(o, &r), [10, 10, 10]);
     }
     // the closed centre-line satin stitches without a seam gap
-    let doc = filum_core::Document {
-        threads: r.threads.clone(),
-        objects: outlines.iter().map(|o| (*o).clone()).collect(),
-        ..Default::default()
-    };
+    let doc = filum_core::Document { threads: r.threads.clone(), objects: outlines.iter().map(|o| (*o).clone()).collect(), ..Default::default() };
     let plan = filum_core::Engine::new().plan(&doc);
     assert!(plan.stats(800.0, 6.0, 12.0).stitches > 400);
 }
@@ -424,11 +416,7 @@ fn outline_skips_thin_strokes() {
     let mut img = Img::new(400, 300, [255, 255, 255]);
     img.paint([220, 20, 30], |x, y| (x - 120.0).powi(2) + (y - 150.0).powi(2) <= 60.0 * 60.0);
     img.paint([25, 25, 60], |x, y| seg_dist(x, y, (220.0, 60.0), (380.0, 260.0)) <= 4.0);
-    let opts = DigitizeOptions {
-        width_mm: 100.0,
-        outline: filum_core::digitize::OutlineKind::Running,
-        ..Default::default()
-    };
+    let opts = DigitizeOptions { width_mm: 100.0, outline: filum_core::digitize::OutlineKind::Running, ..Default::default() };
     let r = img.run(&opts);
     assert!(r.objects.iter().any(|o| matches!(o.stitch, StitchParams::Satin(_)) && !o.name.starts_with("Outline")));
     assert_eq!(r.objects.iter().filter(|o| o.name.starts_with("Outline")).count(), 1, "only the filled circle is outlined");
@@ -635,8 +623,6 @@ fn flow_is_a_fill_method_with_its_own_controls() {
     // smoothing is accepted and still sews
     assert!(!flows(&DigitizeOptions { flow_smoothing: 5, ..base.clone() }).is_empty());
 }
-
-
 
 #[test]
 #[ignore]
@@ -872,14 +858,29 @@ fn pale_shading_does_not_break_the_outline() {
         let d = ((x - 200.0).powi(2) + (y - 200.0).powi(2)).sqrt();
         (139.0..=146.0).contains(&d) && y < 260.0
     });
-    let opts = DigitizeOptions { width_mm: 100.0, edge_outlines: OutlineKind::Satin, edge_contrast: 26.0, allow_satin: false, allow_running: false, ..Default::default() };
+    let opts = DigitizeOptions {
+        width_mm: 100.0,
+        edge_outlines: OutlineKind::Satin,
+        edge_contrast: 26.0,
+        allow_satin: false,
+        allow_running: false,
+        ..Default::default()
+    };
     let r = img.run(&opts);
     let rim = 2.0 * std::f64::consts::PI * 150.0 * 0.25; // mm
     let longest = r
         .objects
         .iter()
         .filter(|o| o.name.starts_with("Edge outline"))
-        .map(|o| o.paths.iter().map(|sp| { let p = sp.flatten(0.05); p.windows(2).map(|w| w[0].dist(w[1])).sum::<f64>() }).sum::<f64>())
+        .map(|o| {
+            o.paths
+                .iter()
+                .map(|sp| {
+                    let p = sp.flatten(0.05);
+                    p.windows(2).map(|w| w[0].dist(w[1])).sum::<f64>()
+                })
+                .sum::<f64>()
+        })
         .fold(0.0, f64::max);
     assert!(longest > rim * 0.95, "outline {longest:.1} of {rim:.1} mm");
 }
@@ -968,7 +969,6 @@ fn line_options_change_the_strokes() {
     let r = thin.run(&DigitizeOptions { thin_triple: true, ..base.clone() });
     assert!(r.objects.iter().any(|o| matches!(&o.stitch, StitchParams::Running(p) if p.bean_repeats == 2)));
 }
-
 
 #[test]
 fn colour_roles_force_lines_and_fills() {
@@ -1190,7 +1190,11 @@ fn outlines_at_a_set_width_sew_as_one_network() {
     let doc = filum_core::Document { objects: r.objects.clone(), threads: r.threads.clone(), ..Default::default() };
     let plan = filum_core::Engine::new().plan(&doc);
     let trims = plan.stitches.iter().filter(|s| s.flags & filum_core::plan::flags::TRIM != 0).count();
-    let routed = filum_core::Engine::new().plan(&filum_core::Document { objects: img.run(&DigitizeOptions { route_lines: false, ..opts.clone() }).objects, threads: r.threads.clone(), ..Default::default() });
+    let routed = filum_core::Engine::new().plan(&filum_core::Document {
+        objects: img.run(&DigitizeOptions { route_lines: false, ..opts.clone() }).objects,
+        threads: r.threads.clone(),
+        ..Default::default()
+    });
     let unrouted = routed.stitches.iter().filter(|s| s.flags & filum_core::plan::flags::TRIM != 0).count();
     assert!(trims < unrouted && trims <= 1, "routed {trims} trims, unrouted {unrouted}");
 }
@@ -1353,7 +1357,11 @@ fn thin_letters_keep_their_arms_and_bold_letters_stay_fills() {
     let drawn: f64 = k_strokes.iter().map(|((x0, y0), (x1, y1))| ((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0)).sqrt() * s).sum();
     assert!(red_len > 0.8 * drawn, "the k's strokes: {red_len:.1} of {drawn:.1} mm");
     let navy: Vec<&Object> = r.objects.iter().filter(|o| rgb(o, &r)[2] > 60 && rgb(o, &r)[0] < 100).collect();
-    assert!(!navy.is_empty() && navy.iter().all(|o| matches!(o.stitch, StitchParams::Fill(_))), "the bold o is a fill: {:?}", navy.iter().map(|o| &o.name).collect::<Vec<_>>());
+    assert!(
+        !navy.is_empty() && navy.iter().all(|o| matches!(o.stitch, StitchParams::Fill(_))),
+        "the bold o is a fill: {:?}",
+        navy.iter().map(|o| &o.name).collect::<Vec<_>>()
+    );
 }
 
 #[test]
@@ -1411,4 +1419,3 @@ fn noise_does_not_become_lines() {
     let lines = r.objects.iter().filter(|o| is_line(o)).count();
     assert!(lines <= 5 && r.objects.len() < 40, "{} objects, {lines} lines", r.objects.len());
 }
-

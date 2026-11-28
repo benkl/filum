@@ -57,7 +57,13 @@ export function WindowControls() {
           <path d="M0 5.5h10" stroke="currentColor" strokeWidth="1" />
         </svg>
       </button>
-      <button type="button" className="win-btn" title={maximized ? "Restore down" : "Maximize"} aria-label={maximized ? "Restore down" : "Maximize"} onClick={() => win?.toggleMaximize()}>
+      <button
+        type="button"
+        className="win-btn"
+        title={maximized ? "Restore down" : "Maximize"}
+        aria-label={maximized ? "Restore down" : "Maximize"}
+        onClick={() => win?.toggleMaximize()}
+      >
         {maximized ? (
           <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
             <path d="M2.5 2.5V.5h7v7h-2M.5 2.5h7v7h-7z" fill="none" stroke="currentColor" strokeWidth="1" />

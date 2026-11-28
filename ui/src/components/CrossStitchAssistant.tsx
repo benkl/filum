@@ -39,7 +39,10 @@ export function CrossStitchDialog({ onClose }: { onClose: () => void }) {
     const s = useStore.getState();
     const ids = fills.map((o) => o.id);
     if (!pixel) {
-      s.commit((d) => ({ ...d, objects: d.objects.map((o) => (ids.includes(o.id) && o.stitch.type === "fill" ? { ...o, stitch: { ...o.stitch, ...params } } : o)) }));
+      s.commit((d) => ({
+        ...d,
+        objects: d.objects.map((o) => (ids.includes(o.id) && o.stitch.type === "fill" ? { ...o, stitch: { ...o.stitch, ...params } } : o)),
+      }));
     } else {
       const b = unionBoxes(fills.map(objectBounds));
       if (!b) return;

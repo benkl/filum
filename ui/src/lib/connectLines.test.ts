@@ -33,7 +33,14 @@ const straightThrough = x.paths.every((sp) => {
   const [a, , c] = pts(sp);
   return sp.nodes.length === 3 && (near([a[0] + c[0], a[1] + c[1]], [10, 10]) || near([a[0] - c[0], a[1] - c[1]], [0, 0]));
 });
-check(straightThrough && x.paths.every((sp) => { const [a, , c] = pts(sp); return Math.abs(a[0] - c[0]) === 10 && Math.abs(a[1] - c[1]) === 10; }), "straight through the crossing, not round the corner");
+check(
+  straightThrough &&
+    x.paths.every((sp) => {
+      const [a, , c] = pts(sp);
+      return Math.abs(a[0] - c[0]) === 10 && Math.abs(a[1] - c[1]) === 10;
+    }),
+  "straight through the crossing, not round the corner",
+);
 
 // a T: the bar stays one straight line, the stem the other
 const t = connectLines([line([0, 0], [5, 0]), line([5, 0], [10, 0]), line([5, 0], [5, 8])], { ...DEFAULT_CONNECT, bridge: 0 });
@@ -53,20 +60,35 @@ const d = connectLines(dbl);
 check(d.doubled === 1 && d.lines === 1, "doubled pieces left out, the rest one line");
 
 // curves keep their handles
-const c1: SubPath = { closed: false, nodes: [{ p: [0, 0], o: [3, 4] }, { p: [10, 0], i: [7, 4] }] };
-const c2: SubPath = { closed: false, nodes: [{ p: [20, 0], o: [17, -4] }, { p: [10, 0], i: [13, -4] }] };
+const c1: SubPath = {
+  closed: false,
+  nodes: [
+    { p: [0, 0], o: [3, 4] },
+    { p: [10, 0], i: [7, 4] },
+  ],
+};
+const c2: SubPath = {
+  closed: false,
+  nodes: [
+    { p: [20, 0], o: [17, -4] },
+    { p: [10, 0], i: [13, -4] },
+  ],
+};
 const cc = connectLines([c1, c2]);
 const mid = cc.paths[0].nodes[1];
 check(cc.lines === 1 && !!mid.i && !!mid.o && near(mid.p, [10, 0]), "curved pieces: the junction keeps the handle on both sides");
 
 // closed paths stay as they are
-check(connectLines([{ closed: true, nodes: [{ p: [0, 0] }, { p: [5, 0] }, { p: [5, 5] }] }, line([20, 0], [30, 0])]).paths.length === 2, "closed shapes are left alone");
+check(
+  connectLines([{ closed: true, nodes: [{ p: [0, 0] }, { p: [5, 0] }, { p: [5, 5] }] }, line([20, 0], [30, 0])]).paths.length === 2,
+  "closed shapes are left alone",
+);
 
 // many loose ends (a hatching drawing): paired nearest first, quickly, without
 // comparing every pair (thousands of pieces ran out of memory)
 {
   let seed = 7;
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const many: Vec2[] = Array.from({ length: 8001 }, () => [rnd() * 300, rnd() * 300] as Vec2);
   const ids = many.map((_, i) => i);
   const t0 = Date.now();
@@ -77,7 +99,12 @@ check(connectLines([{ closed: true, nodes: [{ p: [0, 0] }, { p: [5, 0] }, { p: [
   const mean = pairs.reduce((s, [u, v]) => s + Math.hypot(many[u][0] - many[v][0], many[u][1] - many[v][1]), 0) / pairs.length;
   check(mean < 5, `mostly near neighbours (mean ${mean.toFixed(2)} mm)`);
   // few ends: every pair compared, the nearest pair first
-  const few: Vec2[] = [[0, 0], [100, 0], [1, 0], [100, 2]];
+  const few: Vec2[] = [
+    [0, 0],
+    [100, 0],
+    [1, 0],
+    [100, 2],
+  ];
   const fp = nearestPairs(few, [0, 1, 2, 3]);
   check(fp.length === 2 && fp[0].join() === "0,2" && fp[1].join() === "1,3", "few ends: nearest pairs first");
 }

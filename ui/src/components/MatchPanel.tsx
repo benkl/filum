@@ -25,7 +25,15 @@ export function useMatchOptions(): [MatchOptions, (p: Partial<MatchOptions>, pre
 
 const presetLabel = (id: MatchOptions["preset"]) => MATCH_PRESETS.find((p) => p.id === id)?.label ?? "Custom";
 
-export function MatchButton({ target, opts, set }: { target: FitTarget; opts: MatchOptions; set: (p: Partial<MatchOptions>, preset?: MatchOptions["preset"]) => void }) {
+export function MatchButton({
+  target,
+  opts,
+  set,
+}: {
+  target: FitTarget;
+  opts: MatchOptions;
+  set: (p: Partial<MatchOptions>, preset?: MatchOptions["preset"]) => void;
+}) {
   const [open, setOpen] = useState(false);
   const btn = useRef<HTMLButtonElement>(null);
   return (
@@ -39,7 +47,19 @@ export function MatchButton({ target, opts, set }: { target: FitTarget; opts: Ma
   );
 }
 
-function MatchPanel({ anchor, target, opts, set, onClose }: { anchor: HTMLElement; target: FitTarget; opts: MatchOptions; set: (p: Partial<MatchOptions>, preset?: MatchOptions["preset"]) => void; onClose: () => void }) {
+function MatchPanel({
+  anchor,
+  target,
+  opts,
+  set,
+  onClose,
+}: {
+  anchor: HTMLElement;
+  target: FitTarget;
+  opts: MatchOptions;
+  set: (p: Partial<MatchOptions>, preset?: MatchOptions["preset"]) => void;
+  onClose: () => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ left: 0, top: 0 });
   const doc = useStore((s) => s.doc);
@@ -62,7 +82,12 @@ function MatchPanel({ anchor, target, opts, set, onClose }: { anchor: HTMLElemen
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitTargetId(target), opts, doc]);
   return createPortal(
-    <div className="popover match-panel" ref={ref} style={{ ...pos, transform: mv.moved ? `translate(${mv.off[0]}px, ${mv.off[1]}px)` : undefined }} data-movable>
+    <div
+      className="popover match-panel"
+      ref={ref}
+      style={{ ...pos, transform: mv.moved ? `translate(${mv.off[0]}px, ${mv.off[1]}px)` : undefined }}
+      data-movable
+    >
       <Grip grip={mv.grip} label="Thread matching" />
       <div className="mp-presets">
         {MATCH_PRESETS.map((p) => (

@@ -46,12 +46,7 @@ export async function openFile(filters: FileFilter[]): Promise<OpenedFile | null
 }
 
 /** Save bytes. Returns the chosen path (Tauri) or file name (browser), or null if cancelled. */
-export async function saveFile(
-  suggestedName: string,
-  bytes: Uint8Array,
-  filters: FileFilter[],
-  existingPath?: string | null,
-): Promise<string | null> {
+export async function saveFile(suggestedName: string, bytes: Uint8Array, filters: FileFilter[], existingPath?: string | null): Promise<string | null> {
   if (isTauri) {
     const { save } = await import("@tauri-apps/plugin-dialog");
     const { invoke } = await import("@tauri-apps/api/core");

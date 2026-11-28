@@ -14,7 +14,10 @@ import { segmentsCross } from "../lib/polyline";
  * are drawn, hit-tested and given cursors on this one box.
  */
 export function transformBox(doc: StitchDocument, selection: string[]) {
-  const sel = transformable(doc.objects.filter((o) => selection.includes(o.id)), doc.objects).objects;
+  const sel = transformable(
+    doc.objects.filter((o) => selection.includes(o.id)),
+    doc.objects,
+  ).objects;
   return sel.length ? unionBoxes(sel.map(objectBoundsCached)) : null;
 }
 
@@ -22,7 +25,12 @@ export function transformBox(doc: StitchDocument, selection: string[]) {
  * The points a node-tool box picks on the selected paths: those inside it,
  * added to (Shift) or taken from (Alt) the points selected when the drag began.
  */
-export function boxedNodes(doc: StitchDocument, ids: string[], m: { x: number; y: number; w: number; h: number }, d: { add: boolean; sub: boolean; base: NodeRef[] }): NodeRef[] {
+export function boxedNodes(
+  doc: StitchDocument,
+  ids: string[],
+  m: { x: number; y: number; w: number; h: number },
+  d: { add: boolean; sub: boolean; base: NodeRef[] },
+): NodeRef[] {
   const found = nodesInBox(doc, ids, m);
   if (d.sub) {
     const out = new Set(found.map(nodeKey));
@@ -57,7 +65,6 @@ export function hitObject(o: DesignObject, p: Vec2, tol: number): boolean {
 
 export const isPathObject = (o: DesignObject) =>
   o.stitch.type === "running" || o.stitch.type === "manual" || (o.stitch.type === "satin" && o.paths.length === 1);
-
 
 /** Does the segment a→b cross the object's outline? */
 export function crossesObject(o: DesignObject, a: Vec2, b: Vec2) {

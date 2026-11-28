@@ -198,7 +198,15 @@ export function pixelate(shapes: { rings: Vec2[][] }[], grid: CrossGrid, coverag
 }
 
 /** New objects from cells: one cross-stitch fill per colour (`colours` of them). */
-export function cellsToObjects(grid: CrossGrid, cells: Cells, colours: number, threadFor: (k: number) => string, base: FillParams, nameOf: (k: number) => string, makeId: () => string): DesignObject[] {
+export function cellsToObjects(
+  grid: CrossGrid,
+  cells: Cells,
+  colours: number,
+  threadFor: (k: number) => string,
+  base: FillParams,
+  nameOf: (k: number) => string,
+  makeId: () => string,
+): DesignObject[] {
   const out: DesignObject[] = [];
   for (let k = 0; k < colours; k++) {
     const rings = traceCells(grid, (c, r) => cells[r * grid.cols + c] === k);
@@ -257,8 +265,22 @@ export function crossStitchDesign(
   const grid = gridOver(0, 0, p.widthMm, p.heightMm, s.cell, sy);
   const cells = cellsFromRegions(p, grid, s.coverage);
   const base: FillParams = { ...defaultFill(), ...crossParams(s.cell, sy, s.kind, s.coverage) };
-  const threads: Thread[] = p.colors.map((c, k) => ({ id: `x${k}`, name: c.name || c.hex.toUpperCase(), color: c.hex, brand: c.code ? brand : "", code: c.code }));
-  const objects = cellsToObjects(grid, cells, p.colors.length, (k) => threads[k].id, base, (k) => `${name} · ${threads[k].name}`, makeId);
+  const threads: Thread[] = p.colors.map((c, k) => ({
+    id: `x${k}`,
+    name: c.name || c.hex.toUpperCase(),
+    color: c.hex,
+    brand: c.code ? brand : "",
+    code: c.code,
+  }));
+  const objects = cellsToObjects(
+    grid,
+    cells,
+    p.colors.length,
+    (k) => threads[k].id,
+    base,
+    (k) => `${name} · ${threads[k].name}`,
+    makeId,
+  );
   const used = new Set(objects.map((o) => o.thread));
   let crosses = 0;
   for (const v of cells) if (v >= 0) crosses++;

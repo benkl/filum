@@ -131,7 +131,17 @@ function selectionStitches(plan: PlanData, selectedIndex: number[]): Map<number,
 /** Under the selection: density map, stitch preview of the selection, fill hatching. */
 export function paintUnderlays(
   c: Ctx,
-  o: { plan: PlanData | null; mode: string; density: DensityField | null; densityMode: DensityMode; live?: { ids: string[]; m: number[] } | null; selected: DesignObject[]; selectedIndex: number[]; colors: Map<string, string>; overlay: InteractiveOverlay },
+  o: {
+    plan: PlanData | null;
+    mode: string;
+    density: DensityField | null;
+    densityMode: DensityMode;
+    live?: { ids: string[]; m: number[] } | null;
+    selected: DesignObject[];
+    selectedIndex: number[];
+    colors: Map<string, string>;
+    overlay: InteractiveOverlay;
+  },
 ) {
   const { ctx, scale } = c;
   if (o.density) {

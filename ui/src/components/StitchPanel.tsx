@@ -54,7 +54,17 @@ export const LINE_STYLES: Style[] = [
     title: "Single running stitch — outlines and details",
     icon: svg(<path d="M4 18 C14 6, 26 26, 36 12" {...stroke} strokeWidth={1.4} strokeDasharray="3 2" />),
     matches: (st) => st.type === "running" && st.beanRepeats < 2 && !st.ripple && !st.stem && !st.motif && !st.zigzag,
-    apply: (o) => asSt({ type: "running", ...defaultRunning(), ...keep(o, "running"), beanRepeats: 0, ripple: undefined, stem: undefined, motif: undefined, zigzag: undefined }),
+    apply: (o) =>
+      asSt({
+        type: "running",
+        ...defaultRunning(),
+        ...keep(o, "running"),
+        beanRepeats: 0,
+        ripple: undefined,
+        stem: undefined,
+        motif: undefined,
+        zigzag: undefined,
+      }),
   },
   {
     id: "triple",
@@ -62,7 +72,17 @@ export const LINE_STYLES: Style[] = [
     title: "Triple (bean) stitch — bold, hand-stitched look",
     icon: svg(<path d="M4 18 C14 6, 26 26, 36 12" {...stroke} strokeWidth={2.6} strokeDasharray="4 2" />),
     matches: (st) => st.type === "running" && st.beanRepeats >= 2 && st.beanRepeats < 4 && !st.ripple && !st.stem && !st.motif && !st.zigzag,
-    apply: (o) => asSt({ type: "running", ...defaultRunning(), ...keep(o, "running"), beanRepeats: 2, ripple: undefined, stem: undefined, motif: undefined, zigzag: undefined }),
+    apply: (o) =>
+      asSt({
+        type: "running",
+        ...defaultRunning(),
+        ...keep(o, "running"),
+        beanRepeats: 2,
+        ripple: undefined,
+        stem: undefined,
+        motif: undefined,
+        zigzag: undefined,
+      }),
   },
   {
     id: "heavy",
@@ -70,7 +90,17 @@ export const LINE_STYLES: Style[] = [
     title: "Five passes — very bold line",
     icon: svg(<path d="M4 18 C14 6, 26 26, 36 12" {...stroke} strokeWidth={3.8} strokeDasharray="5 2" />),
     matches: (st) => st.type === "running" && st.beanRepeats >= 4 && !st.ripple && !st.stem && !st.motif && !st.zigzag,
-    apply: (o) => asSt({ type: "running", ...defaultRunning(), ...keep(o, "running"), beanRepeats: 4, ripple: undefined, stem: undefined, motif: undefined, zigzag: undefined }),
+    apply: (o) =>
+      asSt({
+        type: "running",
+        ...defaultRunning(),
+        ...keep(o, "running"),
+        beanRepeats: 4,
+        ripple: undefined,
+        stem: undefined,
+        motif: undefined,
+        zigzag: undefined,
+      }),
   },
   {
     id: "stem",
@@ -78,7 +108,18 @@ export const LINE_STYLES: Style[] = [
     title: "Stem stitch: slanted stitches that overlap by half — a rope-like, hand-sewn line",
     icon: svg(<path d="M4 20 L12 14 M9 19 L17 13 M14 18 L22 12 M19 17 L27 11 M24 16 L32 10 M29 15 L36 10" {...stroke} strokeWidth={1.5} />),
     matches: (st) => st.type === "running" && !!st.stem,
-    apply: (o) => asSt({ type: "running", ...defaultRunning(), ...keep(o, "running"), length: 2.5, beanRepeats: 0, ripple: undefined, motif: undefined, zigzag: undefined, stem: { width: 0.8 } }),
+    apply: (o) =>
+      asSt({
+        type: "running",
+        ...defaultRunning(),
+        ...keep(o, "running"),
+        length: 2.5,
+        beanRepeats: 0,
+        ripple: undefined,
+        motif: undefined,
+        zigzag: undefined,
+        stem: { width: 0.8 },
+      }),
   },
   {
     id: "motif",
@@ -86,7 +127,18 @@ export const LINE_STYLES: Style[] = [
     title: "Motif run: a small pattern (wave, scallop, loop, diamond…) repeated along the line",
     icon: svg(<path d="M4 14 C7 6, 10 6, 13 14 S19 22, 22 14 S28 6, 31 14 S35 20, 36 16" {...stroke} strokeWidth={1.3} />),
     matches: (st) => st.type === "running" && !!st.motif,
-    apply: (o) => asSt({ type: "running", ...defaultRunning(), ...keep(o, "running"), length: 1.5, beanRepeats: 0, ripple: undefined, stem: undefined, zigzag: undefined, motif: { kind: "wave", size: 4 } }),
+    apply: (o) =>
+      asSt({
+        type: "running",
+        ...defaultRunning(),
+        ...keep(o, "running"),
+        length: 1.5,
+        beanRepeats: 0,
+        ripple: undefined,
+        stem: undefined,
+        zigzag: undefined,
+        motif: { kind: "wave", size: 4 },
+      }),
   },
   {
     id: "ripple",
@@ -133,7 +185,12 @@ export const LINE_STYLES: Style[] = [
             stem: undefined,
             motif: undefined,
             beanRepeats: 0,
-            zigzag: (o.stitch.type === "running" && o.stitch.zigzag) || { width: o.stitch.type === "satin" ? o.stitch.width : 2, spacing: 1.4, pullComp: 0, angle: 0 },
+            zigzag: (o.stitch.type === "running" && o.stitch.zigzag) || {
+              width: o.stitch.type === "satin" ? o.stitch.width : 2,
+              spacing: 1.4,
+              pullComp: 0,
+              angle: 0,
+            },
           })
         : asSt({ type: "satin", ...defaultSatin(), ...keep(o, "satin"), method: "zigzag", spacing: 1.4, centerWalk: false }),
   },
@@ -149,9 +206,7 @@ export const LINE_STYLES: Style[] = [
     id: "blanket",
     label: "Blanket",
     title: "E-stitch / blanket stitch — appliqué edges",
-    icon: svg(
-      <path d="M4 20 H36 M8 20 V9 M14 20 V9 M20 20 V9 M26 20 V9 M32 20 V9" {...stroke} strokeWidth={1.3} />,
-    ),
+    icon: svg(<path d="M4 20 H36 M8 20 V9 M14 20 V9 M20 20 V9 M26 20 V9 M32 20 V9" {...stroke} strokeWidth={1.3} />),
     matches: (st) => st.type === "satin" && st.method === "eStitch",
     apply: (o) => asSt({ type: "satin", ...defaultSatin(), ...keep(o, "satin"), method: "eStitch", spacing: 2, centerWalk: false }),
   },
@@ -174,7 +229,8 @@ export const FILL_STYLES: Style[] = [
       </>,
     ),
     matches: (st) => st.type === "fill" && st.method === "tatami" && !st.gradient && !st.ramp && (st.carve ?? "none") === "none",
-    apply: (o) => asSt({ type: "fill", ...defaultFill(), ...keep(o, "fill"), ...fillMethodDefaults("tatami"), gradient: undefined, ramp: undefined, carve: "none" }),
+    apply: (o) =>
+      asSt({ type: "fill", ...defaultFill(), ...keep(o, "fill"), ...fillMethodDefaults("tatami"), gradient: undefined, ramp: undefined, carve: "none" }),
   },
   {
     id: "carved",
@@ -192,7 +248,17 @@ export const FILL_STYLES: Style[] = [
       </>,
     ),
     matches: (st) => st.type === "fill" && st.method === "tatami" && !!st.carve && st.carve !== "none" && !st.gradient,
-    apply: (o) => asSt({ type: "fill", ...defaultFill(), ...keep(o, "fill"), ...fillMethodDefaults("tatami"), gradient: undefined, ramp: undefined, carve: "diamonds", carveSize: 6 }),
+    apply: (o) =>
+      asSt({
+        type: "fill",
+        ...defaultFill(),
+        ...keep(o, "fill"),
+        ...fillMethodDefaults("tatami"),
+        gradient: undefined,
+        ramp: undefined,
+        carve: "diamonds",
+        carveSize: 6,
+      }),
   },
   {
     id: "shading",
@@ -206,7 +272,13 @@ export const FILL_STYLES: Style[] = [
     id: "cross",
     label: "Cross",
     title: "Cross stitch: a grid of little crosses — the hand-embroidered, pixel look",
-    icon: fillIcon(<path d="M5 5 L13 13 M13 5 L5 13 M14 5 L22 13 M22 5 L14 13 M23 5 L31 13 M31 5 L23 13 M5 15 L13 23 M13 15 L5 23 M14 15 L22 23 M22 15 L14 23" {...stroke} strokeWidth={1.2} />),
+    icon: fillIcon(
+      <path
+        d="M5 5 L13 13 M13 5 L5 13 M14 5 L22 13 M22 5 L14 13 M23 5 L31 13 M31 5 L23 13 M5 15 L13 23 M13 15 L5 23 M14 15 L22 23 M22 15 L14 23"
+        {...stroke}
+        strokeWidth={1.2}
+      />,
+    ),
     matches: (st) => st.type === "fill" && st.method === "cross",
     apply: (o) => asSt({ type: "fill", ...defaultFill(), ...keep(o, "fill"), ...fillMethodDefaults("cross"), gradient: undefined, ramp: undefined }),
   },
@@ -228,7 +300,9 @@ export const FILL_STYLES: Style[] = [
     id: "curved",
     label: "Curved",
     title: "Curved fill: rows that follow the outline of the shape (how much: Follow the shape)",
-    icon: fillIcon(<path d="M4 8 C12 2, 28 2, 36 8 M4 14 C12 8, 28 8, 36 14 M4 20 C12 14, 28 14, 36 20 M4 26 C12 20, 28 20, 36 26" {...stroke} strokeWidth={1.1} />),
+    icon: fillIcon(
+      <path d="M4 8 C12 2, 28 2, 36 8 M4 14 C12 8, 28 8, 36 14 M4 20 C12 14, 28 14, 36 20 M4 26 C12 20, 28 20, 36 26" {...stroke} strokeWidth={1.1} />,
+    ),
     matches: (st) => st.type === "fill" && st.method === "curved" && !st.gradient,
     apply: (o) => asSt({ type: "fill", ...defaultFill(), ...keep(o, "fill"), ...fillMethodDefaults("curved"), gradient: undefined }),
   },
@@ -236,10 +310,19 @@ export const FILL_STYLES: Style[] = [
     id: "flow",
     label: "Flow",
     title: "Flow fill: rows follow the picture's flow (fills made by the auto-digitizer)",
-    icon: fillIcon(<path d="M4 6 C10 12, 16 2, 22 9 S32 4, 36 10 M4 13 C10 19, 16 9, 22 16 S32 11, 36 17 M4 20 C10 26, 16 16, 22 23 S32 18, 36 24" {...stroke} strokeWidth={1.1} />),
+    icon: fillIcon(
+      <path
+        d="M4 6 C10 12, 16 2, 22 9 S32 4, 36 10 M4 13 C10 19, 16 9, 22 16 S32 11, 36 17 M4 20 C10 26, 16 16, 22 23 S32 18, 36 24"
+        {...stroke}
+        strokeWidth={1.1}
+      />,
+    ),
     matches: (st) => st.type === "fill" && st.method === "flow" && !st.gradient,
     apply: (o) => asSt({ type: "fill", ...defaultFill(), ...keep(o, "fill"), ...fillMethodDefaults("flow"), gradient: undefined }),
-    needs: (o) => (o.stitch.type === "fill" && o.stitch.flow ? null : "Only for fills made by the auto-digitizer with the Flow fill (they carry the picture's direction field). For a gradient, pick Flow under Rows in the gradient settings: the rows follow its colour bands."),
+    needs: (o) =>
+      o.stitch.type === "fill" && o.stitch.flow
+        ? null
+        : "Only for fills made by the auto-digitizer with the Flow fill (they carry the picture's direction field). For a gradient, pick Flow under Rows in the gradient settings: the rows follow its colour bands.",
   },
   {
     id: "contour",
@@ -267,7 +350,9 @@ export const FILL_STYLES: Style[] = [
     id: "radial",
     label: "Sunburst",
     title: "Rays from a centre",
-    icon: fillIcon(<path d="M20 14 L4 4 M20 14 L20 2 M20 14 L36 4 M20 14 L38 14 M20 14 L36 25 M20 14 L20 26 M20 14 L4 25 M20 14 L2 14" {...stroke} strokeWidth={1.1} />),
+    icon: fillIcon(
+      <path d="M20 14 L4 4 M20 14 L20 2 M20 14 L36 4 M20 14 L38 14 M20 14 L36 25 M20 14 L20 26 M20 14 L4 25 M20 14 L2 14" {...stroke} strokeWidth={1.1} />,
+    ),
     matches: (st) => st.type === "fill" && st.method === "radial",
     apply: (o) => asSt({ type: "fill", ...defaultFill(), ...keep(o, "fill"), ...fillMethodDefaults("radial"), gradient: undefined }),
   },
@@ -299,19 +384,30 @@ export const FILL_STYLES: Style[] = [
     id: "guided",
     label: "Guided",
     title: "Guided fill (Ink/Stitch): rows follow a guide line you can bend on the canvas",
-    icon: fillIcon(<path d="M3 9 C12 1, 24 15, 37 6 M3 15 C12 7, 24 21, 37 12 M3 21 C12 13, 24 27, 37 18 M3 27 C12 19, 24 33, 37 24" {...stroke} strokeWidth={1.1} />),
+    icon: fillIcon(
+      <path d="M3 9 C12 1, 24 15, 37 6 M3 15 C12 7, 24 21, 37 12 M3 21 C12 13, 24 27, 37 18 M3 27 C12 19, 24 33, 37 24" {...stroke} strokeWidth={1.1} />,
+    ),
     matches: (st) => st.type === "fill" && st.method === "guided",
     apply: (o) => {
       const prev = o.stitch.type === "fill" ? o.stitch.guide : undefined;
       const b = objectBounds(o);
-      return asSt({ type: "fill", ...defaultFill(), ...keep(o, "fill"), ...fillMethodDefaults("guided"), guide: prev ?? (b ? defaultGuide(b) : undefined), gradient: undefined });
+      return asSt({
+        type: "fill",
+        ...defaultFill(),
+        ...keep(o, "fill"),
+        ...fillMethodDefaults("guided"),
+        guide: prev ?? (b ? defaultGuide(b) : undefined),
+        gradient: undefined,
+      });
     },
   },
   {
     id: "circular",
     label: "Circular",
     title: "Circular fill (Ink/Stitch): one spiral around a centre you can drag",
-    icon: fillIcon(<path d="M20 14 m0 0 a1.5 1.5 0 1 1 2 0.5 a4 4 0 1 1 -6 -2 a7 7 0 1 1 11 6 a10 10 0 1 1 -16 -8 a13 13 0 0 1 21 3" {...stroke} strokeWidth={1.1} />),
+    icon: fillIcon(
+      <path d="M20 14 m0 0 a1.5 1.5 0 1 1 2 0.5 a4 4 0 1 1 -6 -2 a7 7 0 1 1 11 6 a10 10 0 1 1 -16 -8 a13 13 0 0 1 21 3" {...stroke} strokeWidth={1.1} />,
+    ),
     matches: (st) => st.type === "fill" && st.method === "circular",
     apply: (o) => asSt({ type: "fill", ...defaultFill(), ...keep(o, "fill"), ...fillMethodDefaults("circular"), gradient: undefined }),
   },
@@ -410,7 +506,8 @@ export function StylePicker({ o }: { o: DesignObject }) {
       return;
     }
     // one undo step: the set collapsed, the style on the layer left
-    const next: StitchParams = style.type === "fill" ? { ...style, gradient: undefined, tartan: undefined, ...(style.method === "tartan" ? { method: "tatami" as const } : {}) } : style;
+    const next: StitchParams =
+      style.type === "fill" ? { ...style, gradient: undefined, tartan: undefined, ...(style.method === "tartan" ? { method: "tatami" as const } : {}) } : style;
     let kept: string | undefined;
     st.commit((d) => {
       const c = collapseLayers(d, o.id);
@@ -424,7 +521,13 @@ export function StylePicker({ o }: { o: DesignObject }) {
     const special = many && typeof s.apply(o) === "string";
     const missing = special ? "One object at a time" : (s.needs?.(o) ?? null);
     return (
-      <button key={s.id} className={`style-card ${s.matches(o.stitch) ? "on" : ""}`} title={missing ?? s.title} disabled={!!missing} onClick={() => pickStyle(s)}>
+      <button
+        key={s.id}
+        className={`style-card ${s.matches(o.stitch) ? "on" : ""}`}
+        title={missing ?? s.title}
+        disabled={!!missing}
+        onClick={() => pickStyle(s)}
+      >
         {s.icon}
         <span>{s.label}</span>
       </button>

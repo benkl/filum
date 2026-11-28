@@ -127,11 +127,15 @@ export function ThreadListDialog({ onClose }: { onClose: () => void }) {
       }
     >
       <p className="hint" style={{ marginTop: 0 }}>
-        Colour block 1 gets the first thread of the list, block 2 the second, and so on (Ink/Stitch). Use it to bring back the colours of a DST or EXP — they store none — from the COL, EDR, INF or
-        thread list that came with it.
+        Colour block 1 gets the first thread of the list, block 2 the second, and so on (Ink/Stitch). Use it to bring back the colours of a DST or EXP — they
+        store none — from the COL, EDR, INF or thread list that came with it.
       </p>
       {!file.bytes.length && <p className="hint">Choose a thread list: Ink/Stitch's TXT (ZIP export), another program's TXT, COL, EDR or INF.</p>}
-      {error && <p className="hint" style={{ color: "var(--danger-text)" }}>{file.name}: {error}</p>}
+      {error && (
+        <p className="hint" style={{ color: "var(--danger-text)" }}>
+          {file.name}: {error}
+        </p>
+      )}
       {list && (
         <>
           <div className="tl-summary">
@@ -150,7 +154,10 @@ export function ThreadListDialog({ onClose }: { onClose: () => void }) {
             </p>
           )}
           {chartNeeded && (
-            <label className="row" title="The list names catalogue numbers but no colours (Ink/Stitch: Apply other thread list): the colours come from this chart">
+            <label
+              className="row"
+              title="The list names catalogue numbers but no colours (Ink/Stitch: Apply other thread list): the colours come from this chart"
+            >
               <span>Match numbers in</span>
               <select className="select" value={chart} onChange={(e) => setChart(e.target.value)}>
                 {charts.map((c) => (
@@ -177,7 +184,13 @@ export function ThreadListDialog({ onClose }: { onClose: () => void }) {
                   <ArrowRight size={12} className="stat" />
                   {sw(e?.color)}
                   <span className="nm" title={e ? label(e) : undefined}>
-                    {!e ? <span className="stat">keeps its colour</span> : e.color ? label(e) || e.color : <span className="stat">no colour{e.tokens?.length ? ` (“${e.tokens.join(" ")}” not in the chart)` : ""}</span>}
+                    {!e ? (
+                      <span className="stat">keeps its colour</span>
+                    ) : e.color ? (
+                      label(e) || e.color
+                    ) : (
+                      <span className="stat">no colour{e.tokens?.length ? ` (“${e.tokens.join(" ")}” not in the chart)` : ""}</span>
+                    )}
                   </span>
                 </div>
               );

@@ -12,13 +12,38 @@ const check = (ok: boolean, msg: string) => {
   } else console.log("ok  ", msg);
 };
 const obj = (id: string, thread: string, type: string, extra: Partial<DesignObject> = {}): DesignObject =>
-  ({ id, name: id, thread, visible: true, locked: false, paths: [], stitch: { type }, trimAfter: false, stopAfter: false, ...extra }) as unknown as DesignObject;
+  ({
+    id,
+    name: id,
+    thread,
+    visible: true,
+    locked: false,
+    paths: [],
+    stitch: { type },
+    trimAfter: false,
+    stopAfter: false,
+    ...extra,
+  }) as unknown as DesignObject;
 const doc = (objects: DesignObject[], extra: Partial<StitchDocument> = {}) =>
-  ({ objects, threads: [{ id: "red", name: "Cherry", color: "#c00", brand: "", code: "" }, { id: "blue", name: "Navy", color: "#00c", brand: "", code: "" }], ...extra }) as unknown as StitchDocument;
+  ({
+    objects,
+    threads: [
+      { id: "red", name: "Cherry", color: "#c00", brand: "", code: "" },
+      { id: "blue", name: "Navy", color: "#00c", brand: "", code: "" },
+    ],
+    ...extra,
+  }) as unknown as StitchDocument;
 
 // stitch order: sky (fill, blue), sun (fill, red), ring (satin, blue), birds (running, blue), in group "g": petal1, petal2 (fill, red)
 const d = doc(
-  [obj("sky", "blue", "fill"), obj("sun", "red", "fill"), obj("ring", "blue", "satin"), obj("birds", "blue", "running"), obj("petal1", "red", "fill", { group: "g" }), obj("petal2", "red", "fill", { group: "g" })],
+  [
+    obj("sky", "blue", "fill"),
+    obj("sun", "red", "fill"),
+    obj("ring", "blue", "satin"),
+    obj("birds", "blue", "running"),
+    obj("petal1", "red", "fill", { group: "g" }),
+    obj("petal2", "red", "fill", { group: "g" }),
+  ],
   { groupNames: { g: "Flower" } },
 );
 const rows = buildLayerRows(d.objects, new Set(), d.groupNames, d.groupParents);
@@ -34,18 +59,33 @@ check(filterRows(rows, d, "", "all") === rows, "no filter: the rows as they are"
 // range and solo
 check(rangeIds(rows, "o:birds", "o:sun").join() === "birds,ring,sun", "Shift-click selects the rows in between");
 const s1 = solo(d, ["sun"]);
-check(s1.objects.filter((o) => o.visible).map((o) => o.id).join() === "sun", "Alt-click an eye: only that row shows");
-check(solo(s1, ["sun"]).objects.every((o) => o.visible), "again: everything shows");
+check(
+  s1.objects
+    .filter((o) => o.visible)
+    .map((o) => o.id)
+    .join() === "sun",
+  "Alt-click an eye: only that row shows",
+);
+check(
+  solo(s1, ["sun"]).objects.every((o) => o.visible),
+  "again: everything shows",
+);
 
 // grouping
 const byThread = groupByThread(d);
 check(byThread.made === 1, "by thread: blue has three loose objects, red one loose (the petals are grouped already)");
 const blue = byThread.doc.objects.filter((o) => o.thread === "blue");
-check(new Set(blue.map((o) => o.group)).size === 1 && !!blue[0].group && byThread.doc.groupNames![blue[0].group!] === "Navy", "one group per thread, named after it");
+check(
+  new Set(blue.map((o) => o.group)).size === 1 && !!blue[0].group && byThread.doc.groupNames![blue[0].group!] === "Navy",
+  "one group per thread, named after it",
+);
 check(byThread.doc.objects.map((o) => o.id).join() === d.objects.map((o) => o.id).join(), "the stitch order stays");
 const byKind = groupByKind(d);
 check(byKind.made === 1 && byKind.doc.groupNames![byKind.doc.objects[0].group!] === "Fills", "by stitch type: the two loose fills");
-check(ungroupAll(byThread.doc).objects.every((o) => !o.group), "ungroup all");
+check(
+  ungroupAll(byThread.doc).objects.every((o) => !o.group),
+  "ungroup all",
+);
 
 // moving into a group
 const moved = moveToGroup(d, ["sun"], "g");

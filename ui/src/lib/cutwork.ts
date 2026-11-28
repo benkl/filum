@@ -25,7 +25,7 @@ export const CUTWORK_SECTORS: CutworkSector[] = [
 
 /** Direction of a segment, 0..180 degrees (Ink/Stitch _get_angle). */
 export function segmentAngle(a: Vec2, b: Vec2): number {
-  let ang = Math.round((((Math.atan2(a[1] - b[1], a[0] - b[0]) * 180) / Math.PI) % 360 + 360) % 360);
+  let ang = Math.round(((((Math.atan2(a[1] - b[1], a[0] - b[0]) * 180) / Math.PI) % 360) + 360) % 360);
   if (ang > 180) ang -= 180;
   return ang;
 }
@@ -63,7 +63,12 @@ export function segmentLine(pts: Vec2[], sectors: CutworkSector[]): [number, Vec
  * each piece a running line (1 mm stitches, no locks) in its needle's
  * colour, sorted by needle; the originals removed or kept hidden.
  */
-export function cutworkSegmentation(doc: StitchDocument, ids: string[], sectors: CutworkSector[] = CUTWORK_SECTORS, opts: { sortByNeedle?: boolean; keepOriginals?: boolean } = {}): StitchDocument {
+export function cutworkSegmentation(
+  doc: StitchDocument,
+  ids: string[],
+  sectors: CutworkSector[] = CUTWORK_SECTORS,
+  opts: { sortByNeedle?: boolean; keepOriginals?: boolean } = {},
+): StitchDocument {
   const { sortByNeedle = true, keepOriginals = false } = opts;
   const sel = doc.objects.filter((o) => ids.includes(o.id) && o.paths.length);
   if (!sel.length) return doc;

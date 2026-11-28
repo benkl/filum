@@ -5,12 +5,10 @@
 pub mod applique;
 pub mod decor;
 pub mod fields;
-pub mod travel;
-pub mod underlay;
 pub mod fill;
 pub mod foam;
-pub mod holes;
 pub mod gradient;
+pub mod holes;
 pub mod inkfills;
 pub mod layered3d;
 pub mod meander_tiles;
@@ -18,6 +16,8 @@ pub mod ripple;
 pub mod running;
 pub mod satin;
 pub mod tartan;
+pub mod travel;
+pub mod underlay;
 
 use crate::geom::Point;
 use crate::model::{FabricProfile, Object, StitchParams};
@@ -186,13 +186,18 @@ pub fn apply_patterns(mut runs: Vec<Run>, patterns: &[crate::model::StitchPatter
         }
     }
     for p in patterns.iter().filter(|p| p.add) {
-        let lines: Vec<Vec<Point>> = p.paths.iter().map(|s| {
-            let mut v = s.flatten(0.05);
-            if s.closed && v.len() > 2 {
-                v.push(v[0]);
-            }
-            v
-        }).filter(|v| v.len() >= 2).collect();
+        let lines: Vec<Vec<Point>> = p
+            .paths
+            .iter()
+            .map(|s| {
+                let mut v = s.flatten(0.05);
+                if s.closed && v.len() > 2 {
+                    v.push(v[0]);
+                }
+                v
+            })
+            .filter(|v| v.len() >= 2)
+            .collect();
         let interval: Vec<u32> = if p.interval.iter().any(|v| *v > 0) { p.interval.iter().map(|v| (*v).max(1)).collect() } else { vec![1] };
         for run in &mut runs {
             let mut out: Run = Vec::with_capacity(run.len());
@@ -334,7 +339,6 @@ fn generate_plain(obj: &Object, fabric: &FabricProfile) -> Vec<Run> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -467,7 +471,13 @@ mod pattern_tests {
     fn shape_patterns_leave_out_points_inside_but_keep_row_ends() {
         let sq = vec![SubPath::polyline(&[pt(0.0, 0.0), pt(30.0, 0.0), pt(30.0, 30.0), pt(0.0, 30.0)], true)];
         let fill = StitchParams::Fill(FillParams { underlay: false, ..Default::default() });
-        let hole = StitchPattern { paths: vec![SubPath::polyline(&[pt(10.0, 10.0), pt(20.0, 10.0), pt(20.0, 20.0), pt(10.0, 20.0)], true)], add: false, remove: true, interval: vec![], offset: 0 };
+        let hole = StitchPattern {
+            paths: vec![SubPath::polyline(&[pt(10.0, 10.0), pt(20.0, 10.0), pt(20.0, 20.0), pt(10.0, 20.0)], true)],
+            add: false,
+            remove: true,
+            interval: vec![],
+            offset: 0,
+        };
         // the rows' needle points (travel under the rows is kept, as its points are)
         let rows = |o: &Object| -> Vec<Point> { generate(o, &Fabric::Cotton.profile()).into_iter().flatten().filter(|x| x.1 == 0).map(|x| x.0).collect() };
         let inside = |v: &[Point]| v.iter().filter(|p| p.x > 10.5 && p.x < 19.5 && p.y > 10.5 && p.y < 19.5).count();

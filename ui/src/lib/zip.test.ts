@@ -25,7 +25,10 @@ check(z[0] === 0x50 && z[1] === 0x4b && z[2] === 3 && z[3] === 4, "starts with a
 const back = unzipStored(z);
 check(back.length === 4, "four entries");
 check(back[0].name === "rose.dst" && back[2].name === "rose (2).dst", `repeated names apart: ${back.map((b) => b.name).join(", ")}`);
-check(back.every((b, i) => b.bytes.length === files[i].bytes.length && b.bytes.every((x, k) => x === files[i].bytes[k])), "contents round-trip");
+check(
+  back.every((b, i) => b.bytes.length === files[i].bytes.length && b.bytes.every((x, k) => x === files[i].bytes[k])),
+  "contents round-trip",
+);
 check(dec.decode(back[1].bytes) === "Design Details\nÄ ö", "UTF-8 text intact");
 // the stored CRCs match the contents (what unzip tools verify)
 const v = new DataView(z.buffer);

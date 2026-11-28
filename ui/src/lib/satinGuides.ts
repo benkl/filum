@@ -12,7 +12,6 @@ import { add, len, mul, norm, sub } from "./vec";
 
 export type Guide = [Vec2, Vec2];
 
-
 export const isSatin = (o: DesignObject | undefined): o is DesignObject & { stitch: { type: "satin" } & SatinParams } => o?.stitch.type === "satin";
 
 export const guidesOf = (o: DesignObject | undefined): Guide[] => (isSatin(o) ? (o.stitch.guides ?? []) : []);
@@ -28,7 +27,9 @@ export function setGuides(id: string, guides: Guide[], live = false) {
   const s = useStore.getState();
   const fn = (d: StitchDocument) => ({
     ...d,
-    objects: d.objects.map((x) => (x.id === id && x.stitch.type === "satin" ? { ...x, stitch: { ...x.stitch, guides: guides.length ? guides : undefined } } : x)),
+    objects: d.objects.map((x) =>
+      x.id === id && x.stitch.type === "satin" ? { ...x, stitch: { ...x.stitch, guides: guides.length ? guides : undefined } } : x,
+    ),
   });
   if (live) s.liveUpdate(fn);
   else s.commit(fn);
@@ -55,7 +56,10 @@ function centreOf(o: DesignObject & { stitch: SatinParams }): { pts: Vec2[]; wid
   const usable = o.paths.filter((sp) => sp.nodes.length >= 2);
   if (usable.length === 1) return { pts: flattenSubPath(usable[0], 0.2), width: o.stitch.width };
   if (usable.length < 2) return null;
-  const [a, b] = [...usable].sort((x, y) => y.nodes.length - x.nodes.length || flatLen(y) - flatLen(x)).slice(0, 2).map((sp) => flattenSubPath(sp, 0.2));
+  const [a, b] = [...usable]
+    .sort((x, y) => y.nodes.length - x.nodes.length || flatLen(y) - flatLen(x))
+    .slice(0, 2)
+    .map((sp) => flattenSubPath(sp, 0.2));
   const n = 80;
   const at = (pts: Vec2[], t: number) => pointAt(pts, t);
   const rev = len(sub(a[0], b[0])) + len(sub(a[a.length - 1], b[b.length - 1])) > len(sub(a[0], b[b.length - 1])) + len(sub(a[a.length - 1], b[0]));
@@ -116,7 +120,7 @@ export function autoGuides(o: DesignObject, minTurnDeg = 30): Guide[] {
     if (turn < minTurnDeg || arc[i] - last < c.width * 1.5) continue;
     // the mitre: across both directions' normals
     const nrm = norm(add([-u[1], u[0]], [-v[1], v[0]]));
-    const half = (c.width / 2) / Math.max(0.35, Math.cos((turn * Math.PI) / 360));
+    const half = c.width / 2 / Math.max(0.35, Math.cos((turn * Math.PI) / 360));
     out.push([sub(pts[i], mul(nrm, half)), add(pts[i], mul(nrm, half))]);
     last = arc[i];
   }

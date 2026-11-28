@@ -37,7 +37,8 @@ export function filterRows(rows: LayerListRow[], doc: StitchDocument, query: str
   const threads = new Map(doc.threads.map((t) => [t.id, `${t.name} ${t.brand} ${t.code}`.toLowerCase()]));
   const named = new Set(rows.filter((r) => r.kind === "group" && q && r.name.toLowerCase().includes(q)).map((r) => (r as { group: string }).group));
   const objectHit = (o: DesignObject) =>
-    (kind === "all" || kindOf(o) === kind) && (!q || o.name.toLowerCase().includes(q) || (threads.get(o.thread) ?? "").includes(q) || chainOf(doc, o.group).some((g) => named.has(g)));
+    (kind === "all" || kindOf(o) === kind) &&
+    (!q || o.name.toLowerCase().includes(q) || (threads.get(o.thread) ?? "").includes(q) || chainOf(doc, o.group).some((g) => named.has(g)));
   const hits = new Set(doc.objects.filter(objectHit).map((o) => o.id));
   return rows.filter((r) => r.ids.some((id) => hits.has(id)));
 }
@@ -136,7 +137,11 @@ function groupLooseBy(doc: StitchDocument, key: (o: DesignObject) => string, nam
 /** Group the loose objects by thread colour (named after the thread). */
 export function groupByThread(doc: StitchDocument) {
   const names = new Map(doc.threads.map((t) => [t.id, t.name || t.color.toUpperCase()]));
-  return groupLooseBy(doc, (o) => o.thread, (k) => names.get(k) ?? "Thread");
+  return groupLooseBy(
+    doc,
+    (o) => o.thread,
+    (k) => names.get(k) ?? "Thread",
+  );
 }
 
 const KIND_NAMES: Record<Exclude<KindFilter, "all">, string> = { fill: "Fills", satin: "Satins", line: "Lines", text: "Lettering" };

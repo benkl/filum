@@ -23,10 +23,18 @@ ok(withHole.length === 2, "a ring of cells: an outline and a hole");
 const W = 8;
 const H = 4;
 const regions = new Uint32Array(W * H);
-for (let y = 0; y < H; y++)
-  for (let x = 0; x < W; x++) regions[y * W + x] = x < 4 ? 0 : x >= 6 && y < 2 ? 2 : 1;
+for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) regions[y * W + x] = x < 4 ? 0 : x >= 6 && y < 2 ? 2 : 1;
 regions[1 * W + 1] = 1;
-const p: ColourRegions = { regionWidth: W, regionHeight: H, regions, regionLabel: new Uint8Array([0, 1, 1]), regionReason: new Uint8Array([0, 0, 1]), colours: 2, widthMm: 8, heightMm: 4 };
+const p: ColourRegions = {
+  regionWidth: W,
+  regionHeight: H,
+  regions,
+  regionLabel: new Uint8Array([0, 1, 1]),
+  regionReason: new Uint8Array([0, 0, 1]),
+  colours: 2,
+  widthMm: 8,
+  heightMm: 4,
+};
 const g2 = gridOver(0, 0, 8, 4, 2, 2);
 const cells = cellsFromRegions(p, g2, 0.5);
 ok(g2.cols === 4 && g2.rows === 2, "a 4 × 2 grid of 2 mm cells");
@@ -43,14 +51,50 @@ ok(fine.length === 16 * 8 && fine[6 * 16 + 15] === 1 && fine[2 * 16 + 15] === -1
 
 // the design: one thread and one cross-stitch fill per colour with cells
 let n = 0;
-const d = crossStitchDesign({ ...p, colors: [{ hex: "#ff0000", name: "Red", code: "1147" }, { hex: "#0000ff", name: "", code: "" }] }, CROSS_DEFAULTS, "Madeira", "Pic", () => `o${n++}`);
+const d = crossStitchDesign(
+  {
+    ...p,
+    colors: [
+      { hex: "#ff0000", name: "Red", code: "1147" },
+      { hex: "#0000ff", name: "", code: "" },
+    ],
+  },
+  CROSS_DEFAULTS,
+  "Madeira",
+  "Pic",
+  () => `o${n++}`,
+);
 ok(d.objects.length === 2 && d.threads.length === 2, "two colours → two fills and two threads");
-ok(d.objects.every((o) => o.stitch.type === "fill" && o.stitch.method === "cross" && o.stitch.crossGridCanvas), "cross stitch on the canvas grid");
-ok(d.threads[0].brand === "Madeira" && d.threads[0].code === "1147" && d.threads[1].brand === "" && d.threads[1].name === "#0000FF", "thread chart names and codes carry over");
+ok(
+  d.objects.every((o) => o.stitch.type === "fill" && o.stitch.method === "cross" && o.stitch.crossGridCanvas),
+  "cross stitch on the canvas grid",
+);
+ok(
+  d.threads[0].brand === "Madeira" && d.threads[0].code === "1147" && d.threads[1].brand === "" && d.threads[1].name === "#0000FF",
+  "thread chart names and codes carry over",
+);
 ok(d.crosses > 0 && d.cols === 4 && d.rows === 2, "cross count");
 
 // pixelate: a square shape covering most of a 2×2 grid; a later one takes a cell
-const a = { rings: [[[0, 0], [4, 0], [4, 4], [0, 4]] as [number, number][]] };
-const b = { rings: [[[2, 2], [4, 2], [4, 4], [2, 4]] as [number, number][]] };
+const a = {
+  rings: [
+    [
+      [0, 0],
+      [4, 0],
+      [4, 4],
+      [0, 4],
+    ] as [number, number][],
+  ],
+};
+const b = {
+  rings: [
+    [
+      [2, 2],
+      [4, 2],
+      [4, 4],
+      [2, 4],
+    ] as [number, number][],
+  ],
+};
 const px = pixelate([a, b], { sx: 2, sy: 2, x0: 0, y0: 0, cols: 2, rows: 2 }, 0.5, true);
 ok(px[0].length === 1 && px[0][0].length === 6 && px[1][0].length === 4, "later shapes take their cells from earlier ones");

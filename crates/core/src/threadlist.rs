@@ -9,8 +9,8 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use serde::{Deserialize, Serialize};
 use filum_formats as fmts;
+use serde::{Deserialize, Serialize};
 
 use crate::assemble::Engine;
 use crate::model::{hex_color, Document, Thread};
@@ -239,7 +239,13 @@ pub fn apply_thread_list(doc: &Document, engine: &mut Engine, entries: &[ThreadL
     let mut out = doc.clone();
     let spec = |t: &Thread, e: &ThreadListEntry| -> Thread {
         let rgb = parse_hex(e.color.as_deref().unwrap_or("")).unwrap_or([0, 0, 0]);
-        Thread { brand: e.brand.clone(), code: e.code.clone(), weight: t.weight, min_stitch: t.min_stitch, ..Thread::new(t.id.clone(), if e.name.is_empty() { crate::threads::nearest_name(rgb) } else { e.name.clone() }, hex_color(rgb)) }
+        Thread {
+            brand: e.brand.clone(),
+            code: e.code.clone(),
+            weight: t.weight,
+            min_stitch: t.min_stitch,
+            ..Thread::new(t.id.clone(), if e.name.is_empty() { crate::threads::nearest_name(rgb) } else { e.name.clone() }, hex_color(rgb))
+        }
     };
     let same = |a: &Thread, b: &Thread| a.color.eq_ignore_ascii_case(&b.color) && a.name == b.name && a.code == b.code && a.brand == b.brand;
     // per thread id: the distinct new threads in object order
@@ -299,8 +305,8 @@ pub fn apply_thread_list(doc: &Document, engine: &mut Engine, entries: &[ThreadL
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{Object, StitchParams, SubPath};
     use crate::geom::pt;
+    use crate::model::{Object, StitchParams, SubPath};
 
     fn thread(id: &str, color: &str) -> Thread {
         Thread::new(id, id, color)
@@ -317,10 +323,7 @@ mod tests {
         t.code = "1147".into();
         t.brand = "Madeira Rayon".into();
         let plan = StitchPlan {
-            stitches: vec![
-                crate::plan::Stitch { x: 0.0, y: 0.0, flags: 0, object: 0 },
-                crate::plan::Stitch { x: 10.0, y: 5.0, flags: 0, object: 0 },
-            ],
+            stitches: vec![crate::plan::Stitch { x: 0.0, y: 0.0, flags: 0, object: 0 }, crate::plan::Stitch { x: 10.0, y: 5.0, flags: 0, object: 0 }],
             threads: vec![t.clone(), thread("b", "#0000ff")],
             ..Default::default()
         };

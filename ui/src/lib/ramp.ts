@@ -95,7 +95,9 @@ export function applyRamp(id: string, a: Vec2, b: Vec2, mode: "density" | "blend
     s.commit((d) => ({
       ...d,
       objects: d.objects.map((x) =>
-        members.some((m) => m.id === x.id) && x.stitch.type === "fill" ? { ...x, stitch: { ...x.stitch, angle, ramp: { ...x.stitch.ramp!, from: a, to: b } } } : x,
+        members.some((m) => m.id === x.id) && x.stitch.type === "fill"
+          ? { ...x, stitch: { ...x.stitch, angle, ramp: { ...x.stitch.ramp!, from: a, to: b } } }
+          : x,
       ),
     }));
     return null;
@@ -151,15 +153,25 @@ export function updateRamp(id: string, patch: Partial<DensityRamp>, live = false
   const s = useStore.getState();
   const members = rampMembers(s.doc, id);
   if (!members.length) return;
-  const angle = patch.from || patch.to ? (() => {
-    const r = rampOf(members[0])!;
-    return angleAcross(patch.from ?? r.from, patch.to ?? r.to);
-  })() : undefined;
+  const angle =
+    patch.from || patch.to
+      ? (() => {
+          const r = rampOf(members[0])!;
+          return angleAcross(patch.from ?? r.from, patch.to ?? r.to);
+        })()
+      : undefined;
   const fn = (d: StitchDocument) => ({
     ...d,
     objects: d.objects.map((x) =>
       members.some((m) => m.id === x.id) && x.stitch.type === "fill" && x.stitch.ramp
-        ? { ...x, stitch: { ...x.stitch, ...(angle != null ? { angle } : {}), ramp: { ...x.stitch.ramp, ...patch, reverse: x.stitch.ramp.reverse, group: x.stitch.ramp.group } } }
+        ? {
+            ...x,
+            stitch: {
+              ...x.stitch,
+              ...(angle != null ? { angle } : {}),
+              ramp: { ...x.stitch.ramp, ...patch, reverse: x.stitch.ramp.reverse, group: x.stitch.ramp.group },
+            },
+          }
         : x,
     ),
   });

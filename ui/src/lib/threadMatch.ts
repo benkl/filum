@@ -59,11 +59,36 @@ export const DEFAULT_MATCH: MatchOptions = {
 };
 
 export const MATCH_PRESETS: { id: Exclude<MatchPreset, "custom">; label: string; hint: string; opts: Partial<MatchOptions> }[] = [
-  { id: "faithful", label: "Faithful", hint: "The closest spool for every colour (CIEDE2000)", opts: { weights: { l: 1, c: 1, h: 1 }, saturationBias: 0, unique: false, minSeparation: 0, keepLightOrder: false, keepContrast: false, budget: 0 } },
-  { id: "hue", label: "Keep hue", hint: "Hue shifts cost most: orange stays orange, it may get lighter or darker instead", opts: { weights: { l: 0.7, c: 1, h: 2.2 }, saturationBias: 0, unique: false, minSeparation: 0, budget: 0 } },
-  { id: "vivid", label: "Vivid", hint: "Keeps colours saturated: thread on fabric reads duller than a screen", opts: { weights: { l: 0.8, c: 1.8, h: 1.4 }, saturationBias: 0.25, unique: false, budget: 0 } },
-  { id: "distinct", label: "Distinct", hint: "Every colour its own spool, kept apart, light-to-dark order and contrast kept", opts: { weights: { l: 1, c: 1, h: 1 }, saturationBias: 0, unique: true, minSeparation: 8, keepLightOrder: true, keepContrast: true, budget: 0 } },
-  { id: "few", label: "Few spools", hint: "The best 6 spools for the whole design — fewer colour changes", opts: { weights: { l: 1, c: 1, h: 1 }, saturationBias: 0, unique: false, minSeparation: 0, keepLightOrder: true, keepContrast: false, budget: 6 } },
+  {
+    id: "faithful",
+    label: "Faithful",
+    hint: "The closest spool for every colour (CIEDE2000)",
+    opts: { weights: { l: 1, c: 1, h: 1 }, saturationBias: 0, unique: false, minSeparation: 0, keepLightOrder: false, keepContrast: false, budget: 0 },
+  },
+  {
+    id: "hue",
+    label: "Keep hue",
+    hint: "Hue shifts cost most: orange stays orange, it may get lighter or darker instead",
+    opts: { weights: { l: 0.7, c: 1, h: 2.2 }, saturationBias: 0, unique: false, minSeparation: 0, budget: 0 },
+  },
+  {
+    id: "vivid",
+    label: "Vivid",
+    hint: "Keeps colours saturated: thread on fabric reads duller than a screen",
+    opts: { weights: { l: 0.8, c: 1.8, h: 1.4 }, saturationBias: 0.25, unique: false, budget: 0 },
+  },
+  {
+    id: "distinct",
+    label: "Distinct",
+    hint: "Every colour its own spool, kept apart, light-to-dark order and contrast kept",
+    opts: { weights: { l: 1, c: 1, h: 1 }, saturationBias: 0, unique: true, minSeparation: 8, keepLightOrder: true, keepContrast: true, budget: 0 },
+  },
+  {
+    id: "few",
+    label: "Few spools",
+    hint: "The best 6 spools for the whole design — fewer colour changes",
+    opts: { weights: { l: 1, c: 1, h: 1 }, saturationBias: 0, unique: false, minSeparation: 0, keepLightOrder: true, keepContrast: false, budget: 6 },
+  },
 ];
 
 /** Lightness, chroma and hue (degrees) of a Lab colour. */
@@ -264,8 +289,7 @@ export function solveMatch(threads: MatchThread[], entries: ChartEntry[], opts: 
   });
   if (opts.budget > 0 && opts.budget < G) {
     const pool = [...new Set(top.flatMap((t) => t.slice(0, 15)))];
-    const totalWith = (set: number[]) =>
-      reps.reduce((a, _, g) => a + (lockedSpool[g] ? 0 : gWeight[g] * Math.min(...set.map((j) => costs[g][j]))), 0);
+    const totalWith = (set: number[]) => reps.reduce((a, _, g) => a + (lockedSpool[g] ? 0 : gWeight[g] * Math.min(...set.map((j) => costs[g][j]))), 0);
     const chosen: number[] = [...lockedIdx];
     while (chosen.length < opts.budget) {
       let best = -1;
@@ -351,7 +375,7 @@ export function solveMatch(threads: MatchThread[], entries: ChartEntry[], opts: 
     return p;
   };
   const sameSpool = (a: ChartEntry, b: ChartEntry) => a.color === b.color && a.code === b.code && a.brand === b.brand;
-  const isNeighbour = (g: number, k: number) => neighbourPairs.some(([a, b]) => (a === Math.min(g, k) && b === Math.max(g, k)));
+  const isNeighbour = (g: number, k: number) => neighbourPairs.some(([a, b]) => a === Math.min(g, k) && b === Math.max(g, k));
   const local = (g: number, j: number): number => {
     const sg = entries[j].lab;
     let c = costs[g][j] * gWeight[g];
@@ -401,7 +425,8 @@ export function solveMatch(threads: MatchThread[], entries: ChartEntry[], opts: 
       if (group[a] === group[b]) continue;
       const pa = pick.get(threads[a].id)?.entry;
       const pb = pick.get(threads[b].id)?.entry;
-      if (pa && pb && pa.color === pb.color && pa.code === pb.code && pa.brand === pb.brand) shared.push({ a: threads[a].id, b: threads[b].id, d: deltaE(needs[a], needs[b]) });
+      if (pa && pb && pa.color === pb.color && pa.code === pb.code && pa.brand === pb.brand)
+        shared.push({ a: threads[a].id, b: threads[b].id, d: deltaE(needs[a], needs[b]) });
     }
   return { pick, shared };
 }

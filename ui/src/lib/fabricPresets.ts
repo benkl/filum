@@ -24,7 +24,11 @@ import { FILUM_NEW_FILL, INK_SATIN, INK_TATAMI } from "./inkDefaults";
 export type PresetSet = "filum" | "nova";
 
 export const PRESET_SETS: { id: PresetSet | "none"; label: string; hint: string }[] = [
-  { id: "none", label: "Ink/Stitch (no compensation)", hint: "Ink/Stitch's values: no pull compensation unless you calibrate the fabric. New fills get automatic underlay (none in a fill too narrow for one)" },
+  {
+    id: "none",
+    label: "Ink/Stitch (no compensation)",
+    hint: "Ink/Stitch's values: no pull compensation unless you calibrate the fabric. New fills get automatic underlay (none in a fill too narrow for one)",
+  },
   { id: "filum", label: "Filum", hint: "Filum's earlier values: centre-walk underlay, 0.4 mm rows, pull compensation by fabric" },
   { id: "nova", label: "NOVAstitch", hint: "The NOVAstitch Designer presets: pull compensation and fill overlap by fabric, contour underlay on satins" },
 ];
@@ -107,7 +111,7 @@ export function presetSummary(set: PresetSet | undefined, fabric: Fabric): strin
   return "";
 }
 
-type Calibrated ={ satin?: Partial<SatinParams>; fill?: Partial<FillParams> };
+type Calibrated = { satin?: Partial<SatinParams>; fill?: Partial<FillParams> };
 
 /** The calibration on top of a preset's values: its pull compensation replaces the preset's, its expand adds to the overlap. */
 function withCalibration(v: Record<string, unknown>, cal: Partial<SatinParams> | Partial<FillParams> | undefined): Record<string, unknown> {

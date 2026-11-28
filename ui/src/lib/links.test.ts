@@ -23,8 +23,18 @@ check(linkChoiceOf({ trimAfter: true, link: "join" }) === "trim", "trim after wi
 const stop = withLinkChoice({ ...o, stopAfter: true }, "sew");
 check(stop.stopAfter === true, "stop after is left as it is");
 
-const conn = (kind: Connection["kind"], from: number, start: [number, number], end: [number, number], visible = false): Connection => ({ from, to: from + 1, kind, manual: false, visible, start, end });
-const plan = { links: [conn("trim", 0, [0, 0], [10, 0]), conn("sew", 1, [10, 5], [10, 9], true), conn("colorChange", 2, [0, 20], [10, 20])] } as unknown as PlanData;
+const conn = (kind: Connection["kind"], from: number, start: [number, number], end: [number, number], visible = false): Connection => ({
+  from,
+  to: from + 1,
+  kind,
+  manual: false,
+  visible,
+  start,
+  end,
+});
+const plan = {
+  links: [conn("trim", 0, [0, 0], [10, 0]), conn("sew", 1, [10, 5], [10, 9], true), conn("colorChange", 2, [0, 20], [10, 20])],
+} as unknown as PlanData;
 const doc = { objects: [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }] as DesignObject[] };
 check(connectionAfter(plan, doc, "b")?.kind === "sew" && connectionAfter(plan, doc, "d") === undefined, "the connection after an object");
 check(describeConnection(plan.links![0]) === "trimmed (10.0 mm gap)" && describeConnection(plan.links![1]).endsWith("and it shows"), "said in words");

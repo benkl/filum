@@ -229,7 +229,13 @@ export function RegionEditor({
             <b>{colour ? colour.name : label > p.colors.length ? "Gradient" : "Transparent"}</b>
             <span className={`rt-state ${why === REGION_REASON.stitched ? "on" : "off"}`}>{REASON_TEXT[why]?.[0]}</span>
           </div>
-          <span className="stat">{alt && colour ? (why === REGION_REASON.stitched ? "Alt-click: leave out the whole colour" : "Alt-click: stitch the whole colour") : REASON_TEXT[why]?.[1]}</span>
+          <span className="stat">
+            {alt && colour
+              ? why === REGION_REASON.stitched
+                ? "Alt-click: leave out the whole colour"
+                : "Alt-click: stitch the whole colour"
+              : REASON_TEXT[why]?.[1]}
+          </span>
         </div>
       )}
     </div>

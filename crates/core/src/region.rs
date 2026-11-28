@@ -170,7 +170,11 @@ pub fn subtract_min(area: &[Ring], covers: &[Cover], margin: f64, min_fragment: 
             let between = clip::difference(&slivers, &edge);
             // hairlines of two outlines meeting (rounding) are no gap
             let between = clip::offset(&clip::offset(&between, -HAIRLINE), HAIRLINE);
-            if clip::area(&between) > 1e-6 { clip::union(&opened, &between) } else { opened }
+            if clip::area(&between) > 1e-6 {
+                clip::union(&opened, &between)
+            } else {
+                opened
+            }
         } else {
             opened
         };

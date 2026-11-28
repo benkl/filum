@@ -205,10 +205,7 @@ for (const id of fs.readdirSync(src).sort()) {
   });
   process.stdout.write(".");
 }
-fs.writeFileSync(
-  path.join(out, "index.json"),
-  JSON.stringify({ source: "https://github.com/inkstitch/embroidery-fonts", commit, fonts: index }, null, 0),
-);
+fs.writeFileSync(path.join(out, "index.json"), JSON.stringify({ source: "https://github.com/inkstitch/embroidery-fonts", commit, fonts: index }, null, 0));
 // the download pack for the fonts that can't be bundled
 const dlDir = path.resolve(here, "../public/downloads");
 fs.mkdirSync(dlDir, { recursive: true });
@@ -225,7 +222,8 @@ fs.writeFileSync(
       license: {
         name: licenses.join(" / "),
         url: LICENSE_URLS[licenses[0]] ?? "https://github.com/inkstitch/embroidery-fonts",
-        terms: "Free for personal and other non-commercial use. Give the font's author credit and share changes to the font under the same licence. Designs stitched with these fonts may not be sold or used commercially.",
+        terms:
+          "Free for personal and other non-commercial use. Give the font's author credit and share changes to the font under the same licence. Designs stitched with these fonts may not be sold or used commercially.",
       },
       source: { label: "inkstitch/embroidery-fonts", url: `https://github.com/inkstitch/embroidery-fonts/tree/${commit}/src` },
       base: `https://raw.githubusercontent.com/inkstitch/embroidery-fonts/${commit}/src/`,

@@ -1,5 +1,18 @@
 import { MoveHorizontal, Route, SlidersHorizontal } from "lucide-react";
-import { Digitize, Fabric as FabricIcon, Hoop, PullCompensation, RowSpacing, Spool, StitchAngle, StitchFill, StitchLength, StitchRunning, StitchSatin, Underlay } from "../icons/stitch";
+import {
+  Digitize,
+  Fabric as FabricIcon,
+  Hoop,
+  PullCompensation,
+  RowSpacing,
+  Spool,
+  StitchAngle,
+  StitchFill,
+  StitchLength,
+  StitchRunning,
+  StitchSatin,
+  Underlay,
+} from "../icons/stitch";
 import { TOOL_ICONS } from "../icons/toolIcons";
 import { autoRouteSatins, autoRouteSelection } from "../lib/autoRoute";
 import { openRoute } from "./RouteDialog";
@@ -49,7 +62,13 @@ export function TitleBar() {
   const hoopIdx = hoopIndex(doc.hoop);
   return (
     <div className="titlebar">
-      <input className="docname" value={doc.name} onChange={(e) => useStore.getState().liveUpdate((d) => ({ ...d, name: e.target.value }))} spellCheck={false} aria-label="Design name" />
+      <input
+        className="docname"
+        value={doc.name}
+        onChange={(e) => useStore.getState().liveUpdate((d) => ({ ...d, name: e.target.value }))}
+        spellCheck={false}
+        aria-label="Design name"
+      />
       <span className={`saved ${saved ? "" : "dirty"}`}>
         {saved ? <CircleCheck size={13} /> : <Circle size={11} />}
         {saved ? "Saved" : "Edited"}
@@ -273,7 +292,11 @@ export function ContextBar() {
             <button className={st.beanRepeats < 2 ? "on" : ""} title="Single running stitch" onClick={() => updateStitch(o.id, { beanRepeats: 0 })}>
               Run
             </button>
-            <button className={st.beanRepeats >= 2 && st.beanRepeats < 4 ? "on" : ""} title="Triple (bean) stitch" onClick={() => updateStitch(o.id, { beanRepeats: 2 })}>
+            <button
+              className={st.beanRepeats >= 2 && st.beanRepeats < 4 ? "on" : ""}
+              title="Triple (bean) stitch"
+              onClick={() => updateStitch(o.id, { beanRepeats: 2 })}
+            >
               Triple
             </button>
             <button className={st.beanRepeats >= 4 ? "on" : ""} title="Five passes — very bold line" onClick={() => updateStitch(o.id, { beanRepeats: 4 })}>
@@ -305,13 +328,20 @@ const RAIL: ({ tool: Tool; title: string } | "-")[] = [
   { tool: "ruler", title: "Ruler (M)" },
   { tool: "node", title: "Edit nodes (A)" },
   { tool: "cut", title: "Cutter (C) — click a line to split it, drag across a fill to cut it where the line crosses it" },
-  { tool: "split", title: "Split into satins (K): on a fill, drag cut lines across it and Alt-drag direction lines; Enter turns each part into a satin sewn that way" },
+  {
+    tool: "split",
+    title: "Split into satins (K): on a fill, drag cut lines across it and Alt-drag direction lines; Enter turns each part into a satin sewn that way",
+  },
   "-",
   { tool: "pen", title: "Pen (P) — click for corners, drag for curves; click first point to close" },
   { tool: "curve", title: "Curvature (U) — click points, the path curves smoothly through them; double-click a point for a corner" },
   { tool: "freehand", title: "Freehand (F)" },
   { tool: "satin", title: "Satin column (S) — click / drag for curves, scroll or [ ] for width, Enter to finish" },
-  { tool: "guides", title: "Stitch direction (D): drag across a satin to guide its stitch angle, drag an end to turn it, click a line and press Delete (or Alt-click) to delete it" },
+  {
+    tool: "guides",
+    title:
+      "Stitch direction (D): drag across a satin to guide its stitch angle, drag an end to turn it, click a line and press Delete (or Alt-click) to delete it",
+  },
   { tool: "rect", title: "Rectangle (R)" },
   { tool: "ellipse", title: "Ellipse (E)" },
   "-",
@@ -335,7 +365,13 @@ export function ToolRail() {
   const setDialog = useStore((s) => s.setDialog);
   return (
     <nav className="toolrail" aria-label="Tools">
-      {RAIL.map((t, i) => (t === "-" ? <div className="grp-sep" key={i} /> : <RailButton key={t.tool} tool={t.tool} title={t.title} on={tool === t.tool} onClick={() => setTool(t.tool)} />))}
+      {RAIL.map((t, i) =>
+        t === "-" ? (
+          <div className="grp-sep" key={i} />
+        ) : (
+          <RailButton key={t.tool} tool={t.tool} title={t.title} on={tool === t.tool} onClick={() => setTool(t.tool)} />
+        ),
+      )}
       <div className="grp-sep" />
       <button className="icon-btn" title="Import artwork or embroidery file" onClick={importFile}>
         <Import size={17} />

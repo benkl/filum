@@ -183,7 +183,8 @@ pub fn stitch_quality(doc: &Document, plan: &StitchPlan) -> StitchQuality {
     let n = doc.objects.len();
     let bean: Vec<bool> = doc.objects.iter().map(|o| beans(&o.stitch)).collect();
     // the needle drops of the design's objects, in sewing order
-    let drops: Vec<(f64, f64, usize, Kind)> = plan.stitches.iter().filter(|s| s.is_stitch() && (s.object as usize) < n).map(|s| (s.x, s.y, s.object as usize, kind(s.flags))).collect();
+    let drops: Vec<(f64, f64, usize, Kind)> =
+        plan.stitches.iter().filter(|s| s.is_stitch() && (s.object as usize) < n).map(|s| (s.x, s.y, s.object as usize, kind(s.flags))).collect();
     let mut per: Vec<ObjectQuality> = (0..n).map(|index| ObjectQuality { index, ..Default::default() }).collect();
     let mut holes = Grid::new(SAME_HOLE);
     let mut prev: Option<(f64, f64, usize, Kind)> = None;
@@ -221,7 +222,8 @@ pub fn stitch_quality(doc: &Document, plan: &StitchPlan) -> StitchQuality {
     let drops = &drops;
     let grid = &grid;
     let within = |x: f64, y: f64| grid.near(x, y).filter(move |&j| (drops[j].0 - x).hypot(drops[j].1 - y) < HOT_RADIUS);
-    let mut dense: Vec<(usize, usize)> = counted.iter().map(|&i| (within(drops[i].0, drops[i].1).count(), i)).filter(|&(c, _)| c as f64 / area > limit).collect();
+    let mut dense: Vec<(usize, usize)> =
+        counted.iter().map(|&i| (within(drops[i].0, drops[i].1).count(), i)).filter(|&(c, _)| c as f64 / area > limit).collect();
     dense.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
     let mut hot_spots: Vec<HotSpot> = Vec::new();
     for (c, i) in dense {
@@ -276,10 +278,17 @@ mod tests {
     fn doc(stitches: Vec<StitchParams>) -> Document {
         let d = Document {
             objects: stitches
-            .into_iter()
-            .enumerate()
-            .map(|(i, stitch)| Object { id: format!("o{i}"), name: format!("o{i}"), thread: "t".into(), paths: vec![SubPath::polyline(&[pt(0.0, 0.0), pt(1.0, 0.0)], false)], stitch, ..serde_json::from_str(r#"{"id":"x","thread":"t","paths":[]}"#).unwrap() })
-            .collect(),
+                .into_iter()
+                .enumerate()
+                .map(|(i, stitch)| Object {
+                    id: format!("o{i}"),
+                    name: format!("o{i}"),
+                    thread: "t".into(),
+                    paths: vec![SubPath::polyline(&[pt(0.0, 0.0), pt(1.0, 0.0)], false)],
+                    stitch,
+                    ..serde_json::from_str(r#"{"id":"x","thread":"t","paths":[]}"#).unwrap()
+                })
+                .collect(),
             ..Default::default()
         };
         d

@@ -67,7 +67,7 @@ export function CalibrateDialog({ onClose }: { onClose: () => void }) {
   const [formats, setFormats] = useState<FormatInfo[]>([]);
   const hasMachine = MACHINES.some((m) => m.id === doc.machine.profile);
   const machine = machineById(hasMachine ? doc.machine.profile! : "doc");
-  const [fmt, setFmt] = useState(() => (machine.formats[0] ?? localStorage.getItem("filum.format") ?? "pes"));
+  const [fmt, setFmt] = useState(() => machine.formats[0] ?? localStorage.getItem("filum.format") ?? "pes");
   useEffect(() => {
     engine.formats().then((f) => setFormats(f.filter((x) => x.machine && x.canWrite)));
   }, []);
@@ -81,14 +81,24 @@ export function CalibrateDialog({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const measured: Measurements = useMemo(() => Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, parseMm(v)]).filter(([, v]) => v != null)), [raw]);
+  const measured: Measurements = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(raw)
+          .map(([k, v]) => [k, parseMm(v)])
+          .filter(([, v]) => v != null),
+      ),
+    [raw],
+  );
   const result = useMemo(() => calibrate(measured), [measured]);
   const filled = Object.keys(measured).length;
   const info = fabricInfo(fabric);
-  const affected = fabric === doc.fabric ? doc.objects.filter((o) => (o.stitch.type === "satin" && result.satin) || (o.stitch.type === "fill" && result.fill)).length : 0;
+  const affected =
+    fabric === doc.fabric ? doc.objects.filter((o) => (o.stitch.type === "satin" && result.satin) || (o.stitch.type === "fill" && result.fill)).length : 0;
 
   // a preset's fill overlap stays, the calibration's expand on top (lib/fabricPresets.ts)
-  const overlapOf = (d: typeof doc, st: (typeof doc)["objects"][number]["stitch"]) => (presetValues(presetSetOf(d), d.fabric, st).expand as number | undefined) ?? 0;
+  const overlapOf = (d: typeof doc, st: (typeof doc)["objects"][number]["stitch"]) =>
+    (presetValues(presetSetOf(d), d.fabric, st).expand as number | undefined) ?? 0;
   const save = () => {
     const s = useStore.getState();
     saveCalibration({
@@ -130,7 +140,11 @@ export function CalibrateDialog({ onClose }: { onClose: () => void }) {
       footer={
         <>
           {saved && (
-            <button className="btn ghost" onClick={reset} title={`Forget the ${info.label.toLowerCase()} calibration: new objects start from the standard numbers again`}>
+            <button
+              className="btn ghost"
+              onClick={reset}
+              title={`Forget the ${info.label.toLowerCase()} calibration: new objects start from the standard numbers again`}
+            >
               <RotateCcw size={13} /> Standard numbers
             </button>
           )}
@@ -154,8 +168,8 @@ export function CalibrateDialog({ onClose }: { onClose: () => void }) {
     >
       <div className="cal-top">
         <p className="cal-intro">
-          How much stitches pull depends on the fabric, the backing, the hooping and the machine together. Sew one swatch, measure it, and new objects on this fabric start
-          from your numbers.
+          How much stitches pull depends on the fabric, the backing, the hooping and the machine together. Sew one swatch, measure it, and new objects on this
+          fabric start from your numbers.
         </p>
         <label className="cal-fabric">
           <FabricIcon size={13} />
@@ -189,7 +203,9 @@ export function CalibrateDialog({ onClose }: { onClose: () => void }) {
             <span className="cal-size">100 × 100 mm</span>
           </div>
           <div className="cal-side">
-            <p className="cal-lead">Four pieces with {info.label.toLowerCase()}'s settings and no pull compensation of their own, so the fabric shows what it does.</p>
+            <p className="cal-lead">
+              Four pieces with {info.label.toLowerCase()}'s settings and no pull compensation of their own, so the fabric shows what it does.
+            </p>
             <ul className="cal-check">
               <li>
                 <b>Backing</b> the one you always use · suggested: {info.backing.toLowerCase()}
@@ -217,7 +233,9 @@ export function CalibrateDialog({ onClose }: { onClose: () => void }) {
                 <Download size={13} /> Download swatch
               </button>
             </div>
-            <p className="hint">It uses this design's thread weight and machine settings. Take it out of the hoop and let it rest a minute before you measure.</p>
+            <p className="hint">
+              It uses this design's thread weight and machine settings. Take it out of the hoop and let it rest a minute before you measure.
+            </p>
           </div>
         </div>
       )}
@@ -277,7 +295,8 @@ export function CalibrateDialog({ onClose }: { onClose: () => void }) {
               </tbody>
             </table>
             <p className="hint">
-              A disc's stitches run along its rows; a bar's stitches cross it, so its width is measured along them. One disc and one bar are enough; both make it more reliable.
+              A disc's stitches run along its rows; a bar's stitches cross it, so its width is measured along them. One disc and one bar are enough; both make
+              it more reliable.
             </p>
           </div>
         </div>
@@ -331,7 +350,9 @@ export function CalibrateDialog({ onClose }: { onClose: () => void }) {
                       },
                       {
                         label: "Shape",
-                        value: result.fill.expand ? `${mm(Math.abs(result.fill.expand))} ${result.fill.expand < 0 ? "smaller" : "larger"} each side` : "as drawn",
+                        value: result.fill.expand
+                          ? `${mm(Math.abs(result.fill.expand))} ${result.fill.expand < 0 ? "smaller" : "larger"} each side`
+                          : "as drawn",
                         was: saved?.fill?.expand ?? 0,
                         why: `Sewn ${mm(DISC + result.fill.grow)} across the rows for ${DISC} drawn: the shape is ${result.fill.expand < 0 ? "stitched smaller" : result.fill.expand > 0 ? "stitched larger" : "stitched as drawn"} to make up for it.`,
                       },
@@ -348,7 +369,8 @@ export function CalibrateDialog({ onClose }: { onClose: () => void }) {
           {canSave && (
             <div className="cal-apply">
               <p>
-                Saved for <b>{info.label}</b> on this device. New satins and fills on {info.label.toLowerCase()} start from these numbers; you can still change them per object.
+                Saved for <b>{info.label}</b> on this device. New satins and fills on {info.label.toLowerCase()} start from these numbers; you can still change
+                them per object.
               </p>
               {affected > 0 && (
                 <label className="cal-toggle">
@@ -364,7 +386,19 @@ export function CalibrateDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-function ResultCard({ icon, title, rows, empty, wasLabel }: { icon: React.ReactNode; title: string; empty: boolean; wasLabel: string; rows: { label: string; value: string; was: number; why: string }[] }) {
+function ResultCard({
+  icon,
+  title,
+  rows,
+  empty,
+  wasLabel,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  empty: boolean;
+  wasLabel: string;
+  rows: { label: string; value: string; was: number; why: string }[];
+}) {
   return (
     <section className={`cal-card ${empty ? "empty" : ""}`}>
       <h4>

@@ -288,7 +288,12 @@ export function removeTartan(doc: StitchDocument, group: string): StitchDocument
       .filter((o) => !ids.has(o.id))
       .map((o) =>
         o.id === layers[0].id && o.stitch.type === "fill"
-          ? { ...o, group: o.group === group ? around : o.group, name: o.name.replace(/ · colour \d+$/, ""), stitch: { ...o.stitch, method: "tatami", tartan: undefined } }
+          ? {
+              ...o,
+              group: o.group === group ? around : o.group,
+              name: o.name.replace(/ · colour \d+$/, ""),
+              stitch: { ...o.stitch, method: "tatami", tartan: undefined },
+            }
           : o,
       ),
   });

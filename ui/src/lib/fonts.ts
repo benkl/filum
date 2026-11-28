@@ -137,8 +137,22 @@ export async function embroideryLicense(id: string): Promise<string> {
 }
 
 export const BUNDLED_OUTLINE: FontEntry[] = [
-  { key: "ttf:/fonts/Nunito-Variable.ttf", name: "Nunito", kind: "outline", source: "bundled", description: "Rounded sans", license: "SIL Open Font License 1.1" },
-  { key: "ttf:/fonts/BebasNeue-Regular.ttf", name: "Bebas Neue", kind: "outline", source: "bundled", description: "Block capitals", license: "SIL Open Font License 1.1" },
+  {
+    key: "ttf:/fonts/Nunito-Variable.ttf",
+    name: "Nunito",
+    kind: "outline",
+    source: "bundled",
+    description: "Rounded sans",
+    license: "SIL Open Font License 1.1",
+  },
+  {
+    key: "ttf:/fonts/BebasNeue-Regular.ttf",
+    name: "Bebas Neue",
+    kind: "outline",
+    source: "bundled",
+    description: "Block capitals",
+    license: "SIL Open Font License 1.1",
+  },
   { key: "ttf:/fonts/Pacifico-Regular.ttf", name: "Pacifico", kind: "outline", source: "bundled", description: "Script", license: "SIL Open Font License 1.1" },
 ];
 
@@ -149,8 +163,14 @@ const fontNames = new Map<string, string>(BUNDLED_OUTLINE.map((f) => [f.key, f.n
 export const fontLabel = (key: string) =>
   fontNames.get(key) ??
   (key.startsWith("emb:")
-    ? key.slice(4).replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-    : key.replace(/^(file|local|ttf):/, "").replace(/\.(ttf|otf)$/i, "").replace(/^.*\//, ""));
+    ? key
+        .slice(4)
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase())
+    : key
+        .replace(/^(file|local|ttf):/, "")
+        .replace(/\.(ttf|otf)$/i, "")
+        .replace(/^.*\//, ""));
 
 /** Fetch JSON that may be gzipped (a server may or may not have decoded it already). */
 async function fetchJsonGz<T>(url: string): Promise<T> {
@@ -197,9 +217,28 @@ async function idbAll(): Promise<{ name: string; bytes: ArrayBuffer }[]> {
 
 export async function importedFonts(): Promise<FontEntry[]> {
   try {
-    const outline: FontEntry[] = (await idbAll()).map((f) => ({ key: `file:${f.name}`, name: f.name.replace(/\.(ttf|otf)$/i, ""), kind: "outline", source: "imported" }));
+    const outline: FontEntry[] = (await idbAll()).map((f) => ({
+      key: `file:${f.name}`,
+      name: f.name.replace(/\.(ttf|otf)$/i, ""),
+      kind: "outline",
+      source: "imported",
+    }));
     const packs = await inkPacks();
-    return [...outline, ...packs.map(([id, p]) => ({ key: `inkfont:${id}`, name: p.font.name, kind: "embroidery" as const, source: "imported" as const, description: typeof p.info?.description === "string" ? p.info.description : undefined, size: p.font.size, minScale: p.font.min_scale, maxScale: p.font.max_scale, glyphs: p.font.chunks.reduce((n, c) => n + c.glyphs.length, 0), direction: p.font.text_direction }))];
+    return [
+      ...outline,
+      ...packs.map(([id, p]) => ({
+        key: `inkfont:${id}`,
+        name: p.font.name,
+        kind: "embroidery" as const,
+        source: "imported" as const,
+        description: typeof p.info?.description === "string" ? p.info.description : undefined,
+        size: p.font.size,
+        minScale: p.font.min_scale,
+        maxScale: p.font.max_scale,
+        glyphs: p.font.chunks.reduce((n, c) => n + c.glyphs.length, 0),
+        direction: p.font.text_direction,
+      })),
+    ];
   } catch {
     return [];
   }
@@ -219,7 +258,13 @@ async function putPack(id: string, pack: InkPack) {
   });
 }
 
-const packId = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") + "_" + Date.now().toString(36);
+const packId = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "") +
+  "_" +
+  Date.now().toString(36);
 
 async function inkPacks(): Promise<[string, InkPack][]> {
   const db = await idb();
@@ -242,7 +287,9 @@ async function inkPacks(): Promise<[string, InkPack][]> {
  * (lib/inkFontPack.mjs). Used by Import Ink/Stitch font and by the optional
  * downloads (Preferences ▸ Downloads).
  */
-export async function packInkFolder(files: { path: string; text: () => Promise<string> }[]): Promise<InkPack & { info: Record<string, unknown>; root: string }> {
+export async function packInkFolder(
+  files: { path: string; text: () => Promise<string> }[],
+): Promise<InkPack & { info: Record<string, unknown>; root: string }> {
   const meta = files.find((f) => /(^|[\\/])font\.json$/i.test(f.path));
   if (!meta) throw new Error("no font.json in the folder");
   const info = JSON.parse(await meta.text()) as Record<string, unknown>;
@@ -252,7 +299,9 @@ export async function packInkFolder(files: { path: string; text: () => Promise<s
   // every variant's files: "ltr.svg" / "→.svg" next to font.json, or every SVG in a "ltr" / "→" folder
   const texts: Record<string, string[]> = {};
   for (const v of VARIANTS) {
-    const pick = files.filter((f) => v.some((n) => rel(f) === `${n}.svg` || (rel(f).startsWith(`${n}/`) && rel(f).endsWith(".svg")))).sort((a, b) => a.path.localeCompare(b.path));
+    const pick = files
+      .filter((f) => v.some((n) => rel(f) === `${n}.svg` || (rel(f).startsWith(`${n}/`) && rel(f).endsWith(".svg"))))
+      .sort((a, b) => a.path.localeCompare(b.path));
     if (pick.length) texts[v[0]] = await Promise.all(pick.map((f) => f.text()));
   }
   // the default variant, else any variant with glyphs (like Ink/Stitch)
@@ -332,7 +381,9 @@ export async function copyBundledFont(key: string): Promise<string> {
   const info: Record<string, unknown> = {
     ...infoFromRecord(meta),
     name: `${meta.name} (copy)`,
-    ...(row ? { description: row.description, keywords: row.keywords, font_license: row.license, original_font: row.original, original_font_url: row.url } : {}),
+    ...(row
+      ? { description: row.description, keywords: row.keywords, font_license: row.license, original_font: row.original, original_font_url: row.url }
+      : {}),
   };
   const nid = packId(meta.name + " copy");
   await putPack(nid, { font: { ...meta, ...fontMetrics(info) }, data, info });
@@ -362,7 +413,9 @@ export async function importFontFile(name: string, bytes: Uint8Array): Promise<s
  * sits on the baseline with its lowest stitch, a small side bearing to the
  * left; spacing and kerning can be adjusted in the font editor afterwards.
  */
-export async function lettersToFont(files: { path: string; bytes: () => Promise<Uint8Array>; text: () => Promise<string> }[]): Promise<{ key: string; letters: number }> {
+export async function lettersToFont(
+  files: { path: string; bytes: () => Promise<Uint8Array>; text: () => Promise<string> }[],
+): Promise<{ key: string; letters: number }> {
   const picked = files
     .map((f) => ({ f, letter: letterOfFile(f.path), ext: f.path.split(".").pop()?.toLowerCase() ?? "" }))
     .filter((x) => x.letter && x.letter.trim())
@@ -373,7 +426,10 @@ export async function lettersToFont(files: { path: string; bytes: () => Promise<
   for (const { f, letter, ext } of picked) {
     let doc: StitchDocument;
     try {
-      doc = ext === "svg" ? (await engine.importSvg(await f.text())).document : await engine.importEmbroidery(await f.bytes(), f.path.split(/[\\/]/).pop() ?? f.path);
+      doc =
+        ext === "svg"
+          ? (await engine.importSvg(await f.text())).document
+          : await engine.importEmbroidery(await f.bytes(), f.path.split(/[\\/]/).pop() ?? f.path);
     } catch {
       continue; // not a design file
     }

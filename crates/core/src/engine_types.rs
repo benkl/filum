@@ -122,5 +122,8 @@ fn engine_types_are_current() {
         return;
     }
     let was = std::fs::read_to_string(&path).unwrap_or_default().replace("\r\n", "\n");
-    assert!(was == now, "ui/src/generated/engine-types.ts is out of date with the engine.\nWrite it anew: UPDATE_ENGINE_TYPES=1 cargo test -p filum-core --lib engine_types");
+    assert!(
+        was == now,
+        "ui/src/generated/engine-types.ts is out of date with the engine.\nWrite it anew: UPDATE_ENGINE_TYPES=1 cargo test -p filum-core --lib engine_types"
+    );
 }

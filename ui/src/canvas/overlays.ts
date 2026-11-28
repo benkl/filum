@@ -12,7 +12,13 @@ import { cutChords } from "../lib/cut";
 /** Split into satins on the canvas: the shape, the lines, where the cuts cut, and the parts with their rungs (the line being dragged included). */
 export function splitOverlay(doc: StitchDocument, draft: SplitDraft, live: { a: Vec2; b: Vec2; dir: boolean } | null): InteractiveOverlay["split"] {
   const shape = draft.id ? doc.objects.find((o) => o.id === draft.id) : undefined;
-  const d = live && shape ? { ...draft, ...(live.dir ? { directions: [...draft.directions, [live.a, live.b] as [Vec2, Vec2]] } : { cuts: [...draft.cuts, [live.a, live.b] as [Vec2, Vec2]] }) } : draft;
+  const d =
+    live && shape
+      ? {
+          ...draft,
+          ...(live.dir ? { directions: [...draft.directions, [live.a, live.b] as [Vec2, Vec2]] } : { cuts: [...draft.cuts, [live.a, live.b] as [Vec2, Vec2]] }),
+        }
+      : draft;
   const plan = shape ? draftPlan(doc, d) : null;
   return {
     outline: shape ? regionsOf(shape).flatMap(regionRings) : null,

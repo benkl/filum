@@ -7,7 +7,8 @@ import { deltaE, hexToRgb, lab, rgbToHex } from "./colorMath";
 import { threadsOf } from "./copies";
 
 /** Identity of a spool: brand, code and colour. */
-export const ownedKey = (t: { brand?: string; code?: string; color: string }) => `${(t.brand ?? "").toLowerCase()}|${(t.code ?? "").toLowerCase()}|${t.color.toLowerCase()}`;
+export const ownedKey = (t: { brand?: string; code?: string; color: string }) =>
+  `${(t.brand ?? "").toLowerCase()}|${(t.code ?? "").toLowerCase()}|${t.color.toLowerCase()}`;
 
 // ---------------------------------------------------------------------------
 // My threads as a GIMP palette
@@ -94,7 +95,10 @@ export function chartIdFor(name: string, installed: { id: string; name: string }
   const same = installed.find((c) => c.name === name);
   if (same) return same.id;
   const taken = new Set(installed.map((c) => c.id));
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
   const base = `custom/${slug || "palette"}`;
   if (slug && !taken.has(base)) return base;
   const hashed = `${base}-${hashOf(name)}`;
@@ -115,7 +119,11 @@ export const SPOOL_DELTA = 1;
  * (`spool`: the chart colour, else the colour before the edit). `orig` is the
  * thread before the edit, so moving back restores them.
  */
-export function colourEdit(orig: { color: string; brand: string; code: string }, color: string, spool = orig.color): { color: string; brand?: string; code?: string } {
+export function colourEdit(
+  orig: { color: string; brand: string; code: string },
+  color: string,
+  spool = orig.color,
+): { color: string; brand?: string; code?: string } {
   if (!orig.brand && !orig.code) return { color };
   const keep = deltaE(lab(spool), lab(color)) <= SPOOL_DELTA;
   return { color, brand: keep ? orig.brand : "", code: keep ? orig.code : "" };
@@ -130,7 +138,12 @@ export function colourEdit(orig: { color: string; brand: string; code: string },
  * (they can be kept, never merged), and threads already on their keeper's
  * spool are not merges. Returns thread id → keeper id.
  */
-export function similarMerges(threads: (Spool & { id: string })[], uses: (id: string) => number, locked: ReadonlySet<string>, threshold: number): Map<string, string> {
+export function similarMerges(
+  threads: (Spool & { id: string })[],
+  uses: (id: string) => number,
+  locked: ReadonlySet<string>,
+  threshold: number,
+): Map<string, string> {
   const order = [...threads].sort((a, b) => uses(b.id) - uses(a.id));
   const labs = new Map(order.map((t) => [t.id, lab(t.color)]));
   const taken = new Set<string>();

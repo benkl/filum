@@ -12,11 +12,7 @@ use crate::io::{ByteWriter, Reader};
 use crate::raw::RawPattern;
 use crate::{Error, Pattern, Thread, WriteOptions};
 
-pub(crate) const SETTINGS: EncodeSettings = EncodeSettings {
-    max_stitch: 124,
-    max_jump: 124,
-    full_jump: true,
-};
+pub(crate) const SETTINGS: EncodeSettings = EncodeSettings { max_stitch: 124, max_jump: 124, full_jump: true };
 
 pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Result<Vec<u8>, Error> {
     let e = encode(p, SETTINGS, opts.long_stitch_as_jumps);
@@ -143,8 +139,7 @@ pub(crate) fn read(bytes: &[u8]) -> Result<Pattern, Error> {
         for _ in 0..num_colors {
             let Ok(c) = r.i32be() else { break };
             let c = c as u32;
-            raw.threads
-                .push(Thread::from_rgb([(c >> 16) as u8, (c >> 8) as u8, c as u8]));
+            raw.threads.push(Thread::from_rgb([(c >> 16) as u8, (c >> 8) as u8, c as u8]));
         }
     }
     Ok(raw.finish())

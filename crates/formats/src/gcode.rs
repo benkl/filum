@@ -61,12 +61,7 @@ mod tests {
     #[test]
     fn program() {
         let p = Pattern {
-            stitches: vec![
-                Stitch::new(0.0, 0.0, 0),
-                Stitch::new(1.5, -2.0, 0),
-                Stitch::new(1.5, -2.0, cmd::COLOR_CHANGE),
-                Stitch::new(3.0, 0.0, 0),
-            ],
+            stitches: vec![Stitch::new(0.0, 0.0, 0), Stitch::new(1.5, -2.0, 0), Stitch::new(1.5, -2.0, cmd::COLOR_CHANGE), Stitch::new(3.0, 0.0, 0)],
             ..Default::default()
         };
         let s = String::from_utf8(write(&p)).unwrap();

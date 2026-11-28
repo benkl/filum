@@ -31,13 +31,24 @@ const s = (a: unknown[], i: number) => a[i] as string;
 const opt = (a: unknown[], i: number) => (a[i] as string | undefined) ?? "{}";
 const bytes = (a: unknown[], i: number) => a[i] as Uint8Array;
 /** Most operations answer in JSON. */
-const json = (f: (e: StitchEngine, a: unknown[]) => string) => (e: StitchEngine, a: unknown[]): Out => ({ result: JSON.parse(f(e, a)) });
+const json =
+  (f: (e: StitchEngine, a: unknown[]) => string) =>
+  (e: StitchEngine, a: unknown[]): Out => ({ result: JSON.parse(f(e, a)) });
 
 /** A stitch plan: the records as typed arrays, the rest from the JSON meta (crates/wasm/src/lib.rs plan_js). */
 function planOut(r: { coords: Float32Array; flags: Uint8Array; objects: Uint32Array; meta: string }): Out {
   const meta = JSON.parse(r.meta);
   return {
-    result: { coords: r.coords, flags: r.flags, objects: r.objects, ...meta, basting: meta.basting ?? null, links: meta.links ?? [], quality: meta.quality ?? null, dense: meta.dense ?? null },
+    result: {
+      coords: r.coords,
+      flags: r.flags,
+      objects: r.objects,
+      ...meta,
+      basting: meta.basting ?? null,
+      links: meta.links ?? [],
+      quality: meta.quality ?? null,
+      dense: meta.dense ?? null,
+    },
     transfer: [r.coords.buffer, r.flags.buffer, r.objects.buffer],
   };
 }
@@ -51,7 +62,10 @@ const OPS = {
   exportPlan: (e: StitchEngine, a: unknown[]) => planOut(e.exportPlan(s(a, 0), opt(a, 1))),
   densityField: (e: StitchEngine, a: unknown[]): Out => {
     const r = e.densityField(s(a, 0), opt(a, 1)) as { layers: Float32Array; holes: Float32Array; added: Float32Array; class: Uint8Array; meta: string };
-    return { result: { ...JSON.parse(r.meta), layers: r.layers, holes: r.holes, added: r.added, cls: r.class }, transfer: [r.layers.buffer, r.holes.buffer, r.added.buffer, r.class.buffer] };
+    return {
+      result: { ...JSON.parse(r.meta), layers: r.layers, holes: r.holes, added: r.added, cls: r.class },
+      transfer: [r.layers.buffer, r.holes.buffer, r.added.buffer, r.class.buffer],
+    };
   },
   stitchedShapes: json((e, a) => e.stitchedShapes(s(a, 0))),
   elementInfo: json((e, a) => e.elementInfo(s(a, 0), s(a, 1))),
@@ -107,7 +121,8 @@ self.onmessage = async (e: MessageEvent<Req>) => {
   } catch (err) {
     const error = String((err as Error)?.message ?? err);
     // a panic (a trap) leaves the engine unusable: the client starts a new worker
-    const fatal = err instanceof WebAssembly.RuntimeError || /unreachable|recursive use of an object|memory access out of bounds|null pointer passed/i.test(error);
+    const fatal =
+      err instanceof WebAssembly.RuntimeError || /unreachable|recursive use of an object|memory access out of bounds|null pointer passed/i.test(error);
     (self as unknown as Worker).postMessage({ id, ok: false, error, fatal });
   }
 };

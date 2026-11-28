@@ -482,7 +482,11 @@ export function fitPath(raw: Vec2[], error: number, closed = false, cornerDeg = 
       const next = pieces[n + 1];
       // tangents: along a neighbouring line, the seam, or estimated over a window
       const t1 = prev?.line ? norm(sub(part[prev.b], part[prev.a])) : !prev && k === 0 && seam ? seam : tangentAt(seg, 0, true, reach);
-      const t2 = next?.line ? norm(sub(part[next.a], part[next.b])) : !next && k === cuts.length - 2 && seam ? mul(seam, -1) : tangentAt(seg, seg.length - 1, false, reach);
+      const t2 = next?.line
+        ? norm(sub(part[next.a], part[next.b]))
+        : !next && k === cuts.length - 2 && seam
+          ? mul(seam, -1)
+          : tangentAt(seg, seg.length - 1, false, reach);
       fitCubic(seg, t1, t2, error, curves);
     });
     cornerJoints.add(curves.length - 1);

@@ -29,7 +29,10 @@ for (let i = 0; i <= 40; i++) L.push([0, i * 0.5]);
 for (let i = 1; i <= 40; i++) L.push([i * 0.5, 20]);
 const fl = fitPath(jitter(L, 0.04), 0.15, false, 65);
 check(fl.nodes.length === 3, `L: three nodes (${fl.nodes.length})`);
-check(fl.nodes.every((n) => !n.i && !n.o), "L: straight segments (no handles)");
+check(
+  fl.nodes.every((n) => !n.i && !n.o),
+  "L: straight segments (no handles)",
+);
 check(dist(fl.nodes[1].p, [0, 20]) < 0.3, "L: the corner stays where it was");
 
 // a circle: few nodes, within tolerance, no kink at the seam
@@ -41,7 +44,10 @@ for (let i = 0; i <= 120; i++) {
 const fc = fitPath(C, 0.05, true, 65);
 check(fc.nodes.length <= 6, `circle: few nodes (${fc.nodes.length})`);
 const flat = flattenSubPath(fc, 0.05);
-check(flat.every((p) => Math.abs(Math.hypot(p[0], p[1]) - 10) < 0.1), "circle: within the tolerance");
+check(
+  flat.every((p) => Math.abs(Math.hypot(p[0], p[1]) - 10) < 0.1),
+  "circle: within the tolerance",
+);
 const n0 = fc.nodes[0];
 if (n0.i && n0.o) {
   const u = [n0.o[0] - n0.p[0], n0.o[1] - n0.p[1]];
@@ -61,7 +67,10 @@ const fa = fitPath(LA, 0.05, false, 65);
 check(!fa.nodes[0].o, "line + arc: the line is straight");
 const j = fa.nodes[1];
 check(!!j.o && Math.abs(j.o[1] - j.p[1]) < 0.05, "line + arc: the arc leaves along the line (G1)");
-check(flattenSubPath(fa, 0.05).every((p) => near(LA, p) < 0.12), "line + arc: within the tolerance");
+check(
+  flattenSubPath(fa, 0.05).every((p) => near(LA, p) < 0.12),
+  "line + arc: within the tolerance",
+);
 // without line detection the straight part is still fitted
 check(fitPath(LA, 0.05, false, 65, undefined, { lines: false }).nodes.length >= 2, "lines off: still fits");
 

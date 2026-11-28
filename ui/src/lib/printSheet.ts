@@ -91,7 +91,8 @@ export function blockStats(plan: PlanData): BlockStats[] {
 export const blockSeconds = (b: BlockStats, s: PrintSettings) => (b.stitches / Math.max(1, s.spm)) * 60 + b.trims * s.timeTrim;
 
 /** The whole job: every block, the colour changes and the time added (Ink/Stitch print). */
-export const jobSeconds = (blocks: BlockStats[], s: PrintSettings) => blocks.reduce((t, b) => t + blockSeconds(b, s), 0) + Math.max(0, blocks.length - 1) * s.timeColorChange + s.timeAdditional;
+export const jobSeconds = (blocks: BlockStats[], s: PrintSettings) =>
+  blocks.reduce((t, b) => t + blockSeconds(b, s), 0) + Math.max(0, blocks.length - 1) * s.timeColorChange + s.timeAdditional;
 
 /** "1 h 05 min", "12 min 30 s". */
 export function duration(sec: number): string {

@@ -30,7 +30,11 @@ export const EFFECTS: { id: EffectId; label: string; title: string }[] = [
   { id: "roughen", label: "Roughen", title: "Random jagged or wobbly edges" },
   { id: "twist", label: "Twist", title: "Rotate more at the centre than at the edges" },
   { id: "warp", label: "Warp", title: "Envelope warps: arc, arch, bulge, flag, wave, fish, rise, inflate, squeeze" },
-  { id: "simplify", label: "Simplify", title: "Fit clean curves: fewer anchor points, straight runs as lines, corners kept (tidy up traced or imported paths)" },
+  {
+    id: "simplify",
+    label: "Simplify",
+    title: "Fit clean curves: fewer anchor points, straight runs as lines, corners kept (tidy up traced or imported paths)",
+  },
   { id: "smooth", label: "Smooth", title: "Turn corners into smooth curves" },
   { id: "anchors", label: "Add anchors", title: "Split every segment (more points to edit or distort)" },
 ];
@@ -218,7 +222,16 @@ export function ShapeEffectsDialog({ onClose }: { onClose: () => void }) {
                   <Slider min={1} max={40} step={1} digits={0} value={p.zigzag.ridges} onChange={(v) => set("zigzag", { ridges: Math.round(v) })} />
                 </Row>
                 <Row label="Points">
-                  <Seg value={!!p.zigzag.smooth} options={[[true, "Smooth"], [false, "Corner"]] as const} onChange={(v) => set("zigzag", { smooth: v })} />
+                  <Seg
+                    value={!!p.zigzag.smooth}
+                    options={
+                      [
+                        [true, "Smooth"],
+                        [false, "Corner"],
+                      ] as const
+                    }
+                    onChange={(v) => set("zigzag", { smooth: v })}
+                  />
                 </Row>
               </>
             )}
@@ -231,7 +244,16 @@ export function ShapeEffectsDialog({ onClose }: { onClose: () => void }) {
                   <Slider min={0.5} max={20} step={0.5} unit="/cm" value={p.roughen.detail} onChange={(v) => set("roughen", { detail: v })} />
                 </Row>
                 <Row label="Points">
-                  <Seg value={!!p.roughen.smooth} options={[[true, "Smooth"], [false, "Corner"]] as const} onChange={(v) => set("roughen", { smooth: v })} />
+                  <Seg
+                    value={!!p.roughen.smooth}
+                    options={
+                      [
+                        [true, "Smooth"],
+                        [false, "Corner"],
+                      ] as const
+                    }
+                    onChange={(v) => set("roughen", { smooth: v })}
+                  />
                 </Row>
                 <Row label="Variation">
                   <button className="btn sm" onClick={() => set("roughen", { seed: (p.roughen.seed % 9973) + 1 })}>
@@ -261,7 +283,16 @@ export function ShapeEffectsDialog({ onClose }: { onClose: () => void }) {
                   <Slider min={-100} max={100} step={1} digits={0} unit="%" value={p.warp.bend} onChange={(v) => set("warp", { bend: v })} />
                 </Row>
                 <Row label="Direction">
-                  <Seg value={!!p.warp.vertical} options={[[false, "Horizontal"], [true, "Vertical"]] as const} onChange={(v) => set("warp", { vertical: v })} />
+                  <Seg
+                    value={!!p.warp.vertical}
+                    options={
+                      [
+                        [false, "Horizontal"],
+                        [true, "Vertical"],
+                      ] as const
+                    }
+                    onChange={(v) => set("warp", { vertical: v })}
+                  />
                 </Row>
               </>
             )}
@@ -293,7 +324,11 @@ export function ShapeEffectsDialog({ onClose }: { onClose: () => void }) {
                 <Slider min={1} max={4} step={1} digits={0} value={p.anchors.times} onChange={(v) => set("anchors", { times: Math.round(v) })} />
               </Row>
             )}
-            {skipped > 0 && <p className="hint">{skipped} lettering object{skipped === 1 ? "" : "s"} left out — lettering stays editable text.</p>}
+            {skipped > 0 && (
+              <p className="hint">
+                {skipped} lettering object{skipped === 1 ? "" : "s"} left out — lettering stays editable text.
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -307,7 +342,10 @@ export function pathCommand(fn: (sp: SubPath) => SubPath, label: string) {
   const ids = new Set(s.doc.objects.filter((o) => s.selection.includes(o.id) && !o.text).map((o) => o.id));
   if (!ids.size) return s.toast("Select one or more shapes first");
   s.commit((d) => {
-    let next: StitchDocument = { ...d, objects: d.objects.map((o) => (ids.has(o.id) ? { ...o, paths: o.paths.map((sp) => (sp.nodes.length >= 2 ? fn(sp) : sp)) } : o)) };
+    let next: StitchDocument = {
+      ...d,
+      objects: d.objects.map((o) => (ids.has(o.id) ? { ...o, paths: o.paths.map((sp) => (sp.nodes.length >= 2 ? fn(sp) : sp)) } : o)),
+    };
     for (const o of next.objects) if (ids.has(o.id)) next = syncGradientGeometry(next, o);
     return next;
   });

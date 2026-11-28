@@ -161,11 +161,7 @@ mod tests {
         o
     }
     fn doc(objects: Vec<Object>) -> Document {
-        Document {
-            threads: vec![Thread::new("t", "x", "#000000")],
-            objects,
-            ..Default::default()
-        }
+        Document { threads: vec![Thread::new("t", "x", "#000000")], objects, ..Default::default() }
     }
 
     #[test]
@@ -232,7 +228,15 @@ mod tests {
         assert!(is_stop(&runs[0]));
         let kinds: Vec<&str> = runs[1..]
             .iter()
-            .map(|r| if r.iter().all(|x| x.1 & flags::UNDERLAY != 0) { "contour" } else if r.len() < 60 { "cap" } else { "satin" })
+            .map(|r| {
+                if r.iter().all(|x| x.1 & flags::UNDERLAY != 0) {
+                    "contour"
+                } else if r.len() < 60 {
+                    "cap"
+                } else {
+                    "satin"
+                }
+            })
             .collect();
         assert_eq!(kinds, ["contour", "contour", "cap", "cap", "cap", "satin", "satin"]);
         // each cap on an open end, its outer side on the shape's edge, at most 2 mm deep

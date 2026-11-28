@@ -10,7 +10,7 @@
 //! Extension over Ink/Stitch: a single open sub-path is treated as a satin
 //! *centre line* of `width`, so the "satin column" draw tool needs only one stroke.
 
-use crate::geom::{cumulative_lengths, offset_closed, offset_polyline, polyline_length, project, segment_intersection, substring, point_at, Point};
+use crate::geom::{cumulative_lengths, offset_closed, offset_polyline, point_at, polyline_length, project, segment_intersection, substring, Point};
 use crate::model::{SatinMethod, SatinParams, SubPath};
 use crate::plan::flags;
 
@@ -97,11 +97,7 @@ pub fn satin_geometry(paths: &[SubPath], p: &SatinParams) -> Option<SatinGeometr
             c.reverse();
         }
         let w = p.width.max(0.1) * 0.5;
-        let (mut r0, mut r1) = if usable[0].closed {
-            (offset_closed(&c, -w), offset_closed(&c, w))
-        } else {
-            (offset_polyline(&c, -w), offset_polyline(&c, w))
-        };
+        let (mut r0, mut r1) = if usable[0].closed { (offset_closed(&c, -w), offset_closed(&c, w)) } else { (offset_polyline(&c, -w), offset_polyline(&c, w)) };
         if p.swap_rails {
             std::mem::swap(&mut r0, &mut r1);
         }
@@ -465,7 +461,11 @@ const MIN_SPLIT: f64 = 0.05;
 
 /// A split length brought into range (0 = no splitting).
 fn split_len(v: f64) -> f64 {
-    if v > 0.0 { v.max(MIN_SPLIT) } else { 0.0 }
+    if v > 0.0 {
+        v.max(MIN_SPLIT)
+    } else {
+        0.0
+    }
 }
 
 /// Ink/Stitch `split_segment_even_n`: `n` equal parts, each split point
@@ -602,7 +602,6 @@ fn shape_pairs(pairs: Vec<(Point, Point)>, p: &SatinParams) -> Vec<(Point, Point
     }
     pairs
 }
-
 
 fn underlay(geo: &SatinGeometry, p: &SatinParams, which: super::underlay::SatinUnderlay, run: &mut Run, density: f64) {
     let u = flags::UNDERLAY;
@@ -914,7 +913,8 @@ mod tests {
     #[test]
     fn a_rung_longer_than_short_rails_stays_a_rung() {
         // Barstitch's "t" crossbar: two 4.5 mm rails, one 6.9 mm rung across both
-        let line = |a: (f64, f64), b: (f64, f64)| SubPath { closed: false, nodes: vec![crate::model::Node::corner(a.0, a.1), crate::model::Node::corner(b.0, b.1)] };
+        let line =
+            |a: (f64, f64), b: (f64, f64)| SubPath { closed: false, nodes: vec![crate::model::Node::corner(a.0, a.1), crate::model::Node::corner(b.0, b.1)] };
         let paths = vec![line((11.88, 16.40), (7.37, 16.35)), line((11.88, 20.37), (7.48, 20.37)), line((9.55, 15.0), (9.55, 21.88))];
         let flat: Vec<Vec<Point>> = paths.iter().map(|s| s.flatten(0.2)).collect();
         assert_eq!(rail_indices(&flat), (0, 1));
@@ -1016,10 +1016,12 @@ mod multi_tests {
     #[test]
     fn multi_makes_one_column_per_subpath() {
         let ring = |r: f64| {
-            let pts: Vec<Point> = (0..32).map(|i| {
-                let a = i as f64 / 32.0 * std::f64::consts::TAU;
-                pt(r * a.cos(), r * a.sin())
-            }).collect();
+            let pts: Vec<Point> = (0..32)
+                .map(|i| {
+                    let a = i as f64 / 32.0 * std::f64::consts::TAU;
+                    pt(r * a.cos(), r * a.sin())
+                })
+                .collect();
             SubPath::polyline(&pts, true)
         };
         let p = SatinParams { multi: true, width: 1.0, center_walk: false, ..Default::default() };
@@ -1073,7 +1075,15 @@ mod texture_tests {
 
     #[test]
     fn random_width_varies_and_is_repeatable() {
-        let p = SatinParams { width: 4.0, center_walk: false, pull_comp: 0.0, short_stitch_inset: 0.0, random_wider: 0.2, random_narrower: 0.2, ..Default::default() };
+        let p = SatinParams {
+            width: 4.0,
+            center_walk: false,
+            pull_comp: 0.0,
+            short_stitch_inset: 0.0,
+            random_wider: 0.2,
+            random_narrower: 0.2,
+            ..Default::default()
+        };
         let ys: Vec<f64> = top(&p).iter().map(|q| q.y.abs()).collect();
         let (lo, hi) = (ys.iter().cloned().fold(f64::MAX, f64::min), ys.iter().cloned().fold(f64::MIN, f64::max));
         assert!(hi - lo > 0.3, "{lo} {hi}");
@@ -1082,10 +1092,23 @@ mod texture_tests {
 
     #[test]
     fn staggered_splits_do_not_line_up() {
-        let p = SatinParams { width: 10.0, center_walk: false, pull_comp: 0.0, short_stitch_inset: 0.0, max_stitch_length: 4.0, split_staggers: 3, ..Default::default() };
+        let p = SatinParams {
+            width: 10.0,
+            center_walk: false,
+            pull_comp: 0.0,
+            short_stitch_inset: 0.0,
+            max_stitch_length: 4.0,
+            split_staggers: 3,
+            ..Default::default()
+        };
         let even = SatinParams { split_staggers: 0, ..p.clone() };
         // the y of split points (inside the column): more distinct values when staggered
-        let inner = |v: Vec<Point>| { let mut ys: Vec<i64> = v.iter().filter(|q| q.y.abs() < 4.9).map(|q| (q.y * 10.0).round() as i64).collect(); ys.sort(); ys.dedup(); ys.len() };
+        let inner = |v: Vec<Point>| {
+            let mut ys: Vec<i64> = v.iter().filter(|q| q.y.abs() < 4.9).map(|q| (q.y * 10.0).round() as i64).collect();
+            ys.sort();
+            ys.dedup();
+            ys.len()
+        };
         assert!(inner(top(&p)) > inner(top(&even)), "{} {}", inner(top(&p)), inner(top(&even)));
     }
 }
@@ -1103,12 +1126,22 @@ mod random_split_tests {
         satin_on(&rails(), p, &Fabric::Cotton.profile()).into_iter().flatten().filter(|x| x.1 == 0).map(|x| x.0).collect()
     }
     fn base() -> SatinParams {
-        SatinParams { center_walk: false, contour_underlay: false, zigzag_underlay: false, underlay_auto: false, pull_comp: 0.0, short_stitch_inset: 0.0, ..Default::default() }
+        SatinParams {
+            center_walk: false,
+            contour_underlay: false,
+            zigzag_underlay: false,
+            underlay_auto: false,
+            pull_comp: 0.0,
+            short_stitch_inset: 0.0,
+            ..Default::default()
+        }
     }
 
     #[test]
     fn random_spacing_varies_the_gaps() {
-        let gaps = |p: &SatinParams| -> Vec<f64> { sewn(p).iter().filter(|q| q.y.abs() < 1e-6).map(|q| q.x).collect::<Vec<_>>().windows(2).map(|w| w[1] - w[0]).collect() };
+        let gaps = |p: &SatinParams| -> Vec<f64> {
+            sewn(p).iter().filter(|q| q.y.abs() < 1e-6).map(|q| q.x).collect::<Vec<_>>().windows(2).map(|w| w[1] - w[0]).collect()
+        };
         let even = gaps(&base());
         let rnd = gaps(&SatinParams { random_spacing: 0.4, ..base() });
         let spread = |g: &[f64]| g.iter().cloned().fold(0.0, f64::max) - g.iter().cloned().fold(f64::MAX, f64::min);
@@ -1301,13 +1334,17 @@ mod ink_parity_tests {
         assert!((lo + 0.4).abs() < 1e-6 && (hi - 5.2).abs() < 1e-6, "{lo} {hi}");
         // contour and zig-zag underlay insets per rail
         let sr = SecondRail { contour_inset: Some(1.0), contour_inset_pct: Some(0.1), ..Default::default() };
-        let (lo, hi) = y_range(&under(&rails(4.0), &SatinParams { contour_underlay: true, contour_inset: 0.2, contour_inset_pct: 0.0, second_rail: Some(sr), ..base() }));
+        let (lo, hi) =
+            y_range(&under(&rails(4.0), &SatinParams { contour_underlay: true, contour_inset: 0.2, contour_inset_pct: 0.0, second_rail: Some(sr), ..base() }));
         assert!((lo - 0.2).abs() < 1e-6 && (hi - 2.6).abs() < 1e-6, "{lo} {hi}");
         let sr = SecondRail { zigzag_underlay_inset: Some(1.5), ..Default::default() };
         let (lo, hi) = y_range(&under(&rails(4.0), &SatinParams { zigzag_underlay: true, zigzag_underlay_inset: 0.5, second_rail: Some(sr), ..base() }));
         assert!((lo - 0.5).abs() < 1e-6 && (hi - 2.5).abs() < 1e-6, "{lo} {hi}");
         let sr = SecondRail { zigzag_inset_pct: Some(0.25), ..Default::default() };
-        let (lo, hi) = y_range(&under(&rails(4.0), &SatinParams { zigzag_underlay: true, zigzag_underlay_inset: 0.0, zigzag_inset_pct: 0.0, second_rail: Some(sr), ..base() }));
+        let (lo, hi) = y_range(&under(
+            &rails(4.0),
+            &SatinParams { zigzag_underlay: true, zigzag_underlay_inset: 0.0, zigzag_inset_pct: 0.0, second_rail: Some(sr), ..base() },
+        ));
         assert!(lo.abs() < 1e-6 && (hi - 3.0).abs() < 1e-6, "{lo} {hi}");
         // random width on the second rail only
         let sr = SecondRail { random_wider: Some(0.2), random_narrower: Some(0.0), ..Default::default() };

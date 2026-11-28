@@ -114,10 +114,13 @@ fn build_graph(skel: &[bool], w: usize, h: usize) -> Graph {
         let (x, y) = ((i % w) as i64, (i / w) as i64);
         // 4-neighbours first: the walk follows staircases without skipping
         let order = [0usize, 2, 4, 6, 1, 3, 5, 7];
-        order.iter().filter_map(|&k| {
-            let (dx, dy) = N8[k];
-            at(x + dx, y + dy).then(|| (y + dy) as usize * w + (x + dx) as usize)
-        }).collect()
+        order
+            .iter()
+            .filter_map(|&k| {
+                let (dx, dy) = N8[k];
+                at(x + dx, y + dy).then(|| (y + dy) as usize * w + (x + dx) as usize)
+            })
+            .collect()
     };
     let walk = |start_node: usize, first: usize, seen: &mut Vec<bool>| -> (usize, Vec<usize>) {
         let mut pix = Vec::new();
@@ -235,13 +238,21 @@ fn leave_dir(g: &Graph, e: &Edge, nd: usize, w: usize, zone: f64, reach: f64) ->
         Some(k) => {
             let p1 = pts[k];
             let p2 = *pts[k..].iter().find(|p| p.dist(p1) >= reach).unwrap_or(pts.last().unwrap());
-            if p2.dist(p1) < 2.0 { (c, p2) } else { (p1, p2) }
+            if p2.dist(p1) < 2.0 {
+                (c, p2)
+            } else {
+                (p1, p2)
+            }
         }
         None => (c, *pts.last().unwrap()),
     };
     let d = far - from;
     let l = d.length();
-    if l < 1e-9 { pt(0.0, 0.0) } else { d * (1.0 / l) }
+    if l < 1e-9 {
+        pt(0.0, 0.0)
+    } else {
+        d * (1.0 / l)
+    }
 }
 
 /// Strokes of a skeleton. `radius(i)` is the inscribed radius (px) at pixel i.
@@ -254,26 +265,32 @@ pub fn strokes(skel: &[bool], w: usize, h: usize, radius: &dyn Fn(usize) -> f64,
     // line widths (thinning artefacts of corners and blobs reach about one width; an
     // arm or a serif of a letter is longer), or the minimum
     let prune = |g: &mut Graph| {
-    for _ in 0..3 {
-        let mut changed = false;
-        for k in 0..g.edges.len() {
-            let e = &g.edges[k];
-            if !e.alive || e.a == NONE {
-                continue;
+        for _ in 0..3 {
+            let mut changed = false;
+            for k in 0..g.edges.len() {
+                let e = &g.edges[k];
+                if !e.alive || e.a == NONE {
+                    continue;
+                }
+                let (da, db) = (degree(g, e.a), degree(g, e.b));
+                let (free, junction) = if da == 1 && db >= 3 {
+                    (e.a, e.b)
+                } else if db == 1 && da >= 3 {
+                    (e.b, e.a)
+                } else {
+                    continue;
+                };
+                let _ = free;
+                let len = e.pix.len() as f64 + 1.0;
+                if len < (3.0 * node_r(g, junction)).max(o.min_len) {
+                    g.edges[k].alive = false;
+                    changed = true;
+                }
             }
-            let (da, db) = (degree(g, e.a), degree(g, e.b));
-            let (free, junction) = if da == 1 && db >= 3 { (e.a, e.b) } else if db == 1 && da >= 3 { (e.b, e.a) } else { continue };
-            let _ = free;
-            let len = e.pix.len() as f64 + 1.0;
-            if len < (3.0 * node_r(g, junction)).max(o.min_len) {
-                g.edges[k].alive = false;
-                changed = true;
+            if !changed {
+                break;
             }
         }
-        if !changed {
-            break;
-        }
-    }
     };
     prune(&mut g);
     // a junction of thick lines thins into several junctions a few pixels
@@ -379,7 +396,11 @@ pub fn strokes(skel: &[bool], w: usize, h: usize, radius: &dyn Fn(usize) -> f64,
     let mut out: Vec<Stroke> = Vec::new();
     let edge_pts = |g: &Graph, k: usize, from_end: usize| -> Vec<usize> {
         let e = &g.edges[k];
-        if from_end == 0 { e.pix.clone() } else { e.pix.iter().rev().copied().collect() }
+        if from_end == 0 {
+            e.pix.clone()
+        } else {
+            e.pix.iter().rev().copied().collect()
+        }
     };
     let mut emit = |start: usize, start_end: usize, done: &mut Vec<bool>, g: &Graph| {
         let mut pts: Vec<Point> = Vec::new();
@@ -490,7 +511,8 @@ fn median3(v: &[f64]) -> Vec<f64> {
 
 /// Tangent at an open end (pointing outwards), from `reach` px of the line.
 fn end_dir(pts: &[Point], at_start: bool, reach: f64) -> Point {
-    let (e, it): (Point, Box<dyn Iterator<Item = &Point>>) = if at_start { (pts[0], Box::new(pts.iter())) } else { (*pts.last().unwrap(), Box::new(pts.iter().rev())) };
+    let (e, it): (Point, Box<dyn Iterator<Item = &Point>>) =
+        if at_start { (pts[0], Box::new(pts.iter())) } else { (*pts.last().unwrap(), Box::new(pts.iter().rev())) };
     let mut q = e;
     for p in it {
         q = *p;
@@ -500,7 +522,11 @@ fn end_dir(pts: &[Point], at_start: bool, reach: f64) -> Point {
     }
     let d = e - q;
     let l = d.length();
-    if l < 1e-9 { pt(0.0, 0.0) } else { d * (1.0 / l) }
+    if l < 1e-9 {
+        pt(0.0, 0.0)
+    } else {
+        d * (1.0 / l)
+    }
 }
 
 /// Bridge free ends to nearby lines: end to end (one stroke), else end to the

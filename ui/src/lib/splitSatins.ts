@@ -55,7 +55,6 @@ export interface SplitPlan {
   overlap: number;
 }
 
-
 /** Overlap between neighbouring parts: the fabric preset's (NOVAstitch), else 0.2 mm. */
 export function overlapFor(doc: Pick<StitchDocument, "options" | "fabric">): number {
   const v = presetValues(presetSetOf(doc), doc.fabric, { type: "fill", method: "tatami" } as DesignObject["stitch"]).expand;
@@ -156,7 +155,7 @@ function railsOf(g: Region, dir: Vec2): { rails: [Vec2[], Vec2[]]; oneColumn: bo
     const l = len(e);
     return l < 1e-12 ? len(sub(p, a)) : Math.abs(cross(e, sub(p, a))) / l;
   };
-  for (let k = 1; k < left.length - 1; ) {
+  for (let k = 1; k < left.length - 1;) {
     if (offLine(left[k], left[k - 1], left[k + 1]) < 1e-5 && offLine(right[k], right[k - 1], right[k + 1]) < 1e-5) {
       left.splice(k, 1);
       right.splice(k, 1);

@@ -13,7 +13,7 @@
 //! One object sews one colour (`layer`): every colour of a tartan is a layer
 //! object, like the layers of a gradient.
 
-use super::{Run, running::running_stitch};
+use super::{running::running_stitch, Run};
 use crate::geom::*;
 use crate::model::{FillParams, TartanParams};
 use crate::plan::flags;
@@ -259,7 +259,8 @@ pub fn tartan(rings: &[Ring], p: &FillParams, t: &TartanParams, spacing: f64, st
     let max_len = super::fill::fill_stitch_len(p.max_stitch_length);
 
     // rows at the twill angle (herringbone: +angle and −angle in alternate columns)
-    let passes: Vec<(f64, Option<(f64, bool)>)> = if t.herringbone > 0.0 { vec![(t.angle, Some((t.herringbone, false))), (-t.angle, Some((t.herringbone, true)))] } else { vec![(t.angle, None)] };
+    let passes: Vec<(f64, Option<(f64, bool)>)> =
+        if t.herringbone > 0.0 { vec![(t.angle, Some((t.herringbone, false))), (-t.angle, Some((t.herringbone, true)))] } else { vec![(t.angle, None)] };
     let mut pieces: Vec<(i64, f64, f64, f64, f64)> = Vec::new(); // (row, y, x0, x1, row angle)
     for &(angle, herring) in &passes {
         let a = angle.to_radians();
@@ -393,15 +394,21 @@ mod tests {
         let sq: Vec<Ring> = vec![vec![pt(0.0, 0.0), pt(40.0, 0.0), pt(40.0, 40.0), pt(0.0, 40.0)]];
         let p = FillParams::default();
         let code = "(#ff0000)/5 (#0000ff)/5";
-        let n = |layer: u32| -> usize { tartan(&sq, &p, &TartanParams { palette: code.into(), layer, ..Default::default() }, 0.4, None, 0).iter().map(|r| r.len()).sum() };
+        let n = |layer: u32| -> usize {
+            tartan(&sq, &p, &TartanParams { palette: code.into(), layer, ..Default::default() }, 0.4, None, 0).iter().map(|r| r.len()).sum()
+        };
         let (red, blue) = (n(0), n(1));
         assert!(red > 300 && blue > 300, "{red} {blue}");
         assert_eq!(n(2), 0, "no third colour");
         // all inside the shape
-        let pts: Vec<Point> = tartan(&sq, &p, &TartanParams { palette: code.into(), layer: 0, ..Default::default() }, 0.4, None, 0).into_iter().flatten().map(|x| x.0).collect();
+        let pts: Vec<Point> =
+            tartan(&sq, &p, &TartanParams { palette: code.into(), layer: 0, ..Default::default() }, 0.4, None, 0).into_iter().flatten().map(|x| x.0).collect();
         assert!(pts.iter().all(|q| q.x > -0.6 && q.x < 40.6 && q.y > -0.6 && q.y < 40.6));
         // herringbone too
-        let h: usize = tartan(&sq, &p, &TartanParams { palette: code.into(), layer: 0, herringbone: 6.0, ..Default::default() }, 0.4, None, 0).iter().map(|r| r.len()).sum();
+        let h: usize = tartan(&sq, &p, &TartanParams { palette: code.into(), layer: 0, herringbone: 6.0, ..Default::default() }, 0.4, None, 0)
+            .iter()
+            .map(|r| r.len())
+            .sum();
         assert!(h > 300);
     }
 
@@ -423,7 +430,8 @@ mod tests {
     fn mirroring_follows_the_pivots_or_the_flag() {
         let sq: Vec<Ring> = vec![vec![pt(0.0, 0.0), pt(40.0, 0.0), pt(40.0, 40.0), pt(0.0, 40.0)]];
         let p = FillParams::default();
-        let runs = |palette: &str, symmetry: bool| tartan(&sq, &p, &TartanParams { palette: palette.into(), layer: 1, symmetry, ..Default::default() }, 0.4, None, 0);
+        let runs =
+            |palette: &str, symmetry: bool| tartan(&sq, &p, &TartanParams { palette: palette.into(), layer: 1, symmetry, ..Default::default() }, 0.4, None, 0);
         let flat = "(#ff0000)8 (#0000ff)2 (#00ff00)2";
         let pivots = "(#ff0000)/8 (#0000ff)2 (#00ff00)/2";
         // the UI's Mirrored switch writes both the pivots and the flag; the flag alone (older tartans) still mirrors

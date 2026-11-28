@@ -168,22 +168,23 @@ export function LicensesDialog({ onClose }: { onClose: () => void }) {
       {tab === "app" ? (
         <div className="lic-app">
           <p>
-            Filum is free software: you can redistribute it and/or modify it under the terms of the <b>GNU General Public License</b> as published
-            by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. It includes algorithms ported
-            from Ink/Stitch (GPL-3.0) and its file library pystitch (MIT); the other tabs list every font, library and crate shipped with the app and their licences.
+            Filum is free software: you can redistribute it and/or modify it under the terms of the <b>GNU General Public License</b> as published by the Free
+            Software Foundation, either version 3 of the License, or (at your option) any later version. It includes algorithms ported from Ink/Stitch (GPL-3.0)
+            and its file library pystitch (MIT); the other tabs list every font, library and crate shipped with the app and their licences.
           </p>
           <p className="hint">
             Embroidery fonts come from the Ink/Stitch community collection
-            {fonts?.commit ? ` (${fonts.source} @ ${fonts.commit.slice(0, 7)})` : ""}. Fonts may carry their own terms (most are SIL OFL 1.1) —
-            check a font's licence before selling designs made with it.
+            {fonts?.commit ? ` (${fonts.source} @ ${fonts.commit.slice(0, 7)})` : ""}. Fonts may carry their own terms (most are SIL OFL 1.1) — check a font's
+            licence before selling designs made with it.
             {data ? ` Licence list generated ${data.generated}.` : ""}
           </p>
-          <pre className="lic-full">{data ? data.texts[data.app.text] ?? "" : "Loading…"}</pre>
+          <pre className="lic-full">{data ? (data.texts[data.app.text] ?? "") : "Loading…"}</pre>
         </div>
       ) : (
         <>
           <p className="hint" style={{ padding: "6px 2px" }}>
-            {tab === "embroidery" && "Every Ink/Stitch embroidery font with the licence file shipped by its author. Fonts marked optional download aren't included with Filum; you can download them in Preferences → Downloads. "}
+            {tab === "embroidery" &&
+              "Every Ink/Stitch embroidery font with the licence file shipped by its author. Fonts marked optional download aren't included with Filum; you can download them in Preferences → Downloads. "}
             {tab === "fonts" && "Outline fonts bundled for lettering. "}
             {tab === "ported" && "Projects whose code or data Filum's engine is derived from. "}
             {tab === "npm" && "JavaScript packages in the app's user interface. "}
@@ -200,7 +201,11 @@ export function LicensesDialog({ onClose }: { onClose: () => void }) {
                   "fontId" in i
                     ? () =>
                         embroideryLicense((i as { fontId: string }).fontId).then(
-                          (t) => t || ((i as { download?: string }).download ? `Not included with Filum: its licence (${i.license}) doesn't allow it. Download it in Preferences → Downloads to see the author's licence file here.` : ""),
+                          (t) =>
+                            t ||
+                            ((i as { download?: string }).download
+                              ? `Not included with Filum: its licence (${i.license}) doesn't allow it. Download it in Preferences → Downloads to see the author's licence file here.`
+                              : ""),
                         )
                     : undefined
                 }

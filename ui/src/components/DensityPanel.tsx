@@ -36,7 +36,14 @@ export function DensityLegend() {
   const spots = f?.hotspots ?? [];
   const fab = fabricInfo(fabric);
   // fills stacked on fills (not just meeting at their edges): Remove hidden stitching takes the layers out
-  const stacked = !removeOverlaps && spots.some((h) => fillsStackAt(h.objects.map((i) => objects[i]).filter((o) => !!o), h));
+  const stacked =
+    !removeOverlaps &&
+    spots.some((h) =>
+      fillsStackAt(
+        h.objects.map((i) => objects[i]).filter((o) => !!o),
+        h,
+      ),
+    );
 
   const showHot = (k: number) => {
     const h = spots[k];
@@ -125,7 +132,12 @@ export function DensityLegend() {
                 {hot >= 0 && spots[hot] && (
                   <span className="stat">
                     {" "}
-                    · {hot + 1}/{spots.length}: {spots[hot].objects.map((i) => objects[i]?.name).filter(Boolean).slice(0, 3).join(", ")}
+                    · {hot + 1}/{spots.length}:{" "}
+                    {spots[hot].objects
+                      .map((i) => objects[i]?.name)
+                      .filter(Boolean)
+                      .slice(0, 3)
+                      .join(", ")}
                   </span>
                 )}
               </span>

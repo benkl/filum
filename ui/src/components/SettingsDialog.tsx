@@ -102,7 +102,13 @@ function Appearance() {
       <Section title="Highlight colour" hint="Selections, active tools, buttons and handles. The default is the Filum colour.">
         <div className="st-accents">
           {ACCENTS.map((a) => (
-            <button key={a.color} className={prefs.accent === a.color ? "on" : ""} title={a.label} style={{ ["--c" as string]: a.color }} onClick={() => setPrefs({ accent: a.color })}>
+            <button
+              key={a.color}
+              className={prefs.accent === a.color ? "on" : ""}
+              title={a.label}
+              style={{ ["--c" as string]: a.color }}
+              onClick={() => setPrefs({ accent: a.color })}
+            >
               <i />
               <span>{a.color === APP_COLOR ? "Filum" : a.label}</span>
             </button>
@@ -122,7 +128,10 @@ function CanvasPrefs() {
   const p = s.prefs;
   return (
     <>
-      <Section title="Snapping" hint="Smart guides and point snapping are also in View ▸ Snapping; grid, jumps, underlay and stitch colours in the View menu; the fabric's look in the Design tab.">
+      <Section
+        title="Snapping"
+        hint="Smart guides and point snapping are also in View ▸ Snapping; grid, jumps, underlay and stitch colours in the View menu; the fabric's look in the Design tab."
+      >
         <Row label="Smart guides" title="Snap to other objects and the hoop while moving and scaling (Ctrl while dragging: off)">
           <Toggle on={s.smartGuides} onChange={(v) => s.set({ smartGuides: v })} />
         </Row>

@@ -29,19 +29,57 @@ export function TartanSection({ t }: { t: TartanParams }) {
   const colours = tartanColors(t.palette);
   return (
     <Section title="Tartan">
-      <div className="tartan-swatch" style={{ background: swatchCss(t.palette, 3, symmetric),height: 46, borderRadius: 6, border: "1px solid var(--border)", marginBottom: 8, transform: `rotate(${t.rotate}deg)` }} title="The sett: warp stripes across, weft stripes down" />
+      <div
+        className="tartan-swatch"
+        style={{
+          background: swatchCss(t.palette, 3, symmetric),
+          height: 46,
+          borderRadius: 6,
+          border: "1px solid var(--border)",
+          marginBottom: 8,
+          transform: `rotate(${t.rotate}deg)`,
+        }}
+        title="The sett: warp stripes across, weft stripes down"
+      />
       <p className="hint" style={{ margin: "0 0 6px" }}>
         {colours.length} thread colour{colours.length === 1 ? "" : "s"}, each sewn as its own layer.
       </p>
       {!equal && (
-        <Seg style={{ marginBottom: 6 }} value={side} options={[["warp", "Warp"], ["weft", "Weft"]] as const} onChange={(v) => setSide(v)} />
+        <Seg
+          style={{ marginBottom: 6 }}
+          value={side}
+          options={
+            [
+              ["warp", "Warp"],
+              ["weft", "Weft"],
+            ] as const
+          }
+          onChange={(v) => setSide(v)}
+        />
       )}
       <div className="tartan-stripes">
         {stripes.map((s, i) => (
           <div key={i} className="dz-inline" style={{ marginBottom: 4 }}>
-            <input type="color" value={s.color} title="Stripe colour" onChange={(e) => setStripes(stripes.map((x, k) => (k === i ? { ...x, color: e.target.value } : x)))} />
-            <Num value={s.width} step={0.1} min={0.1} max={50} unit="mm" onChange={(v) => setStripes(stripes.map((x, k) => (k === i ? { ...x, width: v } : x)))} />
-            <select className="select" value={s.render} title="Sewn, left out (the fabric shows), or in the colour before it" onChange={(e) => setStripes(stripes.map((x, k) => (k === i ? { ...x, render: Number(e.target.value) as 0 | 1 | 2 } : x)))}>
+            <input
+              type="color"
+              value={s.color}
+              title="Stripe colour"
+              onChange={(e) => setStripes(stripes.map((x, k) => (k === i ? { ...x, color: e.target.value } : x)))}
+            />
+            <Num
+              value={s.width}
+              step={0.1}
+              min={0.1}
+              max={50}
+              unit="mm"
+              onChange={(v) => setStripes(stripes.map((x, k) => (k === i ? { ...x, width: v } : x)))}
+            />
+            <select
+              className="select"
+              value={s.render}
+              title="Sewn, left out (the fabric shows), or in the colour before it"
+              onChange={(e) => setStripes(stripes.map((x, k) => (k === i ? { ...x, render: Number(e.target.value) as 0 | 1 | 2 } : x)))}
+            >
               <option value={1}>Sewn</option>
               <option value={0}>Left out</option>
               <option value={2}>As before</option>
@@ -51,7 +89,10 @@ export function TartanSection({ t }: { t: TartanParams }) {
             </button>
           </div>
         ))}
-        <button className="btn sm ghost" onClick={() => setStripes([...stripes, { color: stripes[stripes.length - 1]?.color ?? "#000000", width: 2, render: 1 }])}>
+        <button
+          className="btn sm ghost"
+          onClick={() => setStripes([...stripes, { color: stripes[stripes.length - 1]?.color ?? "#000000", width: 2, render: 1 }])}
+        >
           <Plus size={12} /> Stripe
         </button>
       </div>
@@ -87,7 +128,13 @@ export function TartanSection({ t }: { t: TartanParams }) {
           </span>
         </Row>
         <Row label="Code" title="Ink/Stitch palette code — paste one from Ink/Stitch's tartan editor">
-          <input className="input" style={{ width: "100%", fontSize: "var(--fs-xs)" }} defaultValue={t.palette} key={t.palette} onBlur={(e) => e.target.value.trim() && e.target.value !== t.palette && set({ palette: e.target.value.trim() })} />
+          <input
+            className="input"
+            style={{ width: "100%", fontSize: "var(--fs-xs)" }}
+            defaultValue={t.palette}
+            key={t.palette}
+            onBlur={(e) => e.target.value.trim() && e.target.value !== t.palette && set({ palette: e.target.value.trim() })}
+          />
         </Row>
       </Section>
     </Section>

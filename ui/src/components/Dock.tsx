@@ -53,16 +53,33 @@ export function ScenePanel() {
         <div className="grid2">
           <div className="row">
             <label>W</label>
-            <Num value={doc.hoop.width} unit="mm" step={5} min={20} onChange={(v) => commit((d) => ({ ...d, hoop: { ...d.hoop, width: v, name: "Custom" } }))} />
+            <Num
+              value={doc.hoop.width}
+              unit="mm"
+              step={5}
+              min={20}
+              onChange={(v) => commit((d) => ({ ...d, hoop: { ...d.hoop, width: v, name: "Custom" } }))}
+            />
           </div>
           <div className="row">
             <label>H</label>
-            <Num value={doc.hoop.height} unit="mm" step={5} min={20} onChange={(v) => commit((d) => ({ ...d, hoop: { ...d.hoop, height: v, name: "Custom" } }))} />
+            <Num
+              value={doc.hoop.height}
+              unit="mm"
+              step={5}
+              min={20}
+              onChange={(v) => commit((d) => ({ ...d, hoop: { ...d.hoop, height: v, name: "Custom" } }))}
+            />
           </div>
         </div>
         <HoopShapeRow />
         <Row label="Custom size" title="Any frame: type its width and height above, or fit a hoop round the whole design">
-          <button className="btn sm ghost" title="A custom hoop round the whole design with a 10 mm margin, the design centred in it" onClick={fitHoopToDesign} disabled={!doc.objects.length}>
+          <button
+            className="btn sm ghost"
+            title="A custom hoop round the whole design with a 10 mm margin, the design centred in it"
+            onClick={fitHoopToDesign}
+            disabled={!doc.objects.length}
+          >
             Fit to design
           </button>
         </Row>
@@ -108,10 +125,16 @@ function DesignOptionsSection() {
         </>
       )}
       <KnockdownRow o={o} set={set} />
-      <Row label="Avoid holes" title="Travel stitches keep off the needle holes their object made before: fewer drops in one spot, fewer torn fabrics and broken needles. Off: stitch for stitch as Ink/Stitch">
+      <Row
+        label="Avoid holes"
+        title="Travel stitches keep off the needle holes their object made before: fewer drops in one spot, fewer torn fabrics and broken needles. Off: stitch for stitch as Ink/Stitch"
+      >
         <Toggle on={o.avoidHoles ?? true} onChange={(v) => set({ avoidHoles: v })} />
       </Row>
-      <Row label="Hide travel" title="A gap to the next object up to 12 mm that later stitching covers all along is sewn through instead of trimmed: fewer trims, shorter sewing. Off: trimmed as Ink/Stitch does">
+      <Row
+        label="Hide travel"
+        title="A gap to the next object up to 12 mm that later stitching covers all along is sewn through instead of trimmed: fewer trims, shorter sewing. Off: trimmed as Ink/Stitch does"
+      >
         <Toggle on={o.hiddenTravel ?? true} onChange={(v) => set({ hiddenTravel: v })} />
       </Row>
     </Section>
@@ -131,7 +154,11 @@ function KnockdownRow({ o, set }: { o: DesignOptions; set: (p: Partial<DesignOpt
             {(o.knockdownLayers ?? 2) === 2 ? "crossed" : "single"} · {o.knockdownSpacing ?? 2} mm
           </span>
         )}
-        <button className="btn sm ghost" title="Knockdown settings — for the whole design or an object under the selection" onClick={() => openKnockdown("design")}>
+        <button
+          className="btn sm ghost"
+          title="Knockdown settings — for the whole design or an object under the selection"
+          onClick={() => openKnockdown("design")}
+        >
           Edit…
         </button>
       </span>
@@ -156,7 +183,9 @@ function MultiProperties({ objects }: { objects: DesignObject[] }) {
         return (
           <Section title="Ripple guide">
             <p className="hint" style={{ margin: "2px 0 6px" }}>
-              Copies of “{pair.ripple.name}” follow “{pair.guide.name}”{pair.guide.stitch.type === "satin" && pair.guide.paths.length >= 2 ? ", fitted between its rails" : ""} (Ink/Stitch guided ripples). The guide object is taken into the ripple.
+              Copies of “{pair.ripple.name}” follow “{pair.guide.name}”
+              {pair.guide.stitch.type === "satin" && pair.guide.paths.length >= 2 ? ", fitted between its rails" : ""} (Ink/Stitch guided ripples). The guide
+              object is taken into the ripple.
             </p>
             <button
               className="btn primary sm"
@@ -176,12 +205,19 @@ function MultiProperties({ objects }: { objects: DesignObject[] }) {
         return (
           <Section title="Stitch pattern" defaultOpen={false}>
             <p className="hint" style={{ margin: "2px 0 6px" }}>
-              Draw over “{pair.target.name}”: lines add a needle point wherever a stitch crosses them, shapes leave the needle points inside them out (Ink/Stitch selection to pattern).
+              Draw over “{pair.target.name}”: lines add a needle point wherever a stitch crosses them, shapes leave the needle points inside them out
+              (Ink/Stitch selection to pattern).
             </p>
             <button
               className="btn sm"
               onClick={() => {
-                useStore.getState().commit((d) => applyPatterns(d, pair.target.id, pair.patterns.map((p) => p.id)));
+                useStore.getState().commit((d) =>
+                  applyPatterns(
+                    d,
+                    pair.target.id,
+                    pair.patterns.map((p) => p.id),
+                  ),
+                );
                 useStore.getState().set({ selection: [pair.target.id] });
               }}
             >
@@ -201,7 +237,9 @@ function MultiProperties({ objects }: { objects: DesignObject[] }) {
           // letters: their lettering keeps the colour (all its letters of that colour take it)
           onPick={(id) => useStore.getState().commit((d) => ({ ...d, objects: setObjectsThread(d.objects, ids, id) }))}
         />
-        {!objects.every((o) => o.thread === objects[0]?.thread) && <p className="hint">{new Set(objects.map((o) => o.thread)).size} colours — pick one to give it to all.</p>}
+        {!objects.every((o) => o.thread === objects[0]?.thread) && (
+          <p className="hint">{new Set(objects.map((o) => o.thread)).size} colours — pick one to give it to all.</p>
+        )}
         {threads.length === 0 && <p className="hint">No threads yet.</p>}
       </Section>
       <CommandsSection objects={objects} />
@@ -210,7 +248,15 @@ function MultiProperties({ objects }: { objects: DesignObject[] }) {
   );
 }
 
-const TYPE_LABEL: Record<string, string> = { fill: "Fill", satin: "Satin", running: "Line", applique: "Appliqué", manual: "Manual stitch", none: "No stitches", zigzag: "Zig-zag" };
+const TYPE_LABEL: Record<string, string> = {
+  fill: "Fill",
+  satin: "Satin",
+  running: "Line",
+  applique: "Appliqué",
+  manual: "Manual stitch",
+  none: "No stitches",
+  zigzag: "Zig-zag",
+};
 
 /**
  * Several objects selected: their stitch settings, one panel per stitch type,
@@ -234,10 +280,14 @@ function MultiStitchOptions({ objects }: { objects: DesignObject[] }) {
       {[...groups].map(([type, objs]) => {
         const differ = differingSettings(objs);
         return (
-          <Section key={type} title={`Stitch options · ${TYPE_LABEL[type] ?? type}${groups.size > 1 || objs.length !== objects.length ? ` (${objs.length})` : ""}`}>
+          <Section
+            key={type}
+            title={`Stitch options · ${TYPE_LABEL[type] ?? type}${groups.size > 1 || objs.length !== objects.length ? ` (${objs.length})` : ""}`}
+          >
             <p className="hint" style={{ margin: "2px 0 6px" }}>
               {objs.length > 1 ? `Changes apply to all ${objs.length}.` : "Changes apply to this one."}
-              {differ.length > 0 && ` They differ in ${differ.slice(0, 5).map(settingLabel).join(", ")}${differ.length > 5 ? ` and ${differ.length - 5} more` : ""}: shown is the first one's.`}
+              {differ.length > 0 &&
+                ` They differ in ${differ.slice(0, 5).map(settingLabel).join(", ")}${differ.length > 5 ? ` and ${differ.length - 5} more` : ""}: shown is the first one's.`}
             </p>
             <EditTargets.Provider value={objs.map((o) => o.id)}>
               <StitchOptions o={objs[0]} />
@@ -263,10 +313,16 @@ export function PropertiesPanel() {
   if (!sel.length)
     return (
       <div className="props">
-        <div className="hint" style={{ padding: "10px 2px" }}>Select an object to see its settings. The hoop, fabric and machine are under Design.</div>
+        <div className="hint" style={{ padding: "10px 2px" }}>
+          Select an object to see its settings. The hoop, fabric and machine are under Design.
+        </div>
       </div>
     );
-  const o = oneGradient ? [...sel].sort((a, b) => ((a.stitch as { gradient?: { layer: number } }).gradient?.layer ?? 0) - ((b.stitch as { gradient?: { layer: number } }).gradient?.layer ?? 0))[0] : sel[0];
+  const o = oneGradient
+    ? [...sel].sort(
+        (a, b) => ((a.stitch as { gradient?: { layer: number } }).gradient?.layer ?? 0) - ((b.stitch as { gradient?: { layer: number } }).gradient?.layer ?? 0),
+      )[0]
+    : sel[0];
   return (
     <div className="props">
       <div className="props-head">
@@ -284,10 +340,10 @@ export function PropertiesPanel() {
         <Row label="Nodes">{nodeCount(o)}</Row>
       </Section>
       {!oneGradient && (
-      <Section title="Thread">
-        <ThreadCard threadId={o.thread} />
-        <ThreadPicker value={o.thread} onPick={(id) => useStore.getState().updateObject(o.id, { thread: id })} />
-      </Section>
+        <Section title="Thread">
+          <ThreadCard threadId={o.thread} />
+          <ThreadPicker value={o.thread} onPick={(id) => useStore.getState().updateObject(o.id, { thread: id })} />
+        </Section>
       )}
       {!!o.patterns?.length && (
         <Section title="Stitch patterns">
@@ -376,9 +432,18 @@ function PatternList({ o }: { o: DesignObject }) {
             </div>
           </Row>
           {p.add && (
-            <Row label="Interval" title="Which crossings get a point, in turn: “2” every second one, “2 1” … (Ink/Stitch pattern interval); then how many to skip first">
+            <Row
+              label="Interval"
+              title="Which crossings get a point, in turn: “2” every second one, “2 1” … (Ink/Stitch pattern interval); then how many to skip first"
+            >
               <span className="dz-inline">
-                <PatternInput value={p.interval} placeholder="1" parse={(t) => parsePattern(t, { min: 1, max: 20, integer: true })} format={(v) => (v?.length ? formatPattern(v) : "")} onChange={(v) => set(k, { interval: v })} />
+                <PatternInput
+                  value={p.interval}
+                  placeholder="1"
+                  parse={(t) => parsePattern(t, { min: 1, max: 20, integer: true })}
+                  format={(v) => (v?.length ? formatPattern(v) : "")}
+                  onChange={(v) => set(k, { interval: v })}
+                />
                 <Num value={p.offset} step={1} min={0} max={50} digits={0} unit="skip" onChange={(v) => set(k, { offset: Math.round(v) })} />
               </span>
             </Row>

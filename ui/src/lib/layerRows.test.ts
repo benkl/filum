@@ -34,7 +34,11 @@ const named = buildLayerRows(objs, new Set(), { g: "Petals" })[1];
 ok(named.kind === "group" && named.name === "Petals", "a stored name is shown");
 
 // a lettering in a group is one member row
-const lettering = [obj("x", { group: "g", text: { group: "T" } as DesignObject["text"] }), obj("y", { group: "g", text: { group: "T" } as DesignObject["text"] }), obj("z", { group: "g" })];
+const lettering = [
+  obj("x", { group: "g", text: { group: "T" } as DesignObject["text"] }),
+  obj("y", { group: "g", text: { group: "T" } as DesignObject["text"] }),
+  obj("z", { group: "g" }),
+];
 const lr = buildLayerRows(lettering, new Set());
 ok(keys(lr) === "[g] .z .y" && lr[0].kind === "group" && lr[0].count === 2, "a lettering counts once in its group");
 ok(lr[2].kind === "object" && lr[2].ids.join() === "x,y", "the lettering row carries all its objects");
@@ -64,9 +68,17 @@ const grad = (id: string) => obj(id, { group: "grd1", stitch: { type: "fill", gr
 const gobjs = [grad("p"), grad("q"), obj("r")];
 const grows = buildLayerRows(gobjs, new Set());
 ok(grows[1].kind === "group" && grows[1].role === "gradient" && grows[1].name === "P", "a gradient's layers show as one group, named after it");
-const gout = dropRow(gobjs, grows.find((r) => r.key === "o:p")!, grows.find((r) => r.key === "o:r")!);
+const gout = dropRow(
+  gobjs,
+  grows.find((r) => r.key === "o:p")!,
+  grows.find((r) => r.key === "o:r")!,
+);
 ok(gout.find((o) => o.id === "p")!.group === "grd1", "a gradient layer dragged out keeps its gradient");
-const rIn = dropRow(gobjs, grows.find((r) => r.key === "o:r")!, grows.find((r) => r.key === "o:q")!);
+const rIn = dropRow(
+  gobjs,
+  grows.find((r) => r.key === "o:r")!,
+  grows.find((r) => r.key === "o:q")!,
+);
 ok(rIn.find((o) => o.id === "r")!.group === undefined, "objects do not join a gradient");
 
 // names and pruning
@@ -87,12 +99,19 @@ ok(keys(nrows) === "e [out] .d [in] .c .b a", "a group inside a group: its heade
 const inner = nrows.find((r) => r.key === "g:in")!;
 const outer = nrows.find((r) => r.key === "g:out")!;
 ok(inner.kind === "group" && inner.depth === 1 && inner.parent === "out" && inner.count === 2, "the inner header: one level in, two rows");
-ok(outer.kind === "group" && outer.depth === 0 && outer.count === 2 && outer.ids.join("") === "bcd", "the outer header counts its object and its group, and holds all three objects");
+ok(
+  outer.kind === "group" && outer.depth === 0 && outer.count === 2 && outer.ids.join("") === "bcd",
+  "the outer header counts its object and its group, and holds all three objects",
+);
 ok(nrows.find((r) => r.key === "o:b")!.depth === 2, "members of the inner group are two levels in");
 ok(keys(buildLayerRows(nobjs, new Set(["out"]), {}, parents)) === "e [out] a", "folding the outer group hides the inner one too");
 const ndoc = (objects: DesignObject[], groupParents?: Record<string, string>) => ({ objects, groupParents }) as unknown as StitchDocument;
 // dragging a group onto a row in another group puts it there
-const moved = dropOnRow(ndoc(nobjs, parents), inner, nrows.find((r) => r.key === "o:e")!);
+const moved = dropOnRow(
+  ndoc(nobjs, parents),
+  inner,
+  nrows.find((r) => r.key === "o:e")!,
+);
 ok(!moved.groupParents?.in, "a group dragged onto a top-level row leaves its group");
 ok(dropOnRow(ndoc(nobjs, parents), outer, inner).objects === nobjs, "a group dropped on a group inside it: nothing changes");
 // pruning: an outer group left holding only one group dissolves into it
@@ -102,4 +121,7 @@ ok(lonely.groupParents === undefined && lonely.objects[0].group === "in", "a gro
 // many groups left with one object each dissolve in one go (not 64 at a time)
 const many: DesignObject[] = [];
 for (let k = 0; k < 70; k++) many.push(obj(`m${k}`, { group: `grp${k}` }));
-ok(pruneGroups(doc(many)).objects.every((o) => !o.group), "seventy one-object groups all dissolve");
+ok(
+  pruneGroups(doc(many)).objects.every((o) => !o.group),
+  "seventy one-object groups all dissolve",
+);

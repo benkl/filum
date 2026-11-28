@@ -71,7 +71,8 @@ const COLOR_CHANGES: Limit = {
   source: BROTHER_FAQ,
   documented: true,
 };
-const BROTHER_NOTE = "Brother machines ignore a design that is larger than the field, even by 0.1 mm. They also trim jumps themselves (Jump stitch trim, 5–50 mm).";
+const BROTHER_NOTE =
+  "Brother machines ignore a design that is larger than the field, even by 0.1 mm. They also trim jumps themselves (Jump stitch trim, 5–50 mm).";
 
 // frames shared by several profiles (embroidery area, as mounted)
 const F = {
@@ -393,8 +394,16 @@ export const MACHINES: MachineProfile[] = [
   // pages on babylock.com (inches there; mm = the matching Brother frame).
   babyLock("babylock-100x100", "Baby Lock 4 × 4″", "Aurora, Verve", 100, 100, 1, 400, [BL.f4x4]),
   babyLock("babylock-160x260", "Baby Lock 6.25 × 10.25″", "Flare, Vesta", 160, 260, 1, 850, [BL.f4x4, BL.f5x7, BL.f6x10]),
-  babyLock("babylock-200x200", "Baby Lock Alliance 8 × 8″", "Alliance (embroidery only)", 200, 200, 1, 1000, [BL.f4x4, BL.f5x7, { id: "8x8", name: "8 × 8″", width: 200, height: 200 }]),
-  babyLock("babylock-180x300", "Baby Lock 7 × 12″", "Journey, Unity, Spirit", 180, 300, 1, 1050, [BL.f4x4, BL.f5x7, { id: "7x12", name: "7 × 12″", width: 180, height: 300 }]),
+  babyLock("babylock-200x200", "Baby Lock Alliance 8 × 8″", "Alliance (embroidery only)", 200, 200, 1, 1000, [
+    BL.f4x4,
+    BL.f5x7,
+    { id: "8x8", name: "8 × 8″", width: 200, height: 200 },
+  ]),
+  babyLock("babylock-180x300", "Baby Lock 7 × 12″", "Journey, Unity, Spirit", 180, 300, 1, 1050, [
+    BL.f4x4,
+    BL.f5x7,
+    { id: "7x12", name: "7 × 12″", width: 180, height: 300 },
+  ]),
   babyLock("babylock-200x300", "Baby Lock 8 × 12″", "Pathfinder, Aerial (Capella: 1000 spm)", 200, 300, 1, 1050, [BL.f4x4, BL.f5x7, BL.f8x12]),
   babyLock("babylock-240x360", "Baby Lock 9.5 × 14″", "Destiny II, Meridian 2, Reflection, Altair 2", 240, 360, 1, 1050, [
     BL.f4x4,
@@ -402,7 +411,11 @@ export const MACHINES: MachineProfile[] = [
     BL.f8x12,
     { id: "9.5x14", name: "9.5 × 14″", width: 240, height: 360 },
   ]),
-  babyLock("babylock-solaris", "Baby Lock Solaris", "Solaris Vision, Solaris 2", 272, 408, 1, 1050, [BL.f5x7, BL.f8x12, { id: "10.6x16", name: "10.6 × 16″", width: 272, height: 408 }]),
+  babyLock("babylock-solaris", "Baby Lock Solaris", "Solaris Vision, Solaris 2", 272, 408, 1, 1050, [
+    BL.f5x7,
+    BL.f8x12,
+    { id: "10.6x16", name: "10.6 × 16″", width: 272, height: 408 },
+  ]),
   babyLock("babylock-array", "Baby Lock Array (6 needles)", "Array, 7⅞ × 11¾″", 300, 200, 6, 1000, []),
   babyLock("babylock-valiant", "Baby Lock Valiant / Venture (10 needles)", "Valiant, Venture, 7⅞ × 14″", 360, 200, 10, 1000, []),
   // Janome / Elna
@@ -712,7 +725,13 @@ export function areaFits(a: Area, w: number, h: number, reach?: OvalReach): bool
 export function pickFrame(m: MachineProfile, size?: { width: number; height: number } | null, reach?: OvalReach): Frame | undefined {
   const everyday = m.frames.filter((f) => !f.note);
   const fits = (f: Frame) => !!size && areaFits(f, size.width, size.height, reach);
-  return everyday.find((f) => f.shape !== "oval" && fits(f)) ?? everyday.find(fits) ?? m.frames.find(fits) ?? everyday.filter((f) => f.shape !== "oval").at(-1) ?? m.frames.at(-1);
+  return (
+    everyday.find((f) => f.shape !== "oval" && fits(f)) ??
+    everyday.find(fits) ??
+    m.frames.find(fits) ??
+    everyday.filter((f) => f.shape !== "oval").at(-1) ??
+    m.frames.at(-1)
+  );
 }
 
 // The hoop code a JEF file carries (pystitch get_jef_hoop_size, also our
@@ -822,7 +841,8 @@ export function exportChecks(opts: {
       id: "hand-trims",
       level: "warn",
       title: `${n(cuts.uncut)} to snip by hand`,
-      detail: "The machine has no thread cutter: the preview shows these jump threads as thread. Snip them after sewing, or as you go where the hoop could catch them",
+      detail:
+        "The machine has no thread cutter: the preview shows these jump threads as thread. Snip them after sewing, or as you go where the hoop could catch them",
     });
   else if (cuts && cuts.uncut > 0 && cuts.cutter.kind === "jumps")
     out.push({
@@ -838,7 +858,8 @@ export function exportChecks(opts: {
       id: "short-trims",
       level: "warn",
       title: `${n(cuts.brother)} under 5 mm stay uncut on Brother machines`,
-      detail: "Brother and Baby Lock machines cut only jumps longer than their trimming length (5 mm by default): lower it on the machine or snip these by hand. Set the thread cutter in Machine settings to see them in the preview",
+      detail:
+        "Brother and Baby Lock machines cut only jumps longer than their trimming length (5 mm by default): lower it on the machine or snip these by hand. Set the thread cutter in Machine settings to see them in the preview",
     });
   if (format === "jef") {
     const j = jefHoop(w, h);
@@ -855,7 +876,9 @@ export function exportChecks(opts: {
         id: "jef",
         level: "ok",
         title: `The machine asks for the ${j.name} hoop`,
-        detail: differs ? `The JEF names the smallest Janome hoop that fits; to use the ${frame!.name}, choose it on the machine` : "The hoop code in the JEF file (as Ink/Stitch writes it)",
+        detail: differs
+          ? `The JEF names the smallest Janome hoop that fits; to use the ${frame!.name}, choose it on the machine`
+          : "The hoop code in the JEF file (as Ink/Stitch writes it)",
       });
     }
   }

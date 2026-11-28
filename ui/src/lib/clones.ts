@@ -105,7 +105,16 @@ export function syncClones(doc: StitchDocument, prev?: StitchDocument): StitchDo
  */
 export function makeClone(o: DesignObject, offset = 5): DesignObject {
   const link: CloneLink = o.clone ? { ...o.clone, m: mulMat(translateMat(offset, offset), o.clone.m) } : { of: o.id, m: translateMat(offset, offset), rot: 0 };
-  const base: DesignObject = { ...o, id: uid(), name: `${o.name.replace(/ clone( \d+)?$/, "")} clone`, clone: link, start: undefined, end: undefined, text: undefined, group: undefined };
+  const base: DesignObject = {
+    ...o,
+    id: uid(),
+    name: `${o.name.replace(/ clone( \d+)?$/, "")} clone`,
+    clone: link,
+    start: undefined,
+    end: undefined,
+    text: undefined,
+    group: undefined,
+  };
   if (!o.clone) return { ...base, ...derive(o, link) };
   // the original isn't at hand: the clone's shape moved on (the store derives it again from the original)
   const t = transformObject({ ...o, clone: undefined }, translateMat(offset, offset));

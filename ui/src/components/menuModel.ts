@@ -12,11 +12,85 @@
 //   Tools    the drawing and editing tools
 //   Help
 
-import { AlignCenterHorizontal, ArrowDownUp, Clipboard, SquareSplitHorizontal, ArrowRightLeft, Blend, ClipboardPaste, Combine, Copy, CopyPlus, Eye, EyeOff, FileCode, FileDown, FilePlus, FlipHorizontal2, FlipVertical2, Flower2, FolderOpen, Grid2x2Check, Group, ImagePlus, Import, Link2, Lock, LockOpen, Mountain, Printer, Redo2, RotateCw, Route, Ruler, Scissors, Settings, Spline, Trash2, Undo2, Ungroup, Unlink, Wand2, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react";
-import { Applique, Basting, Rebuild, StitchAngle, Cutwork, DensityMap, Digitize, GradientTool, Hoop, Jump, Knockdown, PatchBorder, SewOrder, Spool, StitchCross, StitchRunning, StitchSatin } from "../icons/stitch";
+import {
+  AlignCenterHorizontal,
+  ArrowDownUp,
+  Clipboard,
+  SquareSplitHorizontal,
+  ArrowRightLeft,
+  Blend,
+  ClipboardPaste,
+  Combine,
+  Copy,
+  CopyPlus,
+  Eye,
+  EyeOff,
+  FileCode,
+  FileDown,
+  FilePlus,
+  FlipHorizontal2,
+  FlipVertical2,
+  Flower2,
+  FolderOpen,
+  Grid2x2Check,
+  Group,
+  ImagePlus,
+  Import,
+  Link2,
+  Lock,
+  LockOpen,
+  Mountain,
+  Printer,
+  Redo2,
+  RotateCw,
+  Route,
+  Ruler,
+  Scissors,
+  Settings,
+  Spline,
+  Trash2,
+  Undo2,
+  Ungroup,
+  Unlink,
+  Wand2,
+  ZoomIn,
+  ZoomOut,
+  type LucideIcon,
+} from "lucide-react";
+import {
+  Applique,
+  Basting,
+  Rebuild,
+  StitchAngle,
+  Cutwork,
+  DensityMap,
+  Digitize,
+  GradientTool,
+  Hoop,
+  Jump,
+  Knockdown,
+  PatchBorder,
+  SewOrder,
+  Spool,
+  StitchCross,
+  StitchRunning,
+  StitchSatin,
+} from "../icons/stitch";
 import { TOOL_ICONS } from "../icons/toolIcons";
 import { unlinkClone } from "../lib/clones";
-import { centerInHoop, cloneSelection, exportDesign, fit, importFile, newDocument, openDigitizer, openDocument, optimizeOrder, saveDocument, selectAll } from "../lib/actions";
+import {
+  centerInHoop,
+  cloneSelection,
+  exportDesign,
+  fit,
+  importFile,
+  newDocument,
+  openDigitizer,
+  openDocument,
+  optimizeOrder,
+  saveDocument,
+  selectAll,
+} from "../lib/actions";
 import {
   align,
   copyProperties,
@@ -51,7 +125,19 @@ import { validCalibration } from "../lib/screen";
 import { lastInOrder, linkMenu } from "./linkMenu";
 import { showDesign, showIssues, togglePanels } from "../lib/panelActions";
 import { reversePath, sharpen } from "../lib/shapeOps";
-import { chartLabel, exportPalette, fitThreads, importPalette, matchAll, mergeSimilarColours, mergeTolerance, removeUnused, revertFit, sortBySewOrder, STITCH_COLORS } from "../lib/threads";
+import {
+  chartLabel,
+  exportPalette,
+  fitThreads,
+  importPalette,
+  matchAll,
+  mergeSimilarColours,
+  mergeTolerance,
+  removeUnused,
+  revertFit,
+  sortBySewOrder,
+  STITCH_COLORS,
+} from "../lib/threads";
 import { loadSample } from "../sample";
 import { useStore } from "../store";
 import type { Tool, ViewMode } from "../types";
@@ -84,7 +170,6 @@ export type MenuItem =
 
 export type MenuEntry = Exclude<MenuItem, "-">;
 
-
 /** Zoom around the middle of the canvas. */
 export function zoomBy(f: number) {
   const s = useStore.getState();
@@ -114,7 +199,14 @@ export function buildMenus(): Record<string, MenuItem[]> {
   const oneFill = s.selection.length === 1 && selObj?.stitch.type === "fill";
   const opts = s.doc.options ?? defaultDesignOptions();
   const setOpts = (p: Partial<typeof opts>) => s.commit((d) => ({ ...d, options: { ...(d.options ?? defaultDesignOptions()), ...p } }));
-  const tool = (t: Tool, label: string, kbd: string, hint?: string): MenuItem => ({ label, kbd, hint, icon: TOOL_ICONS[t], run: () => s.setTool(t), checked: s.tool === t });
+  const tool = (t: Tool, label: string, kbd: string, hint?: string): MenuItem => ({
+    label,
+    kbd,
+    hint,
+    icon: TOOL_ICONS[t],
+    run: () => s.setTool(t),
+    checked: s.tool === t,
+  });
   const mode = (m: ViewMode, label: string, kbd: string): MenuItem => ({ label, kbd, run: () => s.setViewMode(m), checked: s.viewMode === m });
   const toggle = (label: string, on: boolean, flip: () => void, kbd?: string, hint?: string): MenuItem => ({ label, kbd, hint, run: flip, checked: on });
   const gradient = (m: "blend" | "density", toast: string) => () => {
@@ -129,7 +221,13 @@ export function buildMenus(): Record<string, MenuItem[]> {
       { label: "Open…", icon: FolderOpen, kbd: `${mod}O`, run: openDocument },
       { label: "Load sample design", icon: Mountain, run: loadSample },
       "-",
-      { label: "Import artwork or embroidery…", icon: Import, kbd: `${mod}I`, run: importFile, hint: "SVG artwork, machine files (DST, PES, JEF …) or a picture to digitize" },
+      {
+        label: "Import artwork or embroidery…",
+        icon: Import,
+        kbd: `${mod}I`,
+        run: importFile,
+        hint: "SVG artwork, machine files (DST, PES, JEF …) or a picture to digitize",
+      },
       { label: "Digitize a picture…", icon: Digitize, run: () => openDigitizer("shapes"), hint: "Turn a picture into fills, satins and lines" },
       { label: "Cross stitch from a picture…", icon: StitchCross, run: () => openDigitizer("cross"), hint: "Turn a picture into cross stitch on a grid" },
       { label: "Add reference picture…", icon: ImagePlus, run: () => void addReferencePicture(), hint: "A picture to trace over — never stitched" },
@@ -249,14 +347,25 @@ export function buildMenus(): Record<string, MenuItem[]> {
       },
     ],
     Path: [
-      { label: "Effects", icon: Wand2, disabled: !hasSel, sub: EFFECTS.map((e): MenuItem => ({ label: `${e.label}…`, hint: e.title, run: () => openEffect(e.id), disabled: !hasSel })) },
+      {
+        label: "Effects",
+        icon: Wand2,
+        disabled: !hasSel,
+        sub: EFFECTS.map((e): MenuItem => ({ label: `${e.label}…`, hint: e.title, run: () => openEffect(e.id), disabled: !hasSel })),
+      },
       { label: "Outlines & offsets…", icon: PatchBorder, run: () => s.setDialog("outline"), disabled: !hasSel },
       { label: "Join", kbd: `${mod}J`, run: joinSelection, disabled: !hasSel, hint: "Close an open path, or join open paths at their nearest ends" },
       {
         label: "Compound path",
         disabled: !hasSel,
         sub: [
-          { label: "Make", kbd: `${mod}8`, run: compoundSelection, disabled: !many, hint: "The paths of the selected shapes become one object (inner ones are holes)" },
+          {
+            label: "Make",
+            kbd: `${mod}8`,
+            run: compoundSelection,
+            disabled: !many,
+            hint: "The paths of the selected shapes become one object (inner ones are holes)",
+          },
           { label: "Release", kbd: `${mod}Alt+⇧8`, run: releaseSelection, disabled: !hasSel, hint: "Every path of an object becomes an object of its own" },
         ],
       },
@@ -265,9 +374,20 @@ export function buildMenus(): Record<string, MenuItem[]> {
         icon: Spline,
         disabled: !hasSel,
         sub: [
-          { label: "Simplify for stitching", run: () => simplifySelectionForStitching(), disabled: !hasSel, hint: "Smooth out the pixel steps of traced and jagged paths, keep real corners: every sharp turn is a needle drop" },
+          {
+            label: "Simplify for stitching",
+            run: () => simplifySelectionForStitching(),
+            disabled: !hasSel,
+            hint: "Smooth out the pixel steps of traced and jagged paths, keep real corners: every sharp turn is a needle drop",
+          },
           { label: "Make all corners sharp", run: () => pathCommand(sharpen, "Corners sharpened"), disabled: !hasSel },
-          { label: "Average points", kbd: `${mod}Alt+J`, run: averageSelectedNodes, disabled: s.tool !== "node" || s.nodeSel.length < 2, hint: "Move the selected points onto their average point (node tool)" },
+          {
+            label: "Average points",
+            kbd: `${mod}Alt+J`,
+            run: averageSelectedNodes,
+            disabled: s.tool !== "node" || s.nodeSel.length < 2,
+            hint: "Move the selected points onto their average point (node tool)",
+          },
           { label: "Reverse path direction", run: () => pathCommand(reversePath, "Reversed"), disabled: !hasSel },
         ],
       },
@@ -285,7 +405,13 @@ export function buildMenus(): Record<string, MenuItem[]> {
         label: "Route",
         icon: Route,
         sub: [
-          { label: "Auto-route running stitch…", icon: StitchRunning, run: () => openRoute("running"), disabled: !selected.some((o) => o.stitch.type === "running"), hint: "Also out and back (redwork)" },
+          {
+            label: "Auto-route running stitch…",
+            icon: StitchRunning,
+            run: () => openRoute("running"),
+            disabled: !selected.some((o) => o.stitch.type === "running"),
+            hint: "Also out and back (redwork)",
+          },
           { label: "Auto-route satin columns…", icon: StitchSatin, run: () => openRoute("satin"), disabled: !selected.some((o) => o.stitch.type === "satin") },
           { label: "Jumps to running stitch…", icon: Jump, run: () => openRoute("jumps") },
         ],
@@ -302,14 +428,29 @@ export function buildMenus(): Record<string, MenuItem[]> {
         icon: GradientTool,
         disabled: !oneFill,
         sub: [
-          { label: "Colour blending", icon: Blend, run: gradient("blend", "Drag across the shape: this colour fades out, the next fades in"), disabled: !oneFill },
-          { label: "Density gradient", icon: DensityMap, run: gradient("density", "Drag across the shape: dense where you start, open where you end"), disabled: !oneFill },
+          {
+            label: "Colour blending",
+            icon: Blend,
+            run: gradient("blend", "Drag across the shape: this colour fades out, the next fades in"),
+            disabled: !oneFill,
+          },
+          {
+            label: "Density gradient",
+            icon: DensityMap,
+            run: gradient("density", "Drag across the shape: dense where you start, open where you end"),
+            disabled: !oneFill,
+          },
         ],
       },
       tool("guides", "Stitch direction", "D", "Draw guide lines the rows follow"),
       tool("split", "Split into satins", "K", "Draw cut lines and direction lines on a fill: each part becomes a satin sewn that way"),
       { label: "Test swatches…", icon: Grid2x2Check, run: () => s.setDialog("swatches"), disabled: !hasSel },
-      { label: "Calibrate fabric…", icon: Ruler, run: () => s.setDialog("calibrate"), hint: "Sew a swatch, measure it: new objects on the fabric start from your pull compensation" },
+      {
+        label: "Calibrate fabric…",
+        icon: Ruler,
+        run: () => s.setDialog("calibrate"),
+        hint: "Sew a swatch, measure it: new objects on the fabric start from your pull compensation",
+      },
       "-",
       {
         label: "Basting",
@@ -320,10 +461,27 @@ export function buildMenus(): Record<string, MenuItem[]> {
           { label: "Following the design", run: () => setOpts({ basting: "contour" }), checked: opts.basting === "contour" },
         ],
       },
-      { label: "Optimise stitch order", icon: SewOrder, run: optimizeOrder, hint: "Fewer colour changes, jumps and trims, with the steps chosen beside the Optimise button" },
+      {
+        label: "Optimise stitch order",
+        icon: SewOrder,
+        run: optimizeOrder,
+        hint: "Fewer colour changes, jumps and trims, with the steps chosen beside the Optimise button",
+      },
       "-",
-      toggle("Remove hidden stitching", !!opts.removeOverlaps, () => setOpts({ removeOverlaps: !opts.removeOverlaps }), undefined, "Leave out what lies under the objects on top"),
-      toggle("Show hidden stitching", s.showHidden, () => s.set({ showHidden: !s.showHidden }), undefined, "Mark what is left out on the canvas (Design ▸ Hidden stitching)"),
+      toggle(
+        "Remove hidden stitching",
+        !!opts.removeOverlaps,
+        () => setOpts({ removeOverlaps: !opts.removeOverlaps }),
+        undefined,
+        "Leave out what lies under the objects on top",
+      ),
+      toggle(
+        "Show hidden stitching",
+        s.showHidden,
+        () => s.set({ showHidden: !s.showHidden }),
+        undefined,
+        "Mark what is left out on the canvas (Design ▸ Hidden stitching)",
+      ),
       {
         label: "Clean up tiny objects",
         run: () => {
@@ -341,7 +499,10 @@ export function buildMenus(): Record<string, MenuItem[]> {
         run: async () => {
           const r = await fitThreads({ kind: "mine" });
           if (!r) return s.toast("My threads is empty — add your spools in Thread colours… → My threads");
-          s.toast(`Fitted ${r.fitted} threads to your spools${r.shared ? ` · ${r.shared} sharing a spool` : ""}${r.far.length ? ` · ${r.far.length} without a close spool` : ""}`, r.far.length ? "info" : "success");
+          s.toast(
+            `Fitted ${r.fitted} threads to your spools${r.shared ? ` · ${r.shared} sharing a spool` : ""}${r.far.length ? ` · ${r.far.length} without a close spool` : ""}`,
+            r.far.length ? "info" : "success",
+          );
         },
       },
       {
@@ -352,9 +513,16 @@ export function buildMenus(): Record<string, MenuItem[]> {
         },
         disabled: !Object.keys(s.doc.threadSources ?? {}).length,
       },
-      { label: `Match all to ${chartLabel(lastChart())}`, run: async () => s.toast(`Matched ${await matchAll(lastChart())} threads to ${chartLabel(lastChart())}`, "success") },
+      {
+        label: `Match all to ${chartLabel(lastChart())}`,
+        run: async () => s.toast(`Matched ${await matchAll(lastChart())} threads to ${chartLabel(lastChart())}`, "success"),
+      },
       "-",
-      { label: `Merge similar colours (ΔE < ${mergeTolerance()})`, run: mergeSimilarColours, hint: "Threads this close share a spool; the tolerance is set in Thread colours" },
+      {
+        label: `Merge similar colours (ΔE < ${mergeTolerance()})`,
+        run: mergeSimilarColours,
+        hint: "Threads this close share a spool; the tolerance is set in Thread colours",
+      },
       {
         label: "Remove unused threads",
         run: () => {
@@ -383,21 +551,41 @@ export function buildMenus(): Record<string, MenuItem[]> {
       mode("vector", "Vector", "1"),
       mode("stitch", "Stitches", "2"),
       mode("realistic", "Realistic", "3"),
-      { label: "Finished piece", kbd: "4", run: () => s.set({ finished: !s.finished }), checked: s.finished, hint: "The jump threads you snip by hand and the basting left out" },
+      {
+        label: "Finished piece",
+        kbd: "4",
+        run: () => s.set({ finished: !s.finished }),
+        checked: s.finished,
+        hint: "The jump threads you snip by hand and the basting left out",
+      },
       "-",
       {
         label: "Show",
         sub: [
-          toggle("Jump stitches", s.showJumps, () => s.set({ showJumps: !s.showJumps }), undefined, "The jumps between objects (dashed) and where the machine cuts; click a jump to choose Trim, Jump or Sew"),
+          toggle(
+            "Jump stitches",
+            s.showJumps,
+            () => s.set({ showJumps: !s.showJumps }),
+            undefined,
+            "The jumps between objects (dashed) and where the machine cuts; click a jump to choose Trim, Jump or Sew",
+          ),
           toggle("Underlay", s.showUnderlay, () => s.set({ showUnderlay: !s.showUnderlay })),
           toggle("Grid", s.showGrid, () => s.set({ showGrid: !s.showGrid })),
-          toggle("Fabric in the hoop", s.fabricAll, () => s.set({ fabricAll: !s.fabricAll }), undefined, "The fabric colour inside the hoop in the vector and stitch views (off: the hoop is an outline only)"),
+          toggle(
+            "Fabric in the hoop",
+            s.fabricAll,
+            () => s.set({ fabricAll: !s.fabricAll }),
+            undefined,
+            "The fabric colour inside the hoop in the vector and stitch views (off: the hoop is an outline only)",
+          ),
           {
             label: "Grid spacing",
             sub: [
               { label: "Automatic (5 / 10 mm)", run: () => s.set({ gridStep: 0, showGrid: true }), checked: !s.gridStep },
               ...[1, 2, 2.5, 5, 10].map((g): MenuItem => ({ label: `${g} mm`, run: () => s.set({ gridStep: g, showGrid: true }), checked: s.gridStep === g })),
-              ...(s.gridStep && ![1, 2, 2.5, 5, 10].includes(s.gridStep) ? [{ label: `${s.gridStep} mm (cross stitch cells)`, checked: true, run: () => {} } as MenuItem] : []),
+              ...(s.gridStep && ![1, 2, 2.5, 5, 10].includes(s.gridStep)
+                ? [{ label: `${s.gridStep} mm (cross stitch cells)`, checked: true, run: () => {} } as MenuItem]
+                : []),
             ],
           },
           toggle("Density map", s.showDensity, () => s.set({ showDensity: !s.showDensity }), "⇧D"),
@@ -406,7 +594,12 @@ export function buildMenus(): Record<string, MenuItem[]> {
       {
         label: "Stitch colours",
         sub: [
-          ...STITCH_COLORS.map((c): MenuItem => ({ label: c.label, hint: c.title, run: () => s.set({ stitchColors: c.id }), checked: s.stitchColors === c.id })),
+          ...STITCH_COLORS.map((c): MenuItem => ({
+            label: c.label,
+            hint: c.title,
+            run: () => s.set({ stitchColors: c.id }),
+            checked: s.stitchColors === c.id,
+          })),
           "-",
           { label: "Only the active colour", run: () => s.set({ colorFocus: !s.colorFocus }), checked: s.colorFocus, disabled: !s.activeThread },
         ],
@@ -414,8 +607,20 @@ export function buildMenus(): Record<string, MenuItem[]> {
       {
         label: "Snapping",
         sub: [
-          toggle("Smart guides", s.smartGuides, () => s.set({ smartGuides: !s.smartGuides }), undefined, "Snap to other objects and the hoop while moving (Ctrl while dragging: off)"),
-          toggle("Snap to points", s.prefs.snapPoints, () => s.setPrefs({ snapPoints: !s.prefs.snapPoints }), undefined, "Pen and node tool: points snap to existing points"),
+          toggle(
+            "Smart guides",
+            s.smartGuides,
+            () => s.set({ smartGuides: !s.smartGuides }),
+            undefined,
+            "Snap to other objects and the hoop while moving (Ctrl while dragging: off)",
+          ),
+          toggle(
+            "Snap to points",
+            s.prefs.snapPoints,
+            () => s.setPrefs({ snapPoints: !s.prefs.snapPoints }),
+            undefined,
+            "Pen and node tool: points snap to existing points",
+          ),
         ],
       },
       "-",
@@ -424,21 +629,51 @@ export function buildMenus(): Record<string, MenuItem[]> {
       "-",
       { label: "Fit hoop", kbd: "0", run: () => fit("hoop") },
       { label: "Fit design", kbd: "⇧0", run: () => fit("design") },
-      { label: "Actual size", run: () => fit(1), hint: validCalibration(s.prefs.screenPxPerMm) ? "The size it is sewn at" : "Assumes 96 dpi until the screen is calibrated" },
-      { label: "Calibrate the screen…", icon: Ruler, run: () => s.setDialog("screen"), hint: "Match a ruler on screen to a real one, so actual size is actual" },
+      {
+        label: "Actual size",
+        run: () => fit(1),
+        hint: validCalibration(s.prefs.screenPxPerMm) ? "The size it is sewn at" : "Assumes 96 dpi until the screen is calibrated",
+      },
+      {
+        label: "Calibrate the screen…",
+        icon: Ruler,
+        run: () => s.setDialog("screen"),
+        hint: "Match a ruler on screen to a real one, so actual size is actual",
+      },
       "-",
       {
         label: "Panels",
         sub: [
           toggle("Layers panel", s.layout.showOutline, () => s.setLayout({ showOutline: !s.layout.showOutline }), undefined, "Layers and issues"),
-          toggle("Properties panel", s.layout.showInspector, () => s.setLayout({ showInspector: !s.layout.showInspector }), undefined, "The selection's and the design's settings"),
-          { label: s.layout.showOutline || s.layout.showInspector ? "Hide panels" : "Show panels", kbd: `${mod}\\`, run: togglePanels, hint: "More room for the canvas" },
+          toggle(
+            "Properties panel",
+            s.layout.showInspector,
+            () => s.setLayout({ showInspector: !s.layout.showInspector }),
+            undefined,
+            "The selection's and the design's settings",
+          ),
+          {
+            label: s.layout.showOutline || s.layout.showInspector ? "Hide panels" : "Show panels",
+            kbd: `${mod}\\`,
+            run: togglePanels,
+            hint: "More room for the canvas",
+          },
           "-",
           { label: "Issues", run: () => showIssues(), checked: s.layout.showOutline && s.outlineTab === "issues" },
           { label: "Design settings", run: () => showDesign(), checked: s.layout.showInspector && s.inspectorTab === "design" },
           "-",
-          { label: "Layers on the left", run: () => s.setLayout({ outlineSide: "left" }), checked: s.layout.outlineSide === "left", hint: "Layers left of the canvas, properties right" },
-          { label: "Layers above properties", run: () => s.setLayout({ outlineSide: "right" }), checked: s.layout.outlineSide === "right", hint: "Both panels on the right, one above the other" },
+          {
+            label: "Layers on the left",
+            run: () => s.setLayout({ outlineSide: "left" }),
+            checked: s.layout.outlineSide === "left",
+            hint: "Layers left of the canvas, properties right",
+          },
+          {
+            label: "Layers above properties",
+            run: () => s.setLayout({ outlineSide: "right" }),
+            checked: s.layout.outlineSide === "right",
+            hint: "Both panels on the right, one above the other",
+          },
           { label: "Reset panel layout", run: () => s.setLayout({ ...DEFAULT_LAYOUT }) },
         ],
       },
@@ -476,7 +711,11 @@ export function buildMenus(): Record<string, MenuItem[]> {
       { label: "Keyboard shortcuts", kbd: "?", run: () => s.setDialog("shortcuts") },
       { label: "Ink/Stitch documentation", run: () => void openExternal("https://inkstitch.org/docs/") },
       "-",
-      { label: "Optional downloads…", run: () => s.openSettings("downloads"), hint: "Fonts and thread charts Filum can't include: accept their licence and download them" },
+      {
+        label: "Optional downloads…",
+        run: () => s.openSettings("downloads"),
+        hint: "Fonts and thread charts Filum can't include: accept their licence and download them",
+      },
       { label: "Licences…", run: () => s.setDialog("licenses") },
       { label: "About Filum", run: () => s.setDialog("about") },
     ],

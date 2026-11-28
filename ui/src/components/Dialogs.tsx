@@ -157,7 +157,15 @@ export function ShortcutsDialog({ onClose }: { onClose: () => void }) {
   const groups = SHORTCUTS.map((g) => ({ ...g, rows: g.rows.filter(match) })).filter((g) => g.rows.length);
   return (
     <Dialog wide title="Keyboard shortcuts" onClose={onClose}>
-      <input className="input" style={{ width: "100%", marginBottom: 10 }} placeholder="Filter shortcuts…" value={q} autoFocus onChange={(e) => setQ(e.target.value)} aria-label="Filter shortcuts" />
+      <input
+        className="input"
+        style={{ width: "100%", marginBottom: 10 }}
+        placeholder="Filter shortcuts…"
+        value={q}
+        autoFocus
+        onChange={(e) => setQ(e.target.value)}
+        aria-label="Filter shortcuts"
+      />
       <div className="shortcut-groups">
         {groups.map((g) => (
           <section key={g.group}>
@@ -185,7 +193,10 @@ export function ShortcutsDialog({ onClose }: { onClose: () => void }) {
 export function AboutDialog({ onClose }: { onClose: () => void }) {
   return (
     <Dialog title="Filum" onClose={onClose}>
-      <p>A modern, Rust-powered machine-embroidery editor. The stitch engine is a Rust port of algorithms from Ink/Stitch, extended with new fills (radial, Hilbert, stipple), raster auto-digitizing, fabric-aware compensation and a stacking-aware stitch-order optimiser.</p>
+      <p>
+        A modern, Rust-powered machine-embroidery editor. The stitch engine is a Rust port of algorithms from Ink/Stitch, extended with new fills (radial,
+        Hilbert, stipple), raster auto-digitizing, fabric-aware compensation and a stacking-aware stitch-order optimiser.
+      </p>
       <p className="hint">
         GPL-3.0-or-later. Ink/Stitch © its authors (GPL-3.0). File encoders ported from Ink/Stitch's pystitch (MIT). Includes the Ink/Stitch embroidery-font
         collection and the Nunito, Bebas Neue and Pacifico fonts (each under its own licence, mostly SIL OFL 1.1).

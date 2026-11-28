@@ -330,7 +330,11 @@ const Tracks = memo(function Tracks({ rows, total, gap }: { rows: RowInfo[]; tot
             </span>
           ))}
           {b.ending !== "end" && (
-            <span className={`so-mark ${b.ending === "color" ? "change" : "stop"}`} style={{ left: pct(b.end, total) }} title={b.ending === "color" ? "Trim and change the thread" : "The machine stops"}>
+            <span
+              className={`so-mark ${b.ending === "color" ? "change" : "stop"}`}
+              style={{ left: pct(b.end, total) }}
+              title={b.ending === "color" ? "Trim and change the thread" : "The machine stops"}
+            >
               {b.ending === "color" ? <ColorChange size={11} /> : <MachineStop size={11} />}
             </span>
           )}
@@ -460,7 +464,14 @@ export function StitchOutPanel() {
       ]
         .filter(Boolean)
         .join("\n");
-      return { block: b, color: t?.color ?? "#888", title, name, seconds, gradient: g ? { group: g.group, layer: g.layer, of: g.stops.length, first: false, last: false } : undefined };
+      return {
+        block: b,
+        color: t?.color ?? "#888",
+        title,
+        name,
+        seconds,
+        gradient: g ? { group: g.group, layer: g.layer, of: g.stops.length, first: false, last: false } : undefined,
+      };
     });
     // a bracket joins the neighbouring rows of one gradient
     out.forEach((r, i) => {
@@ -562,7 +573,14 @@ export function StitchOutPanel() {
     <section
       className={`stitchout ${playing ? "playing" : ""} ${phase === "opening" || phase === "closing" ? phase : ""}`}
       onAnimationEnd={(e) => e.target === e.currentTarget && setPhase(phase === "closing" ? "closed" : "open")}
-      style={{ height: Math.min(height, fit), ["--so-label" as string]: `${LABEL_W}px`, ["--so-row" as string]: `${ROW}px`, ["--so-bar" as string]: `${BAR}px` }} aria-label="Stitch-out">
+      style={{
+        height: Math.min(height, fit),
+        ["--so-label" as string]: `${LABEL_W}px`,
+        ["--so-row" as string]: `${ROW}px`,
+        ["--so-bar" as string]: `${BAR}px`,
+      }}
+      aria-label="Stitch-out"
+    >
       <div className="so-grip" onPointerDown={resizeFrom} title="Drag to resize" />
       <div className="so-head">
         <div className="so-transport" role="group" aria-label="Transport">
@@ -624,7 +642,12 @@ export function StitchOutPanel() {
             ))}
           </select>
         </label>
-        <button className={`icon-btn so-tog ${following ? "on" : ""}`} title="Follow the needle: keep it in view on the canvas" aria-pressed={following} onClick={() => set({ anim: { ...useStore.getState().anim, follow: !following } })}>
+        <button
+          className={`icon-btn so-tog ${following ? "on" : ""}`}
+          title="Follow the needle: keep it in view on the canvas"
+          aria-pressed={following}
+          onClick={() => set({ anim: { ...useStore.getState().anim, follow: !following } })}
+        >
           <FollowNeedle size={15} />
         </button>
         <button className="icon-btn" title="Record a stitch-out video" onClick={recordVideo}>
@@ -643,7 +666,12 @@ export function StitchOutPanel() {
             </span>
           </div>
           {rows.map(({ block: b, color, name, title, seconds, gradient }) => (
-            <button key={b.index} className={`so-label ${b.index === cur ? "on" : ""} ${b.index < cur ? "done" : ""}`} title={`${title}\nClick: go to this block`} onClick={() => seek(b.start)}>
+            <button
+              key={b.index}
+              className={`so-label ${b.index === cur ? "on" : ""} ${b.index < cur ? "done" : ""}`}
+              title={`${title}\nClick: go to this block`}
+              onClick={() => seek(b.start)}
+            >
               {gradient && <span className={`so-bracket ${gradient.first ? "first" : ""} ${gradient.last ? "last" : ""}`} aria-hidden />}
               <i className="so-sw" style={{ background: color }} />
               <span className="so-n">{b.index + 1}</span>
@@ -655,12 +683,7 @@ export function StitchOutPanel() {
             </button>
           ))}
         </div>
-        <div
-          className="so-track"
-          onPointerDown={scrubFrom}
-          onPointerMove={(e) => setHover(recordAt(e.clientX))}
-          onPointerLeave={() => setHover(null)}
-        >
+        <div className="so-track" onPointerDown={scrubFrom} onPointerMove={(e) => setHover(recordAt(e.clientX))} onPointerLeave={() => setHover(null)}>
           {/* the readout under the pointer: its own layer, above the ruler and the needle */}
           <div className="so-tipbar">
             {hover != null && hoverRow && (
@@ -682,7 +705,15 @@ export function StitchOutPanel() {
               {/* the colour sequence, sewn part in full colour */}
               <div className="so-ribbon">
                 {rows.map(({ block: b, color }) => (
-                  <i key={b.index} style={{ left: pct(b.start, total), width: pct(b.end - b.start, total), ["--c" as string]: color, ["--sewn" as string]: `${Math.max(0, Math.min(1, (at - b.start) / Math.max(1, b.end - b.start))) * 100}%` }} />
+                  <i
+                    key={b.index}
+                    style={{
+                      left: pct(b.start, total),
+                      width: pct(b.end - b.start, total),
+                      ["--c" as string]: color,
+                      ["--sewn" as string]: `${Math.max(0, Math.min(1, (at - b.start) / Math.max(1, b.end - b.start))) * 100}%`,
+                    }}
+                  />
                 ))}
               </div>
             </div>
@@ -697,7 +728,12 @@ export function StitchOutPanel() {
                 <div
                   key={b.index}
                   className={`so-fill ${b.index === cur && at < b.end ? "live" : ""}`}
-                  style={{ top: ROW * b.index + (ROW - BAR) / 2, left: pct(b.start, total), width: pct(Math.min(at, b.end) - b.start, total), ["--c" as string]: color }}
+                  style={{
+                    top: ROW * b.index + (ROW - BAR) / 2,
+                    left: pct(b.start, total),
+                    width: pct(Math.min(at, b.end) - b.start, total),
+                    ["--c" as string]: color,
+                  }}
                 />
               ) : null,
             )}

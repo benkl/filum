@@ -10,7 +10,8 @@ const check = (ok: boolean, msg: string) => {
     console.log("FAIL", msg);
   } else console.log("ok  ", msg);
 };
-const obj = (id: string, group?: string) => ({ id, group, name: id, thread: "t", visible: true, locked: false, paths: [], stitch: { type: "running" } }) as unknown as DesignObject;
+const obj = (id: string, group?: string) =>
+  ({ id, group, name: id, thread: "t", visible: true, locked: false, paths: [], stitch: { type: "running" } }) as unknown as DesignObject;
 
 // "in" (b, c) sits in "out" (with d); a stands alone
 const doc = { objects: [obj("a"), obj("b", "in"), obj("c", "in"), obj("d", "out")], groupParents: { in: "out" } };

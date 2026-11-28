@@ -63,10 +63,43 @@ const letter = (id: string, x: number, p: Partial<DesignObject> = {}, t?: TextSp
   check(s2.objects[2] === other && s2.objects[3] === plain, "other objects untouched");
   check(settleTexts(doc2).objects[0].text === undefined, "without the previous document every lettering is checked");
   // the whole lettering transformed: still one lettering
-  const doc3 = { objects: [{ ...a, text: { ...a.text!, anchor: [5, 5] as Vec2, size: 12 } }, moved && { ...b, text: { ...b.text!, anchor: [5, 5] as Vec2, size: 12 } }, other, plain] };
+  const doc3 = {
+    objects: [
+      { ...a, text: { ...a.text!, anchor: [5, 5] as Vec2, size: 12 } },
+      moved && { ...b, text: { ...b.text!, anchor: [5, 5] as Vec2, size: 12 } },
+      other,
+      plain,
+    ],
+  };
   check(settleTexts(doc3, doc) === doc3, "the whole lettering transformed: stays a lettering");
-  const pathed = { objects: [{ ...a, text: { ...a.text!, path: [[0, 0], [1, 1]] as Vec2[] } }, { ...b, text: { ...b.text!, path: [[0, 0], [1, 2]] as Vec2[] } }] };
-  check(settleTexts(pathed).objects.every((o) => !o.text), "different paths: not one lettering");
+  const pathed = {
+    objects: [
+      {
+        ...a,
+        text: {
+          ...a.text!,
+          path: [
+            [0, 0],
+            [1, 1],
+          ] as Vec2[],
+        },
+      },
+      {
+        ...b,
+        text: {
+          ...b.text!,
+          path: [
+            [0, 0],
+            [1, 2],
+          ] as Vec2[],
+        },
+      },
+    ],
+  };
+  check(
+    settleTexts(pathed).objects.every((o) => !o.text),
+    "different paths: not one lettering",
+  );
   // only changed letterings are checked against the previous document (cheap)
   const broken = { objects: [a, moved] };
   const later = { objects: [...broken.objects, plain] };
@@ -90,7 +123,10 @@ const letter = (id: string, x: number, p: Partial<DesignObject> = {}, t?: TextSp
   // the same letters again (e.g. a new colour)
   let out = carryOver(old, base, [letter("n1", 0), letter("n2", 4)]);
   check(out[1].ties === "none" && out[1].stopAfter && out[0].ties === undefined && !out[0].stopAfter, "same letters: settings letter by letter");
-  check(out.every((o) => o.group === "grp"), "the lettering stays in its group");
+  check(
+    out.every((o) => o.group === "grp"),
+    "the lettering stays in its group",
+  );
   check(out[0].id === "a" && out[1].id === "b", "the letters keep their ids (selection, linked clones)");
   // other text: more letters
   out = carryOver(old, base, [letter("n1", 0), letter("n2", 4), letter("n3", 8)]);
@@ -98,9 +134,15 @@ const letter = (id: string, x: number, p: Partial<DesignObject> = {}, t?: TextSp
   check(out[0].ties === undefined && out[2].ties === undefined, "other letters: a lock set on one letter is not spread");
   check(out[0].id === "a" && out[1].id === "b" && out[2].id === "n3", "other letters: ids in place, new letters get new ones");
   // set on all letters: the whole lettering
-  const all = [letter("a", 0, { minStitch: 0.8, forceLock: true, hidden: { keep: true } }), letter("b", 4, { minStitch: 0.8, forceLock: true, hidden: { keep: true } })];
+  const all = [
+    letter("a", 0, { minStitch: 0.8, forceLock: true, hidden: { keep: true } }),
+    letter("b", 4, { minStitch: 0.8, forceLock: true, hidden: { keep: true } }),
+  ];
   out = carryOver(all, base, [letter("n1", 0), letter("n2", 4), letter("n3", 8)]);
-  check(out.every((o) => o.minStitch === 0.8 && o.forceLock && o.hidden?.keep), "the same setting on every letter applies to all new letters");
+  check(
+    out.every((o) => o.minStitch === 0.8 && o.forceLock && o.hidden?.keep),
+    "the same setting on every letter applies to all new letters",
+  );
   // the font's own values are not the user's: not carried to other letters
   const fontBase = [letter("1", 0, { start: [1, -5], minStitch: 0.4 }), letter("2", 4, { start: [5, -5] })];
   const fromFont = [letter("a", 0, { start: [1, -5], minStitch: 0.4 }), letter("b", 4, { start: [5, -5] })];
@@ -118,15 +160,27 @@ const letter = (id: string, x: number, p: Partial<DesignObject> = {}, t?: TextSp
   const lockBase = [letter("1", 0, { ties: "none" }), letter("2", 4)];
   const reset = [letter("a", 0), letter("b", 4)];
   out = carryOver(reset, lockBase, [letter("n1", 0, { ties: "start" }), letter("n2", 4, { ties: "none" }), letter("n3", 8)]);
-  check(out.every((o) => (o.ties ?? "both") === "both"), "locks set back to Both on the whole lettering stay");
+  check(
+    out.every((o) => (o.ties ?? "both") === "both"),
+    "locks set back to Both on the whole lettering stay",
+  );
   // hidden and locked letters
   out = carryOver([letter("a", 0, { visible: false }), letter("b", 4, { visible: false })], base, [letter("n1", 0), letter("n2", 4), letter("n3", 8)]);
-  check(out.every((o) => !o.visible), "a hidden lettering stays hidden");
+  check(
+    out.every((o) => !o.visible),
+    "a hidden lettering stays hidden",
+  );
   out = carryOver([letter("a", 0, { locked: true }), letter("b", 4, { locked: true })], base, [letter("n1", 0), letter("n2", 4), letter("n3", 8)]);
-  check(out.every((o) => o.locked), "a locked lettering stays locked");
+  check(
+    out.every((o) => o.locked),
+    "a locked lettering stays locked",
+  );
   // without a regenerated old layout: every non-default value counts
   out = carryOver([letter("a", 0, { ties: "end" }), letter("b", 4, { ties: "end" })], null, [letter("n1", 0), letter("n2", 4), letter("n3", 8)]);
-  check(out.every((o) => o.ties === "end"), "without the old layout, set values are kept");
+  check(
+    out.every((o) => o.ties === "end"),
+    "without the old layout, set values are kept",
+  );
   // fresh objects are not changed in place
   const fresh = [letter("n1", 0)];
   carryOver([letter("a", 0, { group: "grp" })], [letter("1", 0)], fresh);
@@ -141,10 +195,17 @@ const letter = (id: string, x: number, p: Partial<DesignObject> = {}, t?: TextSp
   const shape = letter("s", 20, { text: undefined });
   const doc = { objects: [a, b, c, shape] };
   // a drag moved the unlocked letters (and a shape), not the locked one
-  const nudged = (o: DesignObject) => ({ ...o, paths: o.paths.map((sp) => ({ ...sp, nodes: sp.nodes.map((n) => ({ ...n, p: [n.p[0] + 5, n.p[1]] as Vec2 })) })), ...(o.text ? { text: { ...o.text, anchor: [5, 0] as Vec2 } } : {}) });
+  const nudged = (o: DesignObject) => ({
+    ...o,
+    paths: o.paths.map((sp) => ({ ...sp, nodes: sp.nodes.map((n) => ({ ...n, p: [n.p[0] + 5, n.p[1]] as Vec2 })) })),
+    ...(o.text ? { text: { ...o.text, anchor: [5, 0] as Vec2 } } : {}),
+  });
   const moved = { objects: [a, nudged(b), nudged(c), nudged(shape)] };
   const s = settleTexts(moved, doc);
-  check(s.objects.slice(0, 3).every((o) => !!o.text), "locked letter: the lettering keeps its text (none of its letters become shapes)");
+  check(
+    s.objects.slice(0, 3).every((o) => !!o.text),
+    "locked letter: the lettering keeps its text (none of its letters become shapes)",
+  );
   check(s.objects[1] === b && s.objects[2] === c, "locked letter: the moved letters are taken back");
   check(s.objects[3] === moved.objects[3], "locked letter: other objects still move");
   check(!!settleTexts(moved).objects[0].text === false, "without the previous document: as before (shapes)");
@@ -165,29 +226,49 @@ const letter = (id: string, x: number, p: Partial<DesignObject> = {}, t?: TextSp
   const h1 = letter("h1", 4, { thread: "p1" }, pal({ colorIndex: 1 }));
   const shape = letter("s", 20, { text: undefined, thread: "q" });
   const objs = [g0, g1, h0, h1, shape];
-  check(threadSlot(g1.text!) === 1 && threadSlot(spec("g", { role: "border", style: "fillBorder" })) === "borderThread" && threadSlot(spec("g", { role: "border", style: "border" })) === "thread", "slots: palette index, border thread, main thread");
+  check(
+    threadSlot(g1.text!) === 1 &&
+      threadSlot(spec("g", { role: "border", style: "fillBorder" })) === "borderThread" &&
+      threadSlot(spec("g", { role: "border", style: "border" })) === "thread",
+    "slots: palette index, border thread, main thread",
+  );
   check(threadSlot(spec("g", { colorIndex: 3 })) === "thread", "slot: a font colour without a palette thread is the main thread");
   // a mixed selection (letter g1 + the shape) given thread "n"
   const out = setObjectsThread(objs, ["g1", "s"], "n");
   check(out[4].thread === "n", "mixed selection: the shape takes the thread");
   check(out[1].thread === "n" && out[3].thread === "n", "mixed selection: every letter of that font colour takes it");
   check(out[0].thread === "p0" && out[2].thread === "p0", "mixed selection: the other font colour stays");
-  check(out.slice(0, 4).every((o) => o.text?.palette?.[1] === "n" && o.text.palette[0] === "p0" && o.text.thread === "p0"), "mixed selection: the lettering's palette keeps the colour for the next layout");
-  check(settleTexts({ objects: out }, { objects: objs }).objects.every((o, i) => i === 4 || !!o.text), "mixed selection: still one lettering");
+  check(
+    out.slice(0, 4).every((o) => o.text?.palette?.[1] === "n" && o.text.palette[0] === "p0" && o.text.thread === "p0"),
+    "mixed selection: the lettering's palette keeps the colour for the next layout",
+  );
+  check(
+    settleTexts({ objects: out }, { objects: objs }).objects.every((o, i) => i === 4 || !!o.text),
+    "mixed selection: still one lettering",
+  );
   // main and border threads of an outline font
   const fill = letter("f", 0, { thread: "t" }, spec("k", { style: "fillBorder", role: "fill", borderThread: "b" }));
   const border = letter("b", 0, { thread: "b" }, spec("k", { style: "fillBorder", role: "border", borderThread: "b" }));
   const ob = setObjectsThread([fill, border], ["b"], "n");
-  check(ob[0].thread === "t" && ob[0].text?.thread === "t" && ob.every((o) => o.text?.borderThread === "n"), "border letter: the spec's border thread changes, the fill stays");
+  check(
+    ob[0].thread === "t" && ob[0].text?.thread === "t" && ob.every((o) => o.text?.borderThread === "n"),
+    "border letter: the spec's border thread changes, the fill stays",
+  );
   const of = setObjectsThread([fill, border], ["f", "b"], "n");
-  check(of.every((o) => o.thread === "n" && o.text?.thread === "n" && o.text.borderThread === "n"), "fill and border picked: both spec threads change");
+  check(
+    of.every((o) => o.thread === "n" && o.text?.thread === "n" && o.text.borderThread === "n"),
+    "fill and border picked: both spec threads change",
+  );
   // threads given from outside (a thread list)
   const listed = objs.map((o) => (o.id === "g0" || o.id === "h0" ? { ...o, thread: "z" } : o));
   const r = syncTextThreads(listed);
   check(r.shapes === 0 && r.objects.slice(0, 4).every((o) => o.text?.palette?.[0] === "z"), "thread list: one new thread per font colour goes into the spec");
   const split = objs.map((o) => (o.id === "g0" ? { ...o, thread: "z" } : o));
   const rs = syncTextThreads(split);
-  check(rs.shapes === 1 && rs.objects.slice(0, 4).every((o) => !o.text) && rs.objects[0].thread === "z", "thread list: one font colour split in two: the lettering becomes shapes, colours kept");
+  check(
+    rs.shapes === 1 && rs.objects.slice(0, 4).every((o) => !o.text) && rs.objects[0].thread === "z",
+    "thread list: one font colour split in two: the lettering becomes shapes, colours kept",
+  );
   check(syncTextThreads(split, new Set(["other"])).objects === split, "only the named letterings are looked at");
   check(syncTextThreads(objs).objects === objs, "nothing to change: the same objects");
 }

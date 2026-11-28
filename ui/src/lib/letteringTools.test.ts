@@ -23,7 +23,10 @@ check(t.length === 3 && t[1].text === "Ben Smith\nTeam A", "custom separator; \\
 t = batchTexts("a\r\nb");
 check(t.map((x) => x.text).join("|") === "a|b", "Windows line ends");
 check(batchFileName(0, "Anna", "pes") === "000-Anna.pes", "file name: number and text");
-check(batchFileName(12, "Benjamin Kleinert", "dst") === "012-Benjami.dst", `file name: 8 characters with the dash, like Ink/Stitch (${batchFileName(12, "Benjamin Kleinert", "dst")})`);
+check(
+  batchFileName(12, "Benjamin Kleinert", "dst") === "012-Benjami.dst",
+  `file name: 8 characters with the dash, like Ink/Stitch (${batchFileName(12, "Benjamin Kleinert", "dst")})`,
+);
 check(batchFileName(3, "Ünïcødé!", "jef") === "003-ncd.jef", "file name: ASCII letters and digits only");
 check(batchFileName(4, "★★", "svg") === "004.svg", "file name: just the number without letters");
 
@@ -37,7 +40,10 @@ const zip = makeZip([
 ]);
 check(zip[0] === 0x50 && zip[1] === 0x4b && zip[2] === 3 && zip[3] === 4, "zip: local file header first");
 const back = readZip(zip);
-check(back.length === 3 && back[0].name === "000-Anna.pes" && back[1].name === "000-Anna (2).pes" && back[2].name === "Ünï.dst", "zip: names (UTF-8, duplicates numbered)");
+check(
+  back.length === 3 && back[0].name === "000-Anna.pes" && back[1].name === "000-Anna (2).pes" && back[2].name === "Ünï.dst",
+  "zip: names (UTF-8, duplicates numbered)",
+);
 check(new TextDecoder().decode(back[0].bytes) === "pes data" && back[2].bytes[3] === 255, "zip: contents round-trip");
 
 // --- font sample and font info -----------------------------------------------------
@@ -72,7 +78,15 @@ check(sampleGlyphNames(["b", "A", "ل.init", "a", "1", " "]).join("") === "1Aab"
   check(s === "AB\nCD\nل", `sample sheet: lines broken at the width (${JSON.stringify(s)})`);
   const big = await fontSampleText(font, 20, 40);
   check(big === "AB\nCD\nل", "sample sheet: widths scale with the size");
-  const f2 = withFontInfo(font, { name: "Edited", size: 12, leading: 96, horiz_adv_x_space: 48, kerning_pairs: { "A V": -9.6 }, horiz_adv_x: { A: 96 }, reversible: false });
+  const f2 = withFontInfo(font, {
+    name: "Edited",
+    size: 12,
+    leading: 96,
+    horiz_adv_x_space: 48,
+    kerning_pairs: { "A V": -9.6 },
+    horiz_adv_x: { A: 96 },
+    reversible: false,
+  });
   check(f2.name === "Edited" && f2.size === 12 && near(f2.leading, 25.4) && near(f2.space, 12.7), "font info: metrics px → mm");
   check(near(f2.kerning["A V"], -2.54) && near(f2.adv.A, 25.4) && f2.reversible === false, "font info: kerning, advances, reversible");
   check(f2.glyph === font.glyph, "font info: the glyphs stay");
@@ -84,8 +98,14 @@ check(sampleGlyphNames(["b", "A", "ل.init", "a", "1", " "]).join("") === "1Aab"
   const chunk = (file: string) => ({ file, glyphs: ["A"], baseline: 0 }) as unknown as PackedFont["chunks"][number];
   const packed = { variant: "ltr", chunks: [chunk("glyphs-0.json")], variants: { rtl: [chunk("rtl-glyphs-0.json")] } } as unknown as PackedFont;
   const sw = withDefaultVariant(packed, "←");
-  check(sw.variant === "rtl" && sw.chunks[0].file === "rtl-glyphs-0.json" && sw.variants?.ltr?.[0].file === "glyphs-0.json" && !sw.variants?.rtl, "saved font info: the default variant's chunks swap with the old default's");
-  check(withDefaultVariant(packed, "ttb") === packed && withDefaultVariant(packed, "ltr") === packed && withDefaultVariant(packed, undefined) === packed, "saved font info: a missing or unchanged variant changes nothing");
+  check(
+    sw.variant === "rtl" && sw.chunks[0].file === "rtl-glyphs-0.json" && sw.variants?.ltr?.[0].file === "glyphs-0.json" && !sw.variants?.rtl,
+    "saved font info: the default variant's chunks swap with the old default's",
+  );
+  check(
+    withDefaultVariant(packed, "ttb") === packed && withDefaultVariant(packed, "ltr") === packed && withDefaultVariant(packed, undefined) === packed,
+    "saved font info: a missing or unchanged variant changes nothing",
+  );
   const rows = kerningRows({ "B A": 1, "A V": -2, AT: 3 });
   check(rows.map((r) => `${r.left}|${r.right}`).join(",") === "A|T,A|V,B|A", "kerning rows: legacy pairs split, sorted");
   check(JSON.parse(fontJsonText({ name: "x", kerning_pairs: {} })).name === "x", "font.json text parses back");
@@ -102,11 +122,21 @@ check(sampleGlyphNames(["b", "A", "ل.init", "a", "1", " "]).join("") === "1Aab"
 // --- letters to font -------------------------------------------------------------
 import { extractGlyphs } from "./inkFontPack.mjs";
 import { fontNameFromFiles, letterOfFile, wrapGlyphLayer } from "./letteringTools";
-check(letterOfFile("abc/Example_Font_A.pes") === "A" && letterOfFile("x_Ä.v2.dst") === "Ä" && letterOfFile("") === null, "letters to font: the glyph is the last character before the dot");
+check(
+  letterOfFile("abc/Example_Font_A.pes") === "A" && letterOfFile("x_Ä.v2.dst") === "Ä" && letterOfFile("") === null,
+  "letters to font: the glyph is the last character before the dot",
+);
 check(fontNameFromFiles(["Example_Font_A.pes", "Example_Font_B.pes"]) === "Example Font", "letters to font: the name from the common prefix");
 check(fontNameFromFiles(["A.pes", "B.pes"]) === "Letters", "letters to font: a default name");
 {
-  const wrapped = wrapGlyphLayer('<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" width="10mm" height="10mm" viewBox="0 0 10 10"><metadata>x</metadata><path d="M1 1 L5 5" style="stroke:#ff0000;fill:none"/></svg>', '"', 2);
+  const wrapped = wrapGlyphLayer(
+    '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" width="10mm" height="10mm" viewBox="0 0 10 10"><metadata>x</metadata><path d="M1 1 L5 5" style="stroke:#ff0000;fill:none"/></svg>',
+    '"',
+    2,
+  );
   const g = extractGlyphs(wrapped).glyphs;
-  check(Object.keys(g).join() === '"' && g['"'].includes("translate(2 0)") && !g['"'].includes("metadata"), "letters to font: the file becomes a glyph layer (escaped name, moved, metadata dropped)");
+  check(
+    Object.keys(g).join() === '"' && g['"'].includes("translate(2 0)") && !g['"'].includes("metadata"),
+    "letters to font: the file becomes a glyph layer (escaped name, moved, metadata dropped)",
+  );
 }

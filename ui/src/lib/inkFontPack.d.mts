@@ -51,7 +51,9 @@ export interface PackedFont extends FontMetrics {
 }
 
 /** font.json metrics with Ink/Stitch's defaults (every flag set). */
-export function fontMetrics(meta: Record<string, unknown>): FontMetrics & Required<Pick<FontMetrics, "reversible" | "sortable" | "combine_at_sort_indices" | "auto_satin" | "scale_cross_stitch_pattern">>;
+export function fontMetrics(
+  meta: Record<string, unknown>,
+): FontMetrics & Required<Pick<FontMetrics, "reversible" | "sortable" | "combine_at_sort_indices" | "auto_satin" | "scale_cross_stitch_pattern">>;
 export function buildFont(
   meta: Record<string, unknown>,
   files: string[],

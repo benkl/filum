@@ -3,7 +3,10 @@
 
 /// A uniform number in [0, 1) from a seed and two indices.
 pub fn uniform(seed: u32, a: u64, b: u64) -> f64 {
-    let mut x = a.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ b.wrapping_mul(0xC2B2_AE3D_27D4_EB4F) ^ (seed as u64).wrapping_mul(0x1656_67B1_9E37_79F9) ^ 0x2545_F491_4F6C_DD1D;
+    let mut x = a.wrapping_mul(0x9E37_79B9_7F4A_7C15)
+        ^ b.wrapping_mul(0xC2B2_AE3D_27D4_EB4F)
+        ^ (seed as u64).wrapping_mul(0x1656_67B1_9E37_79F9)
+        ^ 0x2545_F491_4F6C_DD1D;
     x ^= x >> 33;
     x = x.wrapping_mul(0xFF51_AFD7_ED55_8CCD);
     x ^= x >> 33;

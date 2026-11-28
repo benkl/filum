@@ -11,11 +11,7 @@ use crate::encoder::{encode, Cmd, EncodeSettings};
 use crate::raw::RawPattern;
 use crate::{Error, Pattern, WriteOptions};
 
-pub(crate) const SETTINGS: EncodeSettings = EncodeSettings {
-    max_stitch: 127,
-    max_jump: 127,
-    full_jump: true,
-};
+pub(crate) const SETTINGS: EncodeSettings = EncodeSettings { max_stitch: 127, max_jump: 127, full_jump: true };
 
 pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Vec<u8> {
     let e = encode(p, SETTINGS, opts.long_stitch_as_jumps);
@@ -28,9 +24,7 @@ pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Vec<u8> {
         yy = r.y;
         match r.cmd {
             Cmd::Stitch => out.extend_from_slice(&[(dx & 0xFF) as u8, (-dy & 0xFF) as u8]),
-            Cmd::Jump => {
-                out.extend_from_slice(&[0x80, 0x04, (dx & 0xFF) as u8, (-dy & 0xFF) as u8])
-            }
+            Cmd::Jump => out.extend_from_slice(&[0x80, 0x04, (dx & 0xFF) as u8, (-dy & 0xFF) as u8]),
             Cmd::Trim => out.extend_from_slice(&[0x80, 0x80, 0x07, 0x00]),
             Cmd::ColorChange | Cmd::Stop => out.extend_from_slice(&[0x80, 0x01, 0x00, 0x00]),
             Cmd::End => {}

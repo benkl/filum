@@ -182,13 +182,7 @@ impl Decoder<'_> {
 
 /// pystitch `expand`: decompress `data`, producing at most about `size` bytes.
 pub(crate) fn expand(data: &[u8], size: usize) -> Vec<u8> {
-    let mut d = Decoder {
-        data,
-        bit: 0,
-        block_elements: -1,
-        characters: Huffman::constant(0),
-        distances: Huffman::constant(0),
-    };
+    let mut d = Decoder { data, bit: 0, block_elements: -1, characters: Huffman::constant(0), distances: Huffman::constant(0) };
     let mut out: Vec<u8> = Vec::new();
     let bits_total = data.len() * 8;
     while bits_total > d.bit && out.len() <= size {

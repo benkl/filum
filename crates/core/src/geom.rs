@@ -132,12 +132,7 @@ pub struct Rect {
 }
 
 impl Rect {
-    pub const EMPTY: Rect = Rect {
-        min_x: f64::INFINITY,
-        min_y: f64::INFINITY,
-        max_x: f64::NEG_INFINITY,
-        max_y: f64::NEG_INFINITY,
-    };
+    pub const EMPTY: Rect = Rect { min_x: f64::INFINITY, min_y: f64::INFINITY, max_x: f64::NEG_INFINITY, max_y: f64::NEG_INFINITY };
     pub fn is_empty(&self) -> bool {
         self.min_x > self.max_x || self.min_y > self.max_y
     }
@@ -148,19 +143,10 @@ impl Rect {
         self.max_y = self.max_y.max(p.y);
     }
     pub fn union(&self, o: &Rect) -> Rect {
-        Rect {
-            min_x: self.min_x.min(o.min_x),
-            min_y: self.min_y.min(o.min_y),
-            max_x: self.max_x.max(o.max_x),
-            max_y: self.max_y.max(o.max_y),
-        }
+        Rect { min_x: self.min_x.min(o.min_x), min_y: self.min_y.min(o.min_y), max_x: self.max_x.max(o.max_x), max_y: self.max_y.max(o.max_y) }
     }
     pub fn intersects(&self, o: &Rect) -> bool {
-        !(self.is_empty() || o.is_empty())
-            && self.min_x <= o.max_x
-            && o.min_x <= self.max_x
-            && self.min_y <= o.max_y
-            && o.min_y <= self.max_y
+        !(self.is_empty() || o.is_empty()) && self.min_x <= o.max_x && o.min_x <= self.max_x && self.min_y <= o.max_y && o.min_y <= self.max_y
     }
     pub fn width(&self) -> f64 {
         (self.max_x - self.min_x).max(0.0)
@@ -386,11 +372,7 @@ pub fn rings_area(rings: &[Ring]) -> f64 {
     let mut total = 0.0;
     for (i, r) in rings.iter().enumerate() {
         let a = signed_area(r).abs();
-        let depth = rings
-            .iter()
-            .enumerate()
-            .filter(|(j, o)| *j != i && !r.is_empty() && point_in_ring(r[0], o))
-            .count();
+        let depth = rings.iter().enumerate().filter(|(j, o)| *j != i && !r.is_empty() && point_in_ring(r[0], o)).count();
         if depth % 2 == 0 {
             total += a
         } else {
@@ -467,8 +449,7 @@ pub fn segments_intersect(p1: Point, p2: Point, q1: Point, q2: Point) -> bool {
     let d2 = (p2 - p1).cross(q2 - p1);
     let d3 = (q2 - q1).cross(p1 - q1);
     let d4 = (q2 - q1).cross(p2 - q1);
-    ((d1 > 1e-12 && d2 < -1e-12) || (d1 < -1e-12 && d2 > 1e-12))
-        && ((d3 > 1e-12 && d4 < -1e-12) || (d3 < -1e-12 && d4 > 1e-12))
+    ((d1 > 1e-12 && d2 < -1e-12) || (d1 < -1e-12 && d2 > 1e-12)) && ((d3 > 1e-12 && d4 < -1e-12) || (d3 < -1e-12 && d4 > 1e-12))
 }
 
 /// Intersection point of segment p1p2 and q1q2 if any (parameter on p, point).
@@ -916,9 +897,7 @@ impl DistanceField {
         let d_out = edt_2d(&inside, w, h); // for outside cells: distance to inside
         let half = 0.5f32;
         let r = res as f32;
-        let sd = (0..w * h)
-            .map(|k| if inside[k] { (d_in[k].sqrt() - half) * r } else { -(d_out[k].sqrt() - half) * r })
-            .collect();
+        let sd = (0..w * h).map(|k| if inside[k] { (d_in[k].sqrt() - half) * r } else { -(d_out[k].sqrt() - half) * r }).collect();
         Some(DistanceField { w, h, origin: pt(ox, oy), res, sd })
     }
 
@@ -1058,8 +1037,20 @@ mod tests {
     #[test]
     fn boundary_grid_measures_exactly_as_the_plain_scan() {
         // a wavy ring with a hole, a thin sliver and a lone segment; points inside, outside and far away
-        let outer: Ring = (0..300).map(|k| { let a = k as f64 / 300.0 * std::f64::consts::TAU; let r = 20.0 + 3.0 * (7.0 * a).sin(); pt(25.0 + r * a.cos(), 22.0 + 0.7 * r * a.sin()) }).collect();
-        let hole: Ring = (0..40).rev().map(|k| { let a = k as f64 / 40.0 * std::f64::consts::TAU; pt(25.0 + 5.0 * a.cos(), 22.0 + 4.0 * a.sin()) }).collect();
+        let outer: Ring = (0..300)
+            .map(|k| {
+                let a = k as f64 / 300.0 * std::f64::consts::TAU;
+                let r = 20.0 + 3.0 * (7.0 * a).sin();
+                pt(25.0 + r * a.cos(), 22.0 + 0.7 * r * a.sin())
+            })
+            .collect();
+        let hole: Ring = (0..40)
+            .rev()
+            .map(|k| {
+                let a = k as f64 / 40.0 * std::f64::consts::TAU;
+                pt(25.0 + 5.0 * a.cos(), 22.0 + 4.0 * a.sin())
+            })
+            .collect();
         let sliver = vec![pt(60.0, 0.0), pt(90.0, 0.01), pt(60.0, 0.02)];
         for rings in [vec![outer.clone(), hole], vec![sliver], vec![vec![pt(1.0, 1.0), pt(1.0, 1.0)]], vec![outer]] {
             let g = BoundaryDist::new(&rings);

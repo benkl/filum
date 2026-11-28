@@ -10,7 +10,8 @@ import type { DesignObject, StitchDocument, Vec2 } from "../types";
 import { Seg } from "./ui";
 
 /** A fill the tool can split. */
-export const splittable = (o: DesignObject | undefined | null): o is DesignObject => !!o && !o.locked && !o.text && o.stitch.type === "fill" && o.paths.some((sp) => sp.closed);
+export const splittable = (o: DesignObject | undefined | null): o is DesignObject =>
+  !!o && !o.locked && !o.text && o.stitch.type === "fill" && o.paths.some((sp) => sp.closed);
 
 /** The plan for the draft (memoised on the document and the draft). */
 let memo: { doc: StitchDocument; draft: SplitDraft; plan: SplitPlan | null } | null = null;
@@ -66,8 +67,10 @@ export function applySplitDraft(): void {
   const many = r.plan.parts.filter((p) => p.notOneColumn).length;
   const n = r.made.length;
   s.toast(`${n} satin${n > 1 ? "s" : ""} made${n > 1 ? ` (overlapping ${r.plan.overlap} mm at the cuts)` : ""}`, "success");
-  if (auto && d.directions.length) s.toast(`${auto} part${auto > 1 ? "s" : ""} without a direction line: sewn across ${auto > 1 ? "their columns" : "its column"}`);
-  if (many) s.toast(`${many} part${many > 1 ? "s are" : " is"} not one column across its direction: only the longest stretch is sewn. Add a cut there`, "error");
+  if (auto && d.directions.length)
+    s.toast(`${auto} part${auto > 1 ? "s" : ""} without a direction line: sewn across ${auto > 1 ? "their columns" : "its column"}`);
+  if (many)
+    s.toast(`${many} part${many > 1 ? "s are" : " is"} not one column across its direction: only the longest stretch is sewn. Add a cut there`, "error");
   s.set({ splitDraft: { ...EMPTY_SPLIT, draw: d.draw } });
   s.setTool("select");
 }
@@ -86,9 +89,22 @@ export function SplitToolBar() {
         <Split size={14} />
         <span>{shape ? `Split ${shape.name}` : "Split into satins"}</span>
       </span>
-      <Seg label="A drag draws" value={draft.draw} options={[["cut", "Cut lines", "A drag draws a cut line: the shape is cut where it crosses it"], ["direction", "Direction lines", "A drag draws a direction line: the part it lies in has a stitch along it there (or hold Alt)"]] as const} onChange={(v) => setDraft({ draw: v })} />
+      <Seg
+        label="A drag draws"
+        value={draft.draw}
+        options={
+          [
+            ["cut", "Cut lines", "A drag draws a cut line: the shape is cut where it crosses it"],
+            ["direction", "Direction lines", "A drag draws a direction line: the part it lies in has a stitch along it there (or hold Alt)"],
+          ] as const
+        }
+        onChange={(v) => setDraft({ draw: v })}
+      />
       {shape && (
-        <span className="stat" title={auto ? "A part without a direction line is sewn across its column (one with a counter: across its long side)" : undefined}>
+        <span
+          className="stat"
+          title={auto ? "A part without a direction line is sewn across its column (one with a counter: across its long side)" : undefined}
+        >
           {parts} part{parts === 1 ? "" : "s"}
           {auto ? ` · ${auto} automatic` : ""}
         </span>
@@ -104,7 +120,9 @@ export function SplitToolBar() {
         Make {parts > 1 ? `${parts} satins` : "satin"}
       </button>
       <span className="ctx-help">
-        {shape ? "Drag across the shape to cut it · Alt-drag the way to sew a part · Enter makes the satins" : "Click a fill shape: you'll draw where to cut it and which way to sew each part"}
+        {shape
+          ? "Drag across the shape to cut it · Alt-drag the way to sew a part · Enter makes the satins"
+          : "Click a fill shape: you'll draw where to cut it and which way to sew each part"}
       </span>
     </div>
   );

@@ -3,7 +3,19 @@
 // Font.render_text lays them out.
 
 import opentype from "opentype.js";
-import { arcRadius, bidiLevels, blockOffsets, clampToFont, layoutText, lineVariant, placeGlyphs, reversedVariant, reverseLine, sizeForFont, visualOrder } from "./textLayout";
+import {
+  arcRadius,
+  bidiLevels,
+  blockOffsets,
+  clampToFont,
+  layoutText,
+  lineVariant,
+  placeGlyphs,
+  reversedVariant,
+  reverseLine,
+  sizeForFont,
+  visualOrder,
+} from "./textLayout";
 import { defaultFill, defaultSatin, transformObject, type Mat } from "./geometry";
 import { buildFont, collectColors, extractGlyphs, fontMetrics, variantId } from "./inkFontPack.mjs";
 import type { EmbroideryFont, EmbroideryGlyph, OutlineFont } from "./fonts";
@@ -88,7 +100,10 @@ const order = (objs: DesignObject[]) => objs.map((o) => `${o.name.split(" · ")[
 
 // --- pure rules --------------------------------------------------------------
 check(reversedVariant("ltr") === "rtl" && reversedVariant("ttb") === "btt" && reversedVariant("btt") === "ttb", "reversed variants pair up");
-check(lineVariant("ltr", true, 1) === "rtl" && lineVariant("ltr", true, 2) === "ltr" && lineVariant("ltr", false, 1) === "ltr", "back and forth: every second line reversed");
+check(
+  lineVariant("ltr", true, 1) === "rtl" && lineVariant("ltr", true, 2) === "ltr" && lineVariant("ltr", false, 1) === "ltr",
+  "back and forth: every second line reversed",
+);
 check(!reverseLine("ltr", false, 1) && reverseLine("ltr", true, 1) && !reverseLine("ltr", true, 0), "ltr: second lines run backwards");
 check(reverseLine("rtl", false, 0) && !reverseLine("rtl", true, 1) && reverseLine("rtl", true, 2), "rtl: runs backwards except turned lines");
 check(!reverseLine("ttb", true, 1) && !reverseLine("btt", false, 0), "ttb/btt: reading order kept");
@@ -128,9 +143,15 @@ check(variantId("→") === "ltr" && variantId("↓") === "ttb" && variantId("btt
   check(len(objs[2]) === 2 && len(objs[0]) === 3 && len(objs[4]) === 3, "back and forth: the turned line uses the reversed (rtl) glyphs");
   check(minY(objs[2]) > minY(objs[0]), "back and forth: lines keep their place");
   objs = await layoutText(spec({ content: "AB\nCD", backAndForth: true, trims: "letter" }), f);
-  check(objs.every((o) => o.trimAfter), "back and forth: trims follow the stitch order (after every letter, the last too, as Ink/Stitch)");
+  check(
+    objs.every((o) => o.trimAfter),
+    "back and forth: trims follow the stitch order (after every letter, the last too, as Ink/Stitch)",
+  );
   objs = await layoutText(spec({ content: "AB CD\nEF", trims: "word" }), f);
-  check(objs.map((o) => +o.trimAfter).join("") === "010100", `word trims: after a word's last letter, not after the text's last word (${objs.map((o) => +o.trimAfter).join("")})`);
+  check(
+    objs.map((o) => +o.trimAfter).join("") === "010100",
+    `word trims: after a word's last letter, not after the text's last word (${objs.map((o) => +o.trimAfter).join("")})`,
+  );
   objs = await layoutText(spec({ content: "AB\nCD", trims: "line" }), f);
   check(objs.map((o) => +o.trimAfter).join("") === "0100", "line trims: after every line but the last");
   objs = await layoutText(spec({ content: "AB\nCD", backAndForth: true }), fakeFont("ltr", ["ltr", "rtl"], false));
@@ -158,20 +179,32 @@ check(variantId("→") === "ltr" && variantId("↓") === "ttb" && variantId("btt
   check(!!pack.data["rtl-glyphs-0.json"] && !!pack.data["glyphs-0.json"], "variant chunks get their own files");
   check(pack.font.reversible === true && pack.font.sortable === false, "reversible by default, not sortable (Ink/Stitch defaults)");
   const m = fontMetrics({ name: "X", reversible: false, horiz_adv_x_space: 30, kerning_pairs: { "A V": -2, "A B": 0 } });
-  check(m.reversible === false && m.horiz_adv_x_space === 30 && Object.keys(m.kerning_pairs).length === 1, "font metrics from font.json (zero kerning dropped)");
+  check(
+    m.reversible === false && m.horiz_adv_x_space === 30 && Object.keys(m.kerning_pairs).length === 1,
+    "font metrics from font.json (zero kerning dropped)",
+  );
 
   // --- the font's own commands per glyph object ---------------------------------
   const cmdFont = fakeFont("ltr", ["ltr"], true, { ties: "none", forceLock: true, minStitch: 0.5, minJump: 2, stopAfter: true, start: [1, -5], end: [3, -1] });
   objs = await layoutText(spec({ content: "AB", anchor: [10, 20] }), cmdFont);
   const b = objs[1];
-  check(b.ties === "none" && b.forceLock === true && b.minStitch === 0.5 && b.minJump === 2 && b.stopAfter === true, "glyph objects keep the font's ties, force lock, min stitch / jump and stop");
-  check(!!b.start && near(b.start[0], 15) && near(b.start[1], 15) && !!b.end && near(b.end[0], 17) && near(b.end[1], 19), `start / end points move with the letter (${b.start} ${b.end})`);
+  check(
+    b.ties === "none" && b.forceLock === true && b.minStitch === 0.5 && b.minJump === 2 && b.stopAfter === true,
+    "glyph objects keep the font's ties, force lock, min stitch / jump and stop",
+  );
+  check(
+    !!b.start && near(b.start[0], 15) && near(b.start[1], 15) && !!b.end && near(b.end[0], 17) && near(b.end[1], 19),
+    `start / end points move with the letter (${b.start} ${b.end})`,
+  );
   objs = await layoutText(spec({ content: "A", anchor: [0, 0], size: 20, rotation: 90 }), cmdFont);
   check(!!objs[0].start && near(objs[0].start[0], 10) && near(objs[0].start[1], 2), `start point scaled and turned with the letter (${objs[0].start})`);
   objs = await layoutText(spec({ content: "A B\nAAAAAAA", align: "block" }), cmdFont);
   check(minX(objs[1]) > 7 && !!objs[1].start && near(objs[1].start[0], minX(objs[1]) + 1), `start point follows Block alignment (${objs[1].start})`);
   objs = await layoutText(spec({ content: "AB" }), f);
-  check(objs.every((o) => o.start === undefined && o.ties === undefined && !o.stopAfter), "glyphs without commands get none");
+  check(
+    objs.every((o) => o.start === undefined && o.ties === undefined && !o.stopAfter),
+    "glyphs without commands get none",
+  );
 
   // --- arcs on short text ----------------------------------------------------------
   check(near(arcRadius(90, 10), 10 / (Math.PI / 2)), "arc radius: the width over the angle");
@@ -179,7 +212,10 @@ check(variantId("→") === "ltr" && variantId("↓") === "ttb" && variantId("btt
   objs = await layoutText(spec({ content: "A", align: "center", arc: -300 }), f);
   const nodes = objs[0].paths[0].nodes.map((n) => n.p);
   // box: top-left, top-right, bottom-right, bottom-left
-  check(nodes[0][0] < nodes[1][0] && nodes[0][1] < nodes[3][1] && nodes.every((p) => isFinite(p[0]) && isFinite(p[1])), `a strong dip on one letter keeps it the right way round (${JSON.stringify(nodes)})`);
+  check(
+    nodes[0][0] < nodes[1][0] && nodes[0][1] < nodes[3][1] && nodes.every((p) => isFinite(p[0]) && isFinite(p[1])),
+    `a strong dip on one letter keeps it the right way round (${JSON.stringify(nodes)})`,
+  );
   objs = await layoutText(spec({ content: "A\nA", align: "center", arc: 300 }), f);
   const low = objs[1].paths[0].nodes.map((n) => n.p);
   check(low[0][0] < low[1][0] && low[0][1] < low[3][1], `a strong arch keeps the lower line the right way round (${JSON.stringify(low)})`);
@@ -250,7 +286,10 @@ check(variantId("→") === "ltr" && variantId("↓") === "ttb" && variantId("btt
     const t = theirs[i].getBoundingBox();
     return a.isEmpty() ? t.isEmpty() : near(a.x1, t.x1);
   });
-  check(mine.glyphs.length === theirs.length && samePos && near(mine.width, ot.getAdvanceWidth("AB A", 10, opts)), "left-to-right glyph positions match opentype.js (kerning, letter spacing)");
+  check(
+    mine.glyphs.length === theirs.length && samePos && near(mine.width, ot.getAdvanceWidth("AB A", 10, opts)),
+    "left-to-right glyph positions match opentype.js (kerning, letter spacing)",
+  );
   check(near(mine.glyphs[1].x - mine.glyphs[0].x, 6 - 0.8 + 0.5), `the kerning pair applies (${mine.glyphs[1].x})`);
   check(names("אב") === "bethe alefhe", `Hebrew glyphs right to left (${names("אב")})`);
   check(names("ابت") === "teh beh alef", `Arabic glyphs right to left, not reversed twice (${names("ابت")})`);
@@ -270,19 +309,52 @@ check(variantId("→") === "ltr" && variantId("↓") === "ttb" && variantId("btt
 
   // --- transforms keep the lettering parametric ---------------------------------------
   {
-    const o = (await layoutText(spec({ content: "A", path: [[0, 0], [10, 0]], wordSpacing: 2 }), f))[0];
+    const o = (
+      await layoutText(
+        spec({
+          content: "A",
+          path: [
+            [0, 0],
+            [10, 0],
+          ],
+          wordSpacing: 2,
+        }),
+        f,
+      )
+    )[0];
     const m: Mat = [2, 0, 0, 2, 5, 5];
     const t = transformObject({ ...o, start: [1, 1] }, m);
     // word spacing: an embroidery font keeps it at its own size (it scales with the letters), an outline font's is mm
-    check(JSON.stringify(t.text!.path) === JSON.stringify([[5, 5], [25, 5]]) && t.text!.wordSpacing === (t.text!.font.startsWith("emb:") || t.text!.font.startsWith("inkfont:") ? 2 : 4), "text on a path: the path follows a move / scale, word spacing as the font measures it");
+    check(
+      JSON.stringify(t.text!.path) ===
+        JSON.stringify([
+          [5, 5],
+          [25, 5],
+        ]) && t.text!.wordSpacing === (t.text!.font.startsWith("emb:") || t.text!.font.startsWith("inkfont:") ? 2 : 4),
+      "text on a path: the path follows a move / scale, word spacing as the font measures it",
+    );
     check(!!t.start && t.start[0] === 7 && t.start[1] === 7, "a letter's start point follows the transform");
   }
 
   // --- a font of real objects: alignment, spacing, colour sort, paths, auto-satin ---------
   {
-    const rect = (x0: number, y0: number, x1: number, y1: number): SubPath => ({ closed: true, nodes: [{ p: [x0, y0] }, { p: [x1, y0] }, { p: [x1, y1] }, { p: [x0, y1] }] });
+    const rect = (x0: number, y0: number, x1: number, y1: number): SubPath => ({
+      closed: true,
+      nodes: [{ p: [x0, y0] }, { p: [x1, y0] }, { p: [x1, y1] }, { p: [x0, y1] }],
+    });
     const line = (a: [number, number], b: [number, number]): SubPath => ({ closed: false, nodes: [{ p: a }, { p: b }] });
-    const base = (p: Partial<DesignObject>): DesignObject => ({ id: "x", name: "x", thread: "t", visible: true, locked: false, paths: [rect(0, -10, 4, 0)], stitch: { type: "fill", ...defaultFill(), angle: 0 }, trimAfter: false, stopAfter: false, ...p });
+    const base = (p: Partial<DesignObject>): DesignObject => ({
+      id: "x",
+      name: "x",
+      thread: "t",
+      visible: true,
+      locked: false,
+      paths: [rect(0, -10, 4, 0)],
+      stitch: { type: "fill", ...defaultFill(), angle: 0 },
+      trimAfter: false,
+      stopAfter: false,
+      ...p,
+    });
     /** A font whose every glyph is `objs` (glyph space: left edge 0, baseline 0). */
     const objFont = (objs: () => DesignObject[], extra: Partial<EmbroideryFont> = {}): EmbroideryFont => {
       const f = fakeFont();
@@ -319,7 +391,10 @@ check(variantId("→") === "ltr" && variantId("↓") === "ttb" && variantId("btt
     o = await layoutText(spec({ content: "AB\nAB", colorSort: "line" }), sortable);
     check(idx(o) === "1 1 2 2 404 404 1 1 2 2 404 404", `sorted line by line (${idx(o)})`);
     o = await layoutText(spec({ content: "AB", colorSort: "all", trims: "letter" }), sortable);
-    check(o.every((x) => x.trimAfter), "sorted letter trims: every colour of every letter ends with a trim (Ink/Stitch)");
+    check(
+      o.every((x) => x.trimAfter),
+      "sorted letter trims: every colour of every letter ends with a trim (Ink/Stitch)",
+    );
     o = await layoutText(spec({ content: "AB", colorSort: "off", trims: "letter" }), sortable);
     check(o.map((x) => +x.trimAfter).join("") === "001001", "unsorted letter trims: the letter's last object only");
     o = await layoutText(spec({ content: "AB", colorSort: "all" }), objFont(two, { sortable: true, combineAtSortIndices: [1] }));
@@ -333,12 +408,25 @@ check(variantId("→") === "ltr" && variantId("↓") === "ttb" && variantId("btt
         patterns: [{ paths: [line([0, -5], [4, -5])], add: true, remove: false, offset: 0 }],
         stitch: { type: "fill", ...defaultFill(), method: "guided", angle: 0, guide: line([0, -1], [4, -9]) },
       }),
-      base({ paths: [line([0, 0], [4, -10])], stitch: { type: "running", length: 2, tolerance: 0.2, repeats: 1, beanRepeats: 0, ripple: { lines: 3, minScale: 0, spacing: 1, rotation: 0, reverse: false, target: [2, -5], guide: [line([0, 0], [0, -10])] } } }),
+      base({
+        paths: [line([0, 0], [4, -10])],
+        stitch: {
+          type: "running",
+          length: 2,
+          tolerance: 0.2,
+          repeats: 1,
+          beanRepeats: 0,
+          ripple: { lines: 3, minScale: 0, spacing: 1, rotation: 0, reverse: false, target: [2, -5], guide: [line([0, 0], [0, -10])] },
+        },
+      }),
     ]);
     o = await layoutText(spec({ content: "A", size: 20, anchor: [100, 50] }), rich);
     const st = o[0].stitch as FillParams;
     check(o[0].lock?.start === "star" && o[0].colorSortIndex === 3, "lock stitches and the colour sort index come from the font");
-    check(!!o[0].patterns && near(o[0].patterns[0].paths[0].nodes[1].p[0], 108) && near(o[0].patterns[0].paths[0].nodes[1].p[1], 40), `pattern lines placed with the letter (${JSON.stringify(o[0].patterns?.[0].paths[0].nodes)})`);
+    check(
+      !!o[0].patterns && near(o[0].patterns[0].paths[0].nodes[1].p[0], 108) && near(o[0].patterns[0].paths[0].nodes[1].p[1], 40),
+      `pattern lines placed with the letter (${JSON.stringify(o[0].patterns?.[0].paths[0].nodes)})`,
+    );
     check(!!st.guide && near(st.guide.nodes[1].p[0], 108) && near(st.guide.nodes[1].p[1], 32), "a guided fill's guide line placed with the letter");
     const rp = (o[1].stitch as { ripple: { target: [number, number]; guide: SubPath[] } }).ripple;
     check(near(rp.target[0], 104) && near(rp.target[1], 40) && near(rp.guide[0].nodes[1].p[1], 30), "ripple target and guide placed with the letter");
@@ -350,23 +438,66 @@ check(variantId("→") === "ltr" && variantId("↓") === "ttb" && variantId("btt
     });
     o = await layoutText(spec({ content: "AAA", path: arc, pathAlign: "start" }), ink);
     const side = (sp: SubPath, i: number, j: number) => Math.hypot(sp.nodes[i].p[0] - sp.nodes[j].p[0], sp.nodes[i].p[1] - sp.nodes[j].p[1]);
-    check(o.every((x) => near(side(x.paths[0], 0, 1), 4) && near(side(x.paths[0], 1, 2), 10) && near(side(x.paths[0], 0, 2), Math.hypot(4, 10))), "on a path: letters keep their shape (not bent)");
+    check(
+      o.every((x) => near(side(x.paths[0], 0, 1), 4) && near(side(x.paths[0], 1, 2), 10) && near(side(x.paths[0], 0, 2), Math.hypot(4, 10))),
+      "on a path: letters keep their shape (not bent)",
+    );
     const turned = o.map((x) => (x.stitch as FillParams).angle);
-    check(turned[0] > 45 && turned[1] < turned[0] && turned[2] < turned[1], `on a path: every letter's fill turns with it (${turned.map((a) => a.toFixed(1))})`);
-    check(near(o[0].paths[0].nodes[3].p[0], 0) && near(o[0].paths[0].nodes[3].p[1], 50), `start: the first letter's left edge and baseline at the path's start (${o[0].paths[0].nodes[3].p})`);
-    o = await layoutText(spec({ content: "AA", path: [[0, 0], [100, 0]], pathAlign: "center" }), ink);
+    check(
+      turned[0] > 45 && turned[1] < turned[0] && turned[2] < turned[1],
+      `on a path: every letter's fill turns with it (${turned.map((a) => a.toFixed(1))})`,
+    );
+    check(
+      near(o[0].paths[0].nodes[3].p[0], 0) && near(o[0].paths[0].nodes[3].p[1], 50),
+      `start: the first letter's left edge and baseline at the path's start (${o[0].paths[0].nodes[3].p})`,
+    );
+    o = await layoutText(
+      spec({
+        content: "AA",
+        path: [
+          [0, 0],
+          [100, 0],
+        ],
+        pathAlign: "center",
+      }),
+      ink,
+    );
     check(near(minX(o[0]), 50 - 6), `centre on a path: by the letters' ink width (${minX(o[0])})`);
-    o = await layoutText(spec({ content: "AA A", path: [[0, 0], [100, 0]], pathAlign: "stretch" }), ink);
+    o = await layoutText(
+      spec({
+        content: "AA A",
+        path: [
+          [0, 0],
+          [100, 0],
+        ],
+        pathAlign: "stretch",
+      }),
+      ink,
+    );
     const w = (x: DesignObject) => Math.max(...x.paths[0].nodes.map((n) => n.p[0])) - minX(x);
     // 3 letters (12 mm ink) and gaps: 2 between letters + 1 more between words share the rest
-    check(o.every((x) => near(w(x), 4)) && near(minX(o[0]), 0) && near(minX(o[2]) + 4, 100), `stretch: letters keep their size, spread over the path (${o.map(minX)})`);
+    check(
+      o.every((x) => near(w(x), 4)) && near(minX(o[0]), 0) && near(minX(o[2]) + 4, 100),
+      `stretch: letters keep their size, spread over the path (${o.map(minX)})`,
+    );
     // Ink/Stitch: the letters' own gaps stay; a word gap gets the stretch twice
     check(near(minX(o[2]) - (minX(o[1]) + 4) - 7, 2 * (minX(o[1]) - (minX(o[0]) + 4) - 4)), "stretch: a word gap widened twice as much as a letter gap");
-    o = await layoutText(spec({ content: "A\nA", path: [[0, 0], [100, 0]], pathAlign: "start" }), ink);
+    o = await layoutText(
+      spec({
+        content: "A\nA",
+        path: [
+          [0, 0],
+          [100, 0],
+        ],
+        pathAlign: "start",
+      }),
+      ink,
+    );
     check(near(minY(o[1]) - minY(o[0]), 15), "on a path: the next line follows the path a line lower");
 
     // cross-stitch fonts: the font says whether the crosses scale
-    const cross = (extra: Partial<EmbroideryFont>) => objFont(() => [base({ stitch: { type: "fill", ...defaultFill(), method: "cross", angle: 0, crossSize: 2 } })], extra);
+    const cross = (extra: Partial<EmbroideryFont>) =>
+      objFont(() => [base({ stitch: { type: "fill", ...defaultFill(), method: "cross", angle: 0, crossSize: 2 } })], extra);
     o = await layoutText(spec({ content: "A", size: 20 }), cross({}));
     check((o[0].stitch as FillParams).crossSize === 2, "crosses keep their size by default (Ink/Stitch)");
     o = await layoutText(spec({ content: "A", size: 20 }), cross({ scaleCrossStitch: true }));
@@ -375,14 +506,21 @@ check(variantId("→") === "ltr" && variantId("↓") === "ttb" && variantId("btt
     check((o[0].stitch as FillParams).crossSize === 2, "the lettering's own choice wins over the font's");
 
     // auto-satin (fonts with auto_satin): the satins routed in order, no trims
-    const satin = (y: number): DesignObject => base({ paths: [line([0, y], [4, y]), line([0, y - 1], [4, y - 1])], stitch: { type: "satin", ...defaultSatin(), centerWalkRepeats: 1 } });
+    const satin = (y: number): DesignObject =>
+      base({ paths: [line([0, y], [4, y]), line([0, y - 1], [4, y - 1])], stitch: { type: "satin", ...defaultSatin(), centerWalkRepeats: 1 } });
     const satins = () => [satin(0), satin(-9)];
     o = await layoutText(spec({ content: "AB" }), objFont(satins, { autoSatin: false }));
-    check(o.length === 4 && o.every((x) => (x.stitch as { centerWalkRepeats?: number }).centerWalkRepeats === 1), "auto_satin off: the font's objects as they are");
+    check(
+      o.length === 4 && o.every((x) => (x.stitch as { centerWalkRepeats?: number }).centerWalkRepeats === 1),
+      "auto_satin off: the font's objects as they are",
+    );
     o = await layoutText(spec({ content: "AB", trims: "letter" }), objFont(satins, { autoSatin: true }));
     const walked = o.filter((x) => x.stitch.type === "satin").every((x) => (x.stitch as { centerWalkRepeats?: number }).centerWalkRepeats === 2);
     check(walked && o.every((x) => x.text?.role === "glyph"), "auto_satin: the satins routed (even centre walks)");
-    check(o[o.length - 1].trimAfter && o.filter((x) => x.trimAfter).length === 2 && minX(o.find((x) => x.trimAfter)!) < 4.5, "auto_satin: the lettering's trims still end each letter");
+    check(
+      o[o.length - 1].trimAfter && o.filter((x) => x.trimAfter).length === 2 && minX(o.find((x) => x.trimAfter)!) < 4.5,
+      "auto_satin: the lettering's trims still end each letter",
+    );
   }
 
   // --- sizes in the font's range (Ink/Stitch's scale range) ------------------------------
@@ -405,15 +543,29 @@ check(variantId("→") === "ltr" && variantId("↓") === "ttb" && variantId("btt
         <use xlink:href="#other" x="3" y="3"/>
       </g></svg>`;
     const g = extractGlyphs(svgText).glyphs.A;
-    check(g.includes('id="fill7"') && g.includes('inkscape:connection-start="#use1" inkscape:connection-end="#fill7"') && g.includes('<use id="use1" xlink:href="#inkstitch_trim" x="1" y="1"/>'), `commands: the symbol, its connector and the id they link (${g})`);
+    check(
+      g.includes('id="fill7"') &&
+        g.includes('inkscape:connection-start="#use1" inkscape:connection-end="#fill7"') &&
+        g.includes('<use id="use1" xlink:href="#inkstitch_trim" x="1" y="1"/>'),
+      `commands: the symbol, its connector and the id they link (${g})`,
+    );
     check(!g.includes('id="guide9"') && !g.includes('id="layer"') && !g.includes("#other"), "ids nothing refers to are dropped, and clones");
     check(g.includes("marker-start:url(#inkstitch-guide-line-marker-3)"), "guide-line markers kept (not sewn)");
-    check(g.startsWith('<defs><clipPath') && g.includes('id="clip1"') && g.includes('clip-path="url(#clip1)"') && !g.includes("<symbol"), "clip paths travel with the glyph");
+    check(
+      g.startsWith("<defs><clipPath") && g.includes('id="clip1"') && g.includes('clip-path="url(#clip1)"') && !g.includes("<symbol"),
+      "clip paths travel with the glyph",
+    );
     check(collectColors({ A: g }, []).join() === "#ff0000", `colours: not the clip's, marker's or connector's (${collectColors({ A: g }, [])})`);
     const fm = fontMetrics({ name: "X" });
-    check(fm.auto_satin === true && fm.scale_cross_stitch_pattern === false && fm.combine_at_sort_indices.length === 0, "auto_satin on, crosses unscaled by default (Ink/Stitch)");
+    check(
+      fm.auto_satin === true && fm.scale_cross_stitch_pattern === false && fm.combine_at_sort_indices.length === 0,
+      "auto_satin on, crosses unscaled by default (Ink/Stitch)",
+    );
     const fm2 = fontMetrics({ name: "X", auto_satin: false, scale_cross_stitch_pattern: true, combine_at_sort_indices: [0, 2], sortable: true });
-    check(fm2.auto_satin === false && fm2.scale_cross_stitch_pattern === true && fm2.combine_at_sort_indices.join() === "0,2" && fm2.sortable === true, "font.json flags kept");
+    check(
+      fm2.auto_satin === false && fm2.scale_cross_stitch_pattern === true && fm2.combine_at_sort_indices.join() === "0,2" && fm2.sortable === true,
+      "font.json flags kept",
+    );
   }
 
   if (failed) throw new Error(`${failed} lettering layout check(s) failed`);

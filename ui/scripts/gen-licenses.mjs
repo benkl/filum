@@ -47,7 +47,12 @@ function licenseFiles(dir) {
 }
 const repoUrl = (r) => {
   const u = typeof r === "string" ? r : r?.url;
-  return u ? u.replace(/^git\+/, "").replace(/\.git$/, "").replace(/^git:\/\//, "https://") : "";
+  return u
+    ? u
+        .replace(/^git\+/, "")
+        .replace(/\.git$/, "")
+        .replace(/^git:\/\//, "https://")
+    : "";
 };
 
 // ---------------------------------------------------------------------------
@@ -74,12 +79,12 @@ function npmPackages() {
     const p = pkgJson(dir);
     const key = `${p.name}@${p.version}`;
     if (seen.has(key)) return;
-    const license = typeof p.license === "string" ? p.license : p.license?.type ?? (p.licenses ?? []).map((l) => l.type).join(" OR ");
+    const license = typeof p.license === "string" ? p.license : (p.license?.type ?? (p.licenses ?? []).map((l) => l.type).join(" OR "));
     seen.set(key, {
       name: p.name,
       version: p.version,
       license: license || "see licence file",
-      author: typeof p.author === "string" ? p.author : p.author?.name ?? "",
+      author: typeof p.author === "string" ? p.author : (p.author?.name ?? ""),
       url: p.homepage || repoUrl(p.repository),
       files: licenseFiles(dir),
     });
@@ -100,9 +105,7 @@ function cargoBin() {
 }
 
 function cargoPackages() {
-  const meta = JSON.parse(
-    execFileSync(cargoBin(), ["metadata", "--format-version", "1", "--locked"], { cwd: root, maxBuffer: 1 << 28 }).toString(),
-  );
+  const meta = JSON.parse(execFileSync(cargoBin(), ["metadata", "--format-version", "1", "--locked"], { cwd: root, maxBuffer: 1 << 28 }).toString());
   const byId = new Map(meta.packages.map((p) => [p.id, p]));
   const nodes = new Map(meta.resolve.nodes.map((n) => [n.id, n]));
   const shipped = new Set();
@@ -143,7 +146,9 @@ const outlineFonts = [
   name,
   version: "",
   license: "OFL-1.1",
-  author: read(path.join(ui, "public", "fonts", file)).split("\n")[0].trim(),
+  author: read(path.join(ui, "public", "fonts", file))
+    .split("\n")[0]
+    .trim(),
   url,
   files: [{ file, text: addText(read(path.join(ui, "public", "fonts", file))) }],
 }));
@@ -176,7 +181,10 @@ const models = [
     author: "Chaoning Zhang et al. (MobileSAM); Meta AI (Segment Anything); ONNX export by Acly",
     url: "https://github.com/ChaoningZhang/MobileSAM",
     note: "Bundled segmentation model: click objects in the digitizer to keep, remove or separate them. Runs on the device (ONNX Runtime Web).",
-    files: [{ file: "LICENSE (MobileSAM ONNX, MIT)", text: addText(mit("2023 Chaoning Zhang")) }, ...(apache ? [{ file: "LICENSE (Segment Anything, Apache-2.0)", text: addText(apache) }] : [])],
+    files: [
+      { file: "LICENSE (MobileSAM ONNX, MIT)", text: addText(mit("2023 Chaoning Zhang")) },
+      ...(apache ? [{ file: "LICENSE (Segment Anything, Apache-2.0)", text: addText(apache) }] : []),
+    ],
   },
   {
     name: "DexiNed (ONNX)",
@@ -191,7 +199,8 @@ const models = [
     name: "Informative Drawings (ONNX)",
     version: "rocca/informative-drawings-line-art-onnx",
     license: "MIT",
-    author: "Caroline Chan, Frédo Durand, Phillip Isola (Learning to generate line drawings that convey geometry and semantics, CVPR 2022); ONNX export by Joseph Rocca",
+    author:
+      "Caroline Chan, Frédo Durand, Phillip Isola (Learning to generate line drawings that convey geometry and semantics, CVPR 2022); ONNX export by Joseph Rocca",
     url: "https://github.com/carolineec/informative-drawings",
     note: "Bundled line-drawing model: turns photos and illustrations into line art for the digitizer. Runs on the device (ONNX Runtime Web).",
     files: [{ file: "LICENSE", text: addText(mit("2022 Caroline Chan")) }],
@@ -262,7 +271,14 @@ const cargo = cargoPackages();
 // declared licences (with the authors as copyright holders).
 const spdx = new Map();
 for (const p of [...npm, ...cargo].filter((x) => !x.files.length)) {
-  const ids = [...new Set(p.license.split(/\s+OR\s+|\s+AND\s+|\/|[()]/).map((s) => s.trim()).filter(Boolean))];
+  const ids = [
+    ...new Set(
+      p.license
+        .split(/\s+OR\s+|\s+AND\s+|\/|[()]/)
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
+  ];
   for (const id of ids) {
     if (!spdx.has(id)) spdx.set(id, await fetchText(`https://raw.githubusercontent.com/spdx/license-list-data/main/text/${id}.txt`));
     const text = spdx.get(id);
@@ -274,7 +290,15 @@ for (const p of [...npm, ...cargo].filter((x) => !x.files.length)) {
 fs.mkdirSync(outDir, { recursive: true });
 fs.writeFileSync(
   path.join(outDir, "third-party.json"),
-  JSON.stringify({ generated: new Date().toISOString().slice(0, 10), app: { license: "GPL-3.0-or-later", text: gpl }, ported, fonts: outlineFonts, npm, cargo, texts }),
+  JSON.stringify({
+    generated: new Date().toISOString().slice(0, 10),
+    app: { license: "GPL-3.0-or-later", text: gpl },
+    ported,
+    fonts: outlineFonts,
+    npm,
+    cargo,
+    texts,
+  }),
 );
 console.log(`${npm.length} npm packages, ${cargo.length} crates, ${Object.keys(texts).length} distinct licence texts`);
 const missing = [...npm, ...cargo].filter((p) => !p.files.length).map((p) => `${p.name}@${p.version} (${p.license})`);

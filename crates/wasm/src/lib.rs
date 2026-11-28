@@ -1,8 +1,8 @@
 //! WebAssembly bindings: the same Rust engine runs in the browser, in the
 //! Tauri desktop/mobile shells (inside a Web Worker) and natively in the CLI.
 
-use js_sys::{Float32Array, Object, Reflect, Uint32Array, Uint8Array};
 use filum_core::{io, optimize, svg, threads, Document, Engine};
+use js_sys::{Float32Array, Object, Reflect, Uint32Array, Uint8Array};
 use wasm_bindgen::prelude::*;
 
 fn err<E: std::fmt::Display>(e: E) -> JsValue {
@@ -277,10 +277,8 @@ pub fn shape_build(doc_json: &str, ids_json: &str, faces_json: &str, mode: &str)
     let faces = arrangement(&objects);
     let fit = fit_rings;
     if mode == "divide" {
-        let parts: Vec<serde_json::Value> = faces
-            .iter()
-            .map(|f| serde_json::json!({ "owner": ids[*f.owners.last().unwrap()], "paths": fit(&f.rings) }))
-            .collect();
+        let parts: Vec<serde_json::Value> =
+            faces.iter().map(|f| serde_json::json!({ "owner": ids[*f.owners.last().unwrap()], "paths": fit(&f.rings) })).collect();
         return to_json(&serde_json::json!({ "merged": null, "updates": [], "parts": parts }));
     }
     let pick: Vec<usize> = serde_json::from_str(faces_json).map_err(err)?;
@@ -290,10 +288,8 @@ pub fn shape_build(doc_json: &str, ids_json: &str, faces_json: &str, mode: &str)
     }
     let cut = union_rings(&chosen);
     let touched: std::collections::BTreeSet<usize> = pick.iter().filter_map(|&k| faces.get(k)).flat_map(|f| f.owners.iter().copied()).collect();
-    let updates: Vec<serde_json::Value> = touched
-        .iter()
-        .map(|&i| serde_json::json!({ "id": ids[i], "paths": fit(&subtract_region(&objects[i], &cut)) }))
-        .collect();
+    let updates: Vec<serde_json::Value> =
+        touched.iter().map(|&i| serde_json::json!({ "id": ids[i], "paths": fit(&subtract_region(&objects[i], &cut)) })).collect();
     let merged = if mode == "merge" { Some(fit(&cut)) } else { None };
     to_json(&serde_json::json!({ "merged": merged, "updates": updates, "parts": [] }))
 }
@@ -312,17 +308,19 @@ fn builder_objects(doc_json: &str, ids_json: &str) -> Result<(Vec<Vec<filum_core
 /// is a JSON object (geometry in mm), `doc_json` is only read by knockdown.
 #[wasm_bindgen(js_name = convertShapes)]
 pub fn convert_shapes(op: &str, doc_json: &str, args_json: &str) -> Result<String, JsValue> {
-    use serde_json::{json, Value};
     use filum_core::clip::Join;
     use filum_core::convert::*;
     use filum_core::geom::{pt, Point};
     use filum_core::stitches::fill::fill_rings;
     use filum_core::SubPath;
+    use serde_json::{json, Value};
     let a: Value = serde_json::from_str(args_json).map_err(err)?;
     let paths = || -> Result<Vec<SubPath>, JsValue> { serde_json::from_value(a["paths"].clone()).map_err(err) };
     let lines = |k: &str| -> Vec<Vec<Point>> {
         a[k].as_array()
-            .map(|ls| ls.iter().filter_map(|l| serde_json::from_value::<Vec<[f64; 2]>>(l.clone()).ok()).map(|l| l.iter().map(|q| pt(q[0], q[1])).collect()).collect())
+            .map(|ls| {
+                ls.iter().filter_map(|l| serde_json::from_value::<Vec<[f64; 2]>>(l.clone()).ok()).map(|l| l.iter().map(|q| pt(q[0], q[1])).collect()).collect()
+            })
             .unwrap_or_default()
     };
     let num = |k: &str, d: f64| a[k].as_f64().unwrap_or(d);
@@ -347,7 +345,8 @@ pub fn convert_shapes(op: &str, doc_json: &str, args_json: &str) -> Result<Strin
             let src = paths()?;
             let method = if a["method"].as_str() == Some("complex") { BreakMethod::Complex } else { BreakMethod::Simple };
             // rings with the index of their sub-path (degenerate ones are dropped)
-            let (index, rings): (Vec<usize>, Vec<_>) = src.iter().enumerate().flat_map(|(i, sp)| fill_rings(std::slice::from_ref(sp)).into_iter().map(move |r| (i, r))).unzip();
+            let (index, rings): (Vec<usize>, Vec<_>) =
+                src.iter().enumerate().flat_map(|(i, sp)| fill_rings(std::slice::from_ref(sp)).into_iter().map(move |r| (i, r))).unzip();
             let mut r = break_apart(&rings, method, num("minArea", 1.4));
             if let BreakApart::Parts { parts } = &mut r {
                 for p in parts.iter_mut() {

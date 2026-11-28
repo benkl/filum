@@ -9,7 +9,10 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
 use crate::geom::{point_in_ring, pt, Point, Rect, Ring};
-use crate::model::{thread_density_scale, Basting, CoverMode, DesignOptions, Document, Fabric, FillMethod, LockOverride, MachineSettings, Object, ObjectLink, StitchParams, SubPath, Thread, Ties};
+use crate::model::{
+    thread_density_scale, Basting, CoverMode, DesignOptions, Document, Fabric, FillMethod, LockOverride, MachineSettings, Object, ObjectLink, StitchParams,
+    SubPath, Thread, Ties,
+};
 use crate::plan::{flags, Connection, ConnectionKind, Stitch, StitchPlan};
 use crate::region::{object_cover, outline, subtract_min, Cover};
 use crate::stitches::applique::is_stop;
@@ -195,7 +198,10 @@ impl Engine {
         // underpath): taking it out would leave a jump and a trim in its place
         let next = (i + 1..doc.objects.len()).find(|&j| doc.objects[j].visible);
         let underpath = |j: usize| {
-            lines && Some(j) == next && matches!(doc.objects[j].stitch, StitchParams::Satin(_) | StitchParams::Running(_)) && doc.same_spool(&obj.thread, &doc.objects[j].thread)
+            lines
+                && Some(j) == next
+                && matches!(doc.objects[j].stitch, StitchParams::Satin(_) | StitchParams::Running(_))
+                && doc.same_spool(&obj.thread, &doc.objects[j].thread)
         };
         for j in i + 1..doc.objects.len() {
             if underpath(j) || !(scan.may_cover(doc, j) && scan.bounds(doc, j).intersects(&b)) {
@@ -347,7 +353,8 @@ impl Engine {
         for (r, (i, _)) in items.iter().enumerate() {
             rank[*i] = r;
         }
-        let ties: Vec<(Point, usize)> = plan.stitches.iter().filter(|s| s.is(flags::TIE) && (s.object as usize) < rank.len()).map(|s| (s.pos(), s.object as usize)).collect();
+        let ties: Vec<(Point, usize)> =
+            plan.stitches.iter().filter(|s| s.is(flags::TIE) && (s.object as usize) < rank.len()).map(|s| (s.pos(), s.object as usize)).collect();
         // is the thread cut after each object (the last one is tied off and trimmed)?
         let mut cut_after = vec![false; doc.objects.len()];
         if let Some((last, _)) = items.last() {
@@ -425,7 +432,6 @@ impl Engine {
         }
         fallback
     }
-
 }
 
 /// What hidden-stitch removal asks of every object on top of a fill, worked
@@ -576,11 +582,8 @@ fn knockdown_runs(doc: &Document, items: &[(usize, Vec<Run>)]) -> Vec<Run> {
     let res = ((b.width().max(b.height()) + 2.0 * o.knockdown_offset) / 1500.0).clamp(0.05, 0.3);
     let all = outline(&covers, o.knockdown_offset.max(0.0), res);
     // without holes: only the outer boundaries (the net goes over counters and gaps)
-    let rings: Vec<Ring> = if o.knockdown_holes {
-        all
-    } else {
-        all.iter().filter(|r| !all.iter().any(|q| !std::ptr::eq(*r, q) && point_in_ring(r[0], q))).cloned().collect()
-    };
+    let rings: Vec<Ring> =
+        if o.knockdown_holes { all } else { all.iter().filter(|r| !all.iter().any(|q| !std::ptr::eq(*r, q) && point_in_ring(r[0], q))).cloned().collect() };
     if rings.is_empty() {
         return vec![];
     }
@@ -588,7 +591,22 @@ fn knockdown_runs(doc: &Document, items: &[(usize, Vec<Run>)]) -> Vec<Run> {
     let mut runs: Vec<Run> = Vec::new();
     for k in 0..o.knockdown_layers.clamp(1, 2) {
         let from = runs.last().and_then(|r| r.last()).map(|x| x.0);
-        runs.extend(crate::stitches::fill::tatami(&rings, o.knockdown_angle + 90.0 * k as f64, spacing, 0.0, false, len, 2, 0.0, 3.0, from, None, None, &Default::default(), 0));
+        runs.extend(crate::stitches::fill::tatami(
+            &rings,
+            o.knockdown_angle + 90.0 * k as f64,
+            spacing,
+            0.0,
+            false,
+            len,
+            2,
+            0.0,
+            3.0,
+            from,
+            None,
+            None,
+            &Default::default(),
+            0,
+        ));
     }
     crate::stitches::fill::chain(&rings, runs, 3.0, 0)
 }
@@ -638,7 +656,6 @@ fn basting_runs(doc: &Document, items: &[(usize, Vec<Run>)]) -> Vec<Run> {
         })
         .collect()
 }
-
 
 /// A connecting stitch between two objects (a gap up to the trim distance,
 /// sewn through) is trimmed instead when it stays visible over this length:
@@ -693,7 +710,8 @@ impl Ahead<'_> {
         let near = |p: Point| {
             let (kx, ky) = ((p.x / Self::CELL).floor() as i64, (p.y / Self::CELL).floor() as i64);
             (ky - 1..=ky + 1).any(|y| {
-                (kx - 1..=kx + 1).any(|x| grid.get(&(x, y)).is_some_and(|v| v.iter().any(|&(k, s0, s1)| k as usize >= next && seg_dist(p, s0, s1) < COVERED_WITHIN)))
+                (kx - 1..=kx + 1)
+                    .any(|x| grid.get(&(x, y)).is_some_and(|v| v.iter().any(|&(k, s0, s1)| k as usize >= next && seg_dist(p, s0, s1) < COVERED_WITHIN)))
             })
         };
         let len = a.dist(b);
@@ -789,7 +807,8 @@ impl Builder<'_> {
         }
         let ahead: Vec<Point> = run.iter().take(20).map(|x| x.0).collect();
         let l = self.lock;
-        let (style, scale, length) = (l.start.unwrap_or(self.m.lock_start), l.start_scale.unwrap_or(self.m.lock_scale), l.start_length.unwrap_or(self.m.lock_length));
+        let (style, scale, length) =
+            (l.start.unwrap_or(self.m.lock_start), l.start_scale.unwrap_or(self.m.lock_scale), l.start_length.unwrap_or(self.m.lock_length));
         for p in crate::locks::lock_points(style, &ahead, scale, length, false) {
             if self.out.last().is_some_and(|s| s.pos().dist(p) < 1e-6) {
                 continue;
@@ -1161,11 +1180,7 @@ mod tests {
         vec![SubPath::polyline(&[pt(x, y), pt(x + s, y), pt(x + s, y + s), pt(x, y + s)], true)]
     }
     fn doc(objects: Vec<Object>) -> Document {
-        Document {
-            threads: vec![Thread::new("t", "x", "#000000")],
-            objects,
-            ..Default::default()
-        }
+        Document { threads: vec![Thread::new("t", "x", "#000000")], objects, ..Default::default() }
     }
     fn count(plan: &StitchPlan, f: u8) -> usize {
         plan.stitches.iter().filter(|s| s.is(f)).count()
@@ -1176,7 +1191,10 @@ mod tests {
         let th = |id: &str, color: &str, code: &str| Thread { brand: "Madeira".into(), code: code.into(), ..Thread::new(id, id, color) };
         let fill = StitchParams::Fill(FillParams { underlay: false, ..Default::default() });
         let mk = |a: &str, b: &str| {
-            let mut d = doc(vec![Object { thread: "a".into(), ..obj("1", square(0.0, 0.0, 10.0), fill.clone()) }, Object { thread: "b".into(), ..obj("2", square(20.0, 0.0, 10.0), fill.clone()) }]);
+            let mut d = doc(vec![
+                Object { thread: "a".into(), ..obj("1", square(0.0, 0.0, 10.0), fill.clone()) },
+                Object { thread: "b".into(), ..obj("2", square(20.0, 0.0, 10.0), fill.clone()) },
+            ]);
             d.threads = vec![th("a", a, "1621"), th("b", b, if a.eq_ignore_ascii_case(b) { "1621" } else { "1800" })];
             d
         };
@@ -1232,7 +1250,13 @@ mod tests {
     #[test]
     fn colour_layers_do_not_hide_each_other() {
         use crate::model::GradientParams;
-        let layer = |n: u32, group: &str| StitchParams::Fill(FillParams { underlay: false, gradient: Some(GradientParams { layer: n, group: group.into(), ..Default::default() }), ..Default::default() });
+        let layer = |n: u32, group: &str| {
+            StitchParams::Fill(FillParams {
+                underlay: false,
+                gradient: Some(GradientParams { layer: n, group: group.into(), ..Default::default() }),
+                ..Default::default()
+            })
+        };
         // a two-colour gradient over a plain fill, then a second gradient over the first
         let base = StitchParams::Fill(FillParams { underlay: false, ..Default::default() });
         let mut d = doc(vec![
@@ -1252,8 +1276,15 @@ mod tests {
         assert!(eng.stitched_object(&d, 0).is_none(), "the fill under the gradient is hidden");
 
         // colour blending: two fills with opposite ramps over each other
-        let ramp = |a: f64| StitchParams::Fill(FillParams { underlay: false, ramp: Some(crate::model::DensityRamp { from: [0.0, 0.0], to: [a, 0.0], ..Default::default() }), ..Default::default() });
-        let d2 = Document { options: d.options.clone(), ..doc(vec![obj("a", square(0.0, 0.0, 30.0), ramp(30.0)), obj("b", square(0.0, 0.0, 30.0), ramp(-30.0))]) };
+        let ramp = |a: f64| {
+            StitchParams::Fill(FillParams {
+                underlay: false,
+                ramp: Some(crate::model::DensityRamp { from: [0.0, 0.0], to: [a, 0.0], ..Default::default() }),
+                ..Default::default()
+            })
+        };
+        let d2 =
+            Document { options: d.options.clone(), ..doc(vec![obj("a", square(0.0, 0.0, 30.0), ramp(30.0)), obj("b", square(0.0, 0.0, 30.0), ramp(-30.0))]) };
         assert!(matches!(Engine::new().stitched_object(&d2, 0), Some(Cow::Borrowed(_))), "a blend layer keeps its stitches");
     }
 
@@ -1537,7 +1568,11 @@ mod tests {
         d.machine.min_stitch = 0.6;
         assert!(short(&d) * 4 <= before, "{} short stitches left of {before}", short(&d));
         // a real corner stays: an L of two 10 mm legs
-        let mut l = doc(vec![obj("l", vec![SubPath::polyline(&[pt(0.0, 0.0), pt(10.0, 0.0), pt(10.0, 10.0)], false)], StitchParams::Running(RunningParams::default()))]);
+        let mut l = doc(vec![obj(
+            "l",
+            vec![SubPath::polyline(&[pt(0.0, 0.0), pt(10.0, 0.0), pt(10.0, 10.0)], false)],
+            StitchParams::Running(RunningParams::default()),
+        )]);
         l.machine.min_stitch = 0.6;
         assert!(Engine::new().plan(&l).stitches.iter().any(|s| s.pos().dist(pt(10.0, 0.0)) < 1e-6), "the corner of the L is sewn");
     }
@@ -1662,7 +1697,11 @@ mod trim_tests {
         for style in [LockStyle::Arrow, LockStyle::Star, LockStyle::Zigzag, LockStyle::HalfStitch, LockStyle::BackForth] {
             let d = Document {
                 threads: vec![thread("a", "#000000"), thread("b", "#ff0000")],
-                objects: vec![line("1", "a", &[(55.0, 0.0), (0.0, 0.0)]), line("2", "a", &[(0.0, 30.0), (55.0, 30.0)]), line("3", "b", &[(0.0, 60.0), (55.0, 60.0)])],
+                objects: vec![
+                    line("1", "a", &[(55.0, 0.0), (0.0, 0.0)]),
+                    line("2", "a", &[(0.0, 30.0), (55.0, 30.0)]),
+                    line("3", "b", &[(0.0, 60.0), (55.0, 60.0)]),
+                ],
                 machine: MachineSettings { lock_end: style, ..Default::default() },
                 ..Default::default()
             };
@@ -1705,7 +1744,8 @@ mod link_tests {
     use crate::Engine;
 
     fn line(id: &str, thread: &str, a: [f64; 2], b: [f64; 2]) -> Object {
-        let mut o: Object = serde_json::from_value(serde_json::json!({ "id": id, "name": id, "thread": thread, "paths": [], "stitch": { "type": "running" } })).unwrap();
+        let mut o: Object =
+            serde_json::from_value(serde_json::json!({ "id": id, "name": id, "thread": thread, "paths": [], "stitch": { "type": "running" } })).unwrap();
         o.paths = vec![SubPath::polyline(&[pt(a[0], a[1]), pt(b[0], b[1])], false)];
         o
     }

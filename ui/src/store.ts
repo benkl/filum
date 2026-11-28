@@ -257,7 +257,21 @@ const THEME_KEY = "filum.theme";
 let pendingCheckpoint: { doc: StitchDocument; future: StitchDocument[]; saved: boolean } | null = null;
 /** View toggles remembered between sessions. */
 const VIEW_KEY = "filum.view";
-const VIEW_FIELDS = ["showGrid", "showJumps", "finished", "showUnderlay", "showHidden", "smartGuides", "stitchColors", "fabricColor", "fabricTexture", "fabricAll", "fabricWeave", "densityMode", "foldedGroups"] as const;
+const VIEW_FIELDS = [
+  "showGrid",
+  "showJumps",
+  "finished",
+  "showUnderlay",
+  "showHidden",
+  "smartGuides",
+  "stitchColors",
+  "fabricColor",
+  "fabricTexture",
+  "fabricAll",
+  "fabricWeave",
+  "densityMode",
+  "foldedGroups",
+] as const;
 const savedView: Partial<Pick<State, (typeof VIEW_FIELDS)[number]>> = loadJson(VIEW_KEY, {});
 const DOC_KEY = "filum.autosave";
 const DIRTY_KEY = "filum.autosave.dirty";
@@ -592,7 +606,8 @@ useStore.subscribe((s, p) => {
 // Autosave to local storage (desktop users also get real files via Save).
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 useStore.subscribe((s, prev) => {
-  if (s.anim.speed !== prev.anim.speed || s.anim.follow !== prev.anim.follow) safeSetItem(PLAYER_KEY, JSON.stringify({ speed: s.anim.speed, follow: s.anim.follow }));
+  if (s.anim.speed !== prev.anim.speed || s.anim.follow !== prev.anim.follow)
+    safeSetItem(PLAYER_KEY, JSON.stringify({ speed: s.anim.speed, follow: s.anim.follow }));
   if (VIEW_FIELDS.some((k) => s[k] !== prev[k])) safeSetItem(VIEW_KEY, JSON.stringify(Object.fromEntries(VIEW_FIELDS.map((k) => [k, s[k]]))));
   if (!s.prefs.autosave) return;
   // whether the autosaved design has changes not in a file (asked about before it's replaced)

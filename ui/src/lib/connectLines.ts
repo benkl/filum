@@ -42,7 +42,6 @@ export interface ConnectResult {
   doubled: number;
 }
 
-
 /** A piece turned round: nodes in reverse order, in and out handles swapped. */
 export function reversePiece(sp: SubPath): SubPath {
   return { ...sp, nodes: [...sp.nodes].reverse().map((n) => ({ ...n, i: n.o, o: n.i })) };
@@ -75,11 +74,16 @@ export function nearestPairs(pos: Vec2[], ids: number[]): [number, number][] {
     if (left.length <= ALL_PAIRS_UP_TO) {
       for (let i = 0; i < left.length; i++) for (let j = i + 1; j < left.length; j++) cand.push([d2(pos[left[i]], pos[left[j]]), left[i], left[j]]);
     } else {
-      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      let x0 = Infinity,
+        y0 = Infinity,
+        x1 = -Infinity,
+        y1 = -Infinity;
       for (const v of left) {
         const [x, y] = pos[v];
-        x0 = Math.min(x0, x); y0 = Math.min(y0, y);
-        x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+        x0 = Math.min(x0, x);
+        y0 = Math.min(y0, y);
+        x1 = Math.max(x1, x);
+        y1 = Math.max(y1, y);
       }
       // about one point per cell
       const cell = Math.max(x1 - x0, y1 - y0, 1e-6) / Math.sqrt(left.length);
@@ -137,7 +141,8 @@ export function doubledPieces(pieces: SubPath[], tol = 0.3): Set<number> {
   const near = (p: Vec2) => {
     const cx = Math.floor(p[0] / cell);
     const cy = Math.floor(p[1] / cell);
-    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (const q of grid.get(`${cx + dx},${cy + dy}`) ?? []) if (d2(p, q) <= tol * tol) return true;
+    for (let dx = -1; dx <= 1; dx++)
+      for (let dy = -1; dy <= 1; dy++) for (const q of grid.get(`${cx + dx},${cy + dy}`) ?? []) if (d2(p, q) <= tol * tol) return true;
     return false;
   };
   const out = new Set<number>();

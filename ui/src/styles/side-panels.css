@@ -170,7 +170,9 @@ body.resizing-y * {
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--muted);
-  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+  transition:
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
 }
 .panel-edge:hover {
   background: var(--bg-2);
@@ -267,7 +269,9 @@ body.resizing-y * {
   border-radius: var(--r-sm);
   background: none;
   color: var(--muted);
-  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 .sec-tab:hover {
   background: var(--bg-2);
@@ -369,7 +373,9 @@ body.resizing-y * {
   height: 10px;
   margin-left: -3px;
   border-radius: 50%;
-  box-shadow: 0 0 0 1.5px var(--panel), 0 0 0 2px var(--border);
+  box-shadow:
+    0 0 0 1.5px var(--panel),
+    0 0 0 2px var(--border);
 }
 .layer .grp-sw em {
   margin-left: var(--sp-1);

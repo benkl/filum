@@ -33,7 +33,11 @@ export function routeOptions(): RouteOptions {
 const TAB_ICONS: Record<RouteTab, LucideIcon> = { running: StitchRunning, satin: StitchSatin, jumps: Jump };
 const TABS: [RouteTab, string, string][] = [
   ["running", "Running stitch", "One path through the selected running-stitch lines, sewn twice where it travels (Ink/Stitch auto-route running stitch)"],
-  ["satin", "Satin columns", "One sewing order through the selected satins, cut where the route turns, running underpaths instead of jumps (Ink/Stitch auto-route satin columns)"],
+  [
+    "satin",
+    "Satin columns",
+    "One sewing order through the selected satins, cut where the route turns, running underpaths instead of jumps (Ink/Stitch auto-route satin columns)",
+  ],
   ["jumps", "Jumps", "Short jumps between objects of one colour become running stitches (Ink/Stitch jump to stroke)"],
 ];
 
@@ -97,7 +101,11 @@ export function RouteDialog({ onClose }: { onClose: () => void }) {
           <Row label="Out and back" title="Redwork: every line sewn twice, once each way — one path, no jumps (Ink/Stitch redwork)">
             <Toggle on={o.redwork} onChange={(v) => set({ redwork: v })} />
           </Row>
-          <p className="hint">{o.redwork ? "Every line is sewn out and back, so the path ends where it began." : "Lines are joined into as few paths as possible; where the route has to travel, it sews over a line twice."}</p>
+          <p className="hint">
+            {o.redwork
+              ? "Every line is sewn out and back, so the path ends where it began."
+              : "Lines are joined into as few paths as possible; where the route has to travel, it sews over a line twice."}
+          </p>
         </>
       )}
       {tab === "satin" && (
@@ -122,7 +130,9 @@ export function RouteDialog({ onClose }: { onClose: () => void }) {
           <Row label="Longest" title="Longer jumps stay jumps and are trimmed">
             <Num value={o.jumpMax} unit="mm" step={1} min={o.jumpMin} max={100} onChange={(v) => set({ jumpMax: v })} />
           </Row>
-          <p className="hint">{hasSel ? "Between the selected objects." : "Across the whole design (select objects to limit it)."} Only jumps within one colour.</p>
+          <p className="hint">
+            {hasSel ? "Between the selected objects." : "Across the whole design (select objects to limit it)."} Only jumps within one colour.
+          </p>
         </>
       )}
     </Dialog>

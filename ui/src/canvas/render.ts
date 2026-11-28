@@ -432,7 +432,13 @@ function trimMarks(plan: PlanData): TrimMark[] {
     let j = i + 1;
     while (j < flags.length && flags[j] & FLAG.TRIM) j++;
     while (j < flags.length && flags[j] & FLAG.JUMP && !(flags[j] & (FLAG.COLOR_CHANGE | FLAG.STOP | FLAG.END))) j++;
-    out.push({ i, x: coords[2 * i], y: coords[2 * i + 1], to: j > i + 1 ? [coords[2 * (j - 1)], coords[2 * (j - 1) + 1]] : null, uncut: !!plan.uncut?.mask[i] });
+    out.push({
+      i,
+      x: coords[2 * i],
+      y: coords[2 * i + 1],
+      to: j > i + 1 ? [coords[2 * (j - 1)], coords[2 * (j - 1) + 1]] : null,
+      uncut: !!plan.uncut?.mask[i],
+    });
   }
   trimMarkCache.set(plan, out);
   return out;
@@ -1119,11 +1125,7 @@ export class Renderer {
       ctx.strokeStyle = theme.select;
       for (const o of sel) {
         const p =
-          mode === "vector" && o.stitch.type === "satin" && o.paths.length === 1
-            ? objectPath(o)
-            : o.stitch.type === "satin"
-              ? objectOutline(o)
-              : objectPath(o);
+          mode === "vector" && o.stitch.type === "satin" && o.paths.length === 1 ? objectPath(o) : o.stitch.type === "satin" ? objectOutline(o) : objectPath(o);
         if (!p) continue;
         ctx.lineWidth = (mode === "vector" ? 1.6 : 1.4) / scale;
         ctx.stroke(p);
@@ -1544,7 +1546,7 @@ function drawRamp(ctx: CanvasRenderingContext2D, r: NonNullable<Overlay["ramp"]>
       for (const t of c.rows) {
         const x = ax + (bx - ax) * t;
         const y = ay + (by - ay) * t;
-        ctx.moveTo(x - uy * 2 / scale * c.side, y + ux * 2 / scale * c.side);
+        ctx.moveTo(x - ((uy * 2) / scale) * c.side, y + ((ux * 2) / scale) * c.side);
         ctx.lineTo(x - uy * k, y + ux * k);
       }
       // a dark edge under the thread colour: visible on any fill

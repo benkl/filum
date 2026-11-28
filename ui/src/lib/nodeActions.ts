@@ -3,7 +3,18 @@
 import { useStore } from "../store";
 import type { StitchDocument, Vec2 } from "../types";
 import { syncGradientGeometry } from "./gradient";
-import { alignNodes, allNodes, averageNodes, breakAtNodes, deleteSelectedNodes, joinNodes, moveNodes, setNodeType, setSegmentType, toggleClosed } from "./nodeOps";
+import {
+  alignNodes,
+  allNodes,
+  averageNodes,
+  breakAtNodes,
+  deleteSelectedNodes,
+  joinNodes,
+  moveNodes,
+  setNodeType,
+  setSegmentType,
+  toggleClosed,
+} from "./nodeOps";
 
 /** Keep gradient layers on the shapes of every object that changed. */
 export function syncAll(before: StitchDocument, after: StitchDocument): StitchDocument {

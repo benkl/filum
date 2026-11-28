@@ -23,10 +23,7 @@ use core::ops::Range;
 
 use kurbo::common::{factor_quartic_inner, solve_cubic, solve_quadratic};
 use kurbo::simplify::SimplifyBezPath;
-use kurbo::{
-    Affine, BezPath, CubicBez, CurveFitSample, Line, ParamCurve, ParamCurveFit, ParamCurveNearest,
-    PathEl, PathSeg, Point, QuadBez, Vec2,
-};
+use kurbo::{Affine, BezPath, CubicBez, CurveFitSample, Line, ParamCurve, ParamCurveFit, ParamCurveNearest, PathEl, PathSeg, Point, QuadBez, Vec2};
 
 /// Longest control arm a fitted candidate may have, in chord lengths.
 const D_MAX: f64 = 10.0;
@@ -84,9 +81,7 @@ pub fn simplify_bezpath(path: impl IntoIterator<Item = PathEl>, accuracy: f64, a
                 let last_tan = tangents(&last).1;
                 let this_tan = tangents(&seg).0;
                 // a reversal (cusp) is a corner too; kurbo only compares |dot|
-                if last_tan.cross(this_tan).abs() > last_tan.dot(this_tan).abs() * angle_thresh
-                    || last_tan.dot(this_tan) < 0.0
-                {
+                if last_tan.cross(this_tan).abs() > last_tan.dot(this_tan).abs() * angle_thresh || last_tan.dot(this_tan) < 0.0 {
                     state.flush(accuracy);
                 }
             }
@@ -120,14 +115,22 @@ fn tangents(seg: &PathSeg) -> (Vec2, Vec2) {
                 d01
             } else {
                 let d02 = c.p2 - c.p0;
-                if d02.hypot2() > EPS { d02 } else { c.p3 - c.p0 }
+                if d02.hypot2() > EPS {
+                    d02
+                } else {
+                    c.p3 - c.p0
+                }
             };
             let d23 = c.p3 - c.p2;
             let d1 = if d23.hypot2() > EPS {
                 d23
             } else {
                 let d13 = c.p3 - c.p1;
-                if d13.hypot2() > EPS { d13 } else { c.p3 - c.p0 }
+                if d13.hypot2() > EPS {
+                    d13
+                } else {
+                    c.p3 - c.p0
+                }
             };
             (d0, d1)
         }
@@ -187,14 +190,7 @@ fn push_chord(path: &mut BezPath, a: Point, b: Point) {
     path.curve_to(a.lerp(b, 1.0 / 3.0), b.lerp(a, 1.0 / 3.0), b);
 }
 
-fn fit_rec(
-    source: &SimplifyBezPath,
-    range: Range<f64>,
-    accuracy: f64,
-    path: &mut BezPath,
-    depth: u32,
-    budget: &mut usize,
-) {
+fn fit_rec(source: &SimplifyBezPath, range: Range<f64>, accuracy: f64, path: &mut BezPath, depth: u32, budget: &mut usize) {
     let (start, end) = (range.start, range.end);
     let start_p = source.sample_pt_tangent(start, 1.0).p;
     let end_p = source.sample_pt_tangent(end, -1.0).p;
@@ -372,13 +368,7 @@ const D_PENALTY_ELBOW: f64 = 0.65;
 const D_PENALTY_SLOPE: f64 = 2.0;
 
 /// A straight cubic along the chord, if the source stays within `accuracy`.
-fn try_fit_line(
-    source: &SimplifyBezPath,
-    accuracy: f64,
-    range: Range<f64>,
-    start: Point,
-    end: Point,
-) -> Option<CubicBez> {
+fn try_fit_line(source: &SimplifyBezPath, accuracy: f64, range: Range<f64>, start: Point, end: Point) -> Option<CubicBez> {
     let acc2 = accuracy * accuracy;
     let chord_l = Line::new(start, end);
     const SHORT_N: usize = 7;
@@ -456,9 +446,7 @@ fn cubic_fit(th0: f64, th1: f64, area: f64, mx: f64) -> Vec<(CubicBez, f64, f64)
     let (s1, c1) = th1.sin_cos();
     let a4 = -9. * c0 * (((2. * s1 * c1 * c0 + s0 * (2. * c1 * c1 - 1.)) * c0 - 2. * s1 * c1) * c0 - c1 * c1 * s0);
     let a3 = 12.
-        * ((((c1 * (30. * area * c1 - s1) - 15. * area) * c0 + 2. * s0 - c1 * s0 * (c1 + 30. * area * s1)) * c0
-            + c1 * (s1 - 15. * area * c1))
-            * c0
+        * ((((c1 * (30. * area * c1 - s1) - 15. * area) * c0 + 2. * s0 - c1 * s0 * (c1 + 30. * area * s1)) * c0 + c1 * (s1 - 15. * area * c1)) * c0
             - s0 * c1 * c1);
     let a2 = 12.
         * ((((70. * mx + 15. * area) * s1 * s1 + c1 * (9. * s1 - 70. * c1 * mx - 5. * c1 * area)) * c0
@@ -466,10 +454,7 @@ fn cubic_fit(th0: f64, th1: f64, area: f64, mx: f64) -> Vec<(CubicBez, f64, f64)
             * c0
             - c1 * (9. * s1 - 70. * c1 * mx - 5. * c1 * area));
     let a1 = 16.
-        * (((12. * s0 - 5. * c0 * (42. * mx - 17. * area)) * s1
-            - 70. * c1 * (3. * mx - area) * s0
-            - 75. * c0 * c1 * area * area)
-            * s1
+        * (((12. * s0 - 5. * c0 * (42. * mx - 17. * area)) * s1 - 70. * c1 * (3. * mx - area) * s0 - 75. * c0 * c1 * area * area) * s1
             - 75. * c1 * c1 * area * area * s0);
     let a0 = 80. * s1 * (42. * s1 * mx - 25. * area * (s1 - c1 * area));
     let mut roots: Vec<f64> = Vec::with_capacity(4);
@@ -504,7 +489,11 @@ fn cubic_fit(th0: f64, th1: f64, area: f64, mx: f64) -> Vec<(CubicBez, f64, f64)
         .filter_map(|&d0| {
             let (d0, d1) = if d0 > 0.0 {
                 let d1 = (d0 * s0 - area * (10. / 3.)) / (0.5 * d0 * s01 - s1);
-                if d1 > 0.0 { (d0, d1) } else { (s1 / s01, 0.0) }
+                if d1 > 0.0 {
+                    (d0, d1)
+                } else {
+                    (s1 / s01, 0.0)
+                }
             } else {
                 (0.0, s0 / s01)
             };

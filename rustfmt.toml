@@ -1,0 +1,5 @@
+# The engine's layout: long lines (geometry reads better on one line) and
+# LF endings, as .gitattributes stores them. `npm run lint` checks it.
+max_width = 160
+use_small_heuristics = "Max"
+newline_style = "Unix"

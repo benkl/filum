@@ -71,19 +71,31 @@ export function shapeProblems(o: DesignObject): ShapeProblem[] {
   const st = o.stitch;
   if (st.type === "fill") {
     const closed = o.paths.filter((sp) => sp.closed && sp.nodes.length >= 3);
-    if (!closed.length) out.push({ level: "error", title: "Not a closed shape", detail: "A fill needs a closed outline — close the path or use a running stitch." });
+    if (!closed.length)
+      out.push({ level: "error", title: "Not a closed shape", detail: "A fill needs a closed outline — close the path or use a running stitch." });
     else if (fillArea(o) < 0.05) out.push({ level: "error", title: "Invalid shape", detail: "The outline encloses no area." });
     for (const sp of closed) {
       const x = selfCrossing(sp);
       if (x) {
-        out.push({ level: "warning", title: "Border crosses itself", detail: "Parts of the shape may be left out or sewn twice — untangle the outline (Path ▸ Shape builder can split it).", at: x });
+        out.push({
+          level: "warning",
+          title: "Border crosses itself",
+          detail: "Parts of the shape may be left out or sewn twice — untangle the outline (Path ▸ Shape builder can split it).",
+          at: x,
+        });
         break;
       }
     }
-    if (st.method === "guided" && !st.guide) out.push({ level: "warning", title: "Guided fill without a guide line", detail: "Draw a guide line, or the rows fall back to straight ones." });
+    if (st.method === "guided" && !st.guide)
+      out.push({ level: "warning", title: "Guided fill without a guide line", detail: "Draw a guide line, or the rows fall back to straight ones." });
     if (st.method === "cross") {
       const cell = st.crossSize ?? 2.5;
-      if (fillArea(o) < cell * cell * 0.5) out.push({ level: "warning", title: "Shape too small for its crosses", detail: `Smaller than half a ${cell} mm cell — no cross fits. Use a smaller cell.` });
+      if (fillArea(o) < cell * cell * 0.5)
+        out.push({
+          level: "warning",
+          title: "Shape too small for its crosses",
+          detail: `Smaller than half a ${cell} mm cell — no cross fits. Use a smaller cell.`,
+        });
     }
   }
   if (st.type === "satin") {
@@ -100,9 +112,19 @@ export function shapeProblems(o: DesignObject): ShapeProblem[] {
         return false;
       };
       const dangling = rungs.find((r) => !(crosses(r, r0) && crosses(r, r1)));
-      if (dangling) out.push({ level: "warning", title: "Rung misses a rail", detail: "A rung that doesn't cross both rails is ignored — lengthen it across the column.", at: dangling.nodes[0].p });
-      if (!rungs.length && !(st.guides?.length) && r0.nodes.length !== r1.nodes.length)
-        out.push({ level: "info", title: "Rails with unequal points", detail: "The rails pair up by length only. Add direction guides (D) to control the stitch angle." });
+      if (dangling)
+        out.push({
+          level: "warning",
+          title: "Rung misses a rail",
+          detail: "A rung that doesn't cross both rails is ignored — lengthen it across the column.",
+          at: dangling.nodes[0].p,
+        });
+      if (!rungs.length && !st.guides?.length && r0.nodes.length !== r1.nodes.length)
+        out.push({
+          level: "info",
+          title: "Rails with unequal points",
+          detail: "The rails pair up by length only. Add direction guides (D) to control the stitch angle.",
+        });
     }
   }
   return out;
@@ -130,7 +152,11 @@ export function cleanupCandidates(doc: StitchDocument, opts: CleanupOptions = DE
 }
 
 /** Remove the cleanup candidates in one undo step; returns how many went. */
-export function cleanupDocument(commit: (fn: (d: StitchDocument) => StitchDocument) => void, doc: StitchDocument, opts: CleanupOptions = DEFAULT_CLEANUP): number {
+export function cleanupDocument(
+  commit: (fn: (d: StitchDocument) => StitchDocument) => void,
+  doc: StitchDocument,
+  opts: CleanupOptions = DEFAULT_CLEANUP,
+): number {
   const ids = new Set(cleanupCandidates(doc, opts).map((o) => o.id));
   // a gradient or tartan that lost layers is renumbered, groups left lone dissolve
   if (ids.size) commit((d) => pruneGroups(repairLayers({ ...d, objects: d.objects.filter((o) => !ids.has(o.id)) })));

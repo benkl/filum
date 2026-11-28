@@ -5,7 +5,9 @@
 import type { DesignObject, StitchDocument, SubPath, Vec2 } from "../types";
 import { flatten } from "./geometry";
 
-export type RippleObject = DesignObject & { stitch: Extract<DesignObject["stitch"], { type: "running" }> & { ripple: NonNullable<Extract<DesignObject["stitch"], { type: "running" }>["ripple"]> } };
+export type RippleObject = DesignObject & {
+  stitch: Extract<DesignObject["stitch"], { type: "running" }> & { ripple: NonNullable<Extract<DesignObject["stitch"], { type: "running" }>["ripple"]> };
+};
 
 export const isRipple = (o: DesignObject | undefined): o is RippleObject => !!o && o.stitch.type === "running" && !!o.stitch.ripple;
 

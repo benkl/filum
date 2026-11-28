@@ -335,16 +335,8 @@ mod tests {
 
     fn pattern() -> Pattern {
         Pattern {
-            stitches: vec![
-                Stitch::new(0.0, 0.0, 0),
-                Stitch::new(1.5, -2.0, 0),
-                Stitch::new(1.5, -2.0, cmd::COLOR_CHANGE),
-                Stitch::new(3.0, 0.0, 0),
-            ],
-            threads: vec![
-                Thread { rgb: [255, 0, 0], name: "Rot \"Ü\"".into(), code: "1147".into(), brand: "Madeira".into() },
-                Thread::from_rgb([0, 0, 255]),
-            ],
+            stitches: vec![Stitch::new(0.0, 0.0, 0), Stitch::new(1.5, -2.0, 0), Stitch::new(1.5, -2.0, cmd::COLOR_CHANGE), Stitch::new(3.0, 0.0, 0)],
+            threads: vec![Thread { rgb: [255, 0, 0], name: "Rot \"Ü\"".into(), code: "1147".into(), brand: "Madeira".into() }, Thread::from_rgb([0, 0, 255])],
             name: "Test".into(),
         }
     }
@@ -352,11 +344,15 @@ mod tests {
     #[test]
     fn python_layout() {
         let s = String::from_utf8(write(&pattern())).unwrap();
-        assert!(s.starts_with("{\n    \"threadlist\": [\n        {\n            \"color\": \"#ff0000\",\n            \"description\": \"Rot \\\"\\u00dc\\\"\",\n"));
+        assert!(
+            s.starts_with("{\n    \"threadlist\": [\n        {\n            \"color\": \"#ff0000\",\n            \"description\": \"Rot \\\"\\u00dc\\\"\",\n")
+        );
         assert!(s.contains("            \"catalog_number\": null,\n            \"details\": null,\n            \"brand\": null,\n"));
         assert!(s.contains("    \"stitches\": [\n        [\n            0.0,\n            0.0,\n            \"STITCH\"\n        ],\n        [\n            15.0,\n            -20.0,\n"));
         assert!(s.contains("\"COLOR_CHANGE t1 n2\""));
-        assert!(s.ends_with("        [\n            30.0,\n            0.0,\n            \"END\"\n        ]\n    ],\n    \"extras\": {\n        \"name\": \"Test\"\n    }\n}"));
+        assert!(s.ends_with(
+            "        [\n            30.0,\n            0.0,\n            \"END\"\n        ]\n    ],\n    \"extras\": {\n        \"name\": \"Test\"\n    }\n}"
+        ));
     }
 
     #[test]

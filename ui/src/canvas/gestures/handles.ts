@@ -17,7 +17,13 @@ import { orientationLines, removeOrientationLine } from "../../lib/satinSides";
 import { unitIds } from "../transform";
 
 /** The move of a handle drag. */
-export function moveHandles(c: CanvasCtx, s: StoreState, d: Extract<Drag, { kind: "guideend" | "guidemove" | "guidedraw" | "ref" | "texthandle" | "handle" }>, p: Vec2, e: RPointerEvent) {
+export function moveHandles(
+  c: CanvasCtx,
+  s: StoreState,
+  d: Extract<Drag, { kind: "guideend" | "guidemove" | "guidedraw" | "ref" | "texthandle" | "handle" }>,
+  p: Vec2,
+  e: RPointerEvent,
+) {
   const { draw, iRef, overlayRef } = c;
   switch (d.kind) {
     case "guideend": {
@@ -27,7 +33,7 @@ export function moveHandles(c: CanvasCtx, s: StoreState, d: Extract<Drag, { kind
       const next = g.map((x, i) => (i === d.index ? ((d.end === 0 ? [p, x[1]] : [x[0], p]) as [Vec2, Vec2]) : x));
       setGuides(d.id, next, true);
       const v = next[d.index];
-      iRef.current.tooltip = { p, text: `${(Math.atan2(v[1][1] - v[0][1], v[1][0] - v[0][0]) * -180 / Math.PI).toFixed(0)}°` };
+      iRef.current.tooltip = { p, text: `${((Math.atan2(v[1][1] - v[0][1], v[1][0] - v[0][0]) * -180) / Math.PI).toFixed(0)}°` };
       draw();
       return;
     }
@@ -36,7 +42,18 @@ export function moveHandles(c: CanvasCtx, s: StoreState, d: Extract<Drag, { kind
       if (!g[d.index]) return;
       d.moved = true;
       const dv: Vec2 = [p[0] - d.start[0], p[1] - d.start[1]];
-      setGuides(d.id, g.map((x, i) => (i === d.index ? ([[d.orig[0][0] + dv[0], d.orig[0][1] + dv[1]], [d.orig[1][0] + dv[0], d.orig[1][1] + dv[1]]] as [Vec2, Vec2]) : x)), true);
+      setGuides(
+        d.id,
+        g.map((x, i) =>
+          i === d.index
+            ? ([
+                [d.orig[0][0] + dv[0], d.orig[0][1] + dv[1]],
+                [d.orig[1][0] + dv[0], d.orig[1][1] + dv[1]],
+              ] as [Vec2, Vec2])
+            : x,
+        ),
+        true,
+      );
       draw();
       return;
     }
@@ -53,7 +70,7 @@ export function moveHandles(c: CanvasCtx, s: StoreState, d: Extract<Drag, { kind
         const c = refCenter(o);
         let a = o.rotation + ((Math.atan2(p[1] - c[1], p[0] - c[0]) - d.a0) * 180) / Math.PI;
         if (e.shiftKey) a = Math.round(a / 15) * 15;
-        a = ((a % 360) + 540) % 360 - 180;
+        a = (((a % 360) + 540) % 360) - 180;
         patch = { rotation: Math.round(a * 10) / 10 };
         iRef.current.tooltip = { p, text: `${patch.rotation}° · Shift: 15° steps` };
       } else {
@@ -135,7 +152,13 @@ export function upHandles(c: CanvasCtx, s: StoreState, d: Extract<Drag, { kind: 
       const g = !draft || dist(draft[0], draft[1]) * s.view.scale < 6 ? guideAcross(o, d.a) : draft;
       // added to the point pairs, which become guides too (a guide alone would replace them)
       const f = freeSides(o);
-      if (g) s.commit((doc) => ({ ...doc, objects: doc.objects.map((x) => (x.id === o.id && f.stitch.type === "satin" ? { ...f, stitch: { ...f.stitch, guides: [...(f.stitch.guides ?? []), g] } } : x)) }));
+      if (g)
+        s.commit((doc) => ({
+          ...doc,
+          objects: doc.objects.map((x) =>
+            x.id === o.id && f.stitch.type === "satin" ? { ...f, stitch: { ...f.stitch, guides: [...(f.stitch.guides ?? []), g] } } : x,
+          ),
+        }));
     }
     draw();
     return;

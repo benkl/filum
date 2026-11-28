@@ -29,12 +29,14 @@ export function HiddenStitchingSection() {
   return (
     <Section
       title="Hidden stitching"
-      extra={<Toggle on={o.removeOverlaps} title="Leave out stitching hidden under objects stacked on top" onChange={(v) => setOptions({ removeOverlaps: v })} />}
+      extra={
+        <Toggle on={o.removeOverlaps} title="Leave out stitching hidden under objects stacked on top" onChange={(v) => setOptions({ removeOverlaps: v })} />
+      }
     >
       {!o.removeOverlaps ? (
         <p className="hint hs-off">
-          Everything is sewn, also where an object on top hides it. Turn this on to leave hidden stitching out: less bulk, fewer needle holes, faster sewing. The shapes stay as
-          drawn; you can change it any time.
+          Everything is sewn, also where an object on top hides it. Turn this on to leave hidden stitching out: less bulk, fewer needle holes, faster sewing.
+          The shapes stay as drawn; you can change it any time.
         </p>
       ) : (
         <>
@@ -45,13 +47,20 @@ export function HiddenStitchingSection() {
             <Num value={o.overlapMargin} unit="mm" step={0.1} min={0} max={3} onChange={(v) => setOptions({ overlapMargin: v })} />
           </Row>
           {Math.abs(o.overlapMargin - sug.value) > 0.05 && (
-            <button className="hs-suggest" onClick={() => setOptions({ overlapMargin: sug.value })} title={`The overlap practitioners suggest for ${fabric.label.toLowerCase()}: ${sug.why}`}>
+            <button
+              className="hs-suggest"
+              onClick={() => setOptions({ overlapMargin: sug.value })}
+              title={`The overlap practitioners suggest for ${fabric.label.toLowerCase()}: ${sug.why}`}
+            >
               <Sparkles size={11} /> {sug.value} mm suggested for {fabric.label.toLowerCase()}
             </button>
           )}
 
           <h6 className="hs-sub">What hides stitching</h6>
-          <Row label="Narrowest" title="An object only hides what's under it where it is at least this wide: outlines, thin borders and narrow satins don't, so the fill under them stays whole">
+          <Row
+            label="Narrowest"
+            title="An object only hides what's under it where it is at least this wide: outlines, thin borders and narrow satins don't, so the fill under them stays whole"
+          >
             <Num value={o.coverMinWidth} unit="mm" step={0.5} min={0} max={10} onChange={(v) => setOptions({ coverMinWidth: v })} />
           </Row>
           <Row label="Rows up to" title="Fills and satins with rows further apart than this are open and show what's under them (0: any spacing hides)">
@@ -81,7 +90,10 @@ export function HiddenStitchingSection() {
               </button>
             </div>
           </Row>
-          <Row label="Smallest piece" title="Leftover pieces smaller than this are left out (not worth a jump and a trim), and holes smaller than it aren't cut">
+          <Row
+            label="Smallest piece"
+            title="Leftover pieces smaller than this are left out (not worth a jump and a trim), and holes smaller than it aren't cut"
+          >
             <Num value={o.minFragment} unit="mm²" step={1} min={0} max={100} digits={1} onChange={(v) => setOptions({ minFragment: v })} />
           </Row>
           {changed && (
@@ -96,10 +108,22 @@ export function HiddenStitchingSection() {
             <div className="hs-overrides">
               <p className="hs-note">Set by hand:</p>
               {overrides.map(({ x }) => (
-                <button key={x.id} className="chip sm hs-chip" onClick={() => useStore.getState().select([x.id])} title="Select it (its own setting is in Selection ▸ Hidden stitching)">
+                <button
+                  key={x.id}
+                  className="chip sm hs-chip"
+                  onClick={() => useStore.getState().select([x.id])}
+                  title="Select it (its own setting is in Selection ▸ Hidden stitching)"
+                >
                   <i style={{ background: doc.threads.find((t) => t.id === x.thread)?.color }} />
                   {x.name}
-                  <span>{[x.hidden?.covers === "always" ? "always hides" : x.hidden?.covers === "never" ? "never hides" : "", x.hidden?.keep ? "keeps its stitches" : ""].filter(Boolean).join(" · ")}</span>
+                  <span>
+                    {[
+                      x.hidden?.covers === "always" ? "always hides" : x.hidden?.covers === "never" ? "never hides" : "",
+                      x.hidden?.keep ? "keeps its stitches" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
                 </button>
               ))}
             </div>
@@ -137,7 +161,11 @@ function Summary({ report, show }: { report: HiddenReport | null; show: boolean 
             {report.objects.length} object{report.objects.length === 1 ? "" : "s"} cut{gone ? ` · ${gone} left out completely` : ""}
           </span>
         )}
-        <button className={`hs-show ${show ? "on" : ""}`} onClick={() => useStore.getState().set({ showHidden: !show })} title="Mark what is left out on the canvas (hatched)">
+        <button
+          className={`hs-show ${show ? "on" : ""}`}
+          onClick={() => useStore.getState().set({ showHidden: !show })}
+          title="Mark what is left out on the canvas (hatched)"
+        >
           {show ? <Eye size={12} /> : <EyeOff size={12} />} Show on canvas
         </button>
       </div>

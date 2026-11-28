@@ -39,7 +39,7 @@ export async function divideSelection() {
     byOwner.set(part.owner, list);
   }
   const made = [...byOwner.values()].flat();
-  s.commit((d) => ({ ...d, objects: d.objects.flatMap((o) => (ids.includes(o.id) ? byOwner.get(o.id) ?? [] : [o])) }));
+  s.commit((d) => ({ ...d, objects: d.objects.flatMap((o) => (ids.includes(o.id) ? (byOwner.get(o.id) ?? []) : [o])) }));
   s.select(made.map((o) => o.id));
   s.toast(`Divided into ${made.length} shapes`, "success");
 }

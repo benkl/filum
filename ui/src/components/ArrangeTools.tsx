@@ -2,9 +2,33 @@
 // dialogs: Wreath · Kaleidoscope · Mirror-merge · Grid, Outlines & offsets, Colour
 // blending.
 
-import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalDistributeCenter, AlignStartHorizontal, AlignStartVertical, AlignVerticalDistributeCenter, Crosshair, FlipHorizontal2, FlipVertical2 } from "lucide-react";
+import {
+  AlignCenterHorizontal,
+  AlignCenterVertical,
+  AlignEndHorizontal,
+  AlignEndVertical,
+  AlignHorizontalDistributeCenter,
+  AlignStartHorizontal,
+  AlignStartVertical,
+  AlignVerticalDistributeCenter,
+  Crosshair,
+  FlipHorizontal2,
+  FlipVertical2,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { align, distribute, gridSelection, mirrorSelection, outlineObject, repeatSelection, repeatTransforms, withOutline, type OutlineKind, type OutlineOptions, type RepeatMode } from "../lib/arrange";
+import {
+  align,
+  distribute,
+  gridSelection,
+  mirrorSelection,
+  outlineObject,
+  repeatSelection,
+  repeatTransforms,
+  withOutline,
+  type OutlineKind,
+  type OutlineOptions,
+  type RepeatMode,
+} from "../lib/arrange";
 import { colourChanges, gridBox, gridCells, gridSequence, MAX_PIECES, type GridColours, type GridOrder } from "../lib/grid";
 import { centerInHoop } from "../lib/actions";
 import { applyMat, objectBounds, unionBoxes } from "../lib/geometry";
@@ -139,14 +163,20 @@ export function RepeatDialog({ onClose }: { onClose: () => void }) {
   const grid = mode === "grid";
   const ring: RepeatMode = grid ? "wreath" : mode;
   const center: Vec2 =
-    around === "hoop" || !box ? [doc.hoop.width / 2, doc.hoop.height / 2] : [box.x + box.w / 2, box.y + box.h / 2 + (ring.startsWith("mirror") ? box.h / 2 + radius / 5 : radius)];
+    around === "hoop" || !box
+      ? [doc.hoop.width / 2, doc.hoop.height / 2]
+      : [box.x + box.w / 2, box.y + box.h / 2 + (ring.startsWith("mirror") ? box.h / 2 + radius / 5 : radius)];
   const rotational = ring === "wreath" || ring === "kaleidoscope";
   const total = grid ? rows * cols : repeatTransforms({ mode: ring, copies, center }).length + 1;
   // the grid: where it lies, whether it fits in the hoop, and its colour changes
   const all = box && gridBox(box, { rows, cols, gap });
   const shift: Vec2 = all && centred ? [doc.hoop.width / 2 - (all.x + all.w / 2), doc.hoop.height / 2 - (all.y + all.h / 2)] : [0, 0];
   const beyond =
-    !!all && (all.x + shift[0] < -0.05 || all.y + shift[1] < -0.05 || all.x + shift[0] + all.w > doc.hoop.width + 0.05 || all.y + shift[1] + all.h > doc.hoop.height + 0.05);
+    !!all &&
+    (all.x + shift[0] < -0.05 ||
+      all.y + shift[1] < -0.05 ||
+      all.x + shift[0] + all.w > doc.hoop.width + 0.05 ||
+      all.y + shift[1] + all.h > doc.hoop.height + 0.05);
   const tooMany = rows * cols < 2 || rows * cols > MAX_PIECES;
   const changes = useMemo(() => {
     const piece = doc.objects.filter((o) => selection.includes(o.id) && !o.locked);
@@ -180,14 +210,21 @@ export function RepeatDialog({ onClose }: { onClose: () => void }) {
       }
     >
       {!box && <p className="hint warn">Select the objects to repeat first.</p>}
-      <Seg style={{ marginBottom: 10 }} value={mode} options={[
+      <Seg
+        style={{ marginBottom: 10 }}
+        value={mode}
+        options={
+          [
             ["wreath", "Wreath"],
             ["kaleidoscope", "Kaleidoscope"],
             ["mirrorH", "Mirror ↔"],
             ["mirrorV", "Mirror ↕"],
             ["mirrorHV", "Mirror 4×"],
             ["grid", "Grid"],
-          ] as [RepeatKind, string][]} onChange={(id) => setMode(id)} />
+          ] as [RepeatKind, string][]
+        }
+        onChange={(id) => setMode(id)}
+      />
       <div style={{ display: "grid", gridTemplateColumns: "1fr 200px", gap: 16, alignItems: "start" }}>
         {grid ? (
           <div>
@@ -204,10 +241,28 @@ export function RepeatDialog({ onClose }: { onClose: () => void }) {
               <Num value={gap[1]} unit="mm" step={0.5} onChange={(v) => setGap([gap[0], v])} />
             </Row>
             <Row label="Order" title="The order the pieces are sewn in">
-              <Seg value={order} options={[["rows", "Row by row", "Every row from left to right"], ["serpentine", "Serpentine", "Back along every second row, for shorter jumps"]] as const} onChange={(v) => setOrder(v)} />
+              <Seg
+                value={order}
+                options={
+                  [
+                    ["rows", "Row by row", "Every row from left to right"],
+                    ["serpentine", "Serpentine", "Back along every second row, for shorter jumps"],
+                  ] as const
+                }
+                onChange={(v) => setOrder(v)}
+              />
             </Row>
             <Row label="Colours">
-              <Seg value={colours} options={[["byColour", "One at a time", `Each colour on every piece before the next colour: ${changes.byColour} colour changes`], ["byPiece", "Piece by piece", `Each piece finished before the next: ${changes.byPiece} colour changes`]] as const} onChange={(v) => setColours(v)} />
+              <Seg
+                value={colours}
+                options={
+                  [
+                    ["byColour", "One at a time", `Each colour on every piece before the next colour: ${changes.byColour} colour changes`],
+                    ["byPiece", "Piece by piece", `Each piece finished before the next: ${changes.byPiece} colour changes`],
+                  ] as const
+                }
+                onChange={(v) => setColours(v)}
+              />
             </Row>
             <Row label="Centre in hoop" title="Move the whole grid, the original too, into the middle of the hoop">
               <Toggle on={centred} onChange={setCentred} />
@@ -215,32 +270,41 @@ export function RepeatDialog({ onClose }: { onClose: () => void }) {
             {tooMany && <p className="hint warn">Choose between 2 and {MAX_PIECES} pieces.</p>}
             {!tooMany && beyond && <p className="hint warn">The grid goes beyond the hoop.</p>}
             <p className="hint">
-              The selection stays as the first piece, top left. One colour at a time sews each colour on every piece before the next one, and every piece
-              keeps its own layering.
+              The selection stays as the first piece, top left. One colour at a time sews each colour on every piece before the next one, and every piece keeps
+              its own layering.
             </p>
           </div>
         ) : (
-        <div>
-          {rotational && (
-            <Row label="Copies" title="Number of repeats around the centre">
-              <Num value={copies} step={1} min={2} max={36} digits={0} onChange={(v) => setCopies(Math.round(v))} />
+          <div>
+            {rotational && (
+              <Row label="Copies" title="Number of repeats around the centre">
+                <Num value={copies} step={1} min={2} max={36} digits={0} onChange={(v) => setCopies(Math.round(v))} />
+              </Row>
+            )}
+            <Row label="Centre">
+              <Seg
+                value={around}
+                options={
+                  [
+                    ["radius", rotational ? "Below selection" : "Next to selection"],
+                    ["hoop", "Hoop centre"],
+                  ] as const
+                }
+                onChange={(v) => setAround(v)}
+              />
             </Row>
-          )}
-          <Row label="Centre">
-            <Seg value={around} options={[["radius", rotational ? "Below selection" : "Next to selection"], ["hoop", "Hoop centre"]] as const} onChange={(v) => setAround(v)} />
-          </Row>
-          {around === "radius" && rotational && (
-            <Row label="Radius" title="Distance from the selection's centre to the wreath centre">
-              <Num value={radius} unit="mm" step={1} min={1} onChange={setRadius} />
-            </Row>
-          )}
-          <p className="hint">
-            {ring === "wreath" && "Copies rotate around the centre — rings, flowers, borders."}
-            {ring === "kaleidoscope" && "Rotated copies plus their mirror images — snowflake-like symmetry."}
-            {ring.startsWith("mirror") && "Mirror images joined at the centre line (mirror-merge)."} Fill angles follow every copy; mirrored
-            lettering becomes shapes.
-          </p>
-        </div>
+            {around === "radius" && rotational && (
+              <Row label="Radius" title="Distance from the selection's centre to the wreath centre">
+                <Num value={radius} unit="mm" step={1} min={1} onChange={setRadius} />
+              </Row>
+            )}
+            <p className="hint">
+              {ring === "wreath" && "Copies rotate around the centre — rings, flowers, borders."}
+              {ring === "kaleidoscope" && "Rotated copies plus their mirror images — snowflake-like symmetry."}
+              {ring.startsWith("mirror") && "Mirror images joined at the centre line (mirror-merge)."} Fill angles follow every copy; mirrored lettering becomes
+              shapes.
+            </p>
+          </div>
         )}
         {grid ? (
           <GridPreview rows={rows} cols={cols} gap={gap} order={order} hoop={[doc.hoop.width, doc.hoop.height]} shift={shift} />
@@ -391,7 +455,10 @@ export function OutlineDialog({ onClose }: { onClose: () => void }) {
           <Num value={o.width} unit="mm" step={0.1} min={0.5} max={12} onChange={(v) => set({ width: v })} />
         </Row>
       )}
-      <Row label="Bridge gaps" title="Join pieces of the art that don't touch — gaps up to twice this close — and fill narrow notches, so one border runs around everything (0: follow every gap)">
+      <Row
+        label="Bridge gaps"
+        title="Join pieces of the art that don't touch — gaps up to twice this close — and fill narrow notches, so one border runs around everything (0: follow every gap)"
+      >
         <Num value={o.bridge} unit="mm" step={0.5} min={0} max={50} onChange={(v) => set({ bridge: v })} />
       </Row>
       <Row label="Outer edge only" title="No outlines around holes (letter counters, gaps inside the art)">
@@ -405,12 +472,14 @@ export function OutlineDialog({ onClose }: { onClose: () => void }) {
       </Row>
       {pieces > 1 && patchKind ? (
         <p className="hint warn">
-          {pieces} separate outlines: parts of the art don't touch{o.outerOnly ? "" : " or have holes"}. For one patch border, raise Bridge gaps{o.outerOnly ? "" : " and turn on Outer edge only"}.
+          {pieces} separate outlines: parts of the art don't touch{o.outerOnly ? "" : " or have holes"}. For one patch border, raise Bridge gaps
+          {o.outerOnly ? "" : " and turn on Outer edge only"}.
         </p>
       ) : (
-        <p className="hint">Follows the union of everything selected — lettering, satins and fills — so one outline hugs the whole group. Pieces under 1 mm² are left out.</p>
+        <p className="hint">
+          Follows the union of everything selected — lettering, satins and fills — so one outline hugs the whole group. Pieces under 1 mm² are left out.
+        </p>
       )}
     </Dialog>
   );
 }
-

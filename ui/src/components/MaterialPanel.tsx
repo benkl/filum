@@ -74,7 +74,11 @@ export function MaterialSection() {
           </select>
           <button
             className={`icon-btn ${calibrated ? "on" : ""}`}
-            title={calibrated ? `Calibrated on this device (${calibrated.date}): new objects start from your numbers. Click to measure again.` : "Calibrate this fabric: sew a swatch, measure it, and new objects start from your pull compensation"}
+            title={
+              calibrated
+                ? `Calibrated on this device (${calibrated.date}): new objects start from your numbers. Click to measure again.`
+                : "Calibrate this fabric: sew a swatch, measure it, and new objects start from your pull compensation"
+            }
             onClick={() => useStore.getState().setDialog("calibrate")}
           >
             <Ruler size={13} />
@@ -96,7 +100,12 @@ export function MaterialSection() {
       <Row label="Thread" title="Top thread weight — finer thread stitches denser, heavier thread wider (Madeira's density guide)">
         <div className="seg mt-weights">
           {THREAD_WEIGHTS.map((t) => (
-            <button key={t.weight} className={weight.weight === t.weight ? "on" : ""} title={`${t.label}: ${t.spacing.toFixed(2)} mm satin spacing, needle ${t.needle}`} onClick={() => setWeight(t.weight)}>
+            <button
+              key={t.weight}
+              className={weight.weight === t.weight ? "on" : ""}
+              title={`${t.label}: ${t.spacing.toFixed(2)} mm satin spacing, needle ${t.needle}`}
+              onClick={() => setWeight(t.weight)}
+            >
               {t.weight}
             </button>
           ))}
@@ -117,7 +126,12 @@ export function MaterialSection() {
           <dt>Needle</dt>
           <dd>
             {fabric.needle}
-            {weight.weight !== 40 && <span className="mt-sub"> · No. {weight.weight} thread: {weight.needle}</span>}
+            {weight.weight !== 40 && (
+              <span className="mt-sub">
+                {" "}
+                · No. {weight.weight} thread: {weight.needle}
+              </span>
+            )}
           </dd>
           <dt>Smallest text</dt>
           <dd title={weight.minTextSource}>
@@ -150,7 +164,8 @@ function PresetSuggestion({ onDone }: { onDone: () => void }) {
   return (
     <div className="mt-suggest">
       <span>
-        New objects start from these values. {off.length} {off.length === 1 ? "satin or fill" : "satins and fills"} in this design {off.length === 1 ? "has" : "have"} others.
+        New objects start from these values. {off.length} {off.length === 1 ? "satin or fill" : "satins and fills"} in this design{" "}
+        {off.length === 1 ? "has" : "have"} others.
       </span>
       <button className="btn sm primary" onClick={apply}>
         Update them

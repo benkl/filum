@@ -14,7 +14,30 @@ export function MenuBar() {
   const ref = useRef<HTMLDivElement>(null);
   // Subscribe only to what the menus display (not to every animation frame).
   useStore(
-    useShallow((st) => [st.tool, st.viewMode, st.selection, st.doc.options, st.doc.threadSources, st.past.length > 0, st.future.length > 0, st.showJumps, st.showUnderlay, st.showGrid, st.showDensity, st.smartGuides, st.theme, st.outlineTab, st.inspectorTab, st.layout, st.stitchColors, st.colorFocus, st.activeThread, st.prefs.hints, st.gridStep, st.prefs.snapPoints]),
+    useShallow((st) => [
+      st.tool,
+      st.viewMode,
+      st.selection,
+      st.doc.options,
+      st.doc.threadSources,
+      st.past.length > 0,
+      st.future.length > 0,
+      st.showJumps,
+      st.showUnderlay,
+      st.showGrid,
+      st.showDensity,
+      st.smartGuides,
+      st.theme,
+      st.outlineTab,
+      st.inspectorTab,
+      st.layout,
+      st.stitchColors,
+      st.colorFocus,
+      st.activeThread,
+      st.prefs.hints,
+      st.gridStep,
+      st.prefs.snapPoints,
+    ]),
   );
   const s = useStore.getState();
   const docName = useStore((st) => st.doc.name);
@@ -97,7 +120,21 @@ export function MenuBar() {
  * when there is no room) on hover, → or Enter; ← goes back; a command closes
  * every level.
  */
-export function Menu({ items, x, y, alt, onClose, onBack }: { items: MenuItem[]; x: number; y: number; alt?: number; onClose: () => void; onBack?: () => void }) {
+export function Menu({
+  items,
+  x,
+  y,
+  alt,
+  onClose,
+  onBack,
+}: {
+  items: MenuItem[];
+  x: number;
+  y: number;
+  alt?: number;
+  onClose: () => void;
+  onBack?: () => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const [openSub, setOpenSub] = useState<{ i: number; x: number; y: number; alt: number } | null>(null);
   const [place, setPlace] = useState({ x, y });
@@ -129,7 +166,12 @@ export function Menu({ items, x, y, alt, onClose, onBack }: { items: MenuItem[];
       role="menu"
       style={{ left: place.x, top: place.y }}
       onKeyDown={(e) => {
-        if (e.target !== document.activeElement || !(e.currentTarget as HTMLElement).contains(e.target as Node) || (e.target as HTMLElement).parentElement !== e.currentTarget) return;
+        if (
+          e.target !== document.activeElement ||
+          !(e.currentTarget as HTMLElement).contains(e.target as Node) ||
+          (e.target as HTMLElement).parentElement !== e.currentTarget
+        )
+          return;
         const f = focusables();
         const k = f.indexOf(document.activeElement as HTMLButtonElement);
         if (e.key === "ArrowDown" || e.key === "ArrowUp") {

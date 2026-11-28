@@ -151,9 +151,9 @@ pub(crate) fn read_emd(bytes: &[u8]) -> Result<Pattern, Error> {
                 i += 2;
             }
             0x2A => raw.color_change(),
-            0x7D => {}               // unknown, seen at position 0
+            0x7D => {}                 // unknown, seen at position 0
             0xAD | 0x90 => raw.trim(), // 0x90: final command before returning to start
-            _ => break,              // 0xFD end
+            _ => break,                // 0xFD end
         }
     }
     Ok(raw.finish())

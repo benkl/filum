@@ -1,0 +1,16 @@
+# generated, vendored or built: not ours to lay out
+ui/src/wasm/pkg
+ui/src/generated
+ui/public
+ui/dist
+ui/.model-cache
+target
+node_modules
+src-tauri/gen
+
+# formatted by hand (prose, data, config)
+*.md
+*.json
+*.yml
+*.yaml
+*.html

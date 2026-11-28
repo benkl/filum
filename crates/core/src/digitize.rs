@@ -22,7 +22,8 @@ use serde::{Deserialize, Serialize};
 use crate::clip;
 use crate::geom::{chaikin_ring, polyline_length, pt, signed_area, simplify, simplify_ring, trace_contours, Point, Ring};
 use crate::model::{
-    hex_color, DitherMethod, FillMethod, FillParams, FlowField, GradientKind, GradientParams, GradientStop, Node, Object, RunningParams, SatinParams, StitchParams, SubPath, Thread,
+    hex_color, DitherMethod, FillMethod, FillParams, FlowField, GradientKind, GradientParams, GradientStop, Node, Object, RunningParams, SatinParams,
+    StitchParams, SubPath, Thread,
 };
 use crate::threads::{lab_to_rgb, nearest_name, rgb_to_lab, PaletteEntry};
 use crate::vision::boundary::{self, Chain, Seg};
@@ -423,11 +424,7 @@ pub fn decode_image(bytes: &[u8]) -> Result<(Vec<u8>, u32, u32), String> {
     use image::metadata::Orientation;
     use image::ImageDecoder;
     let err = |e: &dyn std::fmt::Display| format!("could not decode image: {e}");
-    let mut decoder = image::ImageReader::new(std::io::Cursor::new(bytes))
-        .with_guessed_format()
-        .map_err(|e| err(&e))?
-        .into_decoder()
-        .map_err(|e| err(&e))?;
+    let mut decoder = image::ImageReader::new(std::io::Cursor::new(bytes)).with_guessed_format().map_err(|e| err(&e))?.into_decoder().map_err(|e| err(&e))?;
     // a malformed EXIF block is no reason to reject the picture
     let orientation = decoder.orientation().unwrap_or(Orientation::NoTransforms);
     let mut img = image::DynamicImage::from_decoder(decoder).map_err(|e| err(&e))?;
@@ -664,10 +661,13 @@ fn prepare(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOptions) -> Opti
     for m in opts.masks.iter().filter(|m| m.mode == MaskMode::Erase) {
         let inside = decode_mask(m, w, h);
         let mut done: Vec<bool> = inside.iter().map(|b| !b).collect();
-        let mut queue: std::collections::VecDeque<usize> = (0..w * h).filter(|&i| done[i]).filter(|&i| {
-            let (x, y) = (i % w, i / w);
-            (x > 0 && inside[i - 1]) || (x + 1 < w && inside[i + 1]) || (y > 0 && inside[i - w]) || (y + 1 < h && inside[i + w])
-        }).collect();
+        let mut queue: std::collections::VecDeque<usize> = (0..w * h)
+            .filter(|&i| done[i])
+            .filter(|&i| {
+                let (x, y) = (i % w, i / w);
+                (x > 0 && inside[i - 1]) || (x + 1 < w && inside[i + 1]) || (y > 0 && inside[i - w]) || (y + 1 < h && inside[i + w])
+            })
+            .collect();
         while let Some(i) = queue.pop_front() {
             let (x, y) = (i % w, i / w);
             for j in [(x > 0).then(|| i - 1), (x + 1 < w).then(|| i + 1), (y > 0).then(|| i - w), (y + 1 < h).then(|| i + w)].into_iter().flatten() {
@@ -1034,7 +1034,11 @@ fn grow_under_neighbours(regions: &mut [Region], region_comp: &[usize], ordered:
 /// Fill angle convention: rows along (cos(-a), sin(-a)) in y-down coordinates.
 fn angle_of(theta: f64) -> f64 {
     let a = ((-theta).to_degrees().rem_euclid(180.0) * 10.0).round() / 10.0;
-    if a >= 180.0 { a - 180.0 } else { a + 0.0 }
+    if a >= 180.0 {
+        a - 180.0
+    } else {
+        a + 0.0
+    }
 }
 
 /// Snap a colour to the thread chart (if any).
@@ -1043,11 +1047,7 @@ fn snap_rgb(rgb: [u8; 3], opts: &DigitizeOptions) -> ([u8; 3], String, String, S
         return (rgb, nearest_name(rgb), String::new(), String::new());
     }
     let l = rgb_to_lab(rgb);
-    let e = opts
-        .palette
-        .iter()
-        .min_by(|a, b| vision::delta_e2000(l, rgb_to_lab(a.rgb)).total_cmp(&vision::delta_e2000(l, rgb_to_lab(b.rgb))))
-        .unwrap();
+    let e = opts.palette.iter().min_by(|a, b| vision::delta_e2000(l, rgb_to_lab(a.rgb)).total_cmp(&vision::delta_e2000(l, rgb_to_lab(b.rgb)))).unwrap();
     (e.rgb, e.name.clone(), e.code.clone(), opts.palette_brand.clone())
 }
 
@@ -1145,7 +1145,8 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
     let etf = want_flow.then(|| filters::edge_tangent_flow(&filters::luminance(&lab), 4, 2));
     // flow fills: their own smoothing of the edge flow
     let flow_smoothing = opts.flow_smoothing.clamp(1, 8) as usize;
-    let flow_etf = (want_flow && (flow_fill || gradient_flow) && flow_smoothing != 2).then(|| filters::edge_tangent_flow(&filters::luminance(&lab), 4, flow_smoothing));
+    let flow_etf =
+        (want_flow && (flow_fill || gradient_flow) && flow_smoothing != 2).then(|| filters::edge_tangent_flow(&filters::luminance(&lab), 4, flow_smoothing));
 
     // 6./7. vectorise + stitch type
     // pixels next to another stitched region (a seam): where a region's end lies along
@@ -1189,7 +1190,12 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
                 centroid: pt((sx / n + 0.5) * s, (sy / n + 0.5) * s),
                 area: pix.len(),
                 paths: Vec::new(),
-                stitch: StitchParams::Fill(FillParams { method: FillMethod::Tatami, row_spacing: opts.row_spacing.max(0.1), underlay: opts.underlay, ..Default::default() }),
+                stitch: StitchParams::Fill(FillParams {
+                    method: FillMethod::Tatami,
+                    row_spacing: opts.row_spacing.max(0.1),
+                    underlay: opts.underlay,
+                    ..Default::default()
+                }),
                 outline: Vec::new(),
             })
         } else {
@@ -1367,7 +1373,9 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
             // drifts with blur and compression)
             let dark = |c: [u8; 3]| rgb_to_lab(c)[0] < 40.0;
             let rgb = match ls.label {
-                None => keyed.iter().map(|(c, _)| *c).find(|c| crate::threads::delta_e76(*c, rgb) < if dark(*c) && dark(rgb) { 20.0 } else { 12.0 }).unwrap_or(rgb),
+                None => {
+                    keyed.iter().map(|(c, _)| *c).find(|c| crate::threads::delta_e76(*c, rgb) < if dark(*c) && dark(rgb) { 20.0 } else { 12.0 }).unwrap_or(rgb)
+                }
                 Some(_) => rgb,
             };
             keyed.push((rgb, ls));
@@ -1425,7 +1433,10 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
                     cursor = pt(e.p[0], e.p[1]);
                 }
                 k += 1;
-                batch.push(Object { name: format!("{tname} line {k}"), ..Object::new(format!("dz{}", objects.len() + batch.len() + 1), tid.clone(), paths, stitch) });
+                batch.push(Object {
+                    name: format!("{tname} line {k}"),
+                    ..Object::new(format!("dz{}", objects.len() + batch.len() + 1), tid.clone(), paths, stitch)
+                });
             }
             let batch = if opts.route_lines { crate::outline_route::route_lines(batch, from) } else { batch };
             if let Some(e) = batch.last().and_then(|o| o.paths.last()).and_then(|sp| sp.nodes.last()) {
@@ -1864,7 +1875,11 @@ impl Core {
         let (ax1, ay1) = (self.x0 + self.w as i64, self.y0 + self.h as i64);
         let (bx1, by1) = (other.x0 + other.w as i64, other.y0 + other.h as i64);
         let (x0, y0, x1, y1) = (self.x0.max(other.x0), self.y0.max(other.y0), ax1.min(bx1), ay1.min(by1));
-        (y0..y1).any(|y| (x0..x1).any(|x| self.on[((y - self.y0) as usize) * self.w + (x - self.x0) as usize] && other.on[((y - other.y0) as usize) * other.w + (x - other.x0) as usize]))
+        (y0..y1).any(|y| {
+            (x0..x1).any(|x| {
+                self.on[((y - self.y0) as usize) * self.w + (x - self.x0) as usize] && other.on[((y - other.y0) as usize) * other.w + (x - other.x0) as usize]
+            })
+        })
     }
 }
 
@@ -1985,8 +2000,24 @@ fn refine_centres(st: &mut strokes::Stroke, ridge: &[f32], w: usize, h: usize) {
     };
     let orig = st.pts.clone();
     for i in 0..n {
-        let a = if i == 0 { if st.closed { orig[n - 1] } else { orig[0] } } else { orig[i - 1] };
-        let b = if i + 1 == n { if st.closed { orig[0] } else { orig[n - 1] } } else { orig[i + 1] };
+        let a = if i == 0 {
+            if st.closed {
+                orig[n - 1]
+            } else {
+                orig[0]
+            }
+        } else {
+            orig[i - 1]
+        };
+        let b = if i + 1 == n {
+            if st.closed {
+                orig[0]
+            } else {
+                orig[n - 1]
+            }
+        } else {
+            orig[i + 1]
+        };
         let d = b - a;
         let l = d.length();
         if l < 1e-9 {
@@ -2228,7 +2259,13 @@ fn find_lines(
             let pix = &cc.order[c.start..c.start + c.len];
             let (sum, n) = pix.iter().filter(|&&p| !mask[p as usize]).fold((0.0, 0usize), |a, &p| (a.0 + lum[p as usize] as f64, a.1 + 1));
             let l = c.label as usize;
-            let v = if n > 0 { sum / n as f64 } else if l < ncolors { rgb_to_lab(colors_rgb(l))[0] } else { f64::NAN };
+            let v = if n > 0 {
+                sum / n as f64
+            } else if l < ncolors {
+                rgb_to_lab(colors_rgb(l))[0]
+            } else {
+                f64::NAN
+            };
             for &p in pix {
                 body_l[p as usize] = v;
             }
@@ -2427,7 +2464,8 @@ fn find_lines(
             .collect();
         // sub-pixel centres: the ink's darkness profile, else the distance to the line's edge
         if opts.line_subpixel {
-            let ridge: Vec<f32> = (0..w * h).map(|i| dt[i].sqrt() as f32 + if k == 1 { ink_ridge.as_ref().map_or(0.0, |b| b[i].max(0.0) / 8.0) } else { 0.0 }).collect();
+            let ridge: Vec<f32> =
+                (0..w * h).map(|i| dt[i].sqrt() as f32 + if k == 1 { ink_ridge.as_ref().map_or(0.0, |b| b[i].max(0.0) / 8.0) } else { 0.0 }).collect();
             for st in &mut kept {
                 refine_centres(st, &ridge, w, h);
             }
@@ -3001,7 +3039,12 @@ fn grow_under_lines(labels: &mut [u8], line: &[bool], strip: &[bool], w: usize, 
     while let Some(i) = queue.pop_front() {
         let (x, y) = (i % w, i / w);
         let l = labels[i];
-        for j in [if x > 0 { i - 1 } else { usize::MAX }, if x + 1 < w { i + 1 } else { usize::MAX }, if y > 0 { i - w } else { usize::MAX }, if y + 1 < h { i + w } else { usize::MAX }] {
+        for j in [
+            if x > 0 { i - 1 } else { usize::MAX },
+            if x + 1 < w { i + 1 } else { usize::MAX },
+            if y > 0 { i - w } else { usize::MAX },
+            if y + 1 < h { i + w } else { usize::MAX },
+        ] {
             if j != usize::MAX && !done[j] {
                 done[j] = true;
                 dist[j] = dist[i] + 1;
@@ -3340,7 +3383,11 @@ fn is_stroke_like(rings: &[Ring], max_width: f64) -> bool {
         .enumerate()
         .map(|(i, r)| {
             let hole = rings.iter().enumerate().any(|(j, o)| j != i && crate::geom::point_in_ring(r[0], o));
-            if hole { -signed_area(r).abs() } else { signed_area(r).abs() }
+            if hole {
+                -signed_area(r).abs()
+            } else {
+                signed_area(r).abs()
+            }
         })
         .sum();
     if per <= 0.0 || area <= 0.0 {
@@ -3366,10 +3413,7 @@ fn for_samples(pts: &[Point], step: f64, mut f: impl FnMut(Point)) {
 
 /// Outer boundaries of the filled areas (strokes and holes are ignored), in mm.
 fn silhouette_rings(mask: &[bool], w: usize, h: usize, s: f64, opts: &DigitizeOptions) -> Vec<Ring> {
-    let rings: Vec<Ring> = trace_contours(mask, w, h)
-        .into_iter()
-        .map(|r| r.into_iter().map(|p| pt(p.x * s, p.y * s)).collect::<Ring>())
-        .collect();
+    let rings: Vec<Ring> = trace_contours(mask, w, h).into_iter().map(|r| r.into_iter().map(|p| pt(p.x * s, p.y * s)).collect::<Ring>()).collect();
     let min_area = opts.min_region_mm2.max(1.0) * 4.0;
     let tol = opts.simplify_mm.max(0.0).max(s * 0.5);
     let mut out = Vec::new();
@@ -3615,8 +3659,7 @@ fn lloyd(sample: &[[f32; 3]], cents: &mut [[f64; 3]], iters: usize) -> Vec<usize
 /// noticeable thread difference, then (Ward linkage) down to `k`.
 fn reduce_clusters(cents: Vec<[f64; 3]>, counts: Vec<usize>, k: usize) -> Vec<[f64; 3]> {
     const SAME_DE: f64 = 6.0;
-    let mut cl: Vec<([f64; 3], f64)> =
-        cents.into_iter().zip(counts).filter(|(_, n)| *n > 0).map(|(c, n)| (c, n as f64)).collect();
+    let mut cl: Vec<([f64; 3], f64)> = cents.into_iter().zip(counts).filter(|(_, n)| *n > 0).map(|(c, n)| (c, n as f64)).collect();
     loop {
         if cl.len() < 2 {
             break;
@@ -3689,7 +3732,11 @@ fn split_background(q: &mut Quant, lab: &Img, w: usize, h: usize, s: f64, opts: 
     let inside = |p: usize| -> bool {
         let (x, y) = (p % w, p / w);
         let l = labels[p];
-        x >= 2 && y >= 2 && x + 2 < w && y + 2 < h && [p - 1, p + 1, p - w, p + w, p - 2, p + 2, p - 2 * w, p + 2 * w, p - w - 1, p - w + 1, p + w - 1, p + w + 1].iter().all(|&q| labels[q] == l)
+        x >= 2
+            && y >= 2
+            && x + 2 < w
+            && y + 2 < h
+            && [p - 1, p + 1, p - w, p + w, p - 2, p + 2, p - 2 * w, p + 2 * w, p - w - 1, p - w + 1, p + w - 1, p + w + 1].iter().all(|&q| labels[q] == l)
     };
     let mean = |pix: &[u32]| -> Option<([f64; 3], usize)> {
         let mut m = [0f64; 3];
@@ -4292,9 +4339,7 @@ fn process_region(ctx: &Ctx, c: &Comp, pix: &[u32], w: usize) -> Option<Region> 
         }
         if paths.is_empty() {
             // fallback: outline of the region, single pass
-            let ring = trace_contours(&mask, cw, ch)
-                .into_iter()
-                .max_by(|a, b| signed_area(a).abs().total_cmp(&signed_area(b).abs()))?;
+            let ring = trace_contours(&mask, cw, ch).into_iter().max_by(|a, b| signed_area(a).abs().total_cmp(&signed_area(b).abs()))?;
             let mm: Vec<Point> = ring.iter().map(|p| to_mm(*p)).collect();
             let r = simplify_ring(&chaikin_ring(&mm, f64::INFINITY), ctx.tol);
             // a crumb (a few anti-aliased pixels) rather than a hairline
@@ -4394,7 +4439,7 @@ fn process_region(ctx: &Ctx, c: &Comp, pix: &[u32], w: usize) -> Option<Region> 
         sxy += dx * dy;
     }
     let theta = 0.5 * (2.0 * sxy).atan2(sxx - syy); // direction (cos θ, sin θ) on screen
-    // FillParams: rows run along (cos(-a), sin(-a)) in y-down coordinates → a = -θ
+                                                    // FillParams: rows run along (cos(-a), sin(-a)) in y-down coordinates → a = -θ
     let mut angle = ((-theta).to_degrees().rem_euclid(180.0) * 10.0).round() / 10.0;
     if angle >= 180.0 {
         angle -= 180.0;
@@ -4480,15 +4525,7 @@ fn blend_angle(flow: f32, base: f32, k: f32) -> f32 {
 
 /// Centre line (crop coordinates) and width (pixels) of a satin-able region,
 /// or `None` when the region is not a narrow, elongated, unbranched stroke.
-fn satin_centre_line(
-    mask: &[bool],
-    dt: &[f64],
-    cw: usize,
-    ch: usize,
-    area: usize,
-    dmax: f64,
-    min_elongation: f64,
-) -> Option<(Vec<Point>, f64)> {
+fn satin_centre_line(mask: &[bool], dt: &[f64], cw: usize, ch: usize, area: usize, dmax: f64, min_elongation: f64) -> Option<(Vec<Point>, f64)> {
     let skel = zhang_suen(mask, cw, ch);
     let n_skel = skel.iter().filter(|v| **v).count();
     if n_skel < 3 {
@@ -4637,9 +4674,7 @@ pub(crate) fn edt_sq(mask: &[bool], w: usize, h: usize) -> Vec<f64> {
 /// Zhang–Suen thinning. The mask must have a false 1-cell border.
 pub(crate) fn zhang_suen(mask: &[bool], w: usize, h: usize) -> Vec<bool> {
     let mut img = mask.to_vec();
-    let mut fg: Vec<usize> = (0..w * h)
-        .filter(|&i| img[i] && i % w > 0 && i % w + 1 < w && i / w > 0 && i / w + 1 < h)
-        .collect();
+    let mut fg: Vec<usize> = (0..w * h).filter(|&i| img[i] && i % w > 0 && i % w + 1 < w && i / w > 0 && i / w + 1 < h).collect();
     let mut del = Vec::new();
     loop {
         let mut changed = false;
@@ -4780,9 +4815,7 @@ mod tests {
             }
         }
         let mut jpeg = Vec::new();
-        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 100)
-            .encode(&raw, w, h, image::ExtendedColorType::Rgb8)
-            .unwrap();
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 100).encode(&raw, w, h, image::ExtendedColorType::Rgb8).unwrap();
         // APP1 "Exif": big-endian TIFF header, one IFD entry 0x0112 SHORT = 6
         let mut tiff = vec![b'M', b'M', 0, 42, 0, 0, 0, 8, 0, 1];
         tiff.extend_from_slice(&[0x01, 0x12, 0, 3, 0, 0, 0, 1, 0, 6, 0, 0]);

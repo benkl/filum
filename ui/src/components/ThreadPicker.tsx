@@ -87,7 +87,19 @@ export function ChartSelect({ value, onChange, none }: { value: string; onChange
   );
 }
 
-function ChartMenu({ anchor, value, none, onPick, onClose }: { anchor: HTMLElement; value: string; none?: string; onPick: (id: string) => void; onClose: () => void }) {
+function ChartMenu({
+  anchor,
+  value,
+  none,
+  onPick,
+  onClose,
+}: {
+  anchor: HTMLElement;
+  value: string;
+  none?: string;
+  onPick: (id: string) => void;
+  onClose: () => void;
+}) {
   const list = useCharts();
   const ref = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -145,7 +157,13 @@ function ChartMenu({ anchor, value, none, onPick, onClose }: { anchor: HTMLEleme
     <div className="popover chart-menu" ref={ref} style={{ left: pos.left, top: pos.top, maxHeight: pos.maxHeight }}>
       <label className="chart-search">
         <Search size={13} />
-        <input ref={input} className="input" placeholder={`Search ${total} charts — brand, line, collection`} value={q} onChange={(e) => setQ(e.target.value)} />
+        <input
+          ref={input}
+          className="input"
+          placeholder={`Search ${total} charts — brand, line, collection`}
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
         {q && (
           <button type="button" className="icon-btn" onClick={() => setQ("")} title="Clear">
             <X size={12} />
@@ -162,7 +180,15 @@ function ChartMenu({ anchor, value, none, onPick, onClose }: { anchor: HTMLEleme
           <div key={g} className="cm-group">
             <div className="cm-head">{g}</div>
             {cs.map((c) => (
-              <div key={g + c.id} className={`cm-row ${c.id === value ? "on" : ""}`} role="button" tabIndex={0} title={`${c.name} · ${c.count} colours · ${SOURCE_LABEL[c.source]}`} onClick={() => onPick(c.id)} onKeyDown={(e) => e.key === "Enter" && onPick(c.id)}>
+              <div
+                key={g + c.id}
+                className={`cm-row ${c.id === value ? "on" : ""}`}
+                role="button"
+                tabIndex={0}
+                title={`${c.name} · ${c.count} colours · ${SOURCE_LABEL[c.source]}`}
+                onClick={() => onPick(c.id)}
+                onKeyDown={(e) => e.key === "Enter" && onPick(c.id)}
+              >
                 <span className="cm-name">{c.name}</span>
                 <span className="cm-count">{c.count || ""}</span>
                 <i className={`src-tag ${c.source}`} title={SOURCE_LABEL[c.source]}>
@@ -185,7 +211,11 @@ function ChartMenu({ anchor, value, none, onPick, onClose }: { anchor: HTMLEleme
             ))}
           </div>
         ))}
-        {!groups.length && <p className="hint" style={{ padding: "6px 10px" }}>No chart matches “{q}”.</p>}
+        {!groups.length && (
+          <p className="hint" style={{ padding: "6px 10px" }}>
+            No chart matches “{q}”.
+          </p>
+        )}
       </div>
       {more > 0 && (
         <button
@@ -204,7 +234,13 @@ function ChartMenu({ anchor, value, none, onPick, onClose }: { anchor: HTMLEleme
         </button>
       )}
       <div className="cm-foot">
-        <button type="button" className="btn sm" onClick={install} disabled={busy} title="Add a .gpl thread chart (Ink/Stitch “Install custom palette”); it stays available in this app">
+        <button
+          type="button"
+          className="btn sm"
+          onClick={install}
+          disabled={busy}
+          title="Add a .gpl thread chart (Ink/Stitch “Install custom palette”); it stays available in this app"
+        >
           <Download size={12} /> Install palette (.gpl)…
         </button>
         <span className="stat">IS Ink/Stitch · EN Embroidery Nerds · MD Madeira card</span>
@@ -237,9 +273,29 @@ export function useChart(chart: string): ChartEntry[] | null {
 }
 
 /** One colour chip: thread colour, check mark when chosen. */
-export function Swatch({ color, on, title, onClick, size = 20, label }: { color: string; on?: boolean; title?: string; onClick?: () => void; size?: number; label?: string }) {
+export function Swatch({
+  color,
+  on,
+  title,
+  onClick,
+  size = 20,
+  label,
+}: {
+  color: string;
+  on?: boolean;
+  title?: string;
+  onClick?: () => void;
+  size?: number;
+  label?: string;
+}) {
   return (
-    <button type="button" className={`swatch-btn ${on ? "on" : ""}`} title={title} style={{ background: color, width: size, height: size, color: inkOn(color) }} onClick={onClick}>
+    <button
+      type="button"
+      className={`swatch-btn ${on ? "on" : ""}`}
+      title={title}
+      style={{ background: color, width: size, height: size, color: inkOn(color) }}
+      onClick={onClick}
+    >
       {on ? <Check size={Math.round(size * 0.6)} strokeWidth={3} /> : label}
     </button>
   );
@@ -367,7 +423,12 @@ function ThreadPopover({ anchor, current, onPick, onClose }: { anchor: HTMLEleme
     onClose();
   };
   return createPortal(
-    <div className="popover thread-pop" ref={ref} style={{ ...pos, transform: mv.moved ? `translate(${mv.off[0]}px, ${mv.off[1]}px)` : undefined }} data-movable>
+    <div
+      className="popover thread-pop"
+      ref={ref}
+      style={{ ...pos, transform: mv.moved ? `translate(${mv.off[0]}px, ${mv.off[1]}px)` : undefined }}
+      data-movable
+    >
       <Grip grip={mv.grip} label="Thread" />
       <ChartBrowser near={custom} onPick={(e) => pick({ name: e.name, color: e.color, brand: e.brand, code: e.code })} height={170} />
       <div className="pop-sec">
@@ -425,7 +486,14 @@ export function ThreadPicker({ value, onPick, disabled, mixed }: { value?: strin
       {threads.map((t) => (
         <Swatch key={t.id} color={t.color} on={t.id === value && !mixed} title={threadTitle(t)} onClick={disabled ? undefined : () => onPick(t.id)} />
       ))}
-      <button type="button" ref={plus} className={`swatch-add ${open ? "on" : ""}`} title="More colours: thread charts, custom, recent" disabled={disabled} onClick={() => setOpen((v) => !v)}>
+      <button
+        type="button"
+        ref={plus}
+        className={`swatch-add ${open ? "on" : ""}`}
+        title="More colours: thread charts, custom, recent"
+        disabled={disabled}
+        onClick={() => setOpen((v) => !v)}
+      >
         <Plus size={13} />
       </button>
       {open && plus.current && <ThreadPopover anchor={plus.current} current={cur?.color} onPick={onPick} onClose={() => setOpen(false)} />}
@@ -451,7 +519,8 @@ export function ThreadCard({ threadId }: { threadId: string }) {
         </span>
         {u && u.stitches > 0 && (
           <span className="stat">
-            {u.stitches.toLocaleString()} st · {u.metres.toFixed(1)} m · sewn {u.blocks.length === 1 ? `as colour ${u.blocks[0]}` : `in blocks ${u.blocks.join(", ")}`}
+            {u.stitches.toLocaleString()} st · {u.metres.toFixed(1)} m · sewn{" "}
+            {u.blocks.length === 1 ? `as colour ${u.blocks[0]}` : `in blocks ${u.blocks.join(", ")}`}
           </span>
         )}
       </div>

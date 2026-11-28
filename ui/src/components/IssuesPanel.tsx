@@ -14,15 +14,21 @@ const SEVERITY: Record<Issue["level"], LucideIcon> = { error: OctagonAlert, warn
 
 /** What an issue is about, by its title. */
 function IssueTopic({ title }: { title: string }) {
-  const Icon: LucideIcon | null =
-    /hoop/i.test(title) ? Hoop
-    : /satin/i.test(title) ? StitchSatin
-    : /dense/i.test(title) ? DensityMap
-    : /fill/i.test(title) ? StitchFill
-    : /running|long stitch/i.test(title) ? StitchRunning
-    : /lettering/i.test(title) ? Type
-    : /shape|self-inters|open|tiny/i.test(title) ? Shapes
-    : null;
+  const Icon: LucideIcon | null = /hoop/i.test(title)
+    ? Hoop
+    : /satin/i.test(title)
+      ? StitchSatin
+      : /dense/i.test(title)
+        ? DensityMap
+        : /fill/i.test(title)
+          ? StitchFill
+          : /running|long stitch/i.test(title)
+            ? StitchRunning
+            : /lettering/i.test(title)
+              ? Type
+              : /shape|self-inters|open|tiny/i.test(title)
+                ? Shapes
+                : null;
   return Icon ? <Icon size={12} className="issue-topic" aria-hidden /> : null;
 }
 
@@ -39,7 +45,8 @@ export function IssuesPanel() {
   const cleanup = tiny.length ? (
     <div className="issue-cleanup">
       <span>
-        <b>{tiny.length}</b> tiny or empty object{tiny.length > 1 ? "s" : ""} (fills under {DEFAULT_CLEANUP.minFillArea} mm², lines under {DEFAULT_CLEANUP.minLength} mm)
+        <b>{tiny.length}</b> tiny or empty object{tiny.length > 1 ? "s" : ""} (fills under {DEFAULT_CLEANUP.minFillArea} mm², lines under{" "}
+        {DEFAULT_CLEANUP.minLength} mm)
       </span>
       <button
         className="btn sm"
@@ -54,7 +61,14 @@ export function IssuesPanel() {
       </button>
     </div>
   ) : null;
-  if (!issues.length) return cleanup ?? <div className="hint" style={{ padding: 14 }}>No problems found. Markers appear on the canvas while this tab is open.</div>;
+  if (!issues.length)
+    return (
+      cleanup ?? (
+        <div className="hint" style={{ padding: 14 }}>
+          No problems found. Markers appear on the canvas while this tab is open.
+        </div>
+      )
+    );
   const locate = (i: Issue) => focus({ ids: i.objId ? [i.objId] : undefined, at: i.at });
   return (
     <div>

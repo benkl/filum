@@ -13,9 +13,26 @@ function ok(c: unknown, msg: string) {
 const rect = (x: number, y: number, w: number, h: number) =>
   [{ closed: true, nodes: [{ p: [x, y] }, { p: [x + w, y] }, { p: [x + w, y + h] }, { p: [x, y + h] }] }] as DesignObject["paths"];
 const fill = (id: string, paths: DesignObject["paths"]): DesignObject =>
-  ({ id, name: id, thread: "t0", visible: true, locked: false, paths, stitch: { type: "fill", method: "tatami", angle: 0, rowSpacing: 0.4, underlay: false }, trimAfter: false, stopAfter: false }) as DesignObject;
+  ({
+    id,
+    name: id,
+    thread: "t0",
+    visible: true,
+    locked: false,
+    paths,
+    stitch: { type: "fill", method: "tatami", angle: 0, rowSpacing: 0.4, underlay: false },
+    trimAfter: false,
+    stopAfter: false,
+  }) as DesignObject;
 const doc = (objects: DesignObject[], removeOverlaps = false) =>
-  ({ objects, threads: [], fabric: "cotton", hoop: { width: 100, height: 100, shape: "rect" }, machine: { minStitch: 0.3 }, options: { removeOverlaps } }) as unknown as StitchDocument;
+  ({
+    objects,
+    threads: [],
+    fabric: "cotton",
+    hoop: { width: 100, height: 100, shape: "rect" },
+    machine: { minStitch: 0.3 },
+    options: { removeOverlaps },
+  }) as unknown as StitchDocument;
 const plan = (hotspots: DensityHotspot[]) =>
   ({
     coords: new Float32Array(0),
@@ -26,7 +43,16 @@ const plan = (hotspots: DensityHotspot[]) =>
     quality: null,
     dense: { hotspots, limits: { gsm: 130, holesHeavy: 10, holesMax: 17, layersHeavy: 2.5, layersMax: 3.8, layersMin: 0.8, stiffRatio: 1 } },
   }) as unknown as PlanData;
-const spot = (x: number, y: number, objects: number[], layers = 4.6): DensityHotspot => ({ x, y, w: 2, h: 2, area: 3, peakLayers: layers, peakHoles: 12, objects });
+const spot = (x: number, y: number, objects: number[], layers = 4.6): DensityHotspot => ({
+  x,
+  y,
+  w: 2,
+  h: 2,
+  area: 3,
+  peakLayers: layers,
+  peakHoles: 12,
+  objects,
+});
 
 // two squares on top of each other, and two side by side meeting at x = 10
 const under = fill("under", rect(0, 0, 10, 10));

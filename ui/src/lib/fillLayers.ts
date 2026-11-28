@@ -46,7 +46,8 @@ export function layerSetOf(o: DesignObject): string | undefined {
  */
 export function layeredRefusal(objs: DesignObject[]): string | null {
   if (objs.some((o) => o.clone)) return "Linked clones follow their original: unlink them first";
-  if (objs.some((o) => layerSetOf(o))) return "Gradients, tartans and colour blends keep one shape for all their colours: remove the gradient, tartan or blend first";
+  if (objs.some((o) => layerSetOf(o)))
+    return "Gradients, tartans and colour blends keep one shape for all their colours: remove the gradient, tartan or blend first";
   return null;
 }
 
@@ -270,7 +271,8 @@ export function tartanFixes(doc: Pick<StitchDocument, "objects" | "groupParents"
 }
 
 /** The layer objects of gradients and tartans that lost layers, made whole again (see `layerFixes`). */
-export const layerFixes = (doc: Pick<StitchDocument, "objects" | "groupParents">): Map<string, DesignObject> => new Map([...gradientFixes(doc), ...tartanFixes(doc)]);
+export const layerFixes = (doc: Pick<StitchDocument, "objects" | "groupParents">): Map<string, DesignObject> =>
+  new Map([...gradientFixes(doc), ...tartanFixes(doc)]);
 
 /** Gradients and tartans that lost layers made whole again (see repairGradients, repairTartans); groups left lone dissolve. */
 export function repairLayers(doc: StitchDocument): StitchDocument {

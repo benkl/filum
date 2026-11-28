@@ -7,11 +7,11 @@
 //!   UPDATE_ENGINE_CONSTANTS=1 cargo test -p filum-core --test engine_constants
 
 use filum_core::density::thread_spec;
+use filum_core::flags;
 use filum_core::model::{DesignOptions, Fabric};
 use filum_core::optimize::center_out_by_default;
 use filum_core::plan::JUMP_SECONDS;
 use filum_core::stitches::underlay::{auto_fill_widths, auto_satin_widths};
-use filum_core::flags;
 use serde_json::{json, Map, Value};
 use std::path::PathBuf;
 

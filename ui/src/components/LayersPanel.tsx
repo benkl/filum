@@ -1,15 +1,56 @@
 // The Layers panel: the objects in sew order with their groups, thumbnails,
 // links and the reference pictures (split out of Dock.tsx).
 
-import { CirclePause, Link2, Scissors, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, ChevronUp, Eye, EyeOff, GripVertical, ImagePlus, Lock, Move, Trash2, Type, Unlock, Search, X, FolderTree } from "lucide-react";
+import {
+  CirclePause,
+  Link2,
+  Scissors,
+  ChevronDown,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  ChevronUp,
+  Eye,
+  EyeOff,
+  GripVertical,
+  ImagePlus,
+  Lock,
+  Move,
+  Trash2,
+  Type,
+  Unlock,
+  Search,
+  X,
+  FolderTree,
+} from "lucide-react";
 import { Jump } from "../icons/stitch";
 import { addReference, moveReference, removeReference, updateReference } from "../lib/references";
 import { openFile } from "../lib/platform";
 import { memo, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { buildLayerRows, dropOnRow, groupInfo, moveBlock, pruneGroups, type GroupLayerRow as GroupRow, type LayerListRow, type ObjectLayerRow as ObjectRow } from "../lib/layerRows";
+import {
+  buildLayerRows,
+  dropOnRow,
+  groupInfo,
+  moveBlock,
+  pruneGroups,
+  type GroupLayerRow as GroupRow,
+  type LayerListRow,
+  type ObjectLayerRow as ObjectRow,
+} from "../lib/layerRows";
 import { liveGroups, within } from "../lib/groups";
-import { filterRows, groupByKind, groupByThread, groupTargets, KIND_FILTERS, moveToGroup, rangeIds, solo, ungroupAll, type KindFilter } from "../lib/layerTools";
+import {
+  filterRows,
+  groupByKind,
+  groupByThread,
+  groupTargets,
+  KIND_FILTERS,
+  moveToGroup,
+  rangeIds,
+  solo,
+  ungroupAll,
+  type KindFilter,
+} from "../lib/layerTools";
 import { groupSelection, selectSimilar, showAll, ungroupSelection, unlockAll } from "../lib/arrange";
 import { Menu } from "./MenuBar";
 import { lastInOrder, linkMenu } from "./linkMenu";
@@ -42,7 +83,7 @@ function Thumb({ o, color }: { o: DesignObject; color: string }) {
       if (p) ctx.fill(p, "evenodd");
     } else {
       ctx.strokeStyle = color;
-      ctx.lineWidth = 1.6 / s * dpr;
+      ctx.lineWidth = (1.6 / s) * dpr;
       ctx.stroke(pathsToPath2D(o.paths));
     }
   }, [o, color]);
@@ -97,7 +138,13 @@ export function FoldAllGroups() {
 function LinkMark({ o, ctl }: { o: DesignObject; ctl: LayerCtl }) {
   const c = linkChoiceOf(o);
   if (c === "auto" && !o.stopAfter) return null;
-  const [Icon, what] = o.stopAfter ? [CirclePause, "A stop"] : c === "trim" ? [Scissors, "A trim"] : c === "jump" ? [Jump, "A jump without a trim"] : [Link2, "Sewn through"];
+  const [Icon, what] = o.stopAfter
+    ? [CirclePause, "A stop"]
+    : c === "trim"
+      ? [Scissors, "A trim"]
+      : c === "jump"
+        ? [Jump, "A jump without a trim"]
+        : [Link2, "Sewn through"];
   return (
     <button
       className="mini link-mark manual"
@@ -159,7 +206,13 @@ const LayerRow = memo(function LayerRow({
       onDragEnd={() => ctl.dragEnd()}
     >
       <GripVertical size={12} className="grip" />
-      <input type="checkbox" checked={sel} onClick={(e) => e.stopPropagation()} onChange={(e) => ctl.check(rowKey, e.target.checked)} aria-label={`Select ${o.name}`} />
+      <input
+        type="checkbox"
+        checked={sel}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => ctl.check(rowKey, e.target.checked)}
+        aria-label={`Select ${o.name}`}
+      />
       <span className="idx">{i + 1}</span>
       <Thumb o={o} color={color} />
       <span
@@ -201,10 +254,20 @@ const LayerRow = memo(function LayerRow({
       >
         {o.visible ? <Eye size={14} /> : <EyeOff size={14} />}
       </button>
-      <button className="mini" title={`Move ${o.name} later in stitch order`} onClick={(e) => (e.stopPropagation(), s().moveInOrder(o.id, 1))} disabled={i === n - 1}>
+      <button
+        className="mini"
+        title={`Move ${o.name} later in stitch order`}
+        onClick={(e) => (e.stopPropagation(), s().moveInOrder(o.id, 1))}
+        disabled={i === n - 1}
+      >
         <ChevronUp size={14} />
       </button>
-      <button className="mini" title={`Move ${o.name} earlier in stitch order`} onClick={(e) => (e.stopPropagation(), s().moveInOrder(o.id, -1))} disabled={i === 0}>
+      <button
+        className="mini"
+        title={`Move ${o.name} earlier in stitch order`}
+        onClick={(e) => (e.stopPropagation(), s().moveInOrder(o.id, -1))}
+        disabled={i === 0}
+      >
         <ChevronDown size={14} />
       </button>
     </div>
@@ -273,7 +336,14 @@ const GroupHeader = memo(function GroupHeader({
       onDragEnd={() => ctl.dragEnd()}
     >
       <GripVertical size={12} className="grip" />
-      <input ref={box} type="checkbox" checked={sel === "all"} onClick={(e) => e.stopPropagation()} onChange={(e) => ctl.check(r.key, e.target.checked)} aria-label={`Select the ${what}`} />
+      <input
+        ref={box}
+        type="checkbox"
+        checked={sel === "all"}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => ctl.check(r.key, e.target.checked)}
+        aria-label={`Select the ${what}`}
+      />
       <button
         className={`mini fold ${r.folded ? "" : "open"}`}
         aria-expanded={!r.folded}
@@ -286,7 +356,11 @@ const GroupHeader = memo(function GroupHeader({
       >
         <ChevronRight size={14} />
       </button>
-      <span className="lname" onDoubleClick={() => ctl.rename(r.key)} title={`${r.name} · ${ROLE_LABEL[r.role].toLowerCase()} of ${r.count} · double-click to rename`}>
+      <span
+        className="lname"
+        onDoubleClick={() => ctl.rename(r.key)}
+        title={`${r.name} · ${ROLE_LABEL[r.role].toLowerCase()} of ${r.count} · double-click to rename`}
+      >
         {renaming ? (
           <input
             autoFocus
@@ -341,7 +415,12 @@ const GroupHeader = memo(function GroupHeader({
       <button className="mini" title={`Move ${r.name} later in stitch order`} onClick={(e) => (e.stopPropagation(), ctl.stepGroup(r.key, 1))} disabled={first}>
         <ChevronUp size={14} />
       </button>
-      <button className="mini" title={`Move ${r.name} earlier in stitch order`} onClick={(e) => (e.stopPropagation(), ctl.stepGroup(r.key, -1))} disabled={last}>
+      <button
+        className="mini"
+        title={`Move ${r.name} earlier in stitch order`}
+        onClick={(e) => (e.stopPropagation(), ctl.stepGroup(r.key, -1))}
+        disabled={last}
+      >
         <ChevronDown size={14} />
       </button>
     </div>
@@ -431,7 +510,11 @@ export function LayersPanel() {
       dragEnd: () => cur.current.setDrag(null),
       rename: (key) => cur.current.setRenaming(key),
       toggle: (o, only) => {
-        const ids = o.text ? s().doc.objects.filter((x) => x.text?.group === o.text!.group).map((x) => x.id) : [o.id];
+        const ids = o.text
+          ? s()
+              .doc.objects.filter((x) => x.text?.group === o.text!.group)
+              .map((x) => x.id)
+          : [o.id];
         if (only) s().commit((d) => solo(d, ids));
         else setAll(ids, () => ({ visible: !o.visible }));
       },
@@ -482,7 +565,9 @@ export function LayersPanel() {
             ],
           },
           "-",
-          ...(r.kind !== "group" && ids.length ? ([{ label: "After it", hint: "Automatic, trim, jump or sew to the next object", sub: linkMenu(lastInOrder(ids)!) }, "-"] as MenuItem[]) : []),
+          ...(r.kind !== "group" && ids.length
+            ? ([{ label: "After it", hint: "Automatic, trim, jump or sew to the next object", sub: linkMenu(lastInOrder(ids)!) }, "-"] as MenuItem[])
+            : []),
           { label: "Show only this", run: () => s().commit((d) => solo(d, ids)), hint: "Alt-click an eye does the same" },
           { label: "Show all", kbd: `${mod}Alt+3`, run: showAll, disabled: doc.objects.every((o) => o.visible) },
           { label: objs.every((o) => o.locked) ? "Unlock" : "Lock", run: () => setAll(ids, () => ({ locked: !objs.every((o) => o.locked) })) },
@@ -522,7 +607,9 @@ export function LayersPanel() {
   if (!n)
     return (
       <>
-        <div className="hint" style={{ padding: 14 }}>No objects yet. Draw with the tools on the left, import an SVG or embroidery file, or drop a picture to trace or auto-digitize.</div>
+        <div className="hint" style={{ padding: 14 }}>
+          No objects yet. Draw with the tools on the left, import an SVG or embroidery file, or drop a picture to trace or auto-digitize.
+        </div>
         <ReferencesList />
       </>
     );
@@ -541,7 +628,11 @@ export function LayersPanel() {
       y: r.bottom + 2,
       items: [
         { label: "Group loose objects by thread", run: run(groupByThread, "thread"), hint: "One group per thread colour; the stitch order stays" },
-        { label: "Group loose objects by stitch type", run: run(groupByKind, "stitch type"), hint: "Fills, satins, lines and lettering; the stitch order stays" },
+        {
+          label: "Group loose objects by stitch type",
+          run: run(groupByKind, "stitch type"),
+          hint: "Fills, satins, lines and lettering; the stitch order stays",
+        },
         { label: "Ungroup all", run: () => s().commit((d) => ungroupAll(d)), disabled: !groups.length },
         "-",
         { label: "Fold all groups", run: () => setGroupsFolded(groups, true), disabled: !groups.length },
@@ -579,7 +670,12 @@ export function LayersPanel() {
             </option>
           ))}
         </select>
-        <button className="icon-btn" title="Organise: group by thread or stitch type, fold, show and unlock all" aria-label="Organise layers" onClick={organise}>
+        <button
+          className="icon-btn"
+          title="Organise: group by thread or stitch type, fold, show and unlock all"
+          aria-label="Organise layers"
+          onClick={organise}
+        >
           <FolderTree size={14} />
         </button>
       </div>

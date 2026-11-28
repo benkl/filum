@@ -254,7 +254,8 @@ mod tests {
             255 255 255\tWhite 1001\n";
         let p = parse_gpl(text);
         assert_eq!(p.name, "My threads");
-        let got: Vec<(&str, &str, Option<&str>, [u8; 3])> = p.entries.iter().zip(&p.brands).map(|(e, b)| (e.name.as_str(), e.code.as_str(), b.as_deref(), e.rgb)).collect();
+        let got: Vec<(&str, &str, Option<&str>, [u8; 3])> =
+            p.entries.iter().zip(&p.brands).map(|(e, b)| (e.name.as_str(), e.code.as_str(), b.as_deref(), e.rgb)).collect();
         assert_eq!(
             got,
             vec![

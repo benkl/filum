@@ -14,7 +14,18 @@ const preset = (id: string) => opts(MATCH_PRESETS.find((x) => x.id === id)!.opts
 const T = (id: string, need: string, weight = 1): MatchThread => ({ id, need, weight });
 
 // a small chart: one pink, one rose far away, reds, blues, greys
-const chart = [e("#e3d6c2", "beige"), e("#f2a3b6", "pink"), e("#c2185b", "rose"), e("#d32f2f", "red"), e("#8e1b1b", "darkred"), e("#1e4fb0", "blue"), e("#909090", "grey60"), e("#9e9e9e", "grey65"), e("#f6f1ea", "cream"), e("#111111", "black")];
+const chart = [
+  e("#e3d6c2", "beige"),
+  e("#f2a3b6", "pink"),
+  e("#c2185b", "rose"),
+  e("#d32f2f", "red"),
+  e("#8e1b1b", "darkred"),
+  e("#1e4fb0", "blue"),
+  e("#909090", "grey60"),
+  e("#9e9e9e", "grey65"),
+  e("#f6f1ea", "cream"),
+  e("#111111", "black"),
+];
 const pinks = [T("a", "#f4a7b9", 3), T("b", "#e78aa0", 1)];
 
 // faithful: both pinks on the one close pink

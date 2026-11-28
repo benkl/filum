@@ -158,7 +158,12 @@ export function Seg<T extends string | number | boolean>({
   style?: React.CSSProperties;
 }) {
   return (
-    <div className={`seg${full ? " seg-full" : ""}${disabled ? " disabled" : ""}${className ? ` ${className}` : ""}`} style={style} role="group" aria-label={label}>
+    <div
+      className={`seg${full ? " seg-full" : ""}${disabled ? " disabled" : ""}${className ? ` ${className}` : ""}`}
+      style={style}
+      role="group"
+      aria-label={label}
+    >
       {options.map(([id, text, title]) => (
         <button key={String(id)} className={value === id ? "on" : ""} title={title} disabled={disabled} onClick={() => onChange(id)}>
           {text}
@@ -283,9 +288,20 @@ export function Dialog({
           ? (e) => {
               if (e.target !== e.currentTarget) return;
               const n = e.nativeEvent;
-              document
-                .querySelector(".canvas-wrap canvas:last-of-type")
-                ?.dispatchEvent(new WheelEvent("wheel", { deltaX: n.deltaX, deltaY: n.deltaY, deltaMode: n.deltaMode, clientX: n.clientX, clientY: n.clientY, ctrlKey: n.ctrlKey, shiftKey: n.shiftKey, metaKey: n.metaKey, bubbles: true, cancelable: true }));
+              document.querySelector(".canvas-wrap canvas:last-of-type")?.dispatchEvent(
+                new WheelEvent("wheel", {
+                  deltaX: n.deltaX,
+                  deltaY: n.deltaY,
+                  deltaMode: n.deltaMode,
+                  clientX: n.clientX,
+                  clientY: n.clientY,
+                  ctrlKey: n.ctrlKey,
+                  shiftKey: n.shiftKey,
+                  metaKey: n.metaKey,
+                  bubbles: true,
+                  cancelable: true,
+                }),
+              );
             }
           : undefined
       }
@@ -341,7 +357,15 @@ export function followPointer(on: Window | Element, move: (ev: PointerEvent) => 
 export function placeNear(
   r: DOMRect,
   w: number,
-  { align = "start", gap = 4, margin = 8, height, maxHeight = Infinity, minBelow = 0, flip = true }: { align?: "start" | "end" | "center"; gap?: number; margin?: number; height?: number; maxHeight?: number; minBelow?: number; flip?: boolean } = {},
+  {
+    align = "start",
+    gap = 4,
+    margin = 8,
+    height,
+    maxHeight = Infinity,
+    minBelow = 0,
+    flip = true,
+  }: { align?: "start" | "end" | "center"; gap?: number; margin?: number; height?: number; maxHeight?: number; minBelow?: number; flip?: boolean } = {},
 ): { left: number; top: number; maxHeight?: number } {
   const x = align === "start" ? r.left : align === "end" ? r.right - w : r.left + r.width / 2 - w / 2;
   const left = Math.max(margin, Math.min(window.innerWidth - w - margin, x));

@@ -22,9 +22,19 @@ interface OutlineParams {
 }
 
 const PRESETS: { id: string; label: string; hint: string; p: OutlineParams }[] = [
-  { id: "fill", label: "Filled areas", hint: "Merges the rows of fills and satins (rows up to 0.6 mm apart) into solid shapes", p: { buffer: 0.3, inset: 0.3, smoothness: 0.3, threshold: 10 } },
+  {
+    id: "fill",
+    label: "Filled areas",
+    hint: "Merges the rows of fills and satins (rows up to 0.6 mm apart) into solid shapes",
+    p: { buffer: 0.3, inset: 0.3, smoothness: 0.3, threshold: 10 },
+  },
   { id: "open", label: "Open fills", hint: "Light fills and wide rows (up to 1.2 mm apart)", p: { buffer: 0.6, inset: 0.6, smoothness: 0.4, threshold: 10 } },
-  { id: "loops", label: "Closed lines", hint: "Ink/Stitch's defaults: only closed loops of stitches make shapes (outlines, running stitch)", p: { buffer: 0.001, inset: 0, smoothness: 0.3, threshold: 10 } },
+  {
+    id: "loops",
+    label: "Closed lines",
+    hint: "Ink/Stitch's defaults: only closed loops of stitches make shapes (outlines, running stitch)",
+    p: { buffer: 0.001, inset: 0, smoothness: 0.3, threshold: 10 },
+  },
 ];
 const KEY = "filum.rebuild";
 
@@ -45,7 +55,11 @@ export function RebuildShapesDialog({ onClose }: { onClose: () => void }) {
     setBusy(true);
     const t = setTimeout(() => {
       engine
-        .stitchOutline(doc, objects.map((o) => o.id), p)
+        .stitchOutline(
+          doc,
+          objects.map((o) => o.id),
+          p,
+        )
         .then((r) => live && setResult(r))
         .catch(() => live && setResult([]))
         .finally(() => live && setBusy(false));
@@ -123,7 +137,8 @@ export function RebuildShapesDialog({ onClose }: { onClose: () => void }) {
   const apply = () => {
     if (!result) return;
     const s = useStore.getState();
-    const stitch = (o: DesignObject): StitchParams => (as === "fill" ? (o.stitch.type === "fill" ? o.stitch : defaultStitch("fill")) : defaultStitch("running"));
+    const stitch = (o: DesignObject): StitchParams =>
+      as === "fill" ? (o.stitch.type === "fill" ? o.stitch : defaultStitch("fill")) : defaultStitch("running");
     const made: string[] = [];
     s.commit((d) => {
       const out: DesignObject[] = [];
@@ -158,7 +173,13 @@ export function RebuildShapesDialog({ onClose }: { onClose: () => void }) {
       onClose={onClose}
       footer={
         <>
-          <span className="stat">{busy ? "Working…" : result ? `${shapes} shape${shapes === 1 ? "" : "s"}${empty ? ` · ${empty} object${empty === 1 ? "" : "s"} gave none — try a larger buffer` : ""}` : ""}</span>
+          <span className="stat">
+            {busy
+              ? "Working…"
+              : result
+                ? `${shapes} shape${shapes === 1 ? "" : "s"}${empty ? ` · ${empty} object${empty === 1 ? "" : "s"} gave none — try a larger buffer` : ""}`
+                : ""}
+          </span>
           <div className="spacer" />
           <button className="btn" onClick={onClose}>
             Cancel
@@ -177,17 +198,15 @@ export function RebuildShapesDialog({ onClose }: { onClose: () => void }) {
           {!objects.length && <p className="hint">Select the objects to rebuild (e.g. the colours of an imported DST).</p>}
           <div className="chips" style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8 }}>
             {PRESETS.map((x) => (
-              <button
-                key={x.id}
-                className={`chip ${x.p.buffer === p.buffer && x.p.inset === p.inset ? "on" : ""}`}
-                title={x.hint}
-                onClick={() => set(x.p)}
-              >
+              <button key={x.id} className={`chip ${x.p.buffer === p.buffer && x.p.inset === p.inset ? "on" : ""}`} title={x.hint} onClick={() => set(x.p)}>
                 {x.label}
               </button>
             ))}
           </div>
-          <Row label="Buffer" title="Thicken the stitch lines by this much (Ink/Stitch buffer): half the row spacing or more merges the rows of a fill into one shape">
+          <Row
+            label="Buffer"
+            title="Thicken the stitch lines by this much (Ink/Stitch buffer): half the row spacing or more merges the rows of a fill into one shape"
+          >
             <Num value={p.buffer} unit="mm" step={0.05} min={0.001} max={2} digits={3} onChange={(v) => set({ buffer: v })} />
           </Row>
           <Row label="Inset" title="Shrink the shapes back (Ink/Stitch inset) — usually as much as the buffer, so the shapes keep their size">
@@ -200,7 +219,16 @@ export function RebuildShapesDialog({ onClose }: { onClose: () => void }) {
             <Num value={p.threshold} unit="mm²" step={1} min={0} max={100} onChange={(v) => set({ threshold: v })} />
           </Row>
           <Row label="Stitch as" title="What the new shapes are stitched as">
-            <Seg value={as} options={[["fill", "Fill", "Fill stitch (a fill keeps its settings)"], ["running", "Outline", "A running stitch along the outlines"]] as const} onChange={(v) => setAs(v)} />
+            <Seg
+              value={as}
+              options={
+                [
+                  ["fill", "Fill", "Fill stitch (a fill keeps its settings)"],
+                  ["running", "Outline", "A running stitch along the outlines"],
+                ] as const
+              }
+              onChange={(v) => setAs(v)}
+            />
           </Row>
           <Row label="Keep original" title="Add the shapes and keep the stitched objects (Ink/Stitch keep original)">
             <Toggle on={keep} onChange={setKeep} />

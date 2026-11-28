@@ -23,10 +23,12 @@ import type { EngineOp } from "./worker";
 type Pending = { resolve: (v: unknown) => void; reject: (e: Error) => void };
 
 /** A plan with the trims the document's machine leaves uncut. */
-const withCuts = (doc: StitchDocument) => (p: PlanData): PlanData => {
-  p.uncut = uncutTrims(p.flags, p.coords, cutterOf(doc.machine));
-  return p;
-};
+const withCuts =
+  (doc: StitchDocument) =>
+  (p: PlanData): PlanData => {
+    p.uncut = uncutTrims(p.flags, p.coords, cutterOf(doc.machine));
+    return p;
+  };
 
 /** The document as the engine reads it: reference pictures stay in the UI. */
 const engineJson = (doc: StitchDocument) => JSON.stringify(doc.references ? { ...doc, references: undefined } : doc);
@@ -47,7 +49,10 @@ class EngineClient {
   private seq = 0;
   private pending = new Map<number, Pending>();
   /** Latest-wins lanes for side requests (reports, previews): one running, the newest queued. */
-  private lanes = new Map<string, { busy: boolean; queued: { op: EngineOp; args: unknown[]; resolve: (v: unknown) => void; reject: (e: Error) => void } | null }>();
+  private lanes = new Map<
+    string,
+    { busy: boolean; queued: { op: EngineOp; args: unknown[]; resolve: (v: unknown) => void; reject: (e: Error) => void } | null }
+  >();
 
   constructor() {
     this.spawn();
@@ -236,10 +241,7 @@ class EngineClient {
     return this.call<MeanderTile[]>("meanderTiles", []);
   }
   parsePalette(text: string) {
-    return this.call<{ name: string; entries: { name: string; code: string; rgb: [number, number, number] }[] }>(
-      "parsePalette",
-      [text],
-    );
+    return this.call<{ name: string; entries: { name: string; code: string; rgb: [number, number, number] }[] }>("parsePalette", [text]);
   }
   /** Shape conversions (lib/convertActions.ts and lib/knockdown.ts call them with their own types). */
   convertShapes<T>(op: string, args: object, doc?: StitchDocument) {

@@ -4,7 +4,20 @@
 // layer groups and mirrors the core's weights / dithers for UI previews.
 
 import { useStore } from "../store";
-import type { DesignObject, DitherMethod, FillParams, FreePoint, GradientKind, GradientMesh, GradientParams, GradientStop, StitchDocument, SubPath, TransitionCurve, Vec2 } from "../types";
+import type {
+  DesignObject,
+  DitherMethod,
+  FillParams,
+  FreePoint,
+  GradientKind,
+  GradientMesh,
+  GradientParams,
+  GradientStop,
+  StitchDocument,
+  SubPath,
+  TransitionCurve,
+  Vec2,
+} from "../types";
 import { gradientLayers, gradientRefusal, plainGroupOf, removeGradientDoc } from "./fillLayers";
 import { defaultFill, normAngle, objectBounds, uid, unionBoxes, type Box } from "./geometry";
 import { withParent } from "./groups";
@@ -38,7 +51,7 @@ export function rowAngleFor(from: Vec2, to: Vec2): number {
 
 /** How far two row angles are apart (degrees, 0 to 90: rows are undirected). */
 export function rowAngleDiff(a: number, b: number): number {
-  return Math.abs((((a - b) % 180) + 270) % 180 - 90);
+  return Math.abs(((((a - b) % 180) + 270) % 180) - 90);
 }
 
 /** Straight rows that run more along a linear gradient than across it: every
@@ -111,7 +124,12 @@ export function makeGradient(objId: string, from: Vec2, to: Vec2, opts: Partial<
     // a flow fill with its direction field stays one (its layers share the streamlines)
     // (a one-colour tartan or a density ramp of the source does not carry over)
     o.stitch.type === "fill"
-      ? { ...o.stitch, tartan: undefined, ramp: undefined, method: (o.stitch.method === "flow" && o.stitch.flow) || o.stitch.method === "curved" ? o.stitch.method : "tatami" }
+      ? {
+          ...o.stitch,
+          tartan: undefined,
+          ramp: undefined,
+          method: (o.stitch.method === "flow" && o.stitch.flow) || o.stitch.method === "curved" ? o.stitch.method : "tatami",
+        }
       : { ...defaultFill() };
   const angle = kind === "linear" || kind === "reflected" ? rowAngleFor(from, to) : fill.angle;
   const paths: SubPath[] = o.paths.filter((p) => p.closed && p.nodes.length >= 3);
@@ -279,8 +297,8 @@ export function weights(g: Pick<GradientParams, "stops" | "curve" | "steps">, t:
   const order = g.stops.map((_, i) => i).sort((a, b) => g.stops[a].pos - g.stops[b].pos);
   const first = order[0];
   const last = order[order.length - 1];
-  if (t <= g.stops[first].pos) return (w[first] = 1), w;
-  if (t >= g.stops[last].pos) return (w[last] = 1), w;
+  if (t <= g.stops[first].pos) return ((w[first] = 1), w);
+  if (t >= g.stops[last].pos) return ((w[last] = 1), w);
   for (let k = 0; k < order.length - 1; k++) {
     const [a, b] = [order[k], order[k + 1]];
     const [pa, pb] = [g.stops[a].pos, g.stops[b].pos];
@@ -298,7 +316,10 @@ export function weights(g: Pick<GradientParams, "stops" | "curve" | "steps">, t:
   return w;
 }
 
-const BAYER = [0, 32, 8, 40, 2, 34, 10, 42, 48, 16, 56, 24, 50, 18, 58, 26, 12, 44, 4, 36, 14, 46, 6, 38, 60, 28, 52, 20, 62, 30, 54, 22, 3, 35, 11, 43, 1, 33, 9, 41, 51, 19, 59, 27, 49, 17, 57, 25, 15, 47, 7, 39, 13, 45, 5, 37, 63, 31, 55, 23, 61, 29, 53, 21];
+const BAYER = [
+  0, 32, 8, 40, 2, 34, 10, 42, 48, 16, 56, 24, 50, 18, 58, 26, 12, 44, 4, 36, 14, 46, 6, 38, 60, 28, 52, 20, 62, 30, 54, 22, 3, 35, 11, 43, 1, 33, 9, 41, 51,
+  19, 59, 27, 49, 17, 57, 25, 15, 47, 7, 39, 13, 45, 5, 37, 63, 31, 55, 23, 61, 29, 53, 21,
+];
 const hash = (a: number, b: number) => {
   let x = (a * 374761393 + b * 668265263) | 0;
   x = Math.imul(x ^ (x >>> 13), 1274126177);
@@ -364,8 +385,7 @@ export function ditherCells(wAt: (c: number, r: number) => number[], n: number, 
   }
   for (let r = 0; r < rows; r++)
     for (let c = 0; c < cols; c++) {
-      const thr =
-        g.dither === "rows" ? vdc(r) : g.dither === "ordered" ? (BAYER[(r % 8) * 8 + (c % 8)] + 0.5) / 64 : g.dither === "noise" ? hash(r, c) : 0.5;
+      const thr = g.dither === "rows" ? vdc(r) : g.dither === "ordered" ? (BAYER[(r % 8) * 8 + (c % 8)] + 0.5) / 64 : g.dither === "noise" ? hash(r, c) : 0.5;
       out[r * cols + c] = pick(wAt(c, r), thr);
     }
   return out;
@@ -434,7 +454,6 @@ function shapeMix(g: GradientParams, w: number[]) {
   } else for (let k = 0; k < w.length; k++) w[k] /= sum;
 }
 
-
 /** (u, v) of `p` in the quad a (0,0) → b (1,0) → c (1,1) → d (0,1). */
 export function invBilinear(p: Vec2, a: Vec2, b: Vec2, c: Vec2, d: Vec2): [number, number] | null {
   const e: Vec2 = [b[0] - a[0], b[1] - a[1]];
@@ -480,7 +499,8 @@ export function meshLocate(m: GradientMesh, p: Vec2): { r: number; c: number; u:
   for (let r = 0; r < m.rows - 1; r++)
     for (let c = 0; c < m.cols - 1; c++) {
       const q = [nodeAt(m, r, c).p, nodeAt(m, r, c + 1).p, nodeAt(m, r + 1, c + 1).p, nodeAt(m, r + 1, c).p];
-      if (q.every((x) => x[0] < p[0] - eps) || q.every((x) => x[0] > p[0] + eps) || q.every((x) => x[1] < p[1] - eps) || q.every((x) => x[1] > p[1] + eps)) continue;
+      if (q.every((x) => x[0] < p[0] - eps) || q.every((x) => x[0] > p[0] + eps) || q.every((x) => x[1] < p[1] - eps) || q.every((x) => x[1] > p[1] + eps))
+        continue;
       const uv = invBilinear(p, q[0], q[1], q[2], q[3]);
       if (!uv) continue;
       const [u, v] = uv;
@@ -710,11 +730,17 @@ export function commit2D(group: string, next: { mesh?: GradientMesh; points?: Fr
   const list = threads ?? stopsOf(store().doc, group).map((x) => x.thread);
   const mesh = next.mesh ?? g.mesh;
   const points = next.points ?? g.points;
-  const active = g.kind === "mesh" ? mesh?.nodes ?? [] : points ?? [];
+  const active = g.kind === "mesh" ? (mesh?.nodes ?? []) : (points ?? []);
   const used = new Set(active.map((x) => x.c));
   const patch = { ...(mesh ? { mesh } : {}), ...(points ? { points } : {}) };
   if (live || used.size === list.length) {
-    if (list.length !== layers.length) setStops(group, list.map((thread, i) => ({ pos: list.length > 1 ? i / (list.length - 1) : 0, mid: 0.5, thread })), live, patch);
+    if (list.length !== layers.length)
+      setStops(
+        group,
+        list.map((thread, i) => ({ pos: list.length > 1 ? i / (list.length - 1) : 0, mid: 0.5, thread })),
+        live,
+        patch,
+      );
     else updateGradient(group, patch, live);
     return;
   }
@@ -812,7 +838,7 @@ export function makeGradient2D(objId: string, click: Vec2, kind: "mesh" | "freef
 
 /** The node / point of a 2D gradient near `p` (the nearest within `tol`). */
 export function nodeHit(g: GradientParams, p: Vec2, tol: number): number | null {
-  const pts = g.kind === "mesh" ? g.mesh?.nodes ?? [] : g.kind === "freeform" ? g.points ?? [] : [];
+  const pts = g.kind === "mesh" ? (g.mesh?.nodes ?? []) : g.kind === "freeform" ? (g.points ?? []) : [];
   let best: number | null = null;
   let bd = tol;
   for (let i = pts.length - 1; i >= 0; i--) {
@@ -862,7 +888,9 @@ export function setRowStyle(ids: string[], style: RowStyle) {
   const s = store();
   s.commit((d) => ({
     ...d,
-    objects: d.objects.map((o) => (ids.includes(o.id) && o.stitch.type === "fill" ? { ...o, stitch: { ...o.stitch, method: style === "flow" && !flowSource(o) ? "tatami" : style } } : o)),
+    objects: d.objects.map((o) =>
+      ids.includes(o.id) && o.stitch.type === "fill" ? { ...o, stitch: { ...o.stitch, method: style === "flow" && !flowSource(o) ? "tatami" : style } } : o,
+    ),
   }));
 }
 

@@ -47,7 +47,8 @@ const DATA_HINT: Record<string, string> = {
   col: "Only the thread colours, one per colour block. Save it next to a file without colours (such as a DST) under the same name so software shows the right threads.",
   edr: "Only the thread colours, one per colour block (Embird). Save it next to a file without colours (such as a DST) under the same name so software shows the right threads.",
   inf: "Only the threads (colour, name, chart), one per colour block. Save it next to the stitch file under the same name for Viking and Pfaff software.",
-  threadlist: "Ink/Stitch's thread list: design details and the thread of every colour block, as text for the operator. Threads ▸ Apply thread list reads it back onto a design (e.g. a DST).",
+  threadlist:
+    "Ink/Stitch's thread list: design details and the thread of every colour block, as text for the operator. Threads ▸ Apply thread list reads it back onto a design (e.g. a DST).",
 };
 const DATA = Object.keys(DATA_HINT);
 const PICTURE_HINT: Record<string, string> = {
@@ -97,7 +98,8 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   const [pesVersion, setPesVersion] = useState<1 | 6>(() => (localStorage.getItem("filum.pesVersion") === "6" ? 6 : 1));
   // the design's machine and hoop (Design ▸ Machine): one value, changed here or there
   const machine = machineById(MACHINES.some((m) => m.id === doc.machine.profile) ? doc.machine.profile! : "doc");
-  const sameHoop = (f: { width: number; height: number; shape?: string }) => doc.hoop.width === f.width && doc.hoop.height === f.height && (doc.hoop.shape ?? "rect") === (f.shape ?? "rect");
+  const sameHoop = (f: { width: number; height: number; shape?: string }) =>
+    doc.hoop.width === f.width && doc.hoop.height === f.height && (doc.hoop.shape ?? "rect") === (f.shape ?? "rect");
   const [name, setName] = useState(doc.name || "design");
   const [colours, setColours] = useState<MachineColorInfo[] | null>(null);
   // several files at once (Ink/Stitch ZIP export)
@@ -146,12 +148,18 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   const box = unionBoxes(doc.objects.filter((o) => o.visible).map(objectBounds));
   const outsideHoop =
     !!box &&
-    (box.x < -0.5 || box.y < -0.5 || box.x + box.w > doc.hoop.width + 0.5 || box.y + box.h > doc.hoop.height + 0.5 ||
-      (doc.hoop.shape === "oval" && !!plan && (() => {
-        const { coords, flags } = plan;
-        for (let i = 0; i < flags.length; i++) if (!(flags[i] & (FLAG.COLOR_CHANGE | FLAG.TRIM | FLAG.STOP | FLAG.END)) && !inHoop(doc.hoop, coords[2 * i], coords[2 * i + 1], 0.5)) return true;
-        return false;
-      })()));
+    (box.x < -0.5 ||
+      box.y < -0.5 ||
+      box.x + box.w > doc.hoop.width + 0.5 ||
+      box.y + box.h > doc.hoop.height + 0.5 ||
+      (doc.hoop.shape === "oval" &&
+        !!plan &&
+        (() => {
+          const { coords, flags } = plan;
+          for (let i = 0; i < flags.length; i++)
+            if (!(flags[i] & (FLAG.COLOR_CHANGE | FLAG.TRIM | FLAG.STOP | FLAG.END)) && !inHoop(doc.hoop, coords[2 * i], coords[2 * i + 1], 0.5)) return true;
+          return false;
+        })()));
   const fileName = cleanFileName(name, machineFormat ? machine.fileNames : undefined);
   const distinct = useMemo(() => new Set((colours ?? []).map((c) => `${c.color}|${c.code}|${c.brand}`)).size, [colours]);
   // the plan as it goes into the file (long stitches split at the machine's
@@ -244,7 +252,12 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   const fmtButton = (ext: string, label: string, hint: string, extra = "", title?: string) => {
     const on = zipMode ? zipTargets.includes(ext) : fmt === ext;
     return (
-      <button key={ext} className={`${extra} ${zipMode ? "pick" : ""} ${on ? "on" : ""}`} onClick={() => (zipMode ? toggleTarget(ext) : setFmt(ext))} title={title}>
+      <button
+        key={ext}
+        className={`${extra} ${zipMode ? "pick" : ""} ${on ? "on" : ""}`}
+        onClick={() => (zipMode ? toggleTarget(ext) : setFmt(ext))}
+        title={title}
+      >
         <b>{label}</b>
         <span>{hint}</span>
       </button>
@@ -264,7 +277,9 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   };
   /** A frame of the machine as the design's hoop. */
   const pickHoop = (f: { name: string; width: number; height: number; shape?: "rect" | "oval" }) =>
-    useStore.getState().commit((d) => ({ ...d, hoop: { name: `${machine.brand} ${f.name}`.trim(), width: f.width, height: f.height, ...(f.shape ? { shape: f.shape } : {}) } }));
+    useStore
+      .getState()
+      .commit((d) => ({ ...d, hoop: { name: `${machine.brand} ${f.name}`.trim(), width: f.width, height: f.height, ...(f.shape ? { shape: f.shape } : {}) } }));
   const doExport = () => {
     // the default format (Preferences ▸ Export) is a file format, not a picture
     if (!isPicture(fmt) && fmt !== "threadlist") safeSetItem("filum.format", fmt);
@@ -312,24 +327,34 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
         <div className="xp-side">
           <section className="xp-sec">
             <h4>Machine</h4>
-            <select className="select" value={machine.id} onChange={(e) => pickMachine(e.target.value)} title={`${machine.models} — the design's machine (Design ▸ Machine)`}>
+            <select
+              className="select"
+              value={machine.id}
+              onChange={(e) => pickMachine(e.target.value)}
+              title={`${machine.models} — the design's machine (Design ▸ Machine)`}
+            >
               <MachineOptions />
             </select>
             <p className="hint xp-models" title={machine.models}>
               {machine.models}
             </p>
-            {machine.frames.length > 0 && (
-              <FrameButtons
-                frames={machine.frames}
-                isOn={(f) => sameHoop(f)}
-                onPick={pickHoop}
-              />
-            )}
+            {machine.frames.length > 0 && <FrameButtons frames={machine.frames} isOn={(f) => sameHoop(f)} onPick={pickHoop} />}
           </section>
 
           <section className="xp-sec">
             <h4>Format</h4>
-            <Seg full className="xp-mode" value={!!zipMode} options={[[false, "One file", "Save one file"], [true, "Several · ZIP", "Several formats, the thread list and pictures in one ZIP (Ink/Stitch ZIP export)"]] as const} onChange={(v) => setZipMode(v)} />
+            <Seg
+              full
+              className="xp-mode"
+              value={!!zipMode}
+              options={
+                [
+                  [false, "One file", "Save one file"],
+                  [true, "Several · ZIP", "Several formats, the thread list and pictures in one ZIP (Ink/Stitch ZIP export)"],
+                ] as const
+              }
+              onChange={(v) => setZipMode(v)}
+            />
             <div className="xp-formats">
               {machineFormats.map((f) => {
                 const reads = machine.id === "doc" || machine.formats.includes(f.extension);
@@ -349,7 +374,9 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             <section className="xp-sec">
               <h4>Thread lists &amp; stitch data</h4>
               <div className="xp-formats">
-                {dataFormats.map((f) => fmtButton(f.extension, `.${targetExtension(f.extension).toUpperCase()}`, FORMAT_HINT[f.extension] ?? f.name, "", f.name))}
+                {dataFormats.map((f) =>
+                  fmtButton(f.extension, `.${targetExtension(f.extension).toUpperCase()}`, FORMAT_HINT[f.extension] ?? f.name, "", f.name),
+                )}
               </div>
             </section>
           )}
@@ -365,11 +392,25 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
               <input className="input" value={name} onChange={(e) => setName(e.target.value)} spellCheck={false} />
               <span className="stat">{zipMode ? ".zip" : `.${ext}`}</span>
             </label>
-            {fileName !== name.trim() && <p className="hint">Saved as “{fileName}.{zipMode ? "zip" : ext}”</p>}
+            {fileName !== name.trim() && (
+              <p className="hint">
+                Saved as “{fileName}.{zipMode ? "zip" : ext}”
+              </p>
+            )}
             {hasPes && (
               <>
                 <h4>PES version</h4>
-                <Seg full value={pesVersion} options={[[1, "v1 · Brother colours", "What Ink/Stitch writes: colours are entries of Brother's thread table — every Brother machine reads it"], [6, "v6 · exact threads", "Adds the exact thread list (brand, code, name, colour) for machines and software that read PES 6"]] as const} onChange={(v) => setPesVersion(v)} />
+                <Seg
+                  full
+                  value={pesVersion}
+                  options={
+                    [
+                      [1, "v1 · Brother colours", "What Ink/Stitch writes: colours are entries of Brother's thread table — every Brother machine reads it"],
+                      [6, "v6 · exact threads", "Adds the exact thread list (brand, code, name, colour) for machines and software that read PES 6"],
+                    ] as const
+                  }
+                  onChange={(v) => setPesVersion(v)}
+                />
                 <p className="hint">{pesVersion === 1 ? "Most compatible — Brother thread colours." : "Exact threads; older machines may not read v6."}</p>
               </>
             )}

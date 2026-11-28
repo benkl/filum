@@ -26,7 +26,26 @@ import { createTextAt, selectedTextGroup, textSpec } from "../lib/textOps";
 import { members } from "../lib/text";
 import type { InteractiveOverlay } from "./interactive";
 import { buildSatin, satinOutlineOf, zigzagPreview } from "../lib/satinDraw";
-import { addPoint, canClose, continueFrom, deleteFromDraft, insertInDraft, newDraft, PEN_HINTS, CURVE_HINTS, penHitTest, placePoint, removeLast, rubberBand, toggleSmoothInDraft, type PenDraft, type PenHover, addCurvePoint, curvePreview, smoothDraft } from "./penTool";
+import {
+  addPoint,
+  canClose,
+  continueFrom,
+  deleteFromDraft,
+  insertInDraft,
+  newDraft,
+  PEN_HINTS,
+  CURVE_HINTS,
+  penHitTest,
+  placePoint,
+  removeLast,
+  rubberBand,
+  toggleSmoothInDraft,
+  type PenDraft,
+  type PenHover,
+  addCurvePoint,
+  curvePreview,
+  smoothDraft,
+} from "./penTool";
 import { isClosedStroke, type FreehandStroke } from "./freehand";
 import { flattenSubPath, insertNode, resample } from "../lib/bezier";
 import { ROTATE_CURSOR, SKEW_CURSOR, rotateZone, unitIds } from "./transform";
@@ -102,12 +121,16 @@ export function Canvas() {
       if (glRef.current === undefined && glCanvasRef.current) glRef.current = StitchGL.create(glCanvasRef.current);
       // the GPU dropped the context: the 2D drawing takes over until it is back
       const gl = glRef.current && !glRef.current.isLost() ? glRef.current : null;
-      const shownPlan = displayPlan(s.plan && s.finished && s.viewMode !== "vector" ? finishedPlan(s.plan) : s.plan, s.stitchColors, s.colorFocus ? activeThreadOf(s) : null, s.fabricColor);
+      const shownPlan = displayPlan(
+        s.plan && s.finished && s.viewMode !== "vector" ? finishedPlan(s.plan) : s.plan,
+        s.stitchColors,
+        s.colorFocus ? activeThreadOf(s) : null,
+        s.fabricColor,
+      );
       const useGL = !!gl && s.viewMode !== "vector" && !!s.plan;
       // snap to device pixels once so every layer agrees exactly
       const view = { scale: s.view.scale, ox: Math.round(s.view.ox * dpr) / dpr, oy: Math.round(s.view.oy * dpr) / dpr };
-      const selIndex =
-        s.selection.length === 1 && s.tool === "select" && s.anim.index == null ? s.doc.objects.findIndex((o) => o.id === s.selection[0]) : -1;
+      const selIndex = s.selection.length === 1 && s.tool === "select" && s.anim.index == null ? s.doc.objects.findIndex((o) => o.id === s.selection[0]) : -1;
       const tg = s.tool === "select" && s.anim.index == null && !s.editingText ? selectedTextGroup() : null;
       const tspec = tg ? textSpec(tg) : null;
       handlesRef.current =
@@ -191,7 +214,10 @@ export function Canvas() {
             kind: g.kind,
             stops: stops.map((st, i) => ({ pos: st.pos, color: colors[i] })),
             active: dragRef.current?.kind === "gradstop" ? dragRef.current.index : null,
-            mesh: g.kind === "mesh" && meshValid(g.mesh) ? { rows: g.mesh.rows, cols: g.mesh.cols, nodes: g.mesh.nodes.map((n) => ({ p: n.p, color: colorOf(n.c) })) } : null,
+            mesh:
+              g.kind === "mesh" && meshValid(g.mesh)
+                ? { rows: g.mesh.rows, cols: g.mesh.cols, nodes: g.mesh.nodes.map((n) => ({ p: n.p, color: colorOf(n.c) })) }
+                : null,
             points: g.kind === "freeform" ? (g.points ?? []).map((q) => ({ p: q.p, color: colorOf(q.c), spread: q.spread })) : null,
             selected: s.gradNodes,
           };
@@ -220,44 +246,48 @@ export function Canvas() {
         issues: issuesShown(s) ? computeIssues(s.doc, s.plan) : undefined,
         split: s.tool === "split" ? splitOverlay(s.doc, s.splitDraft, splitLiveRef.current) : undefined,
       };
-      const more = rendererRef.current.render(bg.getContext("2d")!, {
-        interactive,
-        showDensity: s.showDensity,
-        density: s.density,
-        densityMode: s.densityMode,
-        live: s.live,
-        glStitches: useGL,
-        doc: s.doc,
-        plan: shownPlan,
-        view,
-        mode: s.viewMode,
-        // while the stitch-out plays, the selection isn't drawn: its outline
-        // would cover what is still to sew (and an imported design's outline is
-        // every stitch, redrawn every frame). Paused, it shows what the
-        // timeline selects
-        selection: s.anim.index == null || !s.anim.playing ? s.selection : [],
-        theme: themeRef.current,
-        overlay: {
-          ...overlayRef.current,
-          ramp: s.tool === "gradient" ? rampOverlay() : null,
-          builder: s.tool === "builder" ? builderOverlay() : null,
-          guides: s.tool === "guides" ? guidesOverlay() : null,
-          nodes: s.tool === "node",
-          nodeSel: s.tool === "node" ? s.nodeSel : [],
-          refEdit: s.refEdit,
+      const more = rendererRef.current.render(
+        bg.getContext("2d")!,
+        {
+          interactive,
+          showDensity: s.showDensity,
+          density: s.density,
+          densityMode: s.densityMode,
+          live: s.live,
+          glStitches: useGL,
+          doc: s.doc,
+          plan: shownPlan,
+          view,
+          mode: s.viewMode,
+          // while the stitch-out plays, the selection isn't drawn: its outline
+          // would cover what is still to sew (and an imported design's outline is
+          // every stitch, redrawn every frame). Paused, it shows what the
+          // timeline selects
+          selection: s.anim.index == null || !s.anim.playing ? s.selection : [],
+          theme: themeRef.current,
+          overlay: {
+            ...overlayRef.current,
+            ramp: s.tool === "gradient" ? rampOverlay() : null,
+            builder: s.tool === "builder" ? builderOverlay() : null,
+            guides: s.tool === "guides" ? guidesOverlay() : null,
+            nodes: s.tool === "node",
+            nodeSel: s.tool === "node" ? s.nodeSel : [],
+            refEdit: s.refEdit,
+          },
+          showGrid: s.showGrid,
+          gridStep: s.gridStep,
+          showJumps: s.showJumps,
+          showUnderlay: s.showUnderlay,
+          hiddenShapes: s.showHidden ? s.hiddenShapes : null,
+          animIndex: s.anim.index,
+          fabricColor: s.fabricColor,
+          fabricAll: s.fabricAll,
+          width: w,
+          height: h,
+          dpr,
         },
-        showGrid: s.showGrid,
-        gridStep: s.gridStep,
-        showJumps: s.showJumps,
-        showUnderlay: s.showUnderlay,
-        hiddenShapes: s.showHidden ? s.hiddenShapes : null,
-        animIndex: s.anim.index,
-        fabricColor: s.fabricColor,
-        fabricAll: s.fabricAll,
-        width: w,
-        height: h,
-        dpr,
-      }, c.getContext("2d")!);
+        c.getContext("2d")!,
+      );
       if (useGL && s.plan) {
         const total = s.plan.flags.length;
         gl!.render({
@@ -289,7 +319,7 @@ export function Canvas() {
       // zoom refinement continues over the next frames
       if (more) draw();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- made once: it reads refs and the store's current state
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- made once: it reads refs and the store's current state
   }, []);
   const draw = useCallback(() => {
     cancelAnimationFrame(rafRef.current);
@@ -353,7 +383,7 @@ export function Canvas() {
       glc?.removeEventListener("webglcontextlost", lost);
       glc?.removeEventListener("webglcontextrestored", restored);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- made once: it reads refs and the store's current state
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- made once: it reads refs and the store's current state
   }, [draw]);
 
   // a drag that ends outside the canvas (or loses the window) still ends: the plan follows again
@@ -411,11 +441,11 @@ export function Canvas() {
       }
       const box =
         which === "design"
-          ? unionBoxes(s.doc.objects.map(objectBounds)) ?? { x: 0, y: 0, w: s.doc.hoop.width, h: s.doc.hoop.height }
+          ? (unionBoxes(s.doc.objects.map(objectBounds)) ?? { x: 0, y: 0, w: s.doc.hoop.width, h: s.doc.hoop.height })
           : { x: 0, y: 0, w: s.doc.hoop.width, h: s.doc.hoop.height };
       s.setView(fitView(w, h, box));
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- made once: it reads refs and the store's current state
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- made once: it reads refs and the store's current state
   }, [draw]);
 
   const toMm = (e: { clientX: number; clientY: number }): Vec2 => {
@@ -481,7 +511,13 @@ export function Canvas() {
   };
 
   // ---- shape builder: the overlap regions of the selected fills
-  const builderRef = useRef<{ doc: unknown; key: string; ids: string[]; regions: ShapeRegion[] | null; hover: number | null }>({ doc: null, key: "", ids: [], regions: null, hover: null });
+  const builderRef = useRef<{ doc: unknown; key: string; ids: string[]; regions: ShapeRegion[] | null; hover: number | null }>({
+    doc: null,
+    key: "",
+    ids: [],
+    regions: null,
+    hover: null,
+  });
   const builderIds = () => {
     const s = useStore.getState();
     return s.doc.objects.filter((o) => s.selection.includes(o.id) && o.visible && o.stitch.type === "fill" && o.paths.some((sp) => sp.closed)).map((o) => o.id);
@@ -536,7 +572,7 @@ export function Canvas() {
       faces: b.regions.map((f) => f.rings),
       hover: b.hover,
       picked: d?.kind === "build" ? d.faces : [],
-      del: d?.kind === "build" ? d.del : (useStore.getState().toolOptions.builder.mode === "delete"),
+      del: d?.kind === "build" ? d.del : useStore.getState().toolOptions.builder.mode === "delete",
     };
   };
   const applyBuild = async (faces: number[], del: boolean) => {
@@ -686,15 +722,19 @@ export function Canvas() {
     } else {
       const opts = s.toolOptions.pen;
       const sp: SubPath = { nodes: d.nodes, closed: isClosed };
-      o =
-        isClosed && opts.closed === "fill"
-          ? newObject([sp], defaultStitch("fill"), "Fill")
-          : newObject([sp], runStitch(opts.stitch, opts.length), "Running");
+      o = isClosed && opts.closed === "fill" ? newObject([sp], defaultStitch("fill"), "Fill") : newObject([sp], runStitch(opts.stitch, opts.length), "Running");
     }
     const old = d.replaces ? s.doc.objects.find((x) => x.id === d.replaces) : undefined;
     if (old) {
       // continued path: keep the object, its colour and its settings
-      const next: DesignObject = { ...old, paths: o.paths, stitch: o.stitch.type === old.stitch.type ? { ...old.stitch, ...(o.stitch.type === "satin" ? { width: (o.stitch as { width: number }).width } : {}) } as StitchParams : o.stitch };
+      const next: DesignObject = {
+        ...old,
+        paths: o.paths,
+        stitch:
+          o.stitch.type === old.stitch.type
+            ? ({ ...old.stitch, ...(o.stitch.type === "satin" ? { width: (o.stitch as { width: number }).width } : {}) } as StitchParams)
+            : o.stitch,
+      };
       s.commit((doc) => replaceObject(doc, old.id, next));
       s.select([old.id]);
     } else {
@@ -729,7 +769,6 @@ export function Canvas() {
   /** Copies of objects beside the originals (in their groups; whole groups, letterings and gradients new). */
   const cloneObjects = (objs: DesignObject[]) => freshCopies(useStore.getState().doc, objs, { inPlace: true });
 
-
   /**
    * Mesh / freeform editing with the gradient tool. Nodes: click selects
    * (Shift adds), drag moves, Alt-click deletes. Mesh: a click inside adds a
@@ -741,7 +780,7 @@ export function Canvas() {
     const s = useStore.getState();
     const g = sg.params;
     const sel = s.gradNodes;
-    const pts: { p: Vec2 }[] = g.kind === "mesh" ? g.mesh?.nodes ?? [] : g.points ?? [];
+    const pts: { p: Vec2 }[] = g.kind === "mesh" ? (g.mesh?.nodes ?? []) : (g.points ?? []);
     if (g.kind === "freeform" && g.points)
       for (const i of sel) {
         const q = g.points[i];
@@ -757,7 +796,8 @@ export function Canvas() {
     const hit = nodeHit(g, p, tol);
     if (hit != null) {
       if (e.altKey) {
-        if (!removeNodes(sg.group, [hit])) s.toast(g.kind === "mesh" ? "The mesh border stays — Alt-click an inner node to remove its lines" : "A gradient keeps at least one colour point");
+        if (!removeNodes(sg.group, [hit]))
+          s.toast(g.kind === "mesh" ? "The mesh border stays — Alt-click an inner node to remove its lines" : "A gradient keeps at least one colour point");
         draw();
         return true;
       }
@@ -767,7 +807,10 @@ export function Canvas() {
       s.set({ gradNodes: next });
       if (next.includes(hit)) {
         s.checkpoint();
-        startDrag(next, next.map((i) => pts[i].p));
+        startDrag(
+          next,
+          next.map((i) => pts[i].p),
+        );
       }
       draw();
       return true;
@@ -806,7 +849,6 @@ export function Canvas() {
     }
     return false;
   };
-
 
   /** An end of a selected open path the pen can continue from. */
   const continuable = (p: Vec2, tol: number, kind: PenDraft["kind"]) => {
@@ -887,8 +929,6 @@ export function Canvas() {
     draw();
   };
 
-
-
   // A two-rail satin's sides are shaped one at a time: the point pairs turn
   // into guides first (the stitches keep their angle). `both` (Ctrl): a pair
   // on both rails, as long as the rails still pair up.
@@ -904,7 +944,6 @@ export function Canvas() {
     }
     return { obj: { ...base, paths }, index: r.index };
   };
-
 
   const penHint = (text: string, at: Vec2) => {
     iRef.current.tooltip = { p: at, text };
@@ -1061,7 +1100,16 @@ export function Canvas() {
     if (!d && s.refEdit) {
       const r = s.doc.references?.find((x) => x.id === s.refEdit);
       const z = r ? refZone(r, p) : null;
-      if (canvasRef.current) canvasRef.current.style.cursor = !z ? "default" : z.mode === "move" ? "move" : z.mode === "rotate" ? ROTATE_CURSOR : z.corner % 2 === 0 ? "nwse-resize" : "nesw-resize";
+      if (canvasRef.current)
+        canvasRef.current.style.cursor = !z
+          ? "default"
+          : z.mode === "move"
+            ? "move"
+            : z.mode === "rotate"
+              ? ROTATE_CURSOR
+              : z.corner % 2 === 0
+                ? "nwse-resize"
+                : "nesw-resize";
       iRef.current.tooltip = z ? null : { p, text: "Click outside or press Enter when done" };
       draw();
       return;
@@ -1083,7 +1131,15 @@ export function Canvas() {
           if (hover.kind === "anchor" && pd.kind === "satin") text = `${pd.widths[hover.index].toFixed(2)} mm · scroll to change · ${text}`;
           if (hover.kind === "close" && !canClose(pd)) text = hints.none;
           penHint(text, pd.cursor ?? p);
-          if (c) c.style.cursor = hover.kind === "handle" || hover.kind === "anchor" ? "move" : hover.kind === "segment" ? "copy" : hover.kind === "close" || hover.kind === "last" ? "pointer" : "";
+          if (c)
+            c.style.cursor =
+              hover.kind === "handle" || hover.kind === "anchor"
+                ? "move"
+                : hover.kind === "segment"
+                  ? "copy"
+                  : hover.kind === "close" || hover.kind === "last"
+                    ? "pointer"
+                    : "";
         } else {
           penHoverRef.current = { kind: "none" };
           const cont = continuable(p, tol, s.tool === "satin" ? "satin" : "run");
@@ -1111,7 +1167,9 @@ export function Canvas() {
         }
         const ins = nodeInsertTarget(p, 8 / s.view.scale);
         iRef.current.insertAt = ins?.p ?? null;
-        iRef.current.tooltip = ins ? { p, text: "Drag to bend the curve · click to add a point · Alt-click a point to delete · double-click: smooth ↔ corner" } : null;
+        iRef.current.tooltip = ins
+          ? { p, text: "Drag to bend the curve · click to add a point · Alt-click a point to delete · double-click: smooth ↔ corner" }
+          : null;
         if (canvasRef.current) canvasRef.current.style.cursor = ins ? "copy" : "";
         draw();
         return;
@@ -1133,7 +1191,9 @@ export function Canvas() {
           draw();
         }
         if (canvasRef.current) canvasRef.current.style.cursor = f != null ? (e.altKey || s.toolOptions.builder.mode === "delete" ? "not-allowed" : "copy") : "";
-        iRef.current.tooltip = builderRef.current.regions ? null : { p, text: "Select overlapping fills (Shift-click to add), then drag across regions to merge them" };
+        iRef.current.tooltip = builderRef.current.regions
+          ? null
+          : { p, text: "Select overlapping fills (Shift-click to add), then drag across regions to merge them" };
         return;
       }
       if (s.tool === "freehand" && !fhRef.current) {
@@ -1249,10 +1309,40 @@ export function Canvas() {
       upTransform(ctx, d);
       if (d.kind !== "move") return;
     }
-    if (d.kind === "gradvec" || d.kind === "gradend" || d.kind === "gradstop" || d.kind === "gradnode" || d.kind === "gradspread" || d.kind === "rampend" || d.kind === "rampvec") return upGradient(ctx, s, d, e);
-    if (d.kind === "corner" || d.kind === "nodes" || d.kind === "nodemarquee" || d.kind === "pen-new" || d.kind === "pen-anchor" || d.kind === "pen-handle" || d.kind === "bend" || d.kind === "pen-close" || d.kind === "pen-last") return upPen(ctx, s, d, e);
-    if (d.kind === "guideend" || d.kind === "guidemove" || d.kind === "guidedraw" || d.kind === "ref" || d.kind === "texthandle" || d.kind === "handle") return upHandles(ctx, s, d);
-    if (d.kind === "build" || d.kind === "marquee" || d.kind === "shape" || d.kind === "freehand" || d.kind === "ruler" || d.kind === "split" || d.kind === "cut") return upDraw(ctx, s, d, e);
+    if (
+      d.kind === "gradvec" ||
+      d.kind === "gradend" ||
+      d.kind === "gradstop" ||
+      d.kind === "gradnode" ||
+      d.kind === "gradspread" ||
+      d.kind === "rampend" ||
+      d.kind === "rampvec"
+    )
+      return upGradient(ctx, s, d, e);
+    if (
+      d.kind === "corner" ||
+      d.kind === "nodes" ||
+      d.kind === "nodemarquee" ||
+      d.kind === "pen-new" ||
+      d.kind === "pen-anchor" ||
+      d.kind === "pen-handle" ||
+      d.kind === "bend" ||
+      d.kind === "pen-close" ||
+      d.kind === "pen-last"
+    )
+      return upPen(ctx, s, d, e);
+    if (d.kind === "guideend" || d.kind === "guidemove" || d.kind === "guidedraw" || d.kind === "ref" || d.kind === "texthandle" || d.kind === "handle")
+      return upHandles(ctx, s, d);
+    if (
+      d.kind === "build" ||
+      d.kind === "marquee" ||
+      d.kind === "shape" ||
+      d.kind === "freehand" ||
+      d.kind === "ruler" ||
+      d.kind === "split" ||
+      d.kind === "cut"
+    )
+      return upDraw(ctx, s, d, e);
     switch (d.kind) {
       default:
         void e;
@@ -1352,8 +1442,7 @@ export function Canvas() {
   useDismiss(!!ctxMenu, () => setCtxMenu(null), [".menu"]);
 
   const tool = useStore((s) => s.tool);
-  const cursor =
-    tool === "pan" ? "grab" : tool === "select" ? "default" : tool === "node" ? "default" : tool === "text" ? "text" : "crosshair";
+  const cursor = tool === "pan" ? "grab" : tool === "select" ? "default" : tool === "node" ? "default" : tool === "text" ? "text" : "crosshair";
 
   useEffect(() => {
     // prevent browser zoom on ctrl+wheel over the canvas
@@ -1365,83 +1454,114 @@ export function Canvas() {
 
   // what the gesture modules (canvas/gestures/) use of the component; the
   // handlers above read it when an event comes, after this render
-  const ctx: CanvasCtx = { draw, iRef, pivotRef, xform, cloneObjects, selKey, overlayRef, pick, toMm, penRef, spaceRef, snapToNode, finishPen, insertIntoObject, fhRef, splitLiveRef, builderRef, faceAt, applyBuild, newObject, replaceObjects, guideFreedFrom, dragRef, refreshRegions, rampDown, gradient2DDown, guideHover, handlesRef, pivotOf, setCtxMenu };
+  const ctx: CanvasCtx = {
+    draw,
+    iRef,
+    pivotRef,
+    xform,
+    cloneObjects,
+    selKey,
+    overlayRef,
+    pick,
+    toMm,
+    penRef,
+    spaceRef,
+    snapToNode,
+    finishPen,
+    insertIntoObject,
+    fhRef,
+    splitLiveRef,
+    builderRef,
+    faceAt,
+    applyBuild,
+    newObject,
+    replaceObjects,
+    guideFreedFrom,
+    dragRef,
+    refreshRegions,
+    rampDown,
+    gradient2DDown,
+    guideHover,
+    handlesRef,
+    pivotOf,
+    setCtxMenu,
+  };
 
   return (
     <>
-    {ctxMenu && <Menu items={ctxMenu.items ?? contextMenu(ctxMenu.onObject)} x={ctxMenu.x} y={ctxMenu.y} onClose={() => setCtxMenu(null)} />}
-    <div
-      ref={wrapRef}
-      className="canvas-wrap"
-      onDragOver={(e) => {
-        e.preventDefault();
-        if (!dropping) setDropping(isImageDrag(e) ? "none" : null);
-      }}
-      onDragLeave={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropping(null);
-      }}
-      onDrop={onDrop}
-    >
-      <canvas ref={bgRef} className="layer-bg" aria-hidden />
-      <canvas ref={glCanvasRef} className="layer-gl" aria-hidden />
-      <canvas
-        ref={canvasRef}
-        style={{ cursor }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        // the pointer is gone (cancelled, or the window lost it): the drag ends where it is
-        onPointerCancel={onPointerUp}
-        onLostPointerCapture={(e) => dragRef.current && onPointerUp(e)}
-        onPointerLeave={() => {
-          setDensityHover(null);
-          if (overlayRef.current.hoverId) {
-            overlayRef.current.hoverId = null;
-            draw();
-          }
-        }}
-        onWheel={onWheel}
-        onContextMenu={(e) => {
+      {ctxMenu && <Menu items={ctxMenu.items ?? contextMenu(ctxMenu.onObject)} x={ctxMenu.x} y={ctxMenu.y} onClose={() => setCtxMenu(null)} />}
+      <div
+        ref={wrapRef}
+        className="canvas-wrap"
+        onDragOver={(e) => {
           e.preventDefault();
-          // a right-click (not a right-drag, which pans) opens the menu of what is under it
-          const r = rightRef.current;
-          rightRef.current = null;
-          if (r && (r.moved || Math.hypot(e.clientX - r.x, e.clientY - r.y) > 4)) return;
-          const s = useStore.getState();
-          if (s.tool !== "select" && s.tool !== "node") return;
-          const hit = pick(toMm(e));
-          if (hit && !s.selection.includes(hit.id)) s.select(unitIds(s.doc, hit));
-          if (!hit && s.selection.length) s.select([]);
-          setCtxMenu({ x: e.clientX, y: e.clientY, onObject: !!hit });
+          if (!dropping) setDropping(isImageDrag(e) ? "none" : null);
         }}
-      />
-      {refEdit && <ReferenceBar id={refEdit} />}
-      {dropping && (
-        <div className="drop-choice">
-          {(
-            [
-              ["reference", <ImagePlus key="i" size={26} />, "Reference picture", "Trace over it with the pen and node tools — never stitched"],
-              ["digitize", <Digitize key="w" size={26} />, "Auto-digitize", "Turn the picture into stitches"],
-            ] as const
-          ).map(([id, icon, title, hint]) => (
-            <div
-              key={id}
-              className={`drop-zone ${dropping === id ? "on" : ""}`}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (dropping !== id) setDropping(id);
-              }}
-              onDrop={(e) => dropAs(id, e)}
-            >
-              {icon}
-              <b>{title}</b>
-              <span>{hint}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropping(null);
+        }}
+        onDrop={onDrop}
+      >
+        <canvas ref={bgRef} className="layer-bg" aria-hidden />
+        <canvas ref={glCanvasRef} className="layer-gl" aria-hidden />
+        <canvas
+          ref={canvasRef}
+          style={{ cursor }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          // the pointer is gone (cancelled, or the window lost it): the drag ends where it is
+          onPointerCancel={onPointerUp}
+          onLostPointerCapture={(e) => dragRef.current && onPointerUp(e)}
+          onPointerLeave={() => {
+            setDensityHover(null);
+            if (overlayRef.current.hoverId) {
+              overlayRef.current.hoverId = null;
+              draw();
+            }
+          }}
+          onWheel={onWheel}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            // a right-click (not a right-drag, which pans) opens the menu of what is under it
+            const r = rightRef.current;
+            rightRef.current = null;
+            if (r && (r.moved || Math.hypot(e.clientX - r.x, e.clientY - r.y) > 4)) return;
+            const s = useStore.getState();
+            if (s.tool !== "select" && s.tool !== "node") return;
+            const hit = pick(toMm(e));
+            if (hit && !s.selection.includes(hit.id)) s.select(unitIds(s.doc, hit));
+            if (!hit && s.selection.length) s.select([]);
+            setCtxMenu({ x: e.clientX, y: e.clientY, onObject: !!hit });
+          }}
+        />
+        {refEdit && <ReferenceBar id={refEdit} />}
+        {dropping && (
+          <div className="drop-choice">
+            {(
+              [
+                ["reference", <ImagePlus key="i" size={26} />, "Reference picture", "Trace over it with the pen and node tools — never stitched"],
+                ["digitize", <Digitize key="w" size={26} />, "Auto-digitize", "Turn the picture into stitches"],
+              ] as const
+            ).map(([id, icon, title, hint]) => (
+              <div
+                key={id}
+                className={`drop-zone ${dropping === id ? "on" : ""}`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (dropping !== id) setDropping(id);
+                }}
+                onDrop={(e) => dropAs(id, e)}
+              >
+                {icon}
+                <b>{title}</b>
+                <span>{hint}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </>
   );
 }

@@ -16,7 +16,14 @@ export interface HoopPreset extends Hoop {
 }
 
 const group = (brand: string, prefix: string, list: [label: string, width: number, height: number, shape?: HoopShape][]): HoopPreset[] =>
-  list.map(([label, width, height, shape]) => ({ brand, label, width, height, ...(shape && shape !== "rect" ? { shape } : {}), name: prefix ? `${prefix} ${label}` : label }));
+  list.map(([label, width, height, shape]) => ({
+    brand,
+    label,
+    width,
+    height,
+    ...(shape && shape !== "rect" ? { shape } : {}),
+    name: prefix ? `${prefix} ${label}` : label,
+  }));
 
 export const HOOPS: HoopPreset[] = [
   ...group("Generic", "", [

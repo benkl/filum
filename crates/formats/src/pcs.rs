@@ -61,8 +61,8 @@ pub(crate) fn read(bytes: &[u8]) -> Result<Pattern, Error> {
 
 /// pystitch's PCM colour table.
 const PCM_COLORS: [u32; 16] = [
-    0x000000, 0x000080, 0x0000FF, 0x008080, 0x00FFFF, 0x800080, 0xFF00FF, 0x800000, 0xFF0000, 0x008000, 0x00FF00, 0x808000, 0xFFFF00,
-    0x808080, 0xC0C0C0, 0xFFFFFF,
+    0x000000, 0x000080, 0x0000FF, 0x008080, 0x00FFFF, 0x800080, 0xFF00FF, 0x800000, 0xFF0000, 0x008000, 0x00FF00, 0x808000, 0xFFFF00, 0x808080, 0xC0C0C0,
+    0xFFFFFF,
 ];
 
 pub(crate) fn read_pcm(bytes: &[u8]) -> Result<Pattern, Error> {
@@ -73,11 +73,7 @@ pub(crate) fn read_pcm(bytes: &[u8]) -> Result<Pattern, Error> {
     for _ in 0..colors {
         let i = r.u16be()? as usize % PCM_COLORS.len();
         let c = PCM_COLORS[i];
-        raw.threads.push(Thread {
-            rgb: [(c >> 16) as u8, (c >> 8) as u8, c as u8],
-            name: format!("PCM Color {}", i + 1),
-            ..Default::default()
-        });
+        raw.threads.push(Thread { rgb: [(c >> 16) as u8, (c >> 8) as u8, c as u8], name: format!("PCM Color {}", i + 1), ..Default::default() });
     }
     let _stitch_count = r.u16be()?;
     while r.remaining() >= 9 {

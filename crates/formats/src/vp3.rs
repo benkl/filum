@@ -16,11 +16,7 @@ use crate::io::{ByteWriter, Reader};
 use crate::raw::RawPattern;
 use crate::{Error, Pattern, Thread, WriteOptions};
 
-pub(crate) const SETTINGS: EncodeSettings = EncodeSettings {
-    max_stitch: 255,
-    max_jump: 3200,
-    full_jump: false,
-};
+pub(crate) const SETTINGS: EncodeSettings = EncodeSettings { max_stitch: 255, max_jump: 3200, full_jump: false };
 const PRODUCER: &str = "Produced by     Software Ltd";
 
 fn string16(out: &mut Vec<u8>, s: &str) {
@@ -113,14 +109,7 @@ pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Result<Vec<u8>, Error> 
     Ok(out)
 }
 
-fn write_colorblock(
-    out: &mut Vec<u8>,
-    first: bool,
-    cx: f64,
-    cy: f64,
-    recs: &[Rec],
-    thread: &Thread,
-) -> Result<(), Error> {
+fn write_colorblock(out: &mut Vec<u8>, first: bool, cx: f64, cy: f64, recs: &[Rec], thread: &Thread) -> Result<(), Error> {
     out.extend_from_slice(&[0x00, 0x05, 0x00]);
     let end_pos = out.len();
     out.u32le(0);
@@ -273,13 +262,7 @@ fn read_colorblock(r: &mut Reader, raw: &mut RawPattern, cx: i32, cy: i32) -> Re
     raw.threads.push(thread);
     r.skip(15)?;
     r.skip(3)?; // 0A F6 00
-    let data: Vec<i32> = r
-        .data
-        .get(r.pos..block_end.max(r.pos))
-        .unwrap_or(&[])
-        .iter()
-        .map(|&b| b as i8 as i32)
-        .collect();
+    let data: Vec<i32> = r.data.get(r.pos..block_end.max(r.pos)).unwrap_or(&[]).iter().map(|&b| b as i8 as i32).collect();
     r.seek(block_end.max(r.pos))?;
     let mut i = 0usize;
     while i + 1 < data.len() {

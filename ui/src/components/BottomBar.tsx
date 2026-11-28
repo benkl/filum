@@ -71,7 +71,12 @@ export function BottomBar() {
         >
           <Focus size={15} />
         </button>
-        <select className="select stitch-colors" value={stitchColors} title="Colour the stitches by" onChange={(e) => set({ stitchColors: e.target.value as typeof stitchColors })}>
+        <select
+          className="select stitch-colors"
+          value={stitchColors}
+          title="Colour the stitches by"
+          onChange={(e) => set({ stitchColors: e.target.value as typeof stitchColors })}
+        >
           {STITCH_COLORS.map((c) => (
             <option key={c.id} value={c.id} title={c.title}>
               {c.label}
@@ -94,7 +99,13 @@ export function BottomBar() {
           key={z}
           className="btn sm ghost bb-zoom"
           style={Math.abs(view.scale / actual - z) < 0.02 ? { color: "var(--accent-text)", fontWeight: "var(--fw-semibold)" } : undefined}
-          title={z === 1 ? (calibrated ? "Zoom 1× (actual size)" : "Zoom 1×: actual size once the screen is calibrated (View ▸ Calibrate the screen…); now it assumes 96 dpi") : `Zoom ${z}×`}
+          title={
+            z === 1
+              ? calibrated
+                ? "Zoom 1× (actual size)"
+                : "Zoom 1×: actual size once the screen is calibrated (View ▸ Calibrate the screen…); now it assumes 96 dpi"
+              : `Zoom ${z}×`
+          }
           onClick={() => fit(z)}
         >
           {z}×
@@ -110,7 +121,11 @@ export function BottomBar() {
         className={`btn sm ${playerOpen ? "primary" : ""}`}
         disabled={!total}
         onClick={() => (playerOpen ? closePlayer() : openPlayer())}
-        title={playerOpen ? "Close the stitch-out player (Esc)" : "Open the stitch-out player: a timeline of the colour blocks and the objects in them (Play sews it out)"}
+        title={
+          playerOpen
+            ? "Close the stitch-out player (Esc)"
+            : "Open the stitch-out player: a timeline of the colour blocks and the objects in them (Play sews it out)"
+        }
       >
         <StitchOut size={14} /> <span className="bb-label">Animate</span>
       </button>

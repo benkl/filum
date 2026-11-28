@@ -115,7 +115,11 @@ fn edge_key(w: usize, x: i64, y: i64, dx: i64, dy: i64) -> usize {
     let (x0, y0) = (x.min(x + dx), y.min(y + dy));
     let cols = w + 1;
     let base = (y0 as usize) * cols + x0 as usize;
-    if dy == 0 { base * 2 } else { base * 2 + 1 }
+    if dy == 0 {
+        base * 2
+    } else {
+        base * 2 + 1
+    }
 }
 
 /// Trace all boundaries of a label image into chains.
@@ -210,7 +214,13 @@ fn corners(pts: &[Point], closed: bool, corner_deg: f64, scale: f64) -> Vec<usiz
         return vec![];
     }
     let pos_at = |s: f64| -> Option<Point> {
-        let s = if closed { s.rem_euclid(total) } else if s < 0.0 || s > total { return None } else { s };
+        let s = if closed {
+            s.rem_euclid(total)
+        } else if s < 0.0 || s > total {
+            return None;
+        } else {
+            s
+        };
         if s >= cum[m - 1] {
             // closing segment (closed) or the very end
             if !closed {
@@ -235,7 +245,11 @@ fn corners(pts: &[Point], closed: bool, corner_deg: f64, scale: f64) -> Vec<usiz
     let score: Vec<f64> = (0..m).map(|j| if turn_at(j, 1.5 * scale) >= 0.45 * thr { turn_at(j, win) } else { 0.0 }).collect();
     let arc = |a: usize, b: usize| {
         let x = (cum[a] - cum[b]).abs();
-        if closed { x.min(total - x) } else { x }
+        if closed {
+            x.min(total - x)
+        } else {
+            x
+        }
     };
     let raw_turn = |i: usize| -> f64 {
         if closed {
@@ -368,7 +382,11 @@ fn seg_near(sg: &Seg, pts: &[Point], tol: f64) -> bool {
             let t = ((q - w[0]).dot(d) / l2).clamp(0.0, 1.0);
             best = best.min((w[0] + d * t).dist(q));
         }
-        if pts.len() == 1 { pts[0].dist(q) } else { best }
+        if pts.len() == 1 {
+            pts[0].dist(q)
+        } else {
+            best
+        }
     };
     samples.into_iter().all(|q| q.x.is_finite() && q.y.is_finite() && dist(q) <= tol)
 }
@@ -446,9 +464,7 @@ fn max_dev_from_chord(pts: &[Point]) -> f64 {
     let (a, b) = (pts[0], *pts.last().unwrap());
     let d = b - a;
     let l = d.length();
-    pts.iter()
-        .map(|q| if l < 1e-9 { q.dist(a) } else { ((*q - a).cross(d) / l).abs() })
-        .fold(0.0, f64::max)
+    pts.iter().map(|q| if l < 1e-9 { q.dist(a) } else { ((*q - a).cross(d) / l).abs() }).fold(0.0, f64::max)
 }
 
 /// Fit one chain: corners stay sharp, straight runs become lines, the rest
@@ -603,7 +619,13 @@ pub fn fit_chain_pixel(c: &Chain, up: f64) -> Vec<Seg> {
         if t == 0 {
             return false;
         }
-        let before = if c.closed { (k + m - 1) % m } else if k == 0 { usize::MAX } else { k - 1 };
+        let before = if c.closed {
+            (k + m - 1) % m
+        } else if k == 0 {
+            usize::MAX
+        } else {
+            k - 1
+        };
         let step_before = before != usize::MAX && run_len(k) <= short && sense(before) == -t;
         let step_after = run_len((k + 1) % m) <= short && (c.closed || k + 2 < m) && sense((k + 1) % m) == -t;
         !(step_before || step_after)
@@ -779,7 +801,15 @@ mod tests {
     #[test]
     fn junctions_split_chains() {
         // three regions meeting: 0 top, 1 bottom-left, 2 bottom-right
-        let ids = img(10, 10, |x, y| if y < 5 { 0 } else if x < 5 { 1 } else { 2 });
+        let ids = img(10, 10, |x, y| {
+            if y < 5 {
+                0
+            } else if x < 5 {
+                1
+            } else {
+                2
+            }
+        });
         let cs = chains(&ids, 10, 10);
         let fitted: Vec<Vec<Seg>> = cs.iter().map(|c| fit_chain(c, 0.3, 55.0, 1.0)).collect();
         for id in [0, 1, 2] {
@@ -788,5 +818,3 @@ mod tests {
         }
     }
 }
-
-

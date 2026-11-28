@@ -91,4 +91,3 @@ export function simplifyForStitching(sp: SubPath, tolerance = STITCH_SIMPLIFY_TO
 
 /** How many of a path's nodes Simplify for stitching would leave (for the hint). */
 export const nodeCount = (paths: SubPath[]) => paths.reduce((n, p) => n + p.nodes.length, 0);
-

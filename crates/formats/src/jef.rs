@@ -14,11 +14,7 @@ use crate::palette::{build_nonrepeat_palette, jef_slots, jef_thread};
 use crate::raw::RawPattern;
 use crate::{Error, Pattern, WriteOptions};
 
-pub(crate) const SETTINGS: EncodeSettings = EncodeSettings {
-    max_stitch: 127,
-    max_jump: 127,
-    full_jump: true,
-};
+pub(crate) const SETTINGS: EncodeSettings = EncodeSettings { max_stitch: 127, max_jump: 127, full_jump: true };
 
 const HOOP_110X110: u32 = 0;
 const HOOP_50X50: u32 = 1;
@@ -73,15 +69,7 @@ fn now_string() -> String {
             let day = doy - (153 * mp + 2) / 5 + 1;
             let month = if mp < 10 { mp + 3 } else { mp - 9 };
             let year = yoe + era * 400 + if month <= 2 { 1 } else { 0 };
-            return format!(
-                "{:04}{:02}{:02}{:02}{:02}{:02}",
-                year,
-                month,
-                day,
-                rem / 3600,
-                (rem / 60) % 60,
-                rem % 60
-            );
+            return format!("{:04}{:02}{:02}{:02}{:02}{:02}", year, month, day, rem / 3600, (rem / 60) % 60, rem % 60);
         }
     }
     "20000101000000".into()
@@ -208,9 +196,7 @@ pub(crate) fn read(bytes: &[u8]) -> Result<Pattern, Error> {
     if let Some(t) = thread_iter.next() {
         out_threads.extend(t);
     }
-    let data = bytes
-        .get(stitch_offset..)
-        .ok_or_else(|| Error::Malformed("JEF stitch offset out of range".into()))?;
+    let data = bytes.get(stitch_offset..).ok_or_else(|| Error::Malformed("JEF stitch offset out of range".into()))?;
     let mut i = 0;
     while i + 2 <= data.len() {
         let (b0, b1) = (data[i], data[i + 1]);

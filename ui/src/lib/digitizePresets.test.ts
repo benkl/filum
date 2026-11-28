@@ -28,13 +28,19 @@ check(DIGITIZE_PRESETS.length <= 6, "a handful of presets, not a wall of them");
 for (const p of DIGITIZE_PRESETS) {
   const s = presetSettings(p.id);
   check(presetOf(s) === p.id, `${p.label}: its own settings are recognised as it`);
-  check(Object.keys(p.opts).every((k) => k in DIGITIZE_DEFAULTS), `${p.label}: only known options`);
+  check(
+    Object.keys(p.opts).every((k) => k in DIGITIZE_DEFAULTS),
+    `${p.label}: only known options`,
+  );
 }
 // a preset starts from the defaults: nothing leaks from the last one
 const drawn = presetSettings("drawing", { photoAngle: 30 });
 check(drawn.outlineLineMm === 0 && drawn.backgroundScope === "outside" && drawn.outline === "none", "line art: no even outlines, no enclosed fills, no border");
 check(drawn.photoAngle === 30, "a kept option the preset does not set stays");
-check(DIGITIZE_PRESETS.every((p) => p.opts.backgroundScope !== undefined), "every preset says what happens to the background");
+check(
+  DIGITIZE_PRESETS.every((p) => p.opts.backgroundScope !== undefined),
+  "every preset says what happens to the background",
+);
 // logo: even satin outlines, enclosed areas stitched, routed
 const logo = presetSettings("logo");
 check(outlinesOf(logo) === "even" && logo.outlineLineMm >= 1.0, "logo: outlines as even satin");
@@ -53,7 +59,10 @@ check(presetOf({ ...logo, ...DETAIL.fine }) === null, "logo with fine detail is 
 
 // old saved settings load
 const old = migrateSettings({ colors: 9, fillDirection: "flow" } as never);
-check(old.colors === 9 && old.fillMethod === "flow" && old.fillDirection === "axis" && old.routeLines === true && old.outlineLineMm === 0, "old settings: the flow direction becomes a flow fill, new options default");
+check(
+  old.colors === 9 && old.fillMethod === "flow" && old.fillDirection === "axis" && old.routeLines === true && old.outlineLineMm === 0,
+  "old settings: the flow direction becomes a flow fill, new options default",
+);
 
 console.log(failed ? `${failed} FAILED` : "all passed");
 if (failed) throw new Error(`${failed} digitize preset checks failed`);

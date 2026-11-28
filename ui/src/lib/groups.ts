@@ -75,7 +75,11 @@ export function unitOf(doc: GroupDoc, o: DesignObject): string[] {
 export function selectedUnits(doc: GroupDoc, sel: ReadonlySet<string>): { groups: string[]; objects: DesignObject[] } {
   const whole = new Map<string, boolean>();
   const isWhole = (g: string) => {
-    if (!whole.has(g)) whole.set(g, objectsIn(doc, g).every((x) => sel.has(x.id)));
+    if (!whole.has(g))
+      whole.set(
+        g,
+        objectsIn(doc, g).every((x) => sel.has(x.id)),
+      );
     return whole.get(g)!;
   };
   const groups = new Set<string>();

@@ -11,7 +11,19 @@ import type { DesignObject } from "../types";
 import { Num, Row, Section, Seg, Toggle } from "./ui";
 
 /** A value of the object's own, or the machine's (shown dimmed) until set. */
-export function OwnValue({ label, title, value, fallback, onChange }: { label: string; title: string; value: number | undefined; fallback: number; onChange: (v: number | undefined) => void }) {
+export function OwnValue({
+  label,
+  title,
+  value,
+  fallback,
+  onChange,
+}: {
+  label: string;
+  title: string;
+  value: number | undefined;
+  fallback: number;
+  onChange: (v: number | undefined) => void;
+}) {
   return (
     <Row label={label} title={title}>
       <span className="dz-inline">
@@ -53,9 +65,15 @@ export function CommandsSection({ objects }: { objects: DesignObject[] }) {
     <Section title="Commands" defaultOpen={!!(one?.start || one?.end || choice !== "auto" || last.stopAfter)}>
       {one &&
         (["start", "end"] as const).map((k) => (
-          <Row key={k} label={k === "start" ? "Start point" : "End point"} title="Drag the S / E pins on the canvas; double-click a pin to go back to automatic">
+          <Row
+            key={k}
+            label={k === "start" ? "Start point" : "End point"}
+            title="Drag the S / E pins on the canvas; double-click a pin to go back to automatic"
+          >
             <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span className="stat">{one[k] ? `${one[k]![0].toFixed(1)}, ${one[k]![1].toFixed(1)} mm` : k === "start" ? "Nearest the last object" : "Automatic"}</span>
+              <span className="stat">
+                {one[k] ? `${one[k]![0].toFixed(1)}, ${one[k]![1].toFixed(1)} mm` : k === "start" ? "Nearest the last object" : "Automatic"}
+              </span>
               {one[k] && (
                 <button className="btn sm ghost" onClick={() => useStore.getState().updateObject(one.id, { [k]: undefined })}>
                   Reset
@@ -64,7 +82,10 @@ export function CommandsSection({ objects }: { objects: DesignObject[] }) {
             </span>
           </Row>
         ))}
-      <Row label="After it" title={`How the needle goes on to the next object${one ? "" : " — after the last of them"}. Also: click the line between two objects on the canvas (View ▸ Jumps)`}>
+      <Row
+        label="After it"
+        title={`How the needle goes on to the next object${one ? "" : " — after the last of them"}. Also: click the line between two objects on the canvas (View ▸ Jumps)`}
+      >
         <div className="seg">
           {LINK_CHOICES.map((c) => (
             <button key={c.id} className={choice === c.id ? "on" : ""} title={c.hint} onClick={() => setLinkChoice([last.id], c.id)}>

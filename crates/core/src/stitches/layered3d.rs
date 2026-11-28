@@ -90,7 +90,13 @@ pub fn layered3d(paths: &[SubPath], p: &SatinParams, fabric: &FabricProfile) -> 
             sp.zigzag_underlay_inset = column.zigzag_underlay_inset + inset / 2.0;
             sp.contour_inset_pct = 0.0;
             sp.zigzag_inset_pct = 0.0;
-            sp.second_rail = sp.second_rail.map(|sr| crate::model::SecondRail { contour_inset: None, contour_inset_pct: None, zigzag_underlay_inset: None, zigzag_inset_pct: None, ..sr });
+            sp.second_rail = sp.second_rail.map(|sr| crate::model::SecondRail {
+                contour_inset: None,
+                contour_inset_pct: None,
+                zigzag_underlay_inset: None,
+                zigzag_inset_pct: None,
+                ..sr
+            });
         }
         runs.extend(satin_on(paths, &sp, fabric));
         // each layer starts where the last one ended

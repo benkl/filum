@@ -62,20 +62,26 @@ pub fn stem(pts: &[Point], length: f64, width: f64) -> Vec<Point> {
 /// One motif in local coordinates: x along the line 0..1, y across it -0.5..0.5.
 fn motif_shape(kind: MotifKind) -> Vec<(f64, f64)> {
     match kind {
-        MotifKind::Wave => (0..=12).map(|i| {
-            let t = i as f64 / 12.0;
-            (t, 0.35 * (t * std::f64::consts::TAU).sin())
-        }).collect(),
+        MotifKind::Wave => (0..=12)
+            .map(|i| {
+                let t = i as f64 / 12.0;
+                (t, 0.35 * (t * std::f64::consts::TAU).sin())
+            })
+            .collect(),
         MotifKind::Zigzag => vec![(0.0, 0.0), (0.25, 0.4), (0.75, -0.4), (1.0, 0.0)],
-        MotifKind::Scallop => (0..=10).map(|i| {
-            let t = i as f64 / 10.0;
-            (t, -0.45 * (t * std::f64::consts::PI).sin())
-        }).collect(),
-        MotifKind::Loop => (0..=16).map(|i| {
-            let a = i as f64 / 16.0 * std::f64::consts::TAU;
-            // a loop over the line, moving forward
-            (i as f64 / 16.0 + 0.3 * a.sin(), -0.35 * (1.0 - a.cos()))
-        }).collect(),
+        MotifKind::Scallop => (0..=10)
+            .map(|i| {
+                let t = i as f64 / 10.0;
+                (t, -0.45 * (t * std::f64::consts::PI).sin())
+            })
+            .collect(),
+        MotifKind::Loop => (0..=16)
+            .map(|i| {
+                let a = i as f64 / 16.0 * std::f64::consts::TAU;
+                // a loop over the line, moving forward
+                (i as f64 / 16.0 + 0.3 * a.sin(), -0.35 * (1.0 - a.cos()))
+            })
+            .collect(),
         MotifKind::Diamond => vec![(0.0, 0.0), (0.5, -0.4), (1.0, 0.0), (0.5, 0.4), (0.0, 0.0), (1.0, 0.0)],
         MotifKind::Cross => vec![(0.0, 0.0), (0.3, 0.0), (0.7, 0.4), (0.5, 0.0), (0.3, 0.4), (0.7, 0.0), (1.0, 0.0)],
     }
@@ -342,14 +348,38 @@ pub fn cross(rings: &[Ring], angle_deg: f64, size: f64, coverage: f64, kind: Cro
 /// on the shape's own top-left corner, shifted by `offset` (mm; Ink/Stitch
 /// `CrossGeometries._get_offset_values`: x to the left, y down).
 #[allow(clippy::too_many_arguments)]
-pub fn cross_grid(rings: &[Ring], angle_deg: f64, size: f64, coverage: f64, kind: CrossKind, canvas: bool, offset: [f64; 2], travel_len: f64, start: Option<Point>, f: u8) -> Vec<Run> {
+pub fn cross_grid(
+    rings: &[Ring],
+    angle_deg: f64,
+    size: f64,
+    coverage: f64,
+    kind: CrossKind,
+    canvas: bool,
+    offset: [f64; 2],
+    travel_len: f64,
+    start: Option<Point>,
+    f: u8,
+) -> Vec<Run> {
     cross_full(rings, angle_deg, size, coverage, kind, canvas, offset, false, 1, travel_len, start, f)
 }
 
 /// Cross stitch with Ink/Stitch's flipped variants (the other diagonal
 /// first) and thread count (every diagonal sewn 1, 3, 5 … times).
 #[allow(clippy::too_many_arguments)]
-pub fn cross_full(rings: &[Ring], angle_deg: f64, size: f64, coverage: f64, kind: CrossKind, canvas: bool, offset: [f64; 2], flip: bool, threads: u32, travel_len: f64, start: Option<Point>, f: u8) -> Vec<Run> {
+pub fn cross_full(
+    rings: &[Ring],
+    angle_deg: f64,
+    size: f64,
+    coverage: f64,
+    kind: CrossKind,
+    canvas: bool,
+    offset: [f64; 2],
+    flip: bool,
+    threads: u32,
+    travel_len: f64,
+    start: Option<Point>,
+    f: u8,
+) -> Vec<Run> {
     cross_full_ex(rings, angle_deg, size, coverage, kind, canvas, offset, flip, threads, travel_len, start, &CrossOpts::default(), f)
 }
 
@@ -444,7 +474,21 @@ fn cross_row(kind: CrossKind, flip: bool, first: f64, last: f64, j: f64) -> Vec<
 
 /// Cross stitch with every option: see [`cross_full`] and [`CrossOpts`].
 #[allow(clippy::too_many_arguments)]
-pub fn cross_full_ex(rings: &[Ring], angle_deg: f64, size: f64, coverage: f64, kind: CrossKind, canvas: bool, offset: [f64; 2], flip: bool, threads: u32, travel_len: f64, start: Option<Point>, o: &CrossOpts, f: u8) -> Vec<Run> {
+pub fn cross_full_ex(
+    rings: &[Ring],
+    angle_deg: f64,
+    size: f64,
+    coverage: f64,
+    kind: CrossKind,
+    canvas: bool,
+    offset: [f64; 2],
+    flip: bool,
+    threads: u32,
+    travel_len: f64,
+    start: Option<Point>,
+    o: &CrossOpts,
+    f: u8,
+) -> Vec<Run> {
     if rings.is_empty() {
         return vec![];
     }
@@ -614,15 +658,30 @@ mod tests {
     #[test]
     fn cross_stitch_travels_over_its_own_diagonals() {
         // a ring: rows break at the hole, so pieces need joining
-        let outer: Vec<Point> = (0..64).map(|k| { let a = k as f64 / 64.0 * std::f64::consts::TAU; pt(20.0 + 18.0 * a.cos(), 20.0 + 14.0 * a.sin()) }).collect();
-        let inner: Vec<Point> = (0..32).rev().map(|k| { let a = k as f64 / 32.0 * std::f64::consts::TAU; pt(20.0 + 6.0 * a.cos(), 20.0 + 5.0 * a.sin()) }).collect();
+        let outer: Vec<Point> = (0..64)
+            .map(|k| {
+                let a = k as f64 / 64.0 * std::f64::consts::TAU;
+                pt(20.0 + 18.0 * a.cos(), 20.0 + 14.0 * a.sin())
+            })
+            .collect();
+        let inner: Vec<Point> = (0..32)
+            .rev()
+            .map(|k| {
+                let a = k as f64 / 32.0 * std::f64::consts::TAU;
+                pt(20.0 + 6.0 * a.cos(), 20.0 + 5.0 * a.sin())
+            })
+            .collect();
         let rings = vec![outer, inner];
         let runs = cross(&rings, 0.0, 2.5, 0.5, CrossKind::Cross, 2.5, None, 0);
         let (mut diag, mut other) = (0.0, 0.0);
         for r in &runs {
             for w in r.windows(2).filter(|w| w[1].1 & flags::TRAVEL != 0) {
                 let d = w[1].0 - w[0].0;
-                if (d.x.abs() - d.y.abs()).abs() < 1e-6 { diag += d.length() } else { other += d.length() }
+                if (d.x.abs() - d.y.abs()).abs() < 1e-6 {
+                    diag += d.length()
+                } else {
+                    other += d.length()
+                }
             }
         }
         assert!(diag > 0.0 && other <= 0.25 * (diag + other), "on the diagonals {diag:.1} mm, elsewhere {other:.1} mm");
@@ -636,7 +695,9 @@ mod tests {
         // Ink/Stitch canvas_grid_origin = False: moved by a fraction of a cell,
         // the crosses move with the shape (cross-stitch fonts)
         let sq = |x: f64| vec![vec![pt(x, 0.0), pt(x + 10.0, 0.0), pt(x + 10.0, 10.0), pt(x, 10.0)]];
-        let pts = |x: f64, canvas: bool| -> Vec<Point> { cross_grid(&sq(x), 0.0, 2.0, 0.5, CrossKind::Cross, canvas, [0.0, 0.0], 2.5, None, 0).iter().flatten().map(|s| s.0 - pt(x, 0.0)).collect() };
+        let pts = |x: f64, canvas: bool| -> Vec<Point> {
+            cross_grid(&sq(x), 0.0, 2.0, 0.5, CrossKind::Cross, canvas, [0.0, 0.0], 2.5, None, 0).iter().flatten().map(|s| s.0 - pt(x, 0.0)).collect()
+        };
         let (a, b) = (pts(0.0, false), pts(0.7, false));
         assert_eq!(a.len(), b.len());
         assert!(a.iter().zip(&b).all(|(p, q)| p.dist(*q) < 1e-6), "shape grid: same stitches");
@@ -644,7 +705,11 @@ mod tests {
         let (c, d) = (pts(0.0, true), pts(0.7, true));
         assert!(c.len() != d.len() || c.iter().zip(&d).any(|(p, q)| p.dist(*q) > 0.1));
         // the shape grid starts at the shape's corner: 5 × 5 whole cells
-        let n = cross_grid(&sq(0.7), 0.0, 2.0, 0.5, CrossKind::Cross, false, [0.0, 0.0], 2.5, None, 0).iter().flatten().filter(|s| s.1 & flags::TRAVEL == 0).count();
+        let n = cross_grid(&sq(0.7), 0.0, 2.0, 0.5, CrossKind::Cross, false, [0.0, 0.0], 2.5, None, 0)
+            .iter()
+            .flatten()
+            .filter(|s| s.1 & flags::TRAVEL == 0)
+            .count();
         assert!(n > 0);
     }
 
@@ -670,7 +735,10 @@ mod cross_variant_tests {
     fn flipped_and_thread_count() {
         let sq = vec![vec![pt(0.0, 0.0), pt(10.0, 0.0), pt(10.0, 10.0), pt(0.0, 10.0)]];
         let run = |flip: bool, n: u32| cross_full(&sq, 0.0, 2.5, 0.5, CrossKind::Cross, true, [0.0, 0.0], flip, n, 2.5, None, 0);
-        let first_diag = |r: &Vec<Run>| { let p: Vec<Point> = r.iter().flatten().map(|x| x.0).collect(); p.windows(2).map(|w| w[1] - w[0]).find(|d| (d.x.abs() - d.y.abs()).abs() < 1e-6 && d.length() > 1e-6).unwrap() };
+        let first_diag = |r: &Vec<Run>| {
+            let p: Vec<Point> = r.iter().flatten().map(|x| x.0).collect();
+            p.windows(2).map(|w| w[1] - w[0]).find(|d| (d.x.abs() - d.y.abs()).abs() < 1e-6 && d.length() > 1e-6).unwrap()
+        };
         let (a, b) = (first_diag(&run(false, 1)), first_diag(&run(true, 1)));
         assert!(a.x * a.y > 0.0 && b.x * b.y < 0.0, "plain first, then flipped: {a:?} {b:?}");
         let count = |r: &Vec<Run>| r.iter().map(|x| x.len()).sum::<usize>();
@@ -687,7 +755,12 @@ mod cross_option_tests {
         vec![vec![pt(0.0, 0.0), pt(s, 0.0), pt(s, s), pt(0.0, s)]]
     }
     fn sewn(kind: CrossKind, o: &CrossOpts) -> Vec<Point> {
-        cross_full_ex(&sq(12.0), 0.0, 3.0, 0.5, kind, true, [0.0, 0.0], false, 1, 2.5, None, o, 0).into_iter().flatten().filter(|x| x.1 & flags::TRAVEL == 0).map(|x| x.0).collect()
+        cross_full_ex(&sq(12.0), 0.0, 3.0, 0.5, kind, true, [0.0, 0.0], false, 1, 2.5, None, o, 0)
+            .into_iter()
+            .flatten()
+            .filter(|x| x.1 & flags::TRAVEL == 0)
+            .map(|x| x.0)
+            .collect()
     }
 
     #[test]
@@ -721,8 +794,28 @@ mod cross_option_tests {
 
     #[test]
     fn long_cross_stitches_are_split() {
-        let big = |m: f64| cross_full_ex(&sq(30.0), 0.0, 10.0, 0.5, CrossKind::Cross, true, [0.0, 0.0], false, 1, 2.5, None, &CrossOpts { max_len: m, ..Default::default() }, 0);
-        let longest = |runs: Vec<Run>| runs.iter().flat_map(|r| r.windows(2).filter(|w| (w[0].1 | w[1].1) & flags::TRAVEL == 0).map(|w| w[0].0.dist(w[1].0)).collect::<Vec<_>>()).fold(0.0, f64::max);
+        let big = |m: f64| {
+            cross_full_ex(
+                &sq(30.0),
+                0.0,
+                10.0,
+                0.5,
+                CrossKind::Cross,
+                true,
+                [0.0, 0.0],
+                false,
+                1,
+                2.5,
+                None,
+                &CrossOpts { max_len: m, ..Default::default() },
+                0,
+            )
+        };
+        let longest = |runs: Vec<Run>| {
+            runs.iter()
+                .flat_map(|r| r.windows(2).filter(|w| (w[0].1 | w[1].1) & flags::TRAVEL == 0).map(|w| w[0].0.dist(w[1].0)).collect::<Vec<_>>())
+                .fold(0.0, f64::max)
+        };
         assert!(longest(big(0.0)) > 14.0);
         assert!(longest(big(5.0)) <= 5.0 + 1e-9);
     }

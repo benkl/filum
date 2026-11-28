@@ -135,12 +135,7 @@ mod tests {
 
     fn pattern() -> Pattern {
         Pattern {
-            stitches: vec![
-                Stitch::new(0.0, 0.0, 0),
-                Stitch::new(1.0, 0.0, cmd::COLOR_CHANGE),
-                Stitch::new(1.0, 0.0, 0),
-                Stitch::new(1.0, 0.0, cmd::END),
-            ],
+            stitches: vec![Stitch::new(0.0, 0.0, 0), Stitch::new(1.0, 0.0, cmd::COLOR_CHANGE), Stitch::new(1.0, 0.0, 0), Stitch::new(1.0, 0.0, cmd::END)],
             threads: vec![
                 Thread { rgb: [255, 0, 0], name: "Red".into(), code: "1147".into(), brand: "Madeira".into() },
                 Thread::from_rgb([0, 128, 255]),
@@ -188,11 +183,14 @@ mod tests {
 
     #[test]
     fn col_skips_bad_lines() {
-        let c = read_col(b"3
+        let c = read_col(
+            b"3
 0,1,2,3
 nonsense
 2,300,0,0
-").unwrap();
+",
+        )
+        .unwrap();
         assert_eq!(c.iter().map(|t| t.rgb).collect::<Vec<_>>(), vec![[1, 2, 3], [255, 0, 0]]);
         assert!(read_col(b"").is_err());
     }

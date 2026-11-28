@@ -26,11 +26,7 @@ impl RawPattern {
 
     fn push(&mut self, cmd: Cmd) {
         self.stitched |= cmd == Cmd::Stitch;
-        self.recs.push(Rec {
-            x: self.x,
-            y: self.y,
-            cmd,
-        });
+        self.recs.push(Rec { x: self.x, y: self.y, cmd });
     }
 
     pub fn stitch(&mut self, dx: i32, dy: i32) {
@@ -81,12 +77,7 @@ impl RawPattern {
     /// pystitch `interpolate_trims`: a run of jumps after stitching gets a trim inserted
     /// at its start once it reaches `count_max` jumps or exceeds `distance` (format units,
     /// per axis). With `clipping`, jump runs with zero net displacement are removed.
-    pub fn interpolate_trims(
-        &mut self,
-        count_max: Option<usize>,
-        distance: Option<i32>,
-        clipping: bool,
-    ) {
+    pub fn interpolate_trims(&mut self, count_max: Option<usize>, distance: Option<i32>, clipping: bool) {
         let s = &mut self.recs;
         let mut i: isize = -1;
         let mut ie: isize = s.len() as isize - 1;
@@ -131,19 +122,8 @@ impl RawPattern {
                 let by_count = count_max == Some(jump_count);
                 let by_dist = distance.is_some_and(|d| jdx.abs() > d || jdy.abs() > d);
                 if by_count || by_dist {
-                    let (px, py) = if jump_start == 0 {
-                        (0, 0)
-                    } else {
-                        (s[jump_start - 1].x, s[jump_start - 1].y)
-                    };
-                    s.insert(
-                        jump_start,
-                        Rec {
-                            x: px,
-                            y: py,
-                            cmd: Cmd::Trim,
-                        },
-                    );
+                    let (px, py) = if jump_start == 0 { (0, 0) } else { (s[jump_start - 1].x, s[jump_start - 1].y) };
+                    s.insert(jump_start, Rec { x: px, y: py, cmd: Cmd::Trim });
                     jump_start += 1;
                     i += 1;
                     ie += 1;
@@ -172,8 +152,7 @@ impl RawPattern {
                             return;
                         }
                         if let (Some(lc), true) = (last_change, thread_index != 0) {
-                            if self.threads[thread_index - 1].rgb == self.threads[thread_index].rgb
-                            {
+                            if self.threads[thread_index - 1].rgb == self.threads[thread_index].rgb {
                                 self.threads.remove(thread_index);
                                 self.recs[lc].cmd = Cmd::Stop;
                             } else {
@@ -220,19 +199,11 @@ impl RawPattern {
             _ => true,
         });
         let (ex, ey) = self.recs.last().map_or((0, 0), |r| (r.x, r.y));
-        self.recs.push(Rec {
-            x: ex,
-            y: ey,
-            cmd: Cmd::End,
-        });
+        self.recs.push(Rec { x: ex, y: ey, cmd: Cmd::End });
 
         let has_stitches = self.recs.iter().any(|r| r.cmd == Cmd::Stitch);
         if has_stitches {
-            let blocks = 1 + self
-                .recs
-                .iter()
-                .filter(|r| r.cmd == Cmd::ColorChange)
-                .count();
+            let blocks = 1 + self.recs.iter().filter(|r| r.cmd == Cmd::ColorChange).count();
             self.threads.truncate(blocks);
             while self.threads.len() < blocks {
                 let i = self.threads.len();
@@ -256,11 +227,7 @@ impl RawPattern {
                 },
             })
             .collect();
-        Pattern {
-            stitches,
-            threads: self.threads,
-            name: self.name,
-        }
+        Pattern { stitches, threads: self.threads, name: self.name }
     }
 }
 
@@ -296,10 +263,7 @@ mod tests {
         r.stitch(1, 1);
         let p = r.finish();
         let flags: Vec<u8> = p.stitches.iter().map(|s| s.flags).collect();
-        assert_eq!(
-            flags,
-            vec![0, cmd::TRIM, cmd::JUMP, cmd::COLOR_CHANGE, 0, cmd::END]
-        );
+        assert_eq!(flags, vec![0, cmd::TRIM, cmd::JUMP, cmd::COLOR_CHANGE, 0, cmd::END]);
         assert_eq!(p.threads.len(), 2);
     }
 }

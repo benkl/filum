@@ -54,12 +54,8 @@ fn as_paths(rings: &[Ring]) -> Vec<SubPath> {
 fn column(rings: &[Ring], p: SatinParams, extra_pull: f64, density: f64, outside_of: &[Ring], flip: bool) -> Vec<Run> {
     let mut runs = satin(&as_paths(rings), &p, extra_pull, density);
     if p.method == SatinMethod::EStitch {
-        let base_inside = runs
-            .iter()
-            .filter_map(|r| r.iter().find(|x| x.1 & flags::UNDERLAY == 0))
-            .next()
-            .map(|x| point_in_rings(x.0, outside_of))
-            .unwrap_or(false);
+        let base_inside =
+            runs.iter().filter_map(|r| r.iter().find(|x| x.1 & flags::UNDERLAY == 0)).next().map(|x| point_in_rings(x.0, outside_of)).unwrap_or(false);
         if base_inside != flip {
             runs = satin(&as_paths(rings), &SatinParams { swap_rails: !p.swap_rails, ..p }, extra_pull, density);
         }
@@ -126,7 +122,8 @@ pub fn applique(paths: &[SubPath], p: &AppliqueParams, extra_pull: f64, density:
 
     // 3. cover stitch over the raw edge
     if p.cover != CoverKind::None {
-        let cover = if p.cover_offset.abs() > 1e-6 { oriented(offset_rings(&rings, within(p.cover_offset, -MAX_WIDTH, MAX_WIDTH, 0.0))) } else { rings.clone() };
+        let cover =
+            if p.cover_offset.abs() > 1e-6 { oriented(offset_rings(&rings, within(p.cover_offset, -MAX_WIDTH, MAX_WIDTH, 0.0))) } else { rings.clone() };
         let cover = if cover.is_empty() { rings.clone() } else { cover };
         let sp = SatinParams {
             method: if p.cover == CoverKind::Satin { SatinMethod::Satin } else { SatinMethod::EStitch },
@@ -149,7 +146,15 @@ const MAX_WIDTH: f64 = 20.0;
 
 /// `v` brought into `lo..=hi` (`fallback` when it is not a number).
 fn within(v: f64, lo: f64, hi: f64, fallback: f64) -> f64 {
-    if v.is_finite() { v.clamp(lo, hi) } else if v.is_nan() { fallback } else if v > 0.0 { hi } else { lo }
+    if v.is_finite() {
+        v.clamp(lo, hi)
+    } else if v.is_nan() {
+        fallback
+    } else if v > 0.0 {
+        hi
+    } else {
+        lo
+    }
 }
 
 #[cfg(test)]
@@ -198,7 +203,11 @@ mod tests {
     fn inside_by(q: Point) -> f64 {
         let r = [vec![pt(0.0, 0.0), pt(30.0, 0.0), pt(30.0, 30.0), pt(0.0, 30.0)]];
         let d = crate::geom::dist_to_boundary(&r, q);
-        if point_in_rings(q, &r) { d } else { -d }
+        if point_in_rings(q, &r) {
+            d
+        } else {
+            -d
+        }
     }
 
     /// The runs between the stops: one group per step.

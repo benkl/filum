@@ -18,7 +18,18 @@ const check = (ok: boolean, msg: string) => {
 };
 const square = { closed: true, nodes: [{ p: [0, 0] }, { p: [10, 0] }, { p: [10, 10] }, { p: [0, 10] }] };
 const obj = (id: string, extra: Partial<DesignObject> = {}): DesignObject =>
-  ({ id, name: id, thread: "t1", visible: true, locked: false, paths: [square], stitch: { type: "fill", angle: 0, rowSpacing: 0.4, maxStitchLength: 3 }, trimAfter: false, stopAfter: false, ...extra }) as unknown as DesignObject;
+  ({
+    id,
+    name: id,
+    thread: "t1",
+    visible: true,
+    locked: false,
+    paths: [square],
+    stitch: { type: "fill", angle: 0, rowSpacing: 0.4, maxStitchLength: 3 },
+    trimAfter: false,
+    stopAfter: false,
+    ...extra,
+  }) as unknown as DesignObject;
 const fillWith = (k: string, v: unknown) => ({ type: "fill", angle: 0, rowSpacing: 0.4, maxStitchLength: 3, [k]: v }) as unknown as DesignObject["stitch"];
 
 // a gradient (its fill group G in group U), a colour blend and a lettering, copied
@@ -28,7 +39,10 @@ const text = obj("x", { text: { group: "T", thread: "t1", borderThread: "t1" } a
 const doc = { objects: [...layers, blend, text], groupParents: { G: "U" }, groupNames: { U: "Badge" } };
 const c = freshCopies(doc, doc.objects);
 const st = (o: DesignObject) => o.stitch as unknown as { gradient?: { group: string }; ramp?: { group: string } };
-check(c.objects.every((o, k) => o.id !== doc.objects[k].id), "every copy has a new id");
+check(
+  c.objects.every((o, k) => o.id !== doc.objects[k].id),
+  "every copy has a new id",
+);
 check(c.objects[0].group === c.objects[1].group && c.objects[0].group !== "G", "the gradient's layers share a new group");
 check(st(c.objects[0]).gradient!.group === c.objects[0].group, "the gradient's own group follows the layers' group");
 check(st(c.objects[2]).ramp!.group !== "B", "a colour blend copied is a blend of its own");
@@ -62,11 +76,13 @@ check(tartanLayers(cloned, tg!).length === tl.length, "a linked clone of a layer
 const rail = (y: number): SubPath => ({ closed: false, nodes: [{ p: [0, y] }, { p: [10, y] }, { p: [10, y + 5] }] });
 const satin = obj("s", { paths: [rail(0), rail(1)], stitch: { type: "satin", width: 2 } as unknown as DesignObject["stitch"] });
 const closed = toggleClosed({ objects: [satin] } as unknown as StitchDocument, [{ id: "s", sp: 0, ni: 0 }]);
-check(closed.objects[0].paths.every((sp) => sp.closed), "closing a satin rail closes the other one too");
+check(
+  closed.objects[0].paths.every((sp) => sp.closed),
+  "closing a satin rail closes the other one too",
+);
 
 // a calibration measurement far off is flagged (and the dialog won't save it)
 check(calibrate({ aAlong: 250, aAcross: 25, bAlong: 25, bAcross: 25 } as never).odd.length > 0, "a typo like 250 for 25 is flagged");
-
 
 // duplicate / Alt-drag / repeat: copies stay in a group copied only in part; a whole group is new, in the same place
 const nest = { objects: [obj("p", { group: "In" }), obj("q", { group: "In" }), obj("r", { group: "Out" })], groupParents: { In: "Out" } };
@@ -93,12 +109,33 @@ check(mergeThreads([madeira], [isacord]).add.length === 1, "the same colour from
 
 // satin rails: the engine's rungs (a reversed closed rail keeps node 0 with node 0)
 const ring = (pts: number[][]): SubPath => ({ closed: true, nodes: pts.map((p) => ({ p: p as [number, number] })) });
-const ra = ring([[0, 0], [10, 0], [10, 10], [0, 10]]);
-const rb = ring([[-1, -1], [-1, 11], [11, 11], [11, -1]]);
+const ra = ring([
+  [0, 0],
+  [10, 0],
+  [10, 10],
+  [0, 10],
+]);
+const rb = ring([
+  [-1, -1],
+  [-1, 11],
+  [11, 11],
+  [11, -1],
+]);
 const rm = railMap(ra, rb)!;
 check(rm.rev && rm.at(0) === 0 && rm.at(1) === 3 && rm.at(3) === 1, "a reversed closed rail pairs node i with node (n − i) mod n");
 const ol = (pts: number[][]): SubPath => ({ closed: false, nodes: pts.map((p) => ({ p: p as [number, number] })) });
-const om = railMap(ol([[0, 0], [10, 0], [20, 0]]), ol([[20, 2], [10, 2], [0, 2]]))!;
+const om = railMap(
+  ol([
+    [0, 0],
+    [10, 0],
+    [20, 0],
+  ]),
+  ol([
+    [20, 2],
+    [10, 2],
+    [0, 2],
+  ]),
+)!;
 check(om.rev && om.at(0) === 2 && om.seg(0) === 1, "a reversed open rail pairs node i with node n − 1 − i");
 
 // a design from a file or the autosave: what can't load is left out, the rest is safe
@@ -109,7 +146,8 @@ check(bad.doc.objects.length === 1 && bad.dropped === 2, "damaged and repeated o
 check(bad.doc.threads.length === 1 && bad.doc.objects[0].thread === bad.doc.threads[0].id, "objects without their thread get one");
 
 // a design from Filum 0.2.0: its embroidery-font spacing (mm) is marked for converting
-const lettering = (font: string, letterSpacing: number) => obj(`l-${font}`, { text: { group: "g", content: "Hi", font, size: 10, letterSpacing, lineSpacing: 1 } as unknown as DesignObject["text"] });
+const lettering = (font: string, letterSpacing: number) =>
+  obj(`l-${font}`, { text: { group: "g", content: "Hi", font, size: 10, letterSpacing, lineSpacing: 1 } as unknown as DesignObject["text"] });
 const old = checkDoc({ objects: [lettering("emb:amitaclo", 2), lettering("emb:other", 0), lettering("ttf:x", 2)], threads: [] }, base)!.doc;
 check(old.objects[0].text?.legacySpacing === true, "0.2.0 design: embroidery-font spacing marked as mm");
 check(!old.objects[1].text?.legacySpacing && !old.objects[2].text?.legacySpacing, "no spacing, or an outline font: nothing to convert");

@@ -51,9 +51,7 @@ const MODELS = [
   },
   {
     dir: "ocr",
-    files: [
-      { name: "eng.traineddata.gz", url: "https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng@1.0.0/4.0.0_best_int/eng.traineddata.gz" },
-    ],
+    files: [{ name: "eng.traineddata.gz", url: "https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng@1.0.0/4.0.0_best_int/eng.traineddata.gz" }],
   },
 ];
 
@@ -94,7 +92,8 @@ if (!fs.existsSync(dexOut) || fs.statSync(dexOut).mtimeMs < fs.statSync(dexIn).m
 
 // ONNX Runtime Web: the WASM backends (plain and SIMD-threaded)
 const ortDist = path.join(ui, "node_modules/onnxruntime-web/dist");
-for (const f of fs.readdirSync(ortDist).filter((f) => /^ort-wasm.*\.(wasm|mjs)$/.test(f) && !f.includes("jsep"))) copy(path.join(ortDist, f), path.join(pub, "ort", f));
+for (const f of fs.readdirSync(ortDist).filter((f) => /^ort-wasm.*\.(wasm|mjs)$/.test(f) && !f.includes("jsep")))
+  copy(path.join(ortDist, f), path.join(pub, "ort", f));
 
 // Tesseract: worker script and WASM cores
 copy(path.join(ui, "node_modules/tesseract.js/dist/worker.min.js"), path.join(pub, "ocr/worker.min.js"));
@@ -104,5 +103,7 @@ for (const f of fs.readdirSync(core).filter((f) => /^tesseract-core.*\.(js|wasm)
 zlib.gunzipSync(fs.readFileSync(path.join(pub, "ocr/eng.traineddata.gz")));
 
 const total = (dir) =>
-  fs.readdirSync(dir, { withFileTypes: true }).reduce((a, e) => a + (e.isDirectory() ? total(path.join(dir, e.name)) : fs.statSync(path.join(dir, e.name)).size), 0);
+  fs
+    .readdirSync(dir, { withFileTypes: true })
+    .reduce((a, e) => a + (e.isDirectory() ? total(path.join(dir, e.name)) : fs.statSync(path.join(dir, e.name)).size), 0);
 console.log(`Models and runtimes: ${(["models", "ort", "ocr"].reduce((a, d) => a + total(path.join(pub, d)), 0) / 1e6).toFixed(1)} MB`);

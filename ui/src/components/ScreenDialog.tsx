@@ -40,7 +40,12 @@ export function ScreenDialog({ onClose }: { onClose: () => void }) {
   for (let k = 0; k <= RULER_MM; k++) {
     const h = k % 10 === 0 ? 18 : k % 5 === 0 ? 12 : 7;
     ticks.push(<line key={k} x1={k * px} x2={k * px} y1={0} y2={h} />);
-    if (k % 10 === 0) ticks.push(<text key={`t${k}`} x={k * px} y={30}>{k === RULER_MM ? `${k / 10} cm` : k / 10}</text>);
+    if (k % 10 === 0)
+      ticks.push(
+        <text key={`t${k}`} x={k * px} y={30}>
+          {k === RULER_MM ? `${k / 10} cm` : k / 10}
+        </text>,
+      );
   }
 
   return (
@@ -102,7 +107,8 @@ export function ScreenDialog({ onClose }: { onClose: () => void }) {
           <span>long on my ruler</span>
         </div>
         <p className="hint">
-          {dpiOf(px)} dpi{validCalibration(saved) ? ` · saved: ${dpiOf(pxPerMm(saved))} dpi` : " · not calibrated yet: Filum assumes 96 dpi, like the browser"}. Kept for this computer; calibrate again after changing the screen.
+          {dpiOf(px)} dpi{validCalibration(saved) ? ` · saved: ${dpiOf(pxPerMm(saved))} dpi` : " · not calibrated yet: Filum assumes 96 dpi, like the browser"}.
+          Kept for this computer; calibrate again after changing the screen.
         </p>
       </div>
     </Dialog>

@@ -18,12 +18,39 @@ const sq: [number, number][] = [
 const parts = segmentLine(sq, CUTWORK_SECTORS);
 ok(parts.length === 4 && parts.every(([n]) => n === 1 || n === 3), `a square: four pieces for two needles (${parts.map((p) => p[0]).join(",")})`);
 // a diagonal at 45°: needle 3 (22..68)
-ok(segmentLine([[0, 0], [10, 10]], CUTWORK_SECTORS)[0][0] === 2, "45° goes to needle 3");
+ok(
+  segmentLine(
+    [
+      [0, 0],
+      [10, 10],
+    ],
+    CUTWORK_SECTORS,
+  )[0][0] === 2,
+  "45° goes to needle 3",
+);
 // overlapping ranges: 112/113 belong to needles 1 and 4
-const steep = segmentLine([[0, 0], [-4, 10]], CUTWORK_SECTORS).map((p) => p[0]).sort();
+const steep = segmentLine(
+  [
+    [0, 0],
+    [-4, 10],
+  ],
+  CUTWORK_SECTORS,
+)
+  .map((p) => p[0])
+  .sort();
 ok(steep.length === 2, `an edge angle is cut by both needles (${steep})`);
 
-const line: DesignObject = { id: "l", name: "Cut", thread: "t", visible: true, locked: false, paths: [{ closed: true, nodes: sq.slice(0, 4).map((p) => ({ p })) }], stitch: { type: "running", length: 2.5, tolerance: 0.2, repeats: 1, beanRepeats: 0 }, trimAfter: false, stopAfter: false };
+const line: DesignObject = {
+  id: "l",
+  name: "Cut",
+  thread: "t",
+  visible: true,
+  locked: false,
+  paths: [{ closed: true, nodes: sq.slice(0, 4).map((p) => ({ p })) }],
+  stitch: { type: "running", length: 2.5, tolerance: 0.2, repeats: 1, beanRepeats: 0 },
+  trimAfter: false,
+  stopAfter: false,
+};
 const d = cutworkSegmentation({ objects: [line], threads: [] } as unknown as StitchDocument, ["l"]);
 ok(d.objects.length === 4 && d.threads.length === 2, `pieces in a thread per needle (${d.objects.length} pieces, ${d.threads.length} threads)`);
 const needles = d.objects.map((o) => (o.stitch.type === "running" ? o.stitch.cutworkNeedle : 0));

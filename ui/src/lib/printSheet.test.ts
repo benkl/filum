@@ -34,7 +34,20 @@ const plan: PlanData = {
     { id: "a", name: "Red <b>", color: "#ff0000", brand: "Madeira", code: "1147" },
     { id: "b", name: "White", color: "#ffffff", brand: "", code: "" },
   ],
-  stats: { stitches: 6, jumps: 3, trims: 2, colorChanges: 1, stops: 1, width: 10, height: 9, threadM: 0.03, bobbinM: 0.02, seconds: 1, threadPerColorM: [0.02, 0.01], stitchesPerColor: [4, 2] },
+  stats: {
+    stitches: 6,
+    jumps: 3,
+    trims: 2,
+    colorChanges: 1,
+    stops: 1,
+    width: 10,
+    height: 9,
+    threadM: 0.03,
+    bobbinM: 0.02,
+    seconds: 1,
+    threadPerColorM: [0.02, 0.01],
+    stitchesPerColor: [4, 2],
+  },
 };
 const b = blockStats(plan);
 check(b.length === 2, "two colour blocks");
@@ -45,13 +58,26 @@ const s = { ...PRINT_DEFAULTS, spm: 600, timeTrim: 10, timeColorChange: 30, time
 check(Math.abs(jobSeconds(b, s) - 110.6) < 1e-9, `job time ${jobSeconds(b, s)}`);
 check(duration(3725) === "1 h 02 min" && duration(75) === "1 min 15 s" && duration(9) === "9 s", "durations");
 
-const input = { name: "Rose", width: 10, height: 9, blocks: b, threadM: 0.03, bobbinM: 0.02, overview: "data:,", blockPictures: ["data:,", "data:,"], materials: [] };
+const input = {
+  name: "Rose",
+  width: 10,
+  height: 9,
+  blocks: b,
+  threadM: 0.03,
+  bobbinM: 0.02,
+  overview: "data:,",
+  blockPictures: ["data:,", "data:,"],
+  materials: [],
+};
 const job = { title: "", client: "ACME & Co", purchaseOrder: "", notes: ["use the <b>red</b>", ""], date: new Date(2026, 0, 2) };
 const html = sheetHtml(input, job, s);
 check((html.match(/<section class="page/g) ?? []).length === 2, "operator overview and detailed view by default");
 check(html.includes("ACME &amp; Co") && html.includes("use the &lt;b&gt;red&lt;/b&gt;") && html.includes("Red &lt;b&gt;"), "user text escaped");
 check(html.includes("<h1>Rose</h1>"), "the design name as title");
-const all = sheetHtml(input, job, { ...s, views: { clientOverview: true, clientDetailed: true, operatorOverview: true, operatorDetailed: true, pattern: true, info: true } });
+const all = sheetHtml(input, job, {
+  ...s,
+  views: { clientOverview: true, clientDetailed: true, operatorOverview: true, operatorDetailed: true, pattern: true, info: true },
+});
 check((all.match(/<section class="page/g) ?? []).length === 1 + 2 + 1 + 1 + 1 + 1, "every layout: one detailed page per colour");
 check(all.includes("size: A4") || all.includes("size: letter"), "paper size");
 

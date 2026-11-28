@@ -167,11 +167,7 @@ pub fn inv_bilinear(p: Point, a: Point, b: Point, c: Point, d: Point) -> Option<
         vec![(-k1 - s) / (2.0 * k2), (-k1 + s) / (2.0 * k2)]
     };
     let out = |u: f64, v: f64| (-u).max(u - 1.0).max(-v).max(v - 1.0).max(0.0);
-    cands
-        .into_iter()
-        .map(|v| (u_of(v), v))
-        .filter(|(u, v)| u.is_finite() && v.is_finite())
-        .min_by(|x, y| out(x.0, x.1).total_cmp(&out(y.0, y.1)))
+    cands.into_iter().map(|v| (u_of(v), v)).filter(|(u, v)| u.is_finite() && v.is_finite()).min_by(|x, y| out(x.0, x.1).total_cmp(&out(y.0, y.1)))
 }
 
 fn catmull_rom(t: f64) -> [f64; 4] {
@@ -192,7 +188,8 @@ fn mesh_weights(g: &GradientParams, m: &crate::model::GradientMesh, p: Point) ->
         for c in 0..cols - 1 {
             let q = [at(r, c), at(r, c + 1), at(r + 1, c + 1), at(r + 1, c)];
             let eps = 1e-6;
-            if q.iter().all(|x| x.x < p.x - eps) || q.iter().all(|x| x.x > p.x + eps) || q.iter().all(|x| x.y < p.y - eps) || q.iter().all(|x| x.y > p.y + eps) {
+            if q.iter().all(|x| x.x < p.x - eps) || q.iter().all(|x| x.x > p.x + eps) || q.iter().all(|x| x.y < p.y - eps) || q.iter().all(|x| x.y > p.y + eps)
+            {
                 continue;
             }
             let Some((u, v)) = inv_bilinear(p, q[0], q[1], q[2], q[3]) else { continue };
@@ -280,7 +277,8 @@ const BAYER8: [[u8; 8]; 8] = [
 ];
 
 fn hash01(a: i64, b: i64, seed: u32) -> f64 {
-    let mut x = (a as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ (b as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F) ^ (seed as u64).wrapping_mul(0x1656_67B1_9E37_79F9);
+    let mut x =
+        (a as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ (b as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F) ^ (seed as u64).wrapping_mul(0x1656_67B1_9E37_79F9);
     x ^= x >> 33;
     x = x.wrapping_mul(0xFF51_AFD7_ED55_8CCD);
     x ^= x >> 33;
@@ -603,9 +601,7 @@ mod tests {
     fn layers_tile_every_row() {
         let sq: Vec<Ring> = vec![vec![pt(0.0, 0.0), pt(40.0, 0.0), pt(40.0, 20.0), pt(0.0, 20.0)]];
         for dither in [DitherMethod::Diffusion, DitherMethod::Rows, DitherMethod::Ordered, DitherMethod::Noise, DitherMethod::Bands] {
-            let masks: Vec<LayerMask> = (0..3)
-                .map(|layer| LayerMask::new(&GradientParams { layer, ..grad(3, dither) }, &sq, 0.0, 0.4))
-                .collect();
+            let masks: Vec<LayerMask> = (0..3).map(|layer| LayerMask::new(&GradientParams { layer, ..grad(3, dither) }, &sq, 0.0, 0.4)).collect();
             for r in 0..50 {
                 let y = (r as f64 + 0.5) * 0.4;
                 let mut cover = 0.0;
@@ -642,7 +638,13 @@ mod tests {
         let mut nodes = Vec::new();
         for r in 0..3 {
             for c in 0..3 {
-                let col = if r == 1 && c == 1 { 2 } else if c == 0 { 0 } else { 1 };
+                let col = if r == 1 && c == 1 {
+                    2
+                } else if c == 0 {
+                    0
+                } else {
+                    1
+                };
                 nodes.push(MeshNode { p: [c as f64 * 20.0, r as f64 * 10.0], c: col });
             }
         }
@@ -737,11 +739,7 @@ mod tests {
         assert!(total < n_plain as f64 * 2.1 && total > n_plain as f64 * 0.9, "{n0}+{n1} vs {n_plain}");
         assert!(x0 < 17.0 && x1 > 23.0, "layer centres {x0:.1} {x1:.1}");
         // rows perpendicular to the gradient + row interleaving: whole rows, almost no extra stitches
-        let rows = |layer| FillParams {
-            angle: 90.0,
-            gradient: Some(GradientParams { layer, ..grad(2, DitherMethod::Rows) }),
-            ..plain.clone()
-        };
+        let rows = |layer| FillParams { angle: 90.0, gradient: Some(GradientParams { layer, ..grad(2, DitherMethod::Rows) }), ..plain.clone() };
         let plain90 = count(&FillParams { angle: 90.0, ..plain.clone() }).0 as f64;
         let (r0, _) = count(&rows(0));
         let (r1, _) = count(&rows(1));

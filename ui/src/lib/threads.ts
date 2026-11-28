@@ -61,7 +61,13 @@ export interface ChartMeta {
   /** Not bundled: comes in this download pack (Preferences ▸ Downloads). */
   download?: string;
 }
-export const SOURCE_LABEL: Record<ChartSource, string> = { mine: "My threads", inkstitch: "Ink/Stitch", embroiderynerd: "Embroidery Nerds", madeira: "Madeira colour card", custom: "Installed" };
+export const SOURCE_LABEL: Record<ChartSource, string> = {
+  mine: "My threads",
+  inkstitch: "Ink/Stitch",
+  embroiderynerd: "Embroidery Nerds",
+  madeira: "Madeira colour card",
+  custom: "Installed",
+};
 
 // until the index has loaded
 const BUILTIN: ChartMeta[] = [
@@ -286,7 +292,11 @@ export async function installPalette(): Promise<ChartMeta | null> {
   const name = paletteBrand(pal.name || f.name) || "Palette";
   // unique: a name in another script gives no letters for an id, two names can give the same
   const id = chartIdFor(name, customCharts());
-  const entry: CustomChart = { id, name, entries: pal.entries.map((e) => ({ name: e.name || rgbToHex(e.rgb).toUpperCase(), code: e.code, color: rgbToHex(e.rgb) })) };
+  const entry: CustomChart = {
+    id,
+    name,
+    entries: pal.entries.map((e) => ({ name: e.name || rgbToHex(e.rgb).toUpperCase(), code: e.code, color: rgbToHex(e.rgb) })),
+  };
   safeSetItem(CUSTOM_KEY, JSON.stringify([entry, ...customCharts().filter((c) => c.id !== id)]));
   chartCache.delete(id);
   setCharts([...localMeta(), ...charts.filter((c) => c.source !== "custom" && c.source !== "mine")]);
@@ -419,7 +429,10 @@ export function setMergeTolerance(v: number) {
 /** Merge similar colours at the remembered tolerance, and say what happened. */
 export function mergeSimilarColours() {
   const n = mergeSimilar(mergeTolerance());
-  store().toast(n ? `${n} similar thread${n === 1 ? "" : "s"} now share a spool — Revert undoes it` : `No threads closer than ΔE ${mergeTolerance()}`, n ? "success" : "info");
+  store().toast(
+    n ? `${n} similar thread${n === 1 ? "" : "s"} now share a spool — Revert undoes it` : `No threads closer than ΔE ${mergeTolerance()}`,
+    n ? "success" : "info",
+  );
 }
 
 export function mergeSimilar(threshold: number): number {
@@ -487,7 +500,11 @@ export function myLines(list: OwnedThread[] = myThreads()): { brand: string; cou
     by.set(b, lines);
   }
   return [...by]
-    .map(([brand, lines]) => ({ brand, count: [...lines.values()].reduce((a, c) => a + c, 0), lines: [...lines].map(([line, count]) => ({ line, count })).sort((a, c) => a.line.localeCompare(c.line)) }))
+    .map(([brand, lines]) => ({
+      brand,
+      count: [...lines.values()].reduce((a, c) => a + c, 0),
+      lines: [...lines].map(([line, count]) => ({ line, count })).sort((a, c) => a.line.localeCompare(c.line)),
+    }))
     .sort((a, c) => a.brand.localeCompare(c.brand));
 }
 
@@ -546,14 +563,18 @@ export function toggleLock(id: string) {
 
 /** Threads whose objects touch (bounding boxes overlap, 0.5 mm slack). */
 export function threadNeighbours(d: StitchDocument): [string, string][] {
-  const boxes = d.objects.filter((o) => o.visible).map((o) => [o.thread, objectBounds(o)] as const).filter((x) => !!x[1]);
+  const boxes = d.objects
+    .filter((o) => o.visible)
+    .map((o) => [o.thread, objectBounds(o)] as const)
+    .filter((x) => !!x[1]);
   const out = new Set<string>();
   for (let i = 0; i < boxes.length; i++)
     for (let j = i + 1; j < boxes.length; j++) {
       const [ta, a] = boxes[i];
       const [tb, b] = boxes[j];
       if (ta === tb || !a || !b) continue;
-      if (a.x - 0.5 <= b.x + b.w && b.x - 0.5 <= a.x + a.w && a.y - 0.5 <= b.y + b.h && b.y - 0.5 <= a.y + a.h) out.add(ta < tb ? ta + "|" + tb : tb + "|" + ta);
+      if (a.x - 0.5 <= b.x + b.w && b.x - 0.5 <= a.x + a.w && a.y - 0.5 <= b.y + b.h && b.y - 0.5 <= a.y + a.h)
+        out.add(ta < tb ? ta + "|" + tb : tb + "|" + ta);
     }
   return [...out].map((k) => k.split("|") as [string, string]);
 }
@@ -586,7 +607,10 @@ async function planFit(target: FitTarget, opts: { only?: string[]; match?: Match
 }
 
 /** What a fit would give (nothing changes): quality, spools, merges. */
-export async function previewFit(target: FitTarget, match: MatchOptions): Promise<{ mean: number; worst: number; spools: number; merged: number; poor: number } | null> {
+export async function previewFit(
+  target: FitTarget,
+  match: MatchOptions,
+): Promise<{ mean: number; worst: number; spools: number; merged: number; poor: number } | null> {
   const planned = await planFit(target, { match });
   if (!planned) return null;
   const ds = [...planned.result.pick.values()].map((c) => c.d);
@@ -636,7 +660,11 @@ export async function fitThreads(target: FitTarget, opts: { farDelta?: number; o
     seen.add(k);
   }
   store().commit((x) => ({ ...x, threads, threadSources: sources }));
-  const nameOf = (id: string) => needOf(d, d.threads.find((t) => t.id === id)!).name;
+  const nameOf = (id: string) =>
+    needOf(
+      d,
+      d.threads.find((t) => t.id === id)!,
+    ).name;
   return {
     target: fitTargetLabel(target),
     fitted: deltas.length,

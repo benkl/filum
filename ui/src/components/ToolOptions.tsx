@@ -1,7 +1,21 @@
 // Context bar while a drawing tool is active: what the tool will create and
 // how it behaves.
 
-import { AlignHorizontalJustifyCenter, Combine, AlignVerticalJustifyCenter, CircleDashed, Hexagon, Link2, PenLine, PenTool, Scissors, Spline, Square, Star, Trash2 } from "lucide-react";
+import {
+  AlignHorizontalJustifyCenter,
+  Combine,
+  AlignVerticalJustifyCenter,
+  CircleDashed,
+  Hexagon,
+  Link2,
+  PenLine,
+  PenTool,
+  Scissors,
+  Spline,
+  Square,
+  Star,
+  Trash2,
+} from "lucide-react";
 import { MoveHorizontal } from "lucide-react";
 import { GradientTool, StitchAngle, StitchLength, StitchSatin } from "../icons/stitch";
 import { alignSelected, breakNodes, deleteNodes, joinSelected, nodeType, segmentType, toggleClosedSelected } from "../lib/nodeActions";
@@ -50,7 +64,10 @@ export function ToolOptionsBar({ tool }: { tool: DrawTool }) {
           ]}
           onChange={(v) => set("pen", { closed: v })}
         />
-        <span className="ctx-help">Drag for curves · Alt breaks handles · Space moves the point · points snap to existing points (Ctrl: off) · ending on another path's end joins them · Alt-click a point to delete</span>
+        <span className="ctx-help">
+          Drag for curves · Alt breaks handles · Space moves the point · points snap to existing points (Ctrl: off) · ending on another path's end joins them ·
+          Alt-click a point to delete
+        </span>
       </div>
     );
   if (tool === "freehand")
@@ -79,14 +96,7 @@ export function ToolOptionsBar({ tool }: { tool: DrawTool }) {
         )}
         <label className="ctx-field ctx-slider" title="Stabiliser: the line trails the pointer and is fitted with smooth curves">
           Smoothing
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={opts.freehand.smoothing}
-            onChange={(e) => set("freehand", { smoothing: +e.target.value })}
-          />
+          <input type="range" min={0} max={1} step={0.05} value={opts.freehand.smoothing} onChange={(e) => set("freehand", { smoothing: +e.target.value })} />
           <span className="ctx-val">{Math.round(opts.freehand.smoothing * 100)}%</span>
         </label>
         <label className="ctx-field" title="Curve fitting: turns sharper than this stay corners">
@@ -121,7 +131,17 @@ export function ToolOptionsBar({ tool }: { tool: DrawTool }) {
         <span className="sr-only">Width of the next point (scroll or [ ])</span>
         <Num value={opts.satin.width} unit="mm" step={0.1} min={0.3} max={15} onChange={(v) => set("satin", { width: v })} />
       </label>
-      <Seg label="New satins" value={!!opts.satin.twoSides} options={[[false, "Centre line", "One line with a width: the column keeps its width (a varying width still gives two sides)"], [true, "Two sides", "Two sides: shape each side on its own with the node tool (A)"]] as const} onChange={(v) => set("satin", { twoSides: v })} />
+      <Seg
+        label="New satins"
+        value={!!opts.satin.twoSides}
+        options={
+          [
+            [false, "Centre line", "One line with a width: the column keeps its width (a varying width still gives two sides)"],
+            [true, "Two sides", "Two sides: shape each side on its own with the node tool (A)"],
+          ] as const
+        }
+        onChange={(v) => set("satin", { twoSides: v })}
+      />
       <span className="ctx-help">
         Drag for curves · scroll over a point to change its width · click a segment to add a point · Alt-click to delete · click the first point to close
       </span>
@@ -140,11 +160,18 @@ export function GradientToolBar() {
   const gmode = useStore((s) => s.toolOptions.gradient.mode) ?? "colour";
   const ramped = selectedRamp();
   const modeSeg = (
-    <Seg label="Gradient type" value={gmode} options={[
+    <Seg
+      label="Gradient type"
+      value={gmode}
+      options={
+        [
           ["colour", "Colour", "Multi-colour gradients with dithering (linear, radial, mesh, points)"],
           ["density", "Density", "Gradient fill: one colour, dense rows opening up along the drag"],
           ["blend", "Blend", "Colour blending: this colour fades out while a second fades in"],
-        ] as const} onChange={(id) => setOpts("gradient", { mode: id })} />
+        ] as const
+      }
+      onChange={(id) => setOpts("gradient", { mode: id })}
+    />
   );
   if (ramped || gmode !== "colour") return <RampToolBar modeSeg={modeSeg} />;
   const help =
@@ -415,7 +442,9 @@ export function GuidesToolBar() {
         <StitchAngle size={13} /> Stitch direction
       </span>
       <GuideActions compact />
-      <span className="ctx-help">Drag across a satin to guide its stitch angle · drag an end to turn it · click a line, then Delete (or Alt-click) to delete it · Shift: 15° steps</span>
+      <span className="ctx-help">
+        Drag across a satin to guide its stitch angle · drag an end to turn it · click a line, then Delete (or Alt-click) to delete it · Shift: 15° steps
+      </span>
     </div>
   );
 }
@@ -439,7 +468,17 @@ export function BuilderToolBar() {
         <Combine size={14} />
         <span>{n ? `Shape builder · ${n} shape${n > 1 ? "s" : ""}` : "Shape builder"}</span>
       </span>
-      <Seg label="Drag across regions to" value={mode} options={[["merge", "Merge", "Drag across regions to merge them into one shape"], ["delete", "Delete", "Drag across regions to delete them (or hold Alt)"]] as const} onChange={(v) => set("builder", { mode: v })} />
+      <Seg
+        label="Drag across regions to"
+        value={mode}
+        options={
+          [
+            ["merge", "Merge", "Drag across regions to merge them into one shape"],
+            ["delete", "Delete", "Drag across regions to delete them (or hold Alt)"],
+          ] as const
+        }
+        onChange={(v) => set("builder", { mode: v })}
+      />
       <div className="vsep" />
       <button className="icon-btn" title="Divide: every overlap region becomes its own shape" disabled={n < 1} onClick={() => void divideSelection()}>
         <BoolIcon op="divide" />

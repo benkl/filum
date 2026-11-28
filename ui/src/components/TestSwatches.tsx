@@ -39,7 +39,8 @@ export function TestSwatchesDialog({ onClose }: { onClose: () => void }) {
   const o = doc.objects.find((x) => selection.includes(x.id));
   // the width only shapes a satin drawn as one centre line (or several, each
   // its own column); two rails set it themselves
-  const singleLine = !!o && o.stitch.type === "satin" && (o.paths.filter((sp) => sp.nodes.length >= 2).length === 1 || !!(o.stitch as { multi?: boolean }).multi);
+  const singleLine =
+    !!o && o.stitch.type === "satin" && (o.paths.filter((sp) => sp.nodes.length >= 2).length === 1 || !!(o.stitch as { multi?: boolean }).multi);
   const params = o ? (PARAMS[o.stitch.type] ?? []).filter((x) => x.key !== "width" || singleLine) : [];
   const [key, setKey] = useState(params[0]?.key ?? "");
   const p = params.find((x) => x.key === key) ?? params[0];
@@ -61,7 +62,12 @@ export function TestSwatchesDialog({ onClose }: { onClose: () => void }) {
       const dx = (i % cols) * (b.w + gap);
       const dy = Math.floor(i / cols) * (b.h + gap);
       const moved = transformObject(o, translateMat(dx, dy));
-      return { ...moved, id: uid(), name: `${o.name} · ${p.label.toLowerCase()} ${v}${p.unit}`, stitch: { ...o.stitch, [p.key]: +(v / scale).toFixed(6) } as DesignObject["stitch"] };
+      return {
+        ...moved,
+        id: uid(),
+        name: `${o.name} · ${p.label.toLowerCase()} ${v}${p.unit}`,
+        stitch: { ...o.stitch, [p.key]: +(v / scale).toFixed(6) } as DesignObject["stitch"],
+      };
     });
     const s = useStore.getState();
     // the swatches take the original's place in the sewing order
@@ -89,7 +95,9 @@ export function TestSwatchesDialog({ onClose }: { onClose: () => void }) {
         <p className="hint">Select a running stitch, satin or fill to make swatches of.</p>
       ) : (
         <>
-          <p className="hint">Copies of “{o.name}” in a grid, one setting stepped from copy to copy and named after its value — sew them once and keep the best.</p>
+          <p className="hint">
+            Copies of “{o.name}” in a grid, one setting stepped from copy to copy and named after its value — sew them once and keep the best.
+          </p>
           <Row label="Setting">
             <select className="select" style={{ width: "100%" }} value={p.key} onChange={(e) => (setKey(e.target.value), setStart(null), setInc(null))}>
               {params.map((x) => (

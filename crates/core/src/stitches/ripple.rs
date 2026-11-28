@@ -670,10 +670,14 @@ pub fn ripple_stitches(paths: &[SubPath], p: &RippleParams, run: &RunningParams)
                 group.push(g);
             }
             if p.grid_first {
-                group = group.into_iter().rev().map(|mut s| {
-                    s.reverse();
-                    s
-                }).collect();
+                group = group
+                    .into_iter()
+                    .rev()
+                    .map(|mut s| {
+                        s.reverse();
+                        s
+                    })
+                    .collect();
             }
         }
         out.extend(group);
@@ -694,7 +698,10 @@ mod tests {
     fn the_default_target_is_the_convex_hull_centroid() {
         // Ink/Stitch `shape.convex_hull.centroid`: a "C" ends in the middle of
         // its hull (50, 50), not at its area centroid (further left)
-        let c = SubPath::polyline(&[pt(30.0, 30.0), pt(70.0, 30.0), pt(70.0, 40.0), pt(40.0, 40.0), pt(40.0, 60.0), pt(70.0, 60.0), pt(70.0, 70.0), pt(30.0, 70.0)], true);
+        let c = SubPath::polyline(
+            &[pt(30.0, 30.0), pt(70.0, 30.0), pt(70.0, 40.0), pt(40.0, 40.0), pt(40.0, 60.0), pt(70.0, 60.0), pt(70.0, 70.0), pt(30.0, 70.0)],
+            true,
+        );
         let s = &ripple_stitches(&[c], &RippleParams { lines: 6, ..Default::default() }, &run())[0];
         assert!(s.last().unwrap().dist(pt(50.0, 50.0)) < 0.3, "{:?}", s.last());
         // an open "^": fanned towards its hull's centroid (10, 10/3), not the
@@ -754,7 +761,13 @@ mod tests {
     fn skip_min_distance_exponent_and_grid() {
         let line = SubPath::polyline(&[pt(0.0, 0.0), pt(20.0, 0.0)], false);
         let base = RippleParams { lines: 6, spacing: 2.0, ..Default::default() };
-        let rows = |p: &RippleParams| ripple_stitches(std::slice::from_ref(&line), p, &run())[0].iter().map(|q| (q.y * 100.0).round() as i64).collect::<std::collections::BTreeSet<_>>().len();
+        let rows = |p: &RippleParams| {
+            ripple_stitches(std::slice::from_ref(&line), p, &run())[0]
+                .iter()
+                .map(|q| (q.y * 100.0).round() as i64)
+                .collect::<std::collections::BTreeSet<_>>()
+                .len()
+        };
         assert_eq!(rows(&base), 6);
         assert_eq!(rows(&RippleParams { skip_start: 1, skip_end: 2, ..base.clone() }), 3, "skipped lines");
         let fan = |p: &RippleParams| ripple_stitches(std::slice::from_ref(&line), p, &run());
@@ -790,7 +803,8 @@ mod tests {
         let line = SubPath::polyline(&[pt(0.0, 0.0), pt(20.0, 0.0)], false);
         let p = RippleParams { lines: 4, spacing: 2.0, staggers: 4, ..Default::default() };
         let s = &ripple_stitches(&[line], &p, &run())[0];
-        let xs = |y: f64| -> Vec<i64> { s.iter().filter(|q| (q.y - y).abs() < 1e-6 && q.x > 0.1 && q.x < 19.9).map(|q| (q.x * 100.0).round() as i64).collect() };
+        let xs =
+            |y: f64| -> Vec<i64> { s.iter().filter(|q| (q.y - y).abs() < 1e-6 && q.x > 0.1 && q.x < 19.9).map(|q| (q.x * 100.0).round() as i64).collect() };
         assert_ne!(xs(0.0).first(), xs(4.0).first(), "rows staggered");
     }
 }

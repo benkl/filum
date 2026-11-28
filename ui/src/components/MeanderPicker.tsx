@@ -35,7 +35,18 @@ const A = 2.5;
 const H = (A * Math.sqrt(3)) / 2;
 type Lattice = MeanderTile & { pattern: MeanderPattern; title: string };
 const LATTICES: Lattice[] = [
-  { pattern: "square", id: "square", name: "Square", title: "Right-angle turns — classic meander", shift0: [A, 0], shift1: [0, A], lines: [[0, 0, A, 0], [0, 0, 0, A]] },
+  {
+    pattern: "square",
+    id: "square",
+    name: "Square",
+    title: "Right-angle turns — classic meander",
+    shift0: [A, 0],
+    shift1: [0, A],
+    lines: [
+      [0, 0, A, 0],
+      [0, 0, 0, A],
+    ],
+  },
   {
     pattern: "triangle",
     id: "triangle",
@@ -43,7 +54,11 @@ const LATTICES: Lattice[] = [
     title: "Angular, zig-zagging walk",
     shift0: [A, 0],
     shift1: [A / 2, H],
-    lines: [[0, 0, A, 0], [0, 0, A / 2, H], [A, 0, A / 2, H]],
+    lines: [
+      [0, 0, A, 0],
+      [0, 0, A / 2, H],
+      [A, 0, A / 2, H],
+    ],
   },
   {
     pattern: "hexagon",
@@ -52,7 +67,11 @@ const LATTICES: Lattice[] = [
     title: "Organic, cell-like walk",
     shift0: [Math.sqrt(3) * A, 0],
     shift1: [(Math.sqrt(3) * A) / 2, 1.5 * A],
-    lines: [[0, 0, 0, A], [0, 0, (-Math.sqrt(3) * A) / 2, -0.5 * A], [0, 0, (Math.sqrt(3) * A) / 2, -0.5 * A]],
+    lines: [
+      [0, 0, 0, A],
+      [0, 0, (-Math.sqrt(3) * A) / 2, -0.5 * A],
+      [0, 0, (Math.sqrt(3) * A) / 2, -0.5 * A],
+    ],
   },
 ];
 
@@ -60,7 +79,11 @@ const LATTICES: Lattice[] = [
 export function TilePreview({ tile, size = 44 }: { tile: MeanderTile; size?: number }) {
   const d = useMemo(() => {
     const [a, b] = [tile.shift0, tile.shift1];
-    const span = Math.max(Math.hypot(...a), Math.hypot(...b), ...tile.lines.flatMap(([x1, y1, x2, y2]) => [Math.abs(x1), Math.abs(y1), Math.abs(x2), Math.abs(y2)]));
+    const span = Math.max(
+      Math.hypot(...a),
+      Math.hypot(...b),
+      ...tile.lines.flatMap(([x1, y1, x2, y2]) => [Math.abs(x1), Math.abs(y1), Math.abs(x2), Math.abs(y2)]),
+    );
     const half = span * 1.25;
     const parts: string[] = [];
     const reach = Math.ceil((half * 2) / Math.max(1e-6, Math.min(Math.hypot(...a), Math.hypot(...b)))) + 2;
@@ -69,7 +92,8 @@ export function TilePreview({ tile, size = 44 }: { tile: MeanderTile; size?: num
         const ox = i * a[0] + j * b[0];
         const oy = i * a[1] + j * b[1];
         if (Math.abs(ox) > half + span || Math.abs(oy) > half + span) continue;
-        for (const [x1, y1, x2, y2] of tile.lines) parts.push(`M${(x1 + ox).toFixed(2)} ${(y1 + oy).toFixed(2)}L${(x2 + ox).toFixed(2)} ${(y2 + oy).toFixed(2)}`);
+        for (const [x1, y1, x2, y2] of tile.lines)
+          parts.push(`M${(x1 + ox).toFixed(2)} ${(y1 + oy).toFixed(2)}L${(x2 + ox).toFixed(2)} ${(y2 + oy).toFixed(2)}`);
       }
     return { path: parts.join(""), half };
   }, [tile]);
@@ -81,14 +105,28 @@ export function TilePreview({ tile, size = 44 }: { tile: MeanderTile; size?: num
 }
 
 /** Pick the meander pattern: a lattice (`tile` undefined) or an Ink/Stitch tile. */
-export function MeanderPicker({ pattern, tile, onPick }: { pattern?: MeanderPattern; tile?: string; onPick: (p: { pattern?: MeanderPattern; tile?: string }) => void }) {
+export function MeanderPicker({
+  pattern,
+  tile,
+  onPick,
+}: {
+  pattern?: MeanderPattern;
+  tile?: string;
+  onPick: (p: { pattern?: MeanderPattern; tile?: string }) => void;
+}) {
   const tiles = useTiles();
   const [open, setOpen] = useState(false);
   const btn = useRef<HTMLButtonElement>(null);
   const cur: MeanderTile | undefined = tile ? tiles?.find((t) => t.id === tile) : LATTICES.find((l) => l.pattern === (pattern ?? "square"));
   return (
     <>
-      <button type="button" ref={btn} className={`meander-pick ${open ? "on" : ""}`} title="Meander pattern: Filum lattices and the Ink/Stitch tile library" onClick={() => setOpen((v) => !v)}>
+      <button
+        type="button"
+        ref={btn}
+        className={`meander-pick ${open ? "on" : ""}`}
+        title="Meander pattern: Filum lattices and the Ink/Stitch tile library"
+        onClick={() => setOpen((v) => !v)}
+      >
         {cur ? <TilePreview tile={cur} size={26} /> : <span className="tile-preview" style={{ width: 26, height: 26 }} />}
         <span className="mp-name">{tile ? `Ink/Stitch ${tile}` : (cur?.name ?? "Square")}</span>
         <ChevronDown size={13} />
@@ -138,7 +176,12 @@ function MeanderMenu({
   const shown = tiles.filter((t) => !s || t.id.toLowerCase().includes(s) || t.name.toLowerCase().includes(s));
   const lattices = LATTICES.filter((l) => !s || l.name.toLowerCase().includes(s));
   return createPortal(
-    <div className="popover meander-menu" ref={ref} style={{ ...pos, transform: mv.moved ? `translate(${mv.off[0]}px, ${mv.off[1]}px)` : undefined }} data-movable>
+    <div
+      className="popover meander-menu"
+      ref={ref}
+      style={{ ...pos, transform: mv.moved ? `translate(${mv.off[0]}px, ${mv.off[1]}px)` : undefined }}
+      data-movable
+    >
       <Grip grip={mv.grip} label="Meander pattern" />
       <label className="chart-search">
         <Search size={13} />
@@ -155,7 +198,13 @@ function MeanderMenu({
             <div className="cm-head">Lattices</div>
             <div className="mm-grid">
               {lattices.map((l) => (
-                <button type="button" key={l.id} title={l.title} className={!tile && (pattern ?? "square") === l.pattern ? "on" : ""} onClick={() => onPick({ pattern: l.pattern, tile: undefined })}>
+                <button
+                  type="button"
+                  key={l.id}
+                  title={l.title}
+                  className={!tile && (pattern ?? "square") === l.pattern ? "on" : ""}
+                  onClick={() => onPick({ pattern: l.pattern, tile: undefined })}
+                >
                   <TilePreview tile={l} />
                   <span>{l.name}</span>
                 </button>
@@ -168,7 +217,13 @@ function MeanderMenu({
             <div className="cm-head">Ink/Stitch tiles · {shown.length}</div>
             <div className="mm-grid">
               {shown.map((t) => (
-                <button type="button" key={t.id} title={`Ink/Stitch meander tile ${t.name}`} className={tile === t.id ? "on" : ""} onClick={() => onPick({ tile: t.id })}>
+                <button
+                  type="button"
+                  key={t.id}
+                  title={`Ink/Stitch meander tile ${t.name}`}
+                  className={tile === t.id ? "on" : ""}
+                  onClick={() => onPick({ tile: t.id })}
+                >
                   <TilePreview tile={t} />
                   <span>{t.name}</span>
                 </button>
@@ -176,7 +231,11 @@ function MeanderMenu({
             </div>
           </>
         )}
-        {!shown.length && !lattices.length && <p className="hint" style={{ padding: "6px 10px" }}>No pattern matches “{q}”.</p>}
+        {!shown.length && !lattices.length && (
+          <p className="hint" style={{ padding: "6px 10px" }}>
+            No pattern matches “{q}”.
+          </p>
+        )}
       </div>
     </div>,
     document.body,

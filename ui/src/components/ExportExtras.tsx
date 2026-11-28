@@ -46,7 +46,13 @@ export function StopPositionChoice({ stops }: { stops: number }) {
           </label>
         </div>
       )}
-      {at && <p className="hint">{stops ? `${stops} stop${stops === 1 ? "" : "s"}: the needle goes to ${at[0].toFixed(0)}, ${at[1].toFixed(0)} mm (hoop coordinates) before each.` : "The design has no stops yet (Stop after, appliqué) — nothing changes."}</p>}
+      {at && (
+        <p className="hint">
+          {stops
+            ? `${stops} stop${stops === 1 ? "" : "s"}: the needle goes to ${at[0].toFixed(0)}, ${at[1].toFixed(0)} mm (hoop coordinates) before each.`
+            : "The design has no stops yet (Stop after, appliqué) — nothing changes."}
+        </p>
+      )}
     </>
   );
 }
@@ -58,7 +64,9 @@ export function RepeatOptions({ opts, set, width, height }: { opts: ExportOption
   const on = xr > 1 || yr > 1;
   return (
     <>
-      <h4 title="Ink/Stitch panelization: the design several times side by side and below each other in one file — for patches and labels sewn in one hooping">Repeats</h4>
+      <h4 title="Ink/Stitch panelization: the design several times side by side and below each other in one file — for patches and labels sewn in one hooping">
+        Repeats
+      </h4>
       <div className="xp-repeat">
         <label className="ctx-field" title="Copies side by side (Ink/Stitch horizontal repeats)">
           ↔ <Num value={xr} step={1} min={1} max={20} digits={0} onChange={(v) => set({ ...opts, xRepeats: Math.round(v) })} />
@@ -77,7 +85,9 @@ export function RepeatOptions({ opts, set, width, height }: { opts: ExportOption
         {on ? (
           <>
             {xr * yr} copies · each colour sews all copies before the next colour
-            {(Math.abs(opts.xSpacing ?? 100) < width && xr > 1) || (Math.abs(opts.ySpacing ?? 100) < height && yr > 1) ? " · the copies overlap: spacing below the design size" : ""}
+            {(Math.abs(opts.xSpacing ?? 100) < width && xr > 1) || (Math.abs(opts.ySpacing ?? 100) < height && yr > 1)
+              ? " · the copies overlap: spacing below the design size"
+              : ""}
             {" · "}
             <button className="link" onClick={() => set({ ...opts, xRepeats: 1, yRepeats: 1 })}>
               Reset
@@ -198,13 +208,17 @@ export function ZipFileList({ targets, name, onRemove }: { targets: string[]; na
         <b>
           <FileArchive size={14} /> {name}.zip
         </b>
-        <span className="stat">{targets.length ? `${targets.length} file${targets.length === 1 ? "" : "s"} — pick formats on the left` : "Pick the files to include on the left"}</span>
+        <span className="stat">
+          {targets.length ? `${targets.length} file${targets.length === 1 ? "" : "s"} — pick formats on the left` : "Pick the files to include on the left"}
+        </span>
       </div>
       <div className="xp-zip-list">
         {targets.map((t) => (
           <div key={t} className="xp-zip-file">
             <span>{targetFileName(t, name, true)}</span>
-            <span className="stat">{isPicture(t) ? "picture" : t === "threadlist" ? "thread list" : t === "svg" ? "Ink/Stitch SVG" : t === "filum" ? "project" : "stitch file"}</span>
+            <span className="stat">
+              {isPicture(t) ? "picture" : t === "threadlist" ? "thread list" : t === "svg" ? "Ink/Stitch SVG" : t === "filum" ? "project" : "stitch file"}
+            </span>
             <button className="mini" title="Leave out" onClick={() => onRemove(t)}>
               ×
             </button>

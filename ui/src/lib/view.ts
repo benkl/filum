@@ -23,7 +23,12 @@ export const RULER = 22;
  * `pad` px clear of its edges, after `inset` px taken at the top and left
  * (the rulers). `minScale` keeps a huge box from zooming out to nothing.
  */
-export function fitBox(box: Box, width: number, height: number, { pad = 40, inset = 0, minScale = 0 }: { pad?: number; inset?: number; minScale?: number } = {}): View {
+export function fitBox(
+  box: Box,
+  width: number,
+  height: number,
+  { pad = 40, inset = 0, minScale = 0 }: { pad?: number; inset?: number; minScale?: number } = {},
+): View {
   const w = Math.max(10, width - inset - pad * 2);
   const h = Math.max(10, height - inset - pad * 2);
   const scale = Math.max(minScale, Math.min(w / box.w, h / box.h));

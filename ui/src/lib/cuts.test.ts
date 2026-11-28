@@ -33,7 +33,10 @@ const plan = (len: number) => {
 const short = plan(4);
 check(uncutTrims(short.flags, short.coords, { kind: "trims", over: 5 }) === null, "a machine that cuts every trim leaves nothing");
 const brother = uncutTrims(short.flags, short.coords, { kind: "jumps", over: 5 });
-check(brother?.count === 1 && brother.mask[2] === 1 && brother.mask[3] === 1 && brother.mask[4] === 0, "a 4 mm jump under a 5 mm trimming length stays, with its trim");
+check(
+  brother?.count === 1 && brother.mask[2] === 1 && brother.mask[3] === 1 && brother.mask[4] === 0,
+  "a 4 mm jump under a 5 mm trimming length stays, with its trim",
+);
 const long = plan(8);
 check(uncutTrims(long.flags, long.coords, { kind: "jumps", over: 5 }) === null, "an 8 mm jump is cut");
 const none = uncutTrims(long.flags, long.coords, { kind: "none", over: 5 });
@@ -46,7 +49,10 @@ const plain = {
 };
 for (const kind of ["trims", "none"] as const) {
   const u = uncutTrims(plain.flags, plain.coords, { kind, over: 5 });
-  check(!!u && u.count === 0 && u.jumps === 1 && u.mask[3] === 1 && u.mask[4] === 1 && u.mask[0] === 0 && u.mask[7] === 0, `${kind}: a jump without a trim stays as one thread`);
+  check(
+    !!u && u.count === 0 && u.jumps === 1 && u.mask[3] === 1 && u.mask[4] === 1 && u.mask[0] === 0 && u.mask[7] === 0,
+    `${kind}: a jump without a trim stays as one thread`,
+  );
 }
 // a machine that cuts long jumps by itself cuts it (13 mm over 5 mm), not over 20 mm
 check(uncutTrims(plain.flags, plain.coords, { kind: "jumps", over: 5 }) === null, "jumps over 5 mm: the 13 mm jump is cut");

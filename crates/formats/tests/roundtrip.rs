@@ -56,24 +56,9 @@ fn test_pattern() -> Pattern {
     Pattern {
         stitches: st,
         threads: vec![
-            Thread {
-                rgb: RED,
-                name: "Red".into(),
-                code: "R1".into(),
-                brand: "Test".into(),
-            },
-            Thread {
-                rgb: GREEN,
-                name: "Green".into(),
-                code: "G1".into(),
-                brand: "Test".into(),
-            },
-            Thread {
-                rgb: BLUE,
-                name: "Blue".into(),
-                code: "B1".into(),
-                brand: "Test".into(),
-            },
+            Thread { rgb: RED, name: "Red".into(), code: "R1".into(), brand: "Test".into() },
+            Thread { rgb: GREEN, name: "Green".into(), code: "G1".into(), brand: "Test".into() },
+            Thread { rgb: BLUE, name: "Blue".into(), code: "B1".into(), brand: "Test".into() },
         ],
         name: "roundtrip".into(),
     }
@@ -84,9 +69,7 @@ fn test_pattern() -> Pattern {
 /// back onto the original for comparisons; other formats keep positions.
 fn aligned(format: Format, orig: &Pattern, mut back: Pattern) -> Pattern {
     if matches!(format, Format::Pes | Format::Pec) {
-        let min = |p: &Pattern| {
-            p.stitches.iter().fold((f64::INFINITY, f64::INFINITY), |m, s| (m.0.min(s.x), m.1.min(s.y)))
-        };
+        let min = |p: &Pattern| p.stitches.iter().fold((f64::INFINITY, f64::INFINITY), |m, s| (m.0.min(s.x), m.1.min(s.y)));
         let (o, b) = (min(orig), min(&back));
         for st in &mut back.stitches {
             st.x += o.0 - b.0;
@@ -97,11 +80,7 @@ fn aligned(format: Format, orig: &Pattern, mut back: Pattern) -> Pattern {
 }
 
 fn penetrations(p: &Pattern) -> Vec<(f64, f64)> {
-    p.stitches
-        .iter()
-        .filter(|s| s.is_penetration())
-        .map(|s| (s.x, s.y))
-        .collect()
+    p.stitches.iter().filter(|s| s.is_penetration()).map(|s| (s.x, s.y)).collect()
 }
 
 fn dist(a: (f64, f64), b: (f64, f64)) -> f64 {
@@ -127,37 +106,23 @@ fn assert_penetrations_match(format: Format, orig: &[(f64, f64)], read: &[(f64, 
         while j < read.len() && dist(read[j], p) > tol {
             j += 1;
         }
-        assert!(
-            j < read.len(),
-            "{format:?}: original penetration #{k} {p:?} not found in order"
-        );
+        assert!(j < read.len(), "{format:?}: original penetration #{k} {p:?} not found in order");
         matched.push(j);
         j += 1;
     }
-    assert_eq!(
-        matched[0], 0,
-        "{format:?}: unexpected penetrations before the first one"
-    );
+    assert_eq!(matched[0], 0, "{format:?}: unexpected penetrations before the first one");
     for k in 0..orig.len() - 1 {
         for r in &read[matched[k] + 1..matched[k + 1]] {
             let d = dist_to_segment(*r, orig[k], orig[k + 1]);
-            assert!(
-                d <= tol,
-                "{format:?}: extra penetration {r:?} is {d} mm off segment #{k}"
-            );
+            assert!(d <= tol, "{format:?}: extra penetration {r:?} is {d} mm off segment #{k}");
         }
     }
-    assert_eq!(
-        matched[orig.len() - 1],
-        read.len() - 1,
-        "{format:?}: trailing extra penetrations"
-    );
+    assert_eq!(matched[orig.len() - 1], read.len() - 1, "{format:?}: trailing extra penetrations");
 }
 
 fn check_roundtrip(format: Format, opts: &WriteOptions) -> Pattern {
     let p = test_pattern();
-    let bytes =
-        write_with_options(&p, format, opts).unwrap_or_else(|e| panic!("{format:?} write: {e}"));
+    let bytes = write_with_options(&p, format, opts).unwrap_or_else(|e| panic!("{format:?} write: {e}"));
     let back = aligned(format, &p, read(&bytes, format).unwrap_or_else(|e| panic!("{format:?} read: {e}")));
 
     let orig = penetrations(&p);
@@ -168,30 +133,13 @@ fn check_roundtrip(format: Format, opts: &WriteOptions) -> Pattern {
     let tol = if format == Format::Vp3 { 0.25 } else { 0.1 };
     assert_penetrations_match(format, &orig, &got, tol);
 
-    let blocks = 1 + back
-        .stitches
-        .iter()
-        .filter(|s| s.flags & cmd::COLOR_CHANGE != 0)
-        .count();
+    let blocks = 1 + back.stitches.iter().filter(|s| s.flags & cmd::COLOR_CHANGE != 0).count();
     assert_eq!(blocks, 3, "{format:?}: colour block count");
     assert_eq!(back.threads.len(), 3, "{format:?}: thread count");
     // SEW has no trim command (pystitch writes a zero jump)
-    assert!(
-        format == Format::Sew || back.stitches.iter().any(|s| s.flags & cmd::TRIM != 0),
-        "{format:?}: trim lost"
-    );
-    assert_eq!(
-        back.stitches.last().unwrap().flags,
-        cmd::END,
-        "{format:?}: final END"
-    );
-    assert_eq!(
-        back.stitches
-            .iter()
-            .filter(|s| s.flags & cmd::END != 0)
-            .count(),
-        1
-    );
+    assert!(format == Format::Sew || back.stitches.iter().any(|s| s.flags & cmd::TRIM != 0), "{format:?}: trim lost");
+    assert_eq!(back.stitches.last().unwrap().flags, cmd::END, "{format:?}: final END");
+    assert_eq!(back.stitches.iter().filter(|s| s.flags & cmd::END != 0).count(), 1);
 
     // Long stitches and jumps were split to the format's maximum per-record delta.
     let max = match format {
@@ -204,26 +152,17 @@ fn check_roundtrip(format: Format, opts: &WriteOptions) -> Pattern {
         let mut prev = (0.0, 0.0);
         for s in &back.stitches {
             let (dx, dy) = ((s.x - prev.0).abs(), (s.y - prev.1).abs());
-            assert!(
-                dx <= max + 1e-9 && dy <= max + 1e-9,
-                "{format:?}: record delta {dx},{dy} > {max}"
-            );
+            assert!(dx <= max + 1e-9 && dy <= max + 1e-9, "{format:?}: record delta {dx},{dy} > {max}");
             prev = (s.x, s.y);
         }
-        assert!(
-            penetrations(&back).len() > orig.len(),
-            "{format:?}: long stitch was not split"
-        );
+        assert!(penetrations(&back).len() > orig.len(), "{format:?}: long stitch was not split");
     }
 
     // Command records do not move.
     let mut pos = (0.0, 0.0);
     for s in &back.stitches {
         if s.flags & (cmd::TRIM | cmd::COLOR_CHANGE | cmd::STOP | cmd::END) != 0 {
-            assert!(
-                dist(pos, (s.x, s.y)) < 1e-9,
-                "{format:?}: command record moved"
-            );
+            assert!(dist(pos, (s.x, s.y)) < 1e-9, "{format:?}: command record moved");
         }
         pos = (s.x, s.y);
     }
@@ -272,10 +211,7 @@ fn roundtrip_pec() {
 
 #[test]
 fn roundtrip_jef() {
-    let opts = WriteOptions {
-        date: Some("20240102030405".into()),
-        ..Default::default()
-    };
+    let opts = WriteOptions { date: Some("20240102030405".into()), ..Default::default() };
     let back = check_roundtrip(Format::Jef, &opts);
     let rgbs: Vec<[u8; 3]> = back.threads.iter().map(|t| t.rgb).collect();
     assert_eq!(rgbs, vec![jef_rgb(RED), jef_rgb(GREEN), jef_rgb(BLUE)]);
@@ -300,17 +236,8 @@ fn roundtrip_xxx() {
 fn roundtrip_long_stitch_as_jumps() {
     // pystitch's default contingency: split long stitches with jumps, so the
     // penetrations are exactly the original ones.
-    let opts = WriteOptions {
-        long_stitch_as_jumps: true,
-        ..Default::default()
-    };
-    for f in [
-        Format::Dst,
-        Format::Jef,
-        Format::Exp,
-        Format::Xxx,
-        Format::Pes,
-    ] {
+    let opts = WriteOptions { long_stitch_as_jumps: true, ..Default::default() };
+    for f in [Format::Dst, Format::Jef, Format::Exp, Format::Xxx, Format::Pes] {
         let p = test_pattern();
         let back = aligned(f, &p, read(&write_with_options(&p, f, &opts).unwrap(), f).unwrap());
         let (a, b) = (penetrations(&p), penetrations(&back));
@@ -324,10 +251,7 @@ fn roundtrip_long_stitch_as_jumps() {
 #[test]
 fn jef_header_and_max_delta() {
     let p = test_pattern();
-    let opts = WriteOptions {
-        date: Some("20240102030405".into()),
-        ..Default::default()
-    };
+    let opts = WriteOptions { date: Some("20240102030405".into()), ..Default::default() };
     let bytes = write_with_options(&p, Format::Jef, &opts).unwrap();
     let back = read(&bytes, Format::Jef).unwrap();
     let mut prev = (0.0, 0.0);
@@ -346,57 +270,27 @@ fn jef_header_and_max_delta() {
     let half_w = i32::from_le_bytes(bytes[0x24..0x28].try_into().unwrap());
     assert!((half_w as f64 - w * 5.0).abs() <= 1.0);
     // A larger design picks a larger hoop.
-    let big = Pattern {
-        stitches: vec![
-            s(-60.0, -50.0, 0),
-            s(-60.0, 50.0, cmd::JUMP),
-            s(60.0, 50.0, cmd::JUMP),
-            s(60.0, 50.0, 0),
-        ],
-        ..Default::default()
-    };
+    let big = Pattern { stitches: vec![s(-60.0, -50.0, 0), s(-60.0, 50.0, cmd::JUMP), s(60.0, 50.0, cmd::JUMP), s(60.0, 50.0, 0)], ..Default::default() };
     let big_bytes = write_with_options(&big, Format::Jef, &opts).unwrap();
-    assert_eq!(
-        u32::from_le_bytes(big_bytes[0x20..0x24].try_into().unwrap()),
-        3
-    );
+    assert_eq!(u32::from_le_bytes(big_bytes[0x20..0x24].try_into().unwrap()), 3);
     assert_eq!(&bytes[8..22], b"20240102030405");
     // Three colour entries => stitch data starts at 0x74 + 3 * 8.
-    assert_eq!(
-        u32::from_le_bytes(bytes[0..4].try_into().unwrap()),
-        0x74 + 24
-    );
+    assert_eq!(u32::from_le_bytes(bytes[0..4].try_into().unwrap()), 0x74 + 24);
     assert_eq!(u32::from_le_bytes(bytes[24..28].try_into().unwrap()), 3);
 }
 
 #[test]
 fn every_writable_format_handles_empty_and_degenerate_patterns() {
     let empty = Pattern::default();
-    let one = Pattern {
-        stitches: vec![s(1.0, 1.0, 0)],
-        ..Default::default()
-    };
-    let commands_only = Pattern {
-        stitches: vec![
-            s(0.0, 0.0, cmd::COLOR_CHANGE),
-            s(5.0, 5.0, cmd::JUMP),
-            s(5.0, 5.0, cmd::END),
-        ],
-        ..Default::default()
-    };
+    let one = Pattern { stitches: vec![s(1.0, 1.0, 0)], ..Default::default() };
+    let commands_only = Pattern { stitches: vec![s(0.0, 0.0, cmd::COLOR_CHANGE), s(5.0, 5.0, cmd::JUMP), s(5.0, 5.0, cmd::END)], ..Default::default() };
     for info in formats().iter().filter(|i| i.can_write) {
         for p in [&empty, &one, &commands_only] {
             let bytes = write(p, info.format).unwrap();
             if info.can_read {
-                let back =
-                    read(&bytes, info.format).unwrap_or_else(|e| panic!("{:?}: {e}", info.format));
+                let back = read(&bytes, info.format).unwrap_or_else(|e| panic!("{:?}: {e}", info.format));
                 assert_eq!(back.stitches.last().map(|s| s.flags), Some(cmd::END));
-                assert_eq!(
-                    penetrations(&back).len(),
-                    penetrations(p).len(),
-                    "{:?}",
-                    info.format
-                );
+                assert_eq!(penetrations(&back).len(), penetrations(p).len(), "{:?}", info.format);
             }
         }
     }
@@ -441,10 +335,7 @@ fn detect_by_magic_and_extension() {
         assert_eq!(detect(&bytes, Some("design.jef")), Some(f), "{f:?}");
     }
     let jef = write(&p, Format::Jef).unwrap();
-    assert_eq!(
-        detect(&jef, Some("C:\\designs\\Flower.JEF")),
-        Some(Format::Jef)
-    );
+    assert_eq!(detect(&jef, Some("C:\\designs\\Flower.JEF")), Some(Format::Jef));
     assert_eq!(detect(&jef, None), None);
     assert_eq!(detect(b"", Some("x.exp")), Some(Format::Exp));
     assert_eq!(detect(b"", Some("x.Xxx")), Some(Format::Xxx));
@@ -476,10 +367,7 @@ fn pec_stream_starts_at_the_top_left_corner() {
     // Ink/Stitch (pystitch): the PEC stitch block opens with a jump from the
     // design's top-left corner to its origin, so machines place the design
     // from that corner. Read back, the design spans from (0, 0).
-    let p = Pattern {
-        stitches: vec![s(-12.0, -8.0, 0), s(12.0, -8.0, 0), s(12.0, 8.0, 0), s(-12.0, 8.0, 0), s(-12.0, -8.0, 0)],
-        ..Default::default()
-    };
+    let p = Pattern { stitches: vec![s(-12.0, -8.0, 0), s(12.0, -8.0, 0), s(12.0, 8.0, 0), s(-12.0, 8.0, 0), s(-12.0, -8.0, 0)], ..Default::default() };
     for f in [Format::Pes, Format::Pec] {
         let back = read(&write(&p, f).unwrap(), f).unwrap();
         let pts = penetrations(&back);
@@ -495,17 +383,8 @@ fn pec_stream_starts_at_the_top_left_corner() {
 fn writers_do_not_recentre() {
     // A design far off-centre must keep its absolute position (PEC / PES
     // anchor at the top-left corner instead, see above).
-    let p = Pattern {
-        stitches: vec![s(40.0, 30.0, 0), s(41.0, 30.0, 0), s(41.0, 31.0, 0)],
-        ..Default::default()
-    };
-    for f in [
-        Format::Dst,
-        Format::Jef,
-        Format::Exp,
-        Format::Vp3,
-        Format::Xxx,
-    ] {
+    let p = Pattern { stitches: vec![s(40.0, 30.0, 0), s(41.0, 30.0, 0), s(41.0, 31.0, 0)], ..Default::default() };
+    for f in [Format::Dst, Format::Jef, Format::Exp, Format::Vp3, Format::Xxx] {
         let back = read(&write(&p, f).unwrap(), f).unwrap();
         let got = penetrations(&back);
         assert_penetrations_match(f, &penetrations(&p), &got, 0.1);
@@ -529,26 +408,14 @@ fn stop_roundtrips_where_the_format_can_express_it() {
     };
     for f in [Format::Pes, Format::Pec, Format::Jef] {
         let back = read(&write(&p, f).unwrap(), f).unwrap();
-        let stops = back
-            .stitches
-            .iter()
-            .filter(|s| s.flags & cmd::STOP != 0)
-            .count();
-        let changes = back
-            .stitches
-            .iter()
-            .filter(|s| s.flags & cmd::COLOR_CHANGE != 0)
-            .count();
+        let stops = back.stitches.iter().filter(|s| s.flags & cmd::STOP != 0).count();
+        let changes = back.stitches.iter().filter(|s| s.flags & cmd::COLOR_CHANGE != 0).count();
         assert_eq!((stops, changes, back.threads.len()), (1, 1, 2), "{f:?}");
     }
     // DST/EXP/XXX use the same record for stop and colour change.
     for f in [Format::Dst, Format::Exp, Format::Xxx] {
         let back = read(&write(&p, f).unwrap(), f).unwrap();
-        let changes = back
-            .stitches
-            .iter()
-            .filter(|s| s.flags & cmd::COLOR_CHANGE != 0)
-            .count();
+        let changes = back.stitches.iter().filter(|s| s.flags & cmd::COLOR_CHANGE != 0).count();
         assert_eq!(changes, 2, "{f:?}");
     }
 }
@@ -662,7 +529,9 @@ fn roundtrip_tbf() {
 #[test]
 fn roundtrip_sew() {
     let back = check_roundtrip(Format::Sew, &WriteOptions::default());
-    let sew = |c: [u8; 3]| palette::SEW_PALETTE[nearest_index(c, &palette::SEW_PALETTE.iter().enumerate().map(|(i, e)| (i > 0).then_some(e.0)).collect::<Vec<_>>()).unwrap()].0;
+    let sew = |c: [u8; 3]| {
+        palette::SEW_PALETTE[nearest_index(c, &palette::SEW_PALETTE.iter().enumerate().map(|(i, e)| (i > 0).then_some(e.0)).collect::<Vec<_>>()).unwrap()].0
+    };
     let rgbs: Vec<[u8; 3]> = back.threads.iter().map(|t| t.rgb).collect();
     assert_eq!(rgbs, vec![sew(RED), sew(GREEN), sew(BLUE)]);
     assert_eq!(back.threads[0].brand, "Sew");

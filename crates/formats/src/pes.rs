@@ -217,13 +217,7 @@ fn split_points(points: Vec<(i32, i32)>) -> Vec<Vec<(i32, i32)>> {
 }
 
 /// Writes the CSewSeg segments; returns the number of sections and of colour log entries.
-fn write_segments(
-    e: &Encoded,
-    indices: &[usize],
-    adjust_x: i32,
-    adjust_y: i32,
-    out: &mut Vec<u8>,
-) -> Result<(usize, usize), Error> {
+fn write_segments(e: &Encoded, indices: &[usize], adjust_x: i32, adjust_y: i32, out: &mut Vec<u8>) -> Result<(usize, usize), Error> {
     let code_for = |block: usize| -> u32 { indices.get(block).copied().unwrap_or(0) as u32 };
     let mut block_index = 0usize;
     let mut color_code = code_for(0);
@@ -246,13 +240,7 @@ fn write_segments(
         let (points, flag): (Vec<(i32, i32)>, u32) = match g[0].cmd {
             Cmd::Jump => {
                 let last = g[g.len() - 1];
-                (
-                    vec![
-                        (sx - adjust_x, sy - adjust_y),
-                        (last.x - adjust_x, last.y - adjust_y),
-                    ],
-                    1,
-                )
+                (vec![(sx - adjust_x, sy - adjust_y), (last.x - adjust_x, last.y - adjust_y)], 1)
             }
             Cmd::ColorChange => {
                 block_index += g.len();
@@ -335,12 +323,7 @@ fn read_thread_chart(r: &mut Reader) -> Result<Vec<Thread>, Error> {
         let name = read_pes_string(r)?.unwrap_or_default();
         let brand = read_pes_string(r)?.unwrap_or_default();
         let _chart = read_pes_string(r)?;
-        threads.push(Thread {
-            rgb: [(c >> 16) as u8, (c >> 8) as u8, c as u8],
-            name,
-            code,
-            brand,
-        });
+        threads.push(Thread { rgb: [(c >> 16) as u8, (c >> 8) as u8, c as u8], name, code, brand });
     }
     Ok(threads)
 }

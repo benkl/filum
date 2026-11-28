@@ -45,7 +45,12 @@ function ColourRow({ value, onChange }: { value: string; onChange: (hex: string)
     <Row label="Colour" title="Usually the fabric's colour, so the knockdown disappears">
       <div className="kd-color">
         <input type="color" value={color} onChange={(e) => onChange(e.target.value)} />
-        <button className="btn sm ghost" disabled={color.toLowerCase() === fabricColor.toLowerCase()} title="Use the fabric colour" onClick={() => onChange(fabricColor)}>
+        <button
+          className="btn sm ghost"
+          disabled={color.toLowerCase() === fabricColor.toLowerCase()}
+          title="Use the fabric colour"
+          onClick={() => onChange(fabricColor)}
+        >
           Fabric
         </button>
       </div>
@@ -202,7 +207,18 @@ export function KnockdownDialog({ onClose }: { onClose: () => void }) {
         )
       }
     >
-      <Seg full style={{ marginBottom: 10 }} value={scope} options={[["design", "Whole design", "Automatic: under everything, following every edit"], ["selection", "Under the selection", "An editable object under the selected objects"]] as const} onChange={(v) => setScope(v)} />
+      <Seg
+        full
+        style={{ marginBottom: 10 }}
+        value={scope}
+        options={
+          [
+            ["design", "Whole design", "Automatic: under everything, following every edit"],
+            ["selection", "Under the selection", "An editable object under the selected objects"],
+          ] as const
+        }
+        onChange={(v) => setScope(v)}
+      />
       {scope === "design" ? (
         <>
           <DesignKnockdownFields o={options} set={setDesign} />

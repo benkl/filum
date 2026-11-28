@@ -51,7 +51,8 @@ export function DownloadsPanel() {
     }
   };
   const remove = async (pack: DownloadPack) => {
-    if (!confirm(`Remove ${pack.title} from this device? Designs that use them keep their stitches, but can't be changed until you download them again.`)) return;
+    if (!confirm(`Remove ${pack.title} from this device? Designs that use them keep their stitches, but can't be changed until you download them again.`))
+      return;
     await removePack(pack.id, pack.kind);
     useStore.getState().toast(`${pack.title}: removed`);
   };
@@ -70,7 +71,9 @@ export function DownloadsPanel() {
       ) : !packs.length ? (
         <p className="hint">This version of Filum offers no downloads.</p>
       ) : (
-        packs.map((p) => <PackCard key={p.id} pack={p} installed={installed.get(p.id)} job={jobs[p.id]} online={online} onStart={() => start(p)} onRemove={() => remove(p)} />)
+        packs.map((p) => (
+          <PackCard key={p.id} pack={p} installed={installed.get(p.id)} job={jobs[p.id]} online={online} onStart={() => start(p)} onRemove={() => remove(p)} />
+        ))
       )}
       <Included />
     </>
@@ -172,7 +175,9 @@ function PackCard({
           <>
             <span className="dl-accepted">
               <PackageCheck size={14} />
-              {unlicensed ? `Downloaded for your own use on ${new Date(installed.acceptedAt).toLocaleDateString()}` : `You accepted ${installed.license} on ${new Date(installed.acceptedAt).toLocaleDateString()}`}
+              {unlicensed
+                ? `Downloaded for your own use on ${new Date(installed.acceptedAt).toLocaleDateString()}`
+                : `You accepted ${installed.license} on ${new Date(installed.acceptedAt).toLocaleDateString()}`}
             </span>
             <button className="btn sm ghost" onClick={onRemove}>
               <Trash2 size={13} /> Remove
@@ -181,7 +186,9 @@ function PackCard({
         ) : (
           <>
             <span className="dl-accept">
-              {failed ? <span className="dl-err">Download failed: {failed}</span> : !online ? (
+              {failed ? (
+                <span className="dl-err">Download failed: {failed}</span>
+              ) : !online ? (
                 "You're offline. Connect to the internet to download."
               ) : unlicensed ? (
                 <>No licence is published ({licence}): by downloading you agree to use them only for yourself.</>
@@ -213,7 +220,8 @@ function Included() {
     embroideryIndex()
       .then((ix) => {
         const bundled = ix.fonts.filter((f) => !f.download);
-        const norm = (l: string) => (/open font/i.test(l) ? "SIL OFL" : /mublic|public/i.test(l) ? "public domain" : l.replace(/^S(CC)/, "$1").replace(/^CC-/, "CC "));
+        const norm = (l: string) =>
+          /open font/i.test(l) ? "SIL OFL" : /mublic|public/i.test(l) ? "public domain" : l.replace(/^S(CC)/, "$1").replace(/^CC-/, "CC ");
         setFonts({ n: bundled.length, licences: [...new Set(bundled.map((f) => norm(f.license)))].sort() });
       })
       .catch(() => {});

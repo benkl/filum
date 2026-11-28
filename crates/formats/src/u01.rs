@@ -15,15 +15,8 @@ use crate::tbf::needle;
 use crate::{Error, Pattern, WriteOptions};
 
 /// pystitch writer limits; Ink/Stitch writes every format with `full_jump`.
-pub(crate) const SETTINGS: EncodeSettings = EncodeSettings {
-    max_stitch: 127,
-    max_jump: 127,
-    full_jump: true,
-};
-pub(crate) const THREAD_CHANGE: ThreadChange = ThreadChange {
-    needle_set: true,
-    explicit_trim: false,
-};
+pub(crate) const SETTINGS: EncodeSettings = EncodeSettings { max_stitch: 127, max_jump: 127, full_jump: true };
+pub(crate) const THREAD_CHANGE: ThreadChange = ThreadChange { needle_set: true, explicit_trim: false };
 const HEADER_SIZE: usize = 0x100;
 
 pub(crate) fn encode(p: &Pattern, opts: &WriteOptions) -> Encoded {

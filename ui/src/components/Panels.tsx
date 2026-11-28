@@ -30,7 +30,20 @@ import {
   Layers2,
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Applique, BatchLettering, EmbroideryMachine, Fabric as FabricIcon, Hoop, LockStitch, Spool, StitchFill, StitchProcessing, StitchRunning, StitchSatin, TextArc } from "../icons/stitch";
+import {
+  Applique,
+  BatchLettering,
+  EmbroideryMachine,
+  Fabric as FabricIcon,
+  Hoop,
+  LockStitch,
+  Spool,
+  StitchFill,
+  StitchProcessing,
+  StitchRunning,
+  StitchSatin,
+  TextArc,
+} from "../icons/stitch";
 import { clamp, DEFAULT_LAYOUT, LIMITS, type Layout } from "../lib/layout";
 import { useStore } from "../store";
 import { PropertiesPanel, ScenePanel } from "./Dock";
@@ -63,7 +76,14 @@ export function Workspace({ rail, center }: { rail: ReactNode; center: ReactNode
       {!stacked && showOutline && <OutlinePanel side="left" mainRef={mainRef} />}
       <div className="center-wrap">
         {center}
-        {!showOutline && <PanelEdge side={stacked ? "right" : "left"} label="Show layers" onOpen={() => useStore.getState().setLayout({ showOutline: true })} offset={stacked && showInspector} />}
+        {!showOutline && (
+          <PanelEdge
+            side={stacked ? "right" : "left"}
+            label="Show layers"
+            onOpen={() => useStore.getState().setLayout({ showOutline: true })}
+            offset={stacked && showInspector}
+          />
+        )}
         {!showInspector && <PanelEdge side="right" label="Show properties" onOpen={() => useStore.getState().setLayout({ showInspector: true })} />}
       </div>
       {stacked && (showOutline || showInspector) && (
@@ -91,7 +111,8 @@ function WidthSash({ prop, edge, mainRef }: { prop: "outlineW" | "inspectorW"; e
   const limits = LIMITS[prop];
   const cssVar = prop === "outlineW" ? "--outline-w" : "--inspector-w";
   const stacked = useStore((s) => s.layout.outlineSide === "right");
-  const hide: Partial<Layout> = prop === "outlineW" ? { showOutline: false } : stacked ? { showOutline: false, showInspector: false } : { showInspector: false };
+  const hide: Partial<Layout> =
+    prop === "outlineW" ? { showOutline: false } : stacked ? { showOutline: false, showInspector: false } : { showInspector: false };
   const set = (v: number) => useStore.getState().setLayout({ [prop]: clamp(v, limits) });
   return (
     <Sash
@@ -210,7 +231,12 @@ function Sash({
 function PanelEdge({ side, label, onOpen, offset }: { side: "left" | "right"; label: string; onOpen: () => void; offset?: boolean }) {
   const Icon = side === "left" ? PanelLeftOpen : PanelRightOpen;
   return (
-    <button className={`panel-edge ${side}${offset ? " offset" : ""}`} title={`${label} (${navigator.platform.toLowerCase().includes("mac") ? "⌘" : "Ctrl+"}\\ shows all panels)`} aria-label={label} onClick={onOpen}>
+    <button
+      className={`panel-edge ${side}${offset ? " offset" : ""}`}
+      title={`${label} (${navigator.platform.toLowerCase().includes("mac") ? "⌘" : "Ctrl+"}\\ shows all panels)`}
+      aria-label={label}
+      onClick={onOpen}
+    >
       <Icon size={14} />
     </button>
   );
@@ -218,11 +244,28 @@ function PanelEdge({ side, label, onOpen, offset }: { side: "left" | "right"; la
 
 /* ---------------- panels ---------------- */
 
-function PanelTabs<T extends string>({ tabs, value, onChange, actions }: { tabs: { id: T; label: ReactNode; title?: string }[]; value: T; onChange: (v: T) => void; actions?: ReactNode }) {
+function PanelTabs<T extends string>({
+  tabs,
+  value,
+  onChange,
+  actions,
+}: {
+  tabs: { id: T; label: ReactNode; title?: string }[];
+  value: T;
+  onChange: (v: T) => void;
+  actions?: ReactNode;
+}) {
   return (
     <div className="ptabs" role="tablist">
       {tabs.map((t) => (
-        <button key={t.id} role="tab" aria-selected={value === t.id} className={`ptab${value === t.id ? " on" : ""}`} title={t.title} onClick={() => onChange(t.id)}>
+        <button
+          key={t.id}
+          role="tab"
+          aria-selected={value === t.id}
+          className={`ptab${value === t.id ? " on" : ""}`}
+          title={t.title}
+          onClick={() => onChange(t.id)}
+        >
           {t.label}
         </button>
       ))}
@@ -245,7 +288,11 @@ function OutlinePanel({ side, mainRef }: { side: "left" | "right"; mainRef: Main
         onChange={(v) => set({ outlineTab: v })}
         tabs={[
           { id: "layers", label: <>Layers{count > 0 && <span className="ptab-n">{count}</span>}</> },
-          { id: "issues", label: <>Issues{issues > 0 && <span className="count">{issues}</span>}</>, title: "Problems that would sew badly — markers show on the canvas while this tab is open" },
+          {
+            id: "issues",
+            label: <>Issues{issues > 0 && <span className="count">{issues}</span>}</>,
+            title: "Problems that would sew badly — markers show on the canvas while this tab is open",
+          },
         ]}
         actions={
           <>
@@ -409,7 +456,11 @@ function Inspector({ mainRef, stacked }: { mainRef: MainRef; stacked?: boolean }
  * title matches stay whole, the rest hide.
  */
 function useSections(bodyRef: React.RefObject<HTMLDivElement | null>, query: string, tab: string) {
-  const [state, setState] = useState<{ list: { title: string; dim: boolean }[]; active: string | null; none: boolean }>({ list: [], active: null, none: false });
+  const [state, setState] = useState<{ list: { title: string; dim: boolean }[]; active: string | null; none: boolean }>({
+    list: [],
+    active: null,
+    none: false,
+  });
   const q = query.trim().toLowerCase();
   // a section picked on the rail stays lit while the panel scrolls to it
   const pin = useRef<{ title: string; until: number } | null>(null);

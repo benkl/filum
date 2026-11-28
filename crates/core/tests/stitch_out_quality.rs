@@ -146,7 +146,12 @@ fn an_objects_own_locks_are_used() {
 fn optimiser_keeps_same_colour_details_on_top() {
     for detail in [
         obj("B", "r", line(&[(29.0, 1.0), (29.0, 29.0), (1.0, 29.0)]), StitchParams::Running(RunningParams::default())),
-        obj("B", "r", line(&[(0.0, 0.0), (30.0, 0.0), (30.0, 30.0), (0.0, 30.0), (0.0, 0.0)]), StitchParams::Satin(SatinParams { width: 2.5, ..Default::default() })),
+        obj(
+            "B",
+            "r",
+            line(&[(0.0, 0.0), (30.0, 0.0), (30.0, 30.0), (0.0, 30.0), (0.0, 0.0)]),
+            StitchParams::Satin(SatinParams { width: 2.5, ..Default::default() }),
+        ),
     ] {
         let d = doc(vec![obj("X", "r", rect(32.0, 0.0, 4.0, 4.0), fill()), obj("A", "r", rect(0.0, 0.0, 30.0, 30.0), fill()), detail]);
         let r = optimize_order(&d, &mut Engine::new());
@@ -154,7 +159,11 @@ fn optimiser_keeps_same_colour_details_on_top() {
         assert!(pos("A") < pos("B"), "the detail stays on top: {:?}", r.order);
     }
     // two fills in one thread may still swap (nothing shows)
-    let d = doc(vec![obj("X", "r", rect(60.0, 0.0, 4.0, 4.0), fill()), obj("A", "r", rect(0.0, 0.0, 30.0, 30.0), fill()), obj("B", "r", rect(50.0, 0.0, 12.0, 12.0), fill())]);
+    let d = doc(vec![
+        obj("X", "r", rect(60.0, 0.0, 4.0, 4.0), fill()),
+        obj("A", "r", rect(0.0, 0.0, 30.0, 30.0), fill()),
+        obj("B", "r", rect(50.0, 0.0, 12.0, 12.0), fill()),
+    ]);
     let r = optimize_order(&d, &mut Engine::new());
     assert_eq!(r.order, vec!["X", "B", "A"], "nearest first among same-thread fills");
 }
@@ -239,9 +248,8 @@ fn basting_is_cut_before_the_knockdown() {
 /// two covers (it shows there), but not a sliver along its own outline.
 #[test]
 fn a_narrow_gap_between_two_covers_keeps_the_fill_under_it() {
-    let area = |d: &Document| {
-        Engine::new().stitched_object(d, 0).map_or(0.0, |o| filum_core::geom::rings_area(&filum_core::stitches::fill::fill_rings(&o.paths)))
-    };
+    let area =
+        |d: &Document| Engine::new().stitched_object(d, 0).map_or(0.0, |o| filum_core::geom::rings_area(&filum_core::stitches::fill::fill_rings(&o.paths)));
     let two_covers = |gap: f64| {
         let mut d = doc(vec![
             obj("A", "b", rect(0.0, 0.0, 30.0, 30.0), fill()),

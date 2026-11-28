@@ -24,7 +24,12 @@ export function linkMenu(id: string): MenuItem[] {
     { label: `After ${o.name}: ${now}`, disabled: true },
     ...LINK_CHOICES.map((c): MenuItem => ({ label: c.label, hint: c.hint, checked: cur === c.id, run: () => setLinkChoice([id], c.id) })),
     "-",
-    { label: "Stop after", hint: "A machine stop after it (appliqué, puff foam…); it trims too", checked: o.stopAfter, run: () => s.updateObject(id, { stopAfter: !o.stopAfter }) },
+    {
+      label: "Stop after",
+      hint: "A machine stop after it (appliqué, puff foam…); it trims too",
+      checked: o.stopAfter,
+      run: () => s.updateObject(id, { stopAfter: !o.stopAfter }),
+    },
   ];
 }
 

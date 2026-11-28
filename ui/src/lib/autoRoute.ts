@@ -13,7 +13,6 @@ import { loadMerged, safeSetItem } from "./storage";
 // ---------------------------------------------------------------------------
 // The action on the selection
 
-
 /** Running-stitch objects among the selection that can be routed together. */
 export function routableSelection(): DesignObject[] {
   const s = useStore.getState();
@@ -75,11 +74,15 @@ export function autoRouteSelection(redwork = false): string | null {
   const parts = routes.reduce((n, r) => n + r.parts, 0);
   const apart = routes.length > 1 ? ` (${routes.length} routes: one per thread and stitch settings)` : "";
   if (redwork) {
-    s.toast(`Redwork: ${lines} line${lines > 1 ? "s" : ""} sewn out and back${parts > routes.length ? ` in ${parts} separate parts` : routes.length > 1 ? "" : " — one path, no jumps"}${apart}`);
+    s.toast(
+      `Redwork: ${lines} line${lines > 1 ? "s" : ""} sewn out and back${parts > routes.length ? ` in ${parts} separate parts` : routes.length > 1 ? "" : " — one path, no jumps"}${apart}`,
+    );
     return null;
   }
   const jumps = parts - routes.length;
-  s.toast(`Routed ${lines} line${lines > 1 ? "s" : ""} into ${parts} path${parts > 1 ? "s" : ""}${jumps ? ` (${jumps} jump${jumps > 1 ? "s" : ""} between separate parts)` : " — no jumps"}${apart}`);
+  s.toast(
+    `Routed ${lines} line${lines > 1 ? "s" : ""} into ${parts} path${parts > 1 ? "s" : ""}${jumps ? ` (${jumps} jump${jumps > 1 ? "s" : ""} between separate parts)` : " — no jumps"}${apart}`,
+  );
   return null;
 }
 
@@ -177,7 +180,9 @@ export function autoRouteSatins(): string | null {
   const around = sel.every((o) => o.group === sel[0].group) ? sel[0].group : undefined;
   s.commit((d) => {
     // the originals: removed, or kept hidden so they are not sewn twice
-    const rest = opts.keepOriginals ? d.objects.map((o) => (ids.has(o.id) ? { ...o, visible: false, name: o.name.endsWith(" (original)") ? o.name : `${o.name} (original)` } : o)) : d.objects.filter((o) => !ids.has(o.id));
+    const rest = opts.keepOriginals
+      ? d.objects.map((o) => (ids.has(o.id) ? { ...o, visible: false, name: o.name.endsWith(" (original)") ? o.name : `${o.name} (original)` } : o))
+      : d.objects.filter((o) => !ids.has(o.id));
     const pos = opts.keepOriginals ? Math.max(...rest.map((o, i) => (ids.has(o.id) ? i + 1 : 0))) : Math.min(at, rest.length);
     rest.splice(pos, 0, ...out);
     return pruneGroups({ ...d, objects: rest, groupParents: withParent(d.groupParents, group, around) });
@@ -185,6 +190,8 @@ export function autoRouteSatins(): string | null {
   s.select(out.map((o) => o.id));
   const satins = out.filter((o) => o.stitch.type === "satin").length;
   const runs = out.length - satins;
-  s.toast(`Auto-routed: ${satins} satin${satins > 1 ? "s" : ""}${runs ? ` and ${runs} underpath${runs > 1 ? "s" : ""}` : ""}${opts.trim ? ", trims between parts" : ""}`);
+  s.toast(
+    `Auto-routed: ${satins} satin${satins > 1 ? "s" : ""}${runs ? ` and ${runs} underpath${runs > 1 ? "s" : ""}` : ""}${opts.trim ? ", trims between parts" : ""}`,
+  );
   return null;
 }

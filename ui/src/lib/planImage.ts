@@ -134,12 +134,23 @@ export function renderPicture(plan: PlanData, opts: PictureOptions): HTMLCanvasE
     const tmp = document.createElement("canvas");
     tmp.width = w;
     tmp.height = h;
-    renderPlanPreview(tmp.getContext("2d")!, plan, { width: w, height: h, dpr: 1, mode: "realistic", fabricColor: opts.fabricColor ?? "#f4f1ea", theme: THEME });
+    renderPlanPreview(tmp.getContext("2d")!, plan, {
+      width: w,
+      height: h,
+      dpr: 1,
+      mode: "realistic",
+      fabricColor: opts.fabricColor ?? "#f4f1ea",
+      theme: THEME,
+    });
     ctx.drawImage(tmp, 0, 0);
     return out;
   }
   const glc = g.gl;
-  const limit = Math.min(4096, glc.getParameter(glc.MAX_RENDERBUFFER_SIZE) as number, ...(Array.from(glc.getParameter(glc.MAX_VIEWPORT_DIMS) as Int32Array) as number[]));
+  const limit = Math.min(
+    4096,
+    glc.getParameter(glc.MAX_RENDERBUFFER_SIZE) as number,
+    ...(Array.from(glc.getParameter(glc.MAX_VIEWPORT_DIMS) as Int32Array) as number[]),
+  );
   const tile = Math.max(256, limit);
   const total = plan.flags.length;
   for (let ty = 0; ty < h; ty += tile) {
@@ -171,7 +182,10 @@ export function renderPicture(plan: PlanData, opts: PictureOptions): HTMLCanvasE
 /** The canvas as PNG bytes. */
 export function canvasPng(c: HTMLCanvasElement): Promise<Uint8Array> {
   return new Promise((resolve, reject) =>
-    c.toBlob((b) => (b ? b.arrayBuffer().then((a) => resolve(new Uint8Array(a)), reject) : reject(new Error("the picture is too large to encode"))), "image/png"),
+    c.toBlob(
+      (b) => (b ? b.arrayBuffer().then((a) => resolve(new Uint8Array(a)), reject) : reject(new Error("the picture is too large to encode"))),
+      "image/png",
+    ),
   );
 }
 

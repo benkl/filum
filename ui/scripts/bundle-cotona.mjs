@@ -42,10 +42,11 @@ function ghostscript() {
     }
   }
   const base = "C:/Program Files/gs";
-  if (fs.existsSync(base)) for (const v of fs.readdirSync(base).sort().reverse()) {
-    const exe = path.join(base, v, "bin/gswin64c.exe");
-    if (fs.existsSync(exe)) return exe;
-  }
+  if (fs.existsSync(base))
+    for (const v of fs.readdirSync(base).sort().reverse()) {
+      const exe = path.join(base, v, "bin/gswin64c.exe");
+      if (fs.existsSync(exe)) return exe;
+    }
   throw new Error("Ghostscript not found (set GS=<path to gs>)");
 }
 
@@ -79,7 +80,14 @@ function spans(file) {
     .slice(1)
     .forEach((pg, pi) => {
       for (const m of pg.matchAll(/<span bbox="(\d+) (\d+) (\d+) (\d+)"[^>]*size="([\d.]+)">([\s\S]*?)<\/span>/g)) {
-        const text = [...m[6].matchAll(/c="((?:[^"]|&quot;)*)"/g)].map((c) => c[1].replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16))).replace(/&quot;/g, '"').replace(/&amp;/g, "&")).join("");
+        const text = [...m[6].matchAll(/c="((?:[^"]|&quot;)*)"/g)]
+          .map((c) =>
+            c[1]
+              .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+              .replace(/&quot;/g, '"')
+              .replace(/&amp;/g, "&"),
+          )
+          .join("");
         const s = { page: pi + 1, x0: +m[1], y: +m[2], size: +m[5], text };
         const k = `${s.page}|${s.x0}|${s.y}|${s.text}`;
         if (!seen.has(k)) {
@@ -129,7 +137,11 @@ function sample(img, k, box) {
 function lab([r, g, b]) {
   [r, g, b] = [lin(r), lin(g), lin(b)];
   const f = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
-  const [x, y, z] = [(0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047, 0.2126 * r + 0.7152 * g + 0.0722 * b, (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883].map(f);
+  const [x, y, z] = [
+    (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047,
+    0.2126 * r + 0.7152 * g + 0.0722 * b,
+    (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883,
+  ].map(f);
   return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
 }
 const dE = (a, b) => Math.hypot(...lab(a).map((v, i) => v - lab(b)[i]));
@@ -187,7 +199,10 @@ const entries = all.map((c) => {
   const rgb = multi ? c.usa.mean : c.usa.med;
   return { ...c, multi, rgb, check: multi ? null : dE(c.madeira.med, c.usa.med) };
 });
-const checks = entries.filter((e) => e.check !== null).map((e) => e.check).sort((a, b) => a - b);
+const checks = entries
+  .filter((e) => e.check !== null)
+  .map((e) => e.check)
+  .sort((a, b) => a - b);
 console.log(`Cotona: ${entries.length} colours (${entries.filter((e) => e.multi).length} multicolour), Cotona 30: ${n30}, Cotona 80: ${n80}`);
 console.log(`cards agree: median ΔE ${checks[checks.length >> 1].toFixed(2)}, 90 % ≤ ${checks[Math.floor(checks.length * 0.9)].toFixed(2)}`);
 
@@ -212,7 +227,11 @@ for (const c of charts) fs.writeFileSync(path.join(pub, `${c.id}.gpl`), gpl(c.na
 // --- index
 const indexFile = path.join(pub, "index.json");
 const index = JSON.parse(fs.readFileSync(indexFile, "utf8"));
-index.sources.madeira = { label: "Madeira colour cards", url: CARDS.madeira, license: "sampled from Madeira's published colour cards (approximate screen colours)" };
+index.sources.madeira = {
+  label: "Madeira colour cards",
+  url: CARDS.madeira,
+  license: "sampled from Madeira's published colour cards (approximate screen colours)",
+};
 index.charts = index.charts.filter((c) => c.source !== "madeira");
 index.charts.push(...charts.map((c) => ({ id: c.id, name: c.name, brand: "Madeira", source: "madeira", count: c.list.length })));
 index.charts.sort((a, b) => a.brand.localeCompare(b.brand) || a.name.localeCompare(b.name) || a.source.localeCompare(b.source));

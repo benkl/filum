@@ -122,7 +122,18 @@ function FillOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: "fi
               {(() => {
                 // 2.5 mm ≙ 100 %
                 const s = sl("meanderScale");
-                return <Slider min={25} max={400} step={5} digits={0} value={((st.meanderScale ?? 2.5) / 2.5) * 100} unit="%" onChange={(v) => s.onChange(v / 40)} onLive={(v) => s.onLive(v / 40)} />;
+                return (
+                  <Slider
+                    min={25}
+                    max={400}
+                    step={5}
+                    digits={0}
+                    value={((st.meanderScale ?? 2.5) / 2.5) * 100}
+                    unit="%"
+                    onChange={(v) => s.onChange(v / 40)}
+                    onLive={(v) => s.onLive(v / 40)}
+                  />
+                );
               })()}
             </Row>
           ) : (
@@ -131,7 +142,15 @@ function FillOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: "fi
             </Row>
           )}
           <Row label="Height" title="Stretch or squash the pattern: its height relative to its width (Ink/Stitch separate x / y meander scale)">
-            <Slider min={25} max={400} step={5} digits={0} unit="%" value={Math.round((st.meanderAspect ?? 1) * 100)} onChange={(v) => up({ meanderAspect: v / 100 })} />
+            <Slider
+              min={25}
+              max={400}
+              step={5}
+              digits={0}
+              unit="%"
+              value={Math.round((st.meanderAspect ?? 1) * 100)}
+              onChange={(v) => up({ meanderAspect: v / 100 })}
+            />
           </Row>
           <Row label="Smoothness" title="0 = sharp corners, 1 = soft curves">
             <Slider min={0} max={1} step={0.05} value={st.smoothness ?? 0.5} {...sl("smoothness")} />
@@ -147,7 +166,10 @@ function FillOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: "fi
               )}
             </span>
           </Row>
-          <Row label="Clip to shape" title="Keep every stitch inside the shape — smoothing, the zig-zag and Expand can carry them over the edge (Ink/Stitch clip)">
+          <Row
+            label="Clip to shape"
+            title="Keep every stitch inside the shape — smoothing, the zig-zag and Expand can carry them over the edge (Ink/Stitch clip)"
+          >
             <Toggle on={!!st.meanderClip} onChange={(v) => up({ meanderClip: v })} />
           </Row>
           <Row label="Variation">
@@ -162,12 +184,21 @@ function FillOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: "fi
           <p className="hint" style={{ margin: "2px 0 6px" }}>
             Rows follow the dashed guide line — drag its points and handles on the canvas.
           </p>
-          <Row label="Rows" title="Copies of the guide shifted across (they bunch where it bends), or parallel to it at an even distance — and round its ends (Ink/Stitch guided fill strategies)">
-            <Seg value={(st.guidedStrategy ?? "copy")} options={[
+          <Row
+            label="Rows"
+            title="Copies of the guide shifted across (they bunch where it bends), or parallel to it at an even distance — and round its ends (Ink/Stitch guided fill strategies)"
+          >
+            <Seg
+              value={st.guidedStrategy ?? "copy"}
+              options={
+                [
                   ["copy", "Copies"],
                   ["parallel", "Parallel"],
                   ["buffer", "Around"],
-                ] as const} onChange={(v) => up({ guidedStrategy: v })} />
+                ] as const
+              }
+              onChange={(v) => up({ guidedStrategy: v })}
+            />
           </Row>
           <Row label="Guide">
             <button
@@ -187,7 +218,9 @@ function FillOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: "fi
             >
               Reset
             </button>
-            <span className="stat" title="Select the fill and an open line together, then Path ▸ Use line as fill guide">or draw a line → Path ▸ Use line as fill guide</span>
+            <span className="stat" title="Select the fill and an open line together, then Path ▸ Use line as fill guide">
+              or draw a line → Path ▸ Use line as fill guide
+            </span>
           </Row>
         </>
       )}
@@ -205,7 +238,14 @@ function FillOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: "fi
       {st.method !== "cross" && (
         <>
           <Row label={st.method === "tatami" ? "Row spacing" : "Spacing"}>
-            <Slider min={0.15} max={st.method === "hilbert" || st.method === "stipple" ? 4 : 1.2} step={0.01} value={st.rowSpacing} unit="mm" {...sl("rowSpacing")} />
+            <Slider
+              min={0.15}
+              max={st.method === "hilbert" || st.method === "stipple" ? 4 : 1.2}
+              step={0.01}
+              value={st.rowSpacing}
+              unit="mm"
+              {...sl("rowSpacing")}
+            />
           </Row>
           <Row label="Max stitch">
             <Slider min={1} max={7} step={0.1} value={st.maxStitchLength} unit="mm" {...sl("maxStitchLength")} />
@@ -224,15 +264,43 @@ function FillOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: "fi
         </Row>
       )}
       {st.method === "tatami" && !st.gradient && (
-        <Row label="Gap rows" title="Extra rows sewn past the end of each section before travelling on, so no gap opens between sections on stretchy fabric (Ink/Stitch gap filling; always an even number)">
-          <Num value={st.gapFillRows ?? 0} step={2} min={0} max={10} digits={0} unit="rows" onChange={(v) => up({ gapFillRows: Math.ceil(Math.round(v) / 2) * 2 })} />
+        <Row
+          label="Gap rows"
+          title="Extra rows sewn past the end of each section before travelling on, so no gap opens between sections on stretchy fabric (Ink/Stitch gap filling; always an even number)"
+        >
+          <Num
+            value={st.gapFillRows ?? 0}
+            step={2}
+            min={0}
+            max={10}
+            digits={0}
+            unit="rows"
+            onChange={(v) => up({ gapFillRows: Math.ceil(Math.round(v) / 2) * 2 })}
+          />
         </Row>
       )}
       {st.method === "cross" && (
         <Row label="Cross order" title="Which diagonal goes first (all crosses alike), and how often each is sewn">
           <span className="dz-inline">
-            <Seg value={!!st.crossFlip} options={[[false, "\\ then /", "Top-left to bottom-right first"], [true, "/ then \\", "Bottom-left to top-right first"]] as const} onChange={(v) => up({ crossFlip: v })} />
-            <Num value={st.crossThreads ?? 1} step={2} min={1} max={5} digits={0} unit="×" onChange={(v) => up({ crossThreads: Math.max(1, Math.round((v - 1) / 2) * 2 + 1) })} />
+            <Seg
+              value={!!st.crossFlip}
+              options={
+                [
+                  [false, "\\ then /", "Top-left to bottom-right first"],
+                  [true, "/ then \\", "Bottom-left to top-right first"],
+                ] as const
+              }
+              onChange={(v) => up({ crossFlip: v })}
+            />
+            <Num
+              value={st.crossThreads ?? 1}
+              step={2}
+              min={1}
+              max={5}
+              digits={0}
+              unit="×"
+              onChange={(v) => up({ crossThreads: Math.max(1, Math.round((v - 1) / 2) * 2 + 1) })}
+            />
           </span>
         </Row>
       )}
@@ -256,7 +324,10 @@ function FillOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: "fi
               <option value="inkStitch">Ink/Stitch</option>
             </select>
           </Row>
-          <Row label="Skip last" title="Leave out the last stitch of every row: it sits right next to the first of the next one (fewer stitches, less build-up at the edges)">
+          <Row
+            label="Skip last"
+            title="Leave out the last stitch of every row: it sits right next to the first of the next one (fewer stitches, less build-up at the edges)"
+          >
             <Toggle on={!!st.skipLast} onChange={(v) => up({ skipLast: v })} />
           </Row>
         </>
@@ -312,7 +383,14 @@ function FillOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: "fi
           <Row label="Cell height" title="Cells taller or flatter than wide (Ink/Stitch pattern size x y); Square keeps them square">
             <span className="dz-inline">
               <span style={{ opacity: st.crossSizeY ? 1 : 0.55 }}>
-                <Num value={st.crossSizeY || st.crossSize || 2.5} step={0.1} min={0.8} max={12} unit="mm" onChange={(v) => up({ crossSizeY: Math.abs(v - (st.crossSize ?? 2.5)) < 1e-6 ? 0 : v })} />
+                <Num
+                  value={st.crossSizeY || st.crossSize || 2.5}
+                  step={0.1}
+                  min={0.8}
+                  max={12}
+                  unit="mm"
+                  onChange={(v) => up({ crossSizeY: Math.abs(v - (st.crossSize ?? 2.5)) < 1e-6 ? 0 : v })}
+                />
               </span>
               {!!st.crossSizeY && (
                 <button className="btn sm ghost" onClick={() => up({ crossSizeY: 0 })}>
@@ -322,16 +400,30 @@ function FillOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: "fi
             </span>
           </Row>
           <Row label="Coverage" title="How much of a cell must be inside the shape to get a cross">
-            <Slider min={10} max={100} step={5} digits={0} unit="%" value={Math.round((st.crossCoverage ?? 0.5) * 100)} onChange={(v) => up({ crossCoverage: v / 100 })} />
+            <Slider
+              min={10}
+              max={100}
+              step={5}
+              digits={0}
+              unit="%"
+              value={Math.round((st.crossCoverage ?? 0.5) * 100)}
+              onChange={(v) => up({ crossCoverage: v / 100 })}
+            />
           </Row>
           <Row label="Stitches">
-            <Seg value={(st.crossKind ?? "cross")} options={[
+            <Seg
+              value={st.crossKind ?? "cross"}
+              options={
+                [
                   ["cross", "×", "Both diagonals"],
                   ["half", "/", "Half cross: one diagonal"],
                   ["upright", "+", "Upright cross"],
                   ["double", "✳", "Double cross: one diagonal, the upright cross, then the other diagonal on top"],
                   ["smyrna", "⁜", "Smyrna cross: the diagonal cross, then the upright cross on top"],
-                ] as const} onChange={(k) => up({ crossKind: k })} />
+                ] as const
+              }
+              onChange={(k) => up({ crossKind: k })}
+            />
           </Row>
           {st.crossKind === "upright" && (
             <Row label="Dense" title="A second grid of upright crosses shifted by half a cell — a closed, woven look (Ink/Stitch dense upright cross)">
@@ -360,7 +452,15 @@ function FillOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: "fi
           <Row label="Pull comp." title="Rows grow at both ends by this much, plus a share of their length">
             <span className="dz-inline">
               <Num value={st.pullComp} step={0.05} unit="mm" onChange={(v) => up({ pullComp: v })} />
-              <Num value={Math.round((st.pullCompPct ?? 0) * 100)} step={1} min={0} max={30} unit="%" digits={0} onChange={(v) => up({ pullCompPct: v / 100 })} />
+              <Num
+                value={Math.round((st.pullCompPct ?? 0) * 100)}
+                step={1}
+                min={0}
+                max={30}
+                unit="%"
+                digits={0}
+                onChange={(v) => up({ pullCompPct: v / 100 })}
+              />
             </span>
           </Row>
         </>
@@ -423,7 +523,10 @@ function FillOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: "fi
                   title="Several passes: angles separated by spaces (Ink/Stitch's underlay angle list)"
                   defaultValue={(st.underlayAngles ?? []).join(" ")}
                   onBlur={(e) => {
-                    const list = e.target.value.split(/[\s,]+/).map(Number).filter((x) => Number.isFinite(x) && e.target.value.trim() !== "");
+                    const list = e.target.value
+                      .split(/[\s,]+/)
+                      .map(Number)
+                      .filter((x) => Number.isFinite(x) && e.target.value.trim() !== "");
                     up({ underlayAngles: list.length ? list : undefined });
                   }}
                 />
@@ -487,13 +590,19 @@ function SatinOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: "s
         <Num value={st.pushComp ?? 0} step={0.1} min={0} max={3} unit="mm" onChange={(v) => up({ pushComp: v })} />
       </Row>
       {!st.foam && !st.layered && (
-        <Row label="Bisatin" title="The cover in two columns half as wide, split along the middle: the first sewn to the far end, the second back to the start, over the column's underlay. For columns too wide for one stitch (not in Ink/Stitch)">
+        <Row
+          label="Bisatin"
+          title="The cover in two columns half as wide, split along the middle: the first sewn to the far end, the second back to the start, over the column's underlay. For columns too wide for one stitch (not in Ink/Stitch)"
+        >
           <Toggle on={!!st.bisatin} onChange={(v) => up({ bisatin: v || undefined })} />
         </Row>
       )}
       {st.maxStitchLength > 0 && (
         <>
-          <Row label="Split pattern" title="Where long stitches are split: evenly (the points line up), staggered from stitch to stitch, or at a random phase (Ink/Stitch split methods)">
+          <Row
+            label="Split pattern"
+            title="Where long stitches are split: evenly (the points line up), staggered from stitch to stitch, or at a random phase (Ink/Stitch split methods)"
+          >
             <div className="seg">
               {(
                 [
@@ -505,7 +614,15 @@ function SatinOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: "s
                   ["random", "Random", { splitStaggers: 0, splitRandomPhase: true }],
                 ] as const
               ).map(([k, l, patch]) => {
-                const cur = st.splitRandomPhase ? "random" : (st.splitStaggers ?? 0) >= 4 ? "s4" : (st.splitStaggers ?? 0) >= 2 ? "s3" : st.splitStaggers === 1 ? "simple" : "even";
+                const cur = st.splitRandomPhase
+                  ? "random"
+                  : (st.splitStaggers ?? 0) >= 4
+                    ? "s4"
+                    : (st.splitStaggers ?? 0) >= 2
+                      ? "s3"
+                      : st.splitStaggers === 1
+                        ? "simple"
+                        : "even";
                 return (
                   <button key={k} className={cur === k ? "on" : ""} onClick={() => up(patch)}>
                     {l}
@@ -515,12 +632,34 @@ function SatinOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: "s
             </div>
           </Row>
           {(st.splitStaggers ?? 0) < 2 && (
-            <Row label="Split jitter" title={st.splitRandomPhase ? "Vary the length of the split stitches by up to this much" : "Move every split point by up to this share of a split stitch"}>
+            <Row
+              label="Split jitter"
+              title={
+                st.splitRandomPhase
+                  ? "Vary the length of the split stitches by up to this much"
+                  : "Move every split point by up to this share of a split stitch"
+              }
+            >
               <span className="dz-inline">
-                <Num value={Math.round((st.splitJitter ?? 0) * 100)} step={5} min={0} max={100} unit="%" digits={0} onChange={(v) => up({ splitJitter: v / 100 })} />
+                <Num
+                  value={Math.round((st.splitJitter ?? 0) * 100)}
+                  step={5}
+                  min={0}
+                  max={100}
+                  unit="%"
+                  digits={0}
+                  onChange={(v) => up({ splitJitter: v / 100 })}
+                />
                 {st.splitRandomPhase && (
                   <span title="Split stitches longer than this already (default: the max stitch length) — a gradual change between single and split stitches">
-                    <Num value={st.splitMinLength || st.maxStitchLength} step={0.5} min={0.5} max={st.maxStitchLength} unit="mm≥" onChange={(v) => up({ splitMinLength: v >= st.maxStitchLength ? 0 : v })} />
+                    <Num
+                      value={st.splitMinLength || st.maxStitchLength}
+                      step={0.5}
+                      min={0.5}
+                      max={st.maxStitchLength}
+                      unit="mm≥"
+                      onChange={(v) => up({ splitMinLength: v >= st.maxStitchLength ? 0 : v })}
+                    />
                   </span>
                 )}
               </span>
@@ -531,9 +670,25 @@ function SatinOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: "s
       <Row label="Texture" title="Random width (up to this much wider / narrower) and spacing for a hand-made look; Shuffle gives another pattern">
         <span className="dz-inline">
           <Num value={Math.round((st.randomWider ?? 0) * 100)} step={5} min={0} max={50} unit="%+" digits={0} onChange={(v) => up({ randomWider: v / 100 })} />
-          <Num value={Math.round((st.randomNarrower ?? 0) * 100)} step={5} min={0} max={50} unit="%−" digits={0} onChange={(v) => up({ randomNarrower: v / 100 })} />
+          <Num
+            value={Math.round((st.randomNarrower ?? 0) * 100)}
+            step={5}
+            min={0}
+            max={50}
+            unit="%−"
+            digits={0}
+            onChange={(v) => up({ randomNarrower: v / 100 })}
+          />
           <span title="Random spacing: each stitch's distance to the next varies by up to this much (Ink/Stitch random zig-zag spacing)">
-            <Num value={Math.round((st.randomSpacing ?? 0) * 100)} step={5} min={0} max={100} unit="%↔" digits={0} onChange={(v) => up({ randomSpacing: v / 100 })} />
+            <Num
+              value={Math.round((st.randomSpacing ?? 0) * 100)}
+              step={5}
+              min={0}
+              max={100}
+              unit="%↔"
+              digits={0}
+              onChange={(v) => up({ randomSpacing: v / 100 })}
+            />
           </span>
           {((st.randomWider ?? 0) > 0 || (st.randomNarrower ?? 0) > 0 || (st.randomSpacing ?? 0) > 0 || (st.splitJitter ?? 0) > 0 || !!st.splitRandomPhase) && (
             <button className="btn sm ghost" title="Another random pattern" onClick={() => up({ randomSeed: ((st.randomSeed ?? 1) % 9973) + 1 })}>
@@ -545,7 +700,10 @@ function SatinOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: "s
       <Row label="Direction" title="Direction guides: lines across the column that set the stitch angle there (Ink/Stitch rungs)">
         <GuideActions />
       </Row>
-      <Row label="Sides" title="Centre line: one line with a width, edited with the width handles. Two sides: each side shaped on its own with the node tool (A). Switch at any time.">
+      <Row
+        label="Sides"
+        title="Centre line: one line with a width, edited with the width handles. Two sides: each side shaped on its own with the node tool (A). Switch at any time."
+      >
         {st.multi ? (
           <span className="stat">One line per column</span>
         ) : (
@@ -553,7 +711,10 @@ function SatinOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: "s
             <button
               className={o.paths.length === 1 ? "on" : ""}
               title="One centre line with a width: the column keeps an even width"
-              onClick={() => o.paths.length !== 1 && useStore.getState().commit((d) => ({ ...d, objects: d.objects.map((x) => (targets.includes(x.id) && !x.locked ? toCentreLine(x) : x)) }))}
+              onClick={() =>
+                o.paths.length !== 1 &&
+                useStore.getState().commit((d) => ({ ...d, objects: d.objects.map((x) => (targets.includes(x.id) && !x.locked ? toCentreLine(x) : x)) }))
+              }
             >
               Centre line
             </button>
@@ -580,8 +741,15 @@ function SatinOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: "s
           <Row label="Swap rails">
             <Toggle on={st.swapRails} onChange={(v) => up({ swapRails: v })} />
           </Row>
-          <Row label="Rail direction" title="A rail drawn the other way twists the satin: Auto detects it; set it by hand if a satin renders strangely (Ink/Stitch reverse rails)">
-            <select className="select" value={st.reverseRails ?? "automatic"} onChange={(e) => up({ reverseRails: e.target.value as NonNullable<typeof st.reverseRails> })}>
+          <Row
+            label="Rail direction"
+            title="A rail drawn the other way twists the satin: Auto detects it; set it by hand if a satin renders strangely (Ink/Stitch reverse rails)"
+          >
+            <select
+              className="select"
+              value={st.reverseRails ?? "automatic"}
+              onChange={(e) => up({ reverseRails: e.target.value as NonNullable<typeof st.reverseRails> })}
+            >
               <option value="automatic">Auto</option>
               <option value="none">As drawn</option>
               <option value="first">Reverse first</option>
@@ -598,7 +766,9 @@ function SatinOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: "s
       )}
       <Satin3dSection o={o} st={st} up={up} />
       <Section title="Underlay">
-        {(st.foam || st.layered) && <p className="hint">{st.foam ? "Over foam the underlay is a contour (3D above)." : "The layers' core has its own underlay (3D above)."}</p>}
+        {(st.foam || st.layered) && (
+          <p className="hint">{st.foam ? "Over foam the underlay is a contour (3D above)." : "The layers' core has its own underlay (3D above)."}</p>
+        )}
         <Presets
           items={[
             ["Auto", { underlayAuto: true }, "Chosen by the column's width and the fabric"],
@@ -616,54 +786,85 @@ function SatinOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: "s
         />
         {st.underlayAuto && <AutoUnderlayHint kind="satin" />}
         {!st.underlayAuto && (
-        <>
-        <Row label="Centre walk">
-          <Toggle on={st.centerWalk} onChange={(v) => up({ centerWalk: v })} />
-        </Row>
-        {st.centerWalk && (
-          <Row label="Walk" title="Passes along the column (there and back = 2) and where across it (50 % = centre)">
-            <span className="dz-inline">
-              <Num value={st.centerWalkRepeats ?? 2} step={2} min={2} max={8} digits={0} onChange={(v) => up({ centerWalkRepeats: Math.max(2, Math.round(v / 2) * 2) })} />
-              <Num value={Math.round((st.centerWalkPosition ?? 0.5) * 100)} step={5} min={0} max={100} unit="%" digits={0} onChange={(v) => up({ centerWalkPosition: v / 100 })} />
-            </span>
-          </Row>
-        )}
-        {(st.centerWalk || st.contourUnderlay) && (
-          <Row label="Run length" title="Stitch length of the centre walk and contour underlay">
-            <Num value={st.underlayStitchLength ?? 2.5} step={0.5} min={1} max={6} unit="mm" onChange={(v) => up({ underlayStitchLength: v })} />
-          </Row>
-        )}
-        <Row label="Contour">
-          <Toggle on={st.contourUnderlay} onChange={(v) => up({ contourUnderlay: v })} />
-        </Row>
-        {st.contourUnderlay && (
-          <Row label="Contour inset" title="Inset from the edges: a fixed distance plus a share of the column width">
-            <span className="dz-inline">
-              <Num value={st.contourInset} step={0.1} min={0} unit="mm" onChange={(v) => up({ contourInset: v })} />
-              <Num value={Math.round((st.contourInsetPct ?? 0) * 100)} step={5} min={0} max={45} unit="%" digits={0} onChange={(v) => up({ contourInsetPct: v / 100 })} />
-            </span>
-          </Row>
-        )}
-        <Row label="Zig-zag">
-          <Toggle on={st.zigzagUnderlay} onChange={(v) => up({ zigzagUnderlay: v })} />
-        </Row>
-        {st.zigzagUnderlay && (
           <>
-            <Row label="ZZ spacing">
-              <Num value={st.zigzagUnderlaySpacing} step={0.25} min={0.5} unit="mm" onChange={(v) => up({ zigzagUnderlaySpacing: v })} />
+            <Row label="Centre walk">
+              <Toggle on={st.centerWalk} onChange={(v) => up({ centerWalk: v })} />
             </Row>
-            <Row label="ZZ inset" title="Inset from the edges: a fixed distance plus a share of the column width">
-              <span className="dz-inline">
-                <Num value={st.zigzagUnderlayInset} step={0.1} min={0} unit="mm" onChange={(v) => up({ zigzagUnderlayInset: v })} />
-                <Num value={Math.round((st.zigzagInsetPct ?? 0) * 100)} step={5} min={0} max={45} unit="%" digits={0} onChange={(v) => up({ zigzagInsetPct: v / 100 })} />
-              </span>
+            {st.centerWalk && (
+              <Row label="Walk" title="Passes along the column (there and back = 2) and where across it (50 % = centre)">
+                <span className="dz-inline">
+                  <Num
+                    value={st.centerWalkRepeats ?? 2}
+                    step={2}
+                    min={2}
+                    max={8}
+                    digits={0}
+                    onChange={(v) => up({ centerWalkRepeats: Math.max(2, Math.round(v / 2) * 2) })}
+                  />
+                  <Num
+                    value={Math.round((st.centerWalkPosition ?? 0.5) * 100)}
+                    step={5}
+                    min={0}
+                    max={100}
+                    unit="%"
+                    digits={0}
+                    onChange={(v) => up({ centerWalkPosition: v / 100 })}
+                  />
+                </span>
+              </Row>
+            )}
+            {(st.centerWalk || st.contourUnderlay) && (
+              <Row label="Run length" title="Stitch length of the centre walk and contour underlay">
+                <Num value={st.underlayStitchLength ?? 2.5} step={0.5} min={1} max={6} unit="mm" onChange={(v) => up({ underlayStitchLength: v })} />
+              </Row>
+            )}
+            <Row label="Contour">
+              <Toggle on={st.contourUnderlay} onChange={(v) => up({ contourUnderlay: v })} />
             </Row>
-            <Row label="ZZ split" title="Split zig-zag underlay stitches longer than this (0 = never)">
-              <Num value={st.zigzagUnderlayMaxStitch ?? 0} step={0.5} min={0} max={10} unit="mm" onChange={(v) => up({ zigzagUnderlayMaxStitch: v })} />
+            {st.contourUnderlay && (
+              <Row label="Contour inset" title="Inset from the edges: a fixed distance plus a share of the column width">
+                <span className="dz-inline">
+                  <Num value={st.contourInset} step={0.1} min={0} unit="mm" onChange={(v) => up({ contourInset: v })} />
+                  <Num
+                    value={Math.round((st.contourInsetPct ?? 0) * 100)}
+                    step={5}
+                    min={0}
+                    max={45}
+                    unit="%"
+                    digits={0}
+                    onChange={(v) => up({ contourInsetPct: v / 100 })}
+                  />
+                </span>
+              </Row>
+            )}
+            <Row label="Zig-zag">
+              <Toggle on={st.zigzagUnderlay} onChange={(v) => up({ zigzagUnderlay: v })} />
             </Row>
+            {st.zigzagUnderlay && (
+              <>
+                <Row label="ZZ spacing">
+                  <Num value={st.zigzagUnderlaySpacing} step={0.25} min={0.5} unit="mm" onChange={(v) => up({ zigzagUnderlaySpacing: v })} />
+                </Row>
+                <Row label="ZZ inset" title="Inset from the edges: a fixed distance plus a share of the column width">
+                  <span className="dz-inline">
+                    <Num value={st.zigzagUnderlayInset} step={0.1} min={0} unit="mm" onChange={(v) => up({ zigzagUnderlayInset: v })} />
+                    <Num
+                      value={Math.round((st.zigzagInsetPct ?? 0) * 100)}
+                      step={5}
+                      min={0}
+                      max={45}
+                      unit="%"
+                      digits={0}
+                      onChange={(v) => up({ zigzagInsetPct: v / 100 })}
+                    />
+                  </span>
+                </Row>
+                <Row label="ZZ split" title="Split zig-zag underlay stitches longer than this (0 = never)">
+                  <Num value={st.zigzagUnderlayMaxStitch ?? 0} step={0.5} min={0} max={10} unit="mm" onChange={(v) => up({ zigzagUnderlayMaxStitch: v })} />
+                </Row>
+              </>
+            )}
           </>
-        )}
-        </>
         )}
       </Section>
     </>
@@ -742,10 +943,16 @@ function RunningOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: 
               placeholder={String(Math.ceil(st.beanRepeats / 2))}
               parse={(t) => parsePattern(t, { min: 0, max: 5, integer: true })}
               format={(v) => (v?.length ? formatPattern(v) : "")}
-              onChange={(v) => up({ beanPattern: v.length > 1 ? beansToPasses(v) : undefined, ...(v.length === 1 ? { beanRepeats: beansToPasses(v)[0] } : {}) })}
+              onChange={(v) =>
+                up({ beanPattern: v.length > 1 ? beansToPasses(v) : undefined, ...(v.length === 1 ? { beanRepeats: beansToPasses(v)[0] } : {}) })
+              }
             />
           </Row>
-          <RandomLength value={st.randomLength ?? 0} onChange={(v) => up({ randomLength: v })} onShuffle={() => up({ randomSeed: ((st.randomSeed ?? 1) % 9973) + 1 })} />
+          <RandomLength
+            value={st.randomLength ?? 0}
+            onChange={(v) => up({ randomLength: v })}
+            onShuffle={() => up({ randomSeed: ((st.randomSeed ?? 1) % 9973) + 1 })}
+          />
         </Section>
       )}
       {st.stem && (
@@ -884,7 +1091,11 @@ function ManualOptions({ e, st }: { e: Edit; st: Extract<StitchParams, { type: "
     <>
       <div className="hint">
         Every node is a needle penetration (imported machine files use this). Edit nodes with the node tool (A), or{" "}
-        <button className="link" onClick={() => useStore.getState().setDialog("rebuild")} title="Turn the stitches back into shapes that can be stitched again (Ink/Stitch Outline)">
+        <button
+          className="link"
+          onClick={() => useStore.getState().setDialog("rebuild")}
+          title="Turn the stitches back into shapes that can be stitched again (Ink/Stitch Outline)"
+        >
           rebuild shapes from the stitches…
         </button>
       </div>
@@ -938,7 +1149,10 @@ function TatamiPattern({ st, up }: { st: Extract<StitchParams, { type: "fill" }>
           onChange={(v) => up({ lengthPattern: v.length ? v : undefined })}
         />
       </Row>
-      <Row label="Row offsets" title="Where each row's pattern begins, as a share of the pattern's length, used in turn row after row, e.g. “0 33 67”. Empty: the staggers">
+      <Row
+        label="Row offsets"
+        title="Where each row's pattern begins, as a share of the pattern's length, used in turn row after row, e.g. “0 33 67”. Empty: the staggers"
+      >
         <PatternInput
           value={offsetsShown}
           placeholder={stagger.join(" ")}
@@ -954,7 +1168,10 @@ function TatamiPattern({ st, up }: { st: Extract<StitchParams, { type: "fill" }>
 
 function RandomLength({ value, onChange, onShuffle }: { value: number; onChange: (v: number) => void; onShuffle: () => void }) {
   return (
-    <Row label="Random length" title="Vary every stitch length by up to this much, with a random start on each line — no lines or moiré across parallel rows (Ink/Stitch random stitch length)">
+    <Row
+      label="Random length"
+      title="Vary every stitch length by up to this much, with a random start on each line — no lines or moiré across parallel rows (Ink/Stitch random stitch length)"
+    >
       <span className="dz-inline">
         <Toggle on={value > 0} onChange={(on) => onChange(on ? 10 : 0)} />
         {value > 0 && (
@@ -981,7 +1198,9 @@ function RippleSection({ o }: { o: DesignObject }) {
     const ids = new Set(targets);
     useStore.getState().commit((d) => ({
       ...d,
-      objects: d.objects.map((x) => (ids.has(x.id) && x.stitch.type === "running" && x.stitch.ripple ? { ...x, stitch: { ...x.stitch, ripple: { ...x.stitch.ripple, ...patch } } } : x)),
+      objects: d.objects.map((x) =>
+        ids.has(x.id) && x.stitch.type === "running" && x.stitch.ripple ? { ...x, stitch: { ...x.stitch, ripple: { ...x.stitch.ripple, ...patch } } } : x,
+      ),
     }));
   };
   const closed = o.paths.length === 1 && o.paths[0].closed;
@@ -1046,14 +1265,32 @@ function RippleSection({ o }: { o: DesignObject }) {
             <Toggle on={r.flipCopies ?? true} onChange={(v) => up({ flipCopies: v })} />
           </Row>
           <Row label="Joins" title="Where copies meet: flat connections, or points (Ink/Stitch join style)">
-            <Seg value={!!r.joinPoint} options={[[false, "Flat"], [true, "Point"]] as const} onChange={(v) => up({ joinPoint: v })} />
+            <Seg
+              value={!!r.joinPoint}
+              options={
+                [
+                  [false, "Flat"],
+                  [true, "Point"],
+                ] as const
+              }
+              onChange={(v) => up({ joinPoint: v })}
+            />
           </Row>
           <Row label="Staggers" title="Needle points shifted from line to line over this many lines (0 = even stitches)">
             <Num value={r.staggers ?? 0} step={1} min={0} max={12} digits={0} onChange={(v) => up({ staggers: Math.round(v) })} />
           </Row>
           {!rails && !guide.length && (
             <Row label="Towards target" title="Without a guide: parallel copies, or copies fanned towards the target (Ink/Stitch)">
-              <Seg value={!!r.fan} options={[[false, "Parallel"], [true, "Fan"]] as const} onChange={(v) => up({ fan: v })} />
+              <Seg
+                value={!!r.fan}
+                options={
+                  [
+                    [false, "Parallel"],
+                    [true, "Fan"],
+                  ] as const
+                }
+                onChange={(v) => up({ fan: v })}
+              />
             </Row>
           )}
           <Row label="Manual points" title="The outline's own points are the stitches — no running stitch in between (Ink/Stitch manual pattern placement)">
@@ -1075,23 +1312,35 @@ function RippleSection({ o }: { o: DesignObject }) {
                 </span>
               </Row>
               <Row label="Scale axes">
-                <Seg value={(r.scaleAxis ?? "both")} options={[
+                <Seg
+                  value={r.scaleAxis ?? "both"}
+                  options={
+                    [
                       ["both", "X Y"],
                       ["x", "X"],
                       ["y", "Y"],
                       ["none", "None"],
-                    ] as const} onChange={(k) => up({ scaleAxis: k })} />
+                    ] as const
+                  }
+                  onChange={(k) => up({ scaleAxis: k })}
+                />
               </Row>
               <Row label="Turn with guide" title="Copies turn with the guide's direction">
                 <Toggle on={r.rotateRipples ?? true} onChange={(v) => up({ rotateRipples: v })} />
               </Row>
               {satinGuide && (
                 <Row label="Copies at" title="By the line count, at the satin's rungs, or as many as fit without overlapping (Ink/Stitch pattern position)">
-                  <Seg value={(r.guidePosition ?? "lineCount")} options={[
+                  <Seg
+                    value={r.guidePosition ?? "lineCount"}
+                    options={
+                      [
                         ["lineCount", "Count"],
                         ["rungs", "Rungs"],
                         ["adaptive", "Fit"],
-                      ] as const} onChange={(k) => up({ guidePosition: k })} />
+                      ] as const
+                    }
+                    onChange={(k) => up({ guidePosition: k })}
+                  />
                 </Row>
               )}
               <button className="btn sm ghost" onClick={() => up({ guide: undefined, anchor: undefined })}>

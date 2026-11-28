@@ -41,7 +41,11 @@ const tst = (o: DesignObject) => (o.stitch as { tartan?: { group: string; layer:
 const grad = (group = "G", n = 3) => {
   const stops = Array.from({ length: n }, (_, k) => ({ pos: k / (n - 1), mid: 0.5 }));
   return Array.from({ length: n }, (_, layer) =>
-    obj(`${group}${layer}`, { gradient: { kind: "linear", from: [0, 0], to: [10, 0], stops, curve: "linear", layer, group } }, { group, name: `Shape · colour ${layer + 1}`, thread: "t0" }),
+    obj(
+      `${group}${layer}`,
+      { gradient: { kind: "linear", from: [0, 0], to: [10, 0], stops, curve: "linear", layer, group } },
+      { group, name: `Shape · colour ${layer + 1}`, thread: "t0" },
+    ),
   );
 };
 const tartanDoc = () => {
@@ -75,14 +79,8 @@ ok(!tst(unlinkClone(makeClone(tl0[2]))), "an unlinked clone of a tartan layer is
 const gd = doc([...g3, obj("x", {}, { group: "U" })], { groupParents: { G: "U" } });
 const two = freshCopies(gd, [g3[0], g3[2]], { inPlace: true });
 const tg = gst(two.objects[0])!;
-ok(
-  two.objects.every((o) => gst(o)!.group === tg.group && o.group === tg.group) && tg.group !== "G",
-  "two layers of three copied: a gradient of their own",
-);
-ok(
-  two.objects.map((o) => gst(o)!.layer).join() === "0,1" && two.objects.every((o) => gst(o)!.stops.length === 2),
-  "numbered 0, 1 with two stops",
-);
+ok(two.objects.every((o) => gst(o)!.group === tg.group && o.group === tg.group) && tg.group !== "G", "two layers of three copied: a gradient of their own");
+ok(two.objects.map((o) => gst(o)!.layer).join() === "0,1" && two.objects.every((o) => gst(o)!.stops.length === 2), "numbered 0, 1 with two stops");
 const one = freshCopies(gd, [g3[1]], { inPlace: true });
 ok(!gst(one.objects[0]) && one.objects[0].group === "U" && one.objects[0].name === "Shape", "one layer copied: a plain fill in the group around");
 ok(!Object.keys(one.parents).some((k) => k !== "U" && !one.objects.some((o) => o.group === k)), "no parents left for the dissolved layer group");
@@ -108,13 +106,22 @@ const left = tartanLayers(deleted, tgroup);
 ok(left.length === colors.length - 1 && left.map((o) => tst(o)!.layer).join() === left.map((_, i) => i).join(), "a tartan layer deleted: the rest renumbered");
 ok(!tartanColors(tst(left[0])!.palette).includes(colors[1]), "and the deleted colour is left out of the palette");
 ok(repairTartans(td) === td, "a whole tartan is left alone");
-ok(paletteWithout("(#ff0000)/2 (#00ff00)1 (red)*3 (#0000ff)/2", ["#ff0000"]) === "(#ff0000)?/2 (#00ff00)1 (red)*3 (#0000ff)/2", "paletteWithout marks only sewn stripes of the colour");
+ok(
+  paletteWithout("(#ff0000)/2 (#00ff00)1 (red)*3 (#0000ff)/2", ["#ff0000"]) === "(#ff0000)?/2 (#00ff00)1 (red)*3 (#0000ff)/2",
+  "paletteWithout marks only sewn stripes of the colour",
+);
 
 // ---- 2. a style for one layer: the set becomes one plain fill first
 const cg = collapseLayers(gd, "G2");
-ok(cg.id === "G0" && cg.doc.objects.filter((o) => o.id.startsWith("G")).length === 1 && !gst(cg.doc.objects.find((o) => o.id === "G0")!), "collapsing a gradient from its last layer keeps the first as a plain fill");
+ok(
+  cg.id === "G0" && cg.doc.objects.filter((o) => o.id.startsWith("G")).length === 1 && !gst(cg.doc.objects.find((o) => o.id === "G0")!),
+  "collapsing a gradient from its last layer keeps the first as a plain fill",
+);
 const ct = collapseLayers(td, tls[2].id);
-ok(ct.id === tls[0].id && !tst(ct.doc.objects.find((o) => o.id === ct.id)!) && tartanLayers(ct.doc, tgroup).length === 0, "collapsing a tartan from a later layer");
+ok(
+  ct.id === tls[0].id && !tst(ct.doc.objects.find((o) => o.id === ct.id)!) && tartanLayers(ct.doc, tgroup).length === 0,
+  "collapsing a tartan from a later layer",
+);
 ok(collapseLayers(gd, "x").doc === gd && collapseLayers(gd, "nope").id === undefined, "plain objects and missing ids: unchanged");
 
 // ---- 3. pasted stitch properties: no gradient / tartan / blend membership
@@ -124,7 +131,10 @@ const plainTarget = obj("p");
 const ps = pastedStitch(plainTarget, fromGrad.stitch);
 ok(ps.type === "fill" && !ps.gradient, "a gradient layer's settings pasted on a plain fill: no gradient");
 const onTartan = pastedStitch(tls[1], fromGrad.stitch);
-ok(onTartan.type === "fill" && !onTartan.gradient && onTartan.tartan?.group === tgroup && onTartan.method === "tartan", "pasted on a tartan layer: it keeps its tartan");
+ok(
+  onTartan.type === "fill" && !onTartan.gradient && onTartan.tartan?.group === tgroup && onTartan.method === "tartan",
+  "pasted on a tartan layer: it keeps its tartan",
+);
 const blendRamp = { from: [0, 0], to: [10, 0], dense: 0.25, sparse: 2, profile: "linear", group: "B" };
 const fromBlend = pastedStitch(plainTarget, obj("b", { ramp: blendRamp, underlay: false }).stitch);
 ok(fromBlend.type === "fill" && !fromBlend.ramp, "a blend layer's settings: no blend");
@@ -132,7 +142,10 @@ const pd = pastedStitchDoc(gd, ["G1", "G2"], satinClip);
 ok(pd.n === 1 && pd.selection.join() === "G0", "a satin pasted on gradient layers: the gradient collapses, the layer left takes it");
 ok(pd.doc.objects.find((o) => o.id === "G0")!.stitch.type === "satin" && !gradientLayers(pd.doc, "G").length, "one object, a satin");
 const pf = pastedStitchDoc(gd, ["G1"], { stitch: obj("q", { angle: 45 }).stitch, thread: "t0" });
-ok(gst(pf.doc.objects.find((o) => o.id === "G1")!)?.layer === 1 && gradientLayers(pf.doc, "G").length === 3, "a fill pasted on a gradient layer keeps the gradient");
+ok(
+  gst(pf.doc.objects.find((o) => o.id === "G1")!)?.layer === 1 && gradientLayers(pf.doc, "G").length === 3,
+  "a fill pasted on a gradient layer keeps the gradient",
+);
 
 // ---- 5. the cutter: a gradient cut as one, each half a gradient of its own
 const cutDoc = doc(g3, { groupParents: { G: "U" } });
@@ -142,13 +155,25 @@ const halves = [...new Set(cut.doc.objects.map((o) => gst(o)!.group))];
 ok(halves.length === 2 && !halves.includes("G"), "in two new gradients");
 for (const h of halves) {
   const ls = gradientLayers(cut.doc, h);
-  ok(ls.length === 3 && ls.map((o) => gst(o)!.layer).join() === "0,1,2" && ls.every((o) => o.group === h) && cut.doc.groupParents?.[h] === "U", `half ${h.slice(0, 2)}…: whole, in its own group inside U`);
+  ok(
+    ls.length === 3 && ls.map((o) => gst(o)!.layer).join() === "0,1,2" && ls.every((o) => o.group === h) && cut.doc.groupParents?.[h] === "U",
+    `half ${h.slice(0, 2)}…: whole, in its own group inside U`,
+  );
 }
 const lockedOne = cutFills(cutDoc, g3.slice(0, 2), [5, -5], [5, 15]);
 ok(lockedOne.n === 0 && lockedOne.left === 1 && lockedOne.doc === cutDoc, "a gradient with a layer that can't be cut is left whole");
 const tcut = cutFills(td, tls, [5, -5], [5, 15]);
 const tHalves = [...new Set(tcut.doc.objects.filter((o) => tst(o)).map((o) => tst(o)!.group))];
-ok(tHalves.length === 2 && tHalves.every((h) => tartanLayers(tcut.doc, h).map((o) => tst(o)!.layer).join() === tls.map((_, i) => i).join()), "a tartan cut: two whole tartans");
+ok(
+  tHalves.length === 2 &&
+    tHalves.every(
+      (h) =>
+        tartanLayers(tcut.doc, h)
+          .map((o) => tst(o)!.layer)
+          .join() === tls.map((_, i) => i).join(),
+    ),
+  "a tartan cut: two whole tartans",
+);
 const pcut = cutFills(doc([obj("p")]), [obj("p")], [5, -5], [5, 15]);
 ok(pcut.n === 1 && pcut.doc.objects.map((o) => o.name).join() === "p a,p b", "a plain fill is cut as before");
 

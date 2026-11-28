@@ -22,4 +22,3 @@ ok(back.name === "x 1.0000001", "text is untouched");
 ok(back.objects[0].paths[0].nodes[0].p[0] === 10 && back.objects[0].paths[0].nodes[0].p[1] === 0.333333, "coordinates are tidied");
 ok(back.objects[0].stitch.angle === 45 && back.objects[0].stitch.seed === 7, "parameters are tidied, whole ones kept");
 ok(projectJson(doc).length < JSON.stringify(doc, null, 1).length, "the file is smaller");
-

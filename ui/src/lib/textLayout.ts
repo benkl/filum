@@ -30,7 +30,15 @@ export function pathMap(pts: Vec2[]) {
   const total = cum[cum.length - 1];
   const at = (s: number): { p: Vec2; t: Vec2 } => {
     // beyond the ends: straight on along the end direction
-    const k = s <= 0 ? 1 : s >= total ? pts.length - 1 : Math.max(1, cum.findIndex((c) => c >= s));
+    const k =
+      s <= 0
+        ? 1
+        : s >= total
+          ? pts.length - 1
+          : Math.max(
+              1,
+              cum.findIndex((c) => c >= s),
+            );
     const a = pts[k - 1];
     const b = pts[k];
     const l = cum[k] - cum[k - 1] || 1e-9;
@@ -530,7 +538,20 @@ function commandsToSubPaths(commands: opentype.PathCommand[]): SubPath[] {
 /** Hebrew, Arabic, Syriac, Thaana, NKo … and their presentation forms. */
 const RTL_CHAR = /[\u0590-\u05ff\u0600-\u065f\u066a-\u06ef\u06fa-\u08ff\ufb1d-\ufdff\ufe70-\ufeff]/;
 const DIGIT = /[0-9\u0660-\u0669\u06f0-\u06f9]/;
-const MIRROR: Record<string, string> = { "(": ")", ")": "(", "[": "]", "]": "[", "{": "}", "}": "{", "<": ">", ">": "<", "«": "»", "»": "«", "‹": "›", "›": "‹" };
+const MIRROR: Record<string, string> = {
+  "(": ")",
+  ")": "(",
+  "[": "]",
+  "]": "[",
+  "{": "}",
+  "}": "{",
+  "<": ">",
+  ">": "<",
+  "«": "»",
+  "»": "«",
+  "‹": "›",
+  "›": "‹",
+};
 
 type BidiType = "L" | "R" | "EN" | "N";
 function bidiType(cluster: string): BidiType {
@@ -568,7 +589,7 @@ export function bidiLevels(text: string): { clusters: string[]; levels: number[]
   }
   // N1, N2: neutrals between the same direction take it (numbers count as right to left), else the line's
   const dirOf = (t: BidiType) => (t === "L" ? "L" : "R");
-  for (let i = 0; i < types.length; ) {
+  for (let i = 0; i < types.length;) {
     if (types[i] !== "N") {
       i++;
       continue;
@@ -594,7 +615,7 @@ export function reorderLevels<T>(items: T[], levels: number[]): T[] {
   const lv = levels.slice();
   const max = Math.max(0, ...lv);
   for (let k = max; k >= 1; k--) {
-    for (let i = 0; i < out.length; ) {
+    for (let i = 0; i < out.length;) {
       if (lv[i] < k) {
         i++;
         continue;
@@ -641,7 +662,11 @@ function bidiRuns(text: string): { text: string; level: number }[] {
 const OT_ARABIC = /[\u0600-\u065f\u066a-\u06d2\u06fa-\u06ff\u0610-\u061b\u061e\u0670\u06d6-\u06dc\u06df-\u06e4\u06e7\u06e8\u06ea-\u06ed]/;
 
 type RenderOpts = opentype.RenderOptions & { tracking?: number; script?: string; language?: string };
-type Positioning = { getDefaultScriptName(): string; getKerningTables(script: string, language?: string): unknown; getKerningValue(tables: unknown, left: number, right: number): number };
+type Positioning = {
+  getDefaultScriptName(): string;
+  getKerningTables(script: string, language?: string): unknown;
+  getKerningValue(tables: unknown, left: number, right: number): number;
+};
 
 function toGlyphs(f: opentype.Font, s: string, o: RenderOpts): opentype.Glyph[] {
   return (f.stringToGlyphs as (this: opentype.Font, s: string, o?: RenderOpts) => opentype.Glyph[]).call(f, s, o);
@@ -674,7 +699,8 @@ export function placeGlyphs(f: opentype.Font, line: string, size: number, opts: 
   const o: RenderOpts = { ...(f as unknown as { defaultRenderOptions: RenderOpts }).defaultRenderOptions, ...opts };
   const scale = size / f.unitsPerEm;
   const pos = (f as unknown as { position?: Positioning }).position;
-  const script = (s: string) => (/[\u0590-\u05ff\ufb1d-\ufb4f]/.test(s) ? "hebr" : /[\u0600-\u08ff\ufb50-\ufeff]/.test(s) ? "arab" : (o.script ?? pos?.getDefaultScriptName() ?? "latn"));
+  const script = (s: string) =>
+    /[\u0590-\u05ff\ufb1d-\ufb4f]/.test(s) ? "hebr" : /[\u0600-\u08ff\ufb50-\ufeff]/.test(s) ? "arab" : (o.script ?? pos?.getDefaultScriptName() ?? "latn");
   type Item = { g: opentype.Glyph; level: number; run: number; i: number; kern: number };
   const items: Item[] = [];
   bidiRuns(line).forEach((r, ri) => {
@@ -823,7 +849,7 @@ const sortIndex = (o: DesignObject) => o.colorSortIndex ?? 404;
 export function letterTrims<T extends { obj: DesignObject; unit?: Unit }>(pieces: T[], trims: TextSpec["trims"], sorted: boolean) {
   const level = trims && trims !== "never" ? trims : null;
   if (!level) return;
-  for (let i = 0; i < pieces.length; ) {
+  for (let i = 0; i < pieces.length;) {
     const u = pieces[i].unit;
     let j = i + 1;
     while (j < pieces.length && u && pieces[j].unit?.letter === u.letter) j++;
@@ -939,7 +965,11 @@ export function offsetLine(pts: Vec2[], d: number): Vec2[] {
  * spreads them over the whole path, every gap between letters widened the
  * same and the gaps between words twice that.
  */
-export function placeAlong(path: Vec2[], lines: { boxes: LetterBox[]; y: number }[], align: TextSpec["pathAlign"] = "center"): Map<number, { f: Mat; deg: number }> {
+export function placeAlong(
+  path: Vec2[],
+  lines: { boxes: LetterBox[]; y: number }[],
+  align: TextSpec["pathAlign"] = "center",
+): Map<number, { f: Mat; deg: number }> {
   const out = new Map<number, { f: Mat; deg: number }>();
   const clean = path.filter((p, i) => i === 0 || Math.hypot(p[0] - path[i - 1][0], p[1] - path[i - 1][1]) > 1e-9);
   if (clean.length < 2) return out;
@@ -1024,13 +1054,22 @@ export async function layoutText(spec: TextSpec, font: LoadedFont): Promise<Desi
       const routed = routeLetters(lines.flatMap((ln) => ln.items));
       lines.forEach((ln, li) => (ln.items = routed.filter((p) => p.unit?.line === li)));
     }
-    if (pathPts) placed = placeAlong(pathPts, lines.map((ln) => ({ boxes: letterBoxes(ln.items, (p) => [...p.obj.paths, ...markerPaths(p.obj)]), y: ln.y })), spec.pathAlign);
+    if (pathPts)
+      placed = placeAlong(
+        pathPts,
+        lines.map((ln) => ({ boxes: letterBoxes(ln.items, (p) => [...p.obj.paths, ...markerPaths(p.obj)]), y: ln.y })),
+        spec.pathAlign,
+      );
   } else {
     const glyphLines = layoutOutline(spec, font);
     if (isBlock(spec.align)) justify(glyphLines, spec.align === "blockLetters", (it, dx) => (it.paths = shiftX(it.paths, dx)));
     if (pathPts) {
       // the letters are merged per line below: placed on the path first
-      const at = placeAlong(pathPts, glyphLines.map((gl) => ({ boxes: letterBoxes(gl.items, (it) => it.paths), y: gl.y })), spec.pathAlign);
+      const at = placeAlong(
+        pathPts,
+        glyphLines.map((gl) => ({ boxes: letterBoxes(gl.items, (it) => it.paths), y: gl.y })),
+        spec.pathAlign,
+      );
       for (const gl of glyphLines)
         for (const it of gl.items) {
           const t = at.get(it.unit.letter);
@@ -1038,18 +1077,44 @@ export async function layoutText(spec: TextSpec, font: LoadedFont): Promise<Desi
         }
       placed = new Map();
     }
-    const obj = (paths: SubPath[], stitch: StitchParams, thread: string): DesignObject => ({ id: "", name: "", thread, visible: true, locked: false, paths, stitch, trimAfter: false, stopAfter: false });
+    const obj = (paths: SubPath[], stitch: StitchParams, thread: string): DesignObject => ({
+      id: "",
+      name: "",
+      thread,
+      visible: true,
+      locked: false,
+      paths,
+      stitch,
+      trimAfter: false,
+      stopAfter: false,
+    });
     lines = glyphLines.map((gl) => {
       const ps: Piece[] = [];
       const paths = gl.items.flatMap((it) => it.paths);
       if (paths.length) {
         if (spec.style === "fill" || spec.style === "fillBorder")
-          ps.push({ obj: obj(paths, { type: "fill", ...defaultFill(), angle: spec.fillAngle, underlayInset: 0.2 }, spec.thread), role: "fill", name: "fill", thread: spec.thread });
+          ps.push({
+            obj: obj(paths, { type: "fill", ...defaultFill(), angle: spec.fillAngle, underlayInset: 0.2 }, spec.thread),
+            role: "fill",
+            name: "fill",
+            thread: spec.thread,
+          });
         if (spec.style === "border" || spec.style === "fillBorder") {
           const t = spec.style === "fillBorder" ? spec.borderThread : spec.thread;
-          ps.push({ obj: obj(paths, { type: "satin", ...defaultSatin(), width: spec.borderWidth, multi: true, centerWalk: true, shortStitchInset: 0.25 }, t), role: "border", name: "border", thread: t });
+          ps.push({
+            obj: obj(paths, { type: "satin", ...defaultSatin(), width: spec.borderWidth, multi: true, centerWalk: true, shortStitchInset: 0.25 }, t),
+            role: "border",
+            name: "border",
+            thread: t,
+          });
         }
-        if (spec.style === "outline") ps.push({ obj: obj(paths, { type: "running", ...defaultRunning(), length: 1.6, beanRepeats: 2 }, spec.thread), role: "outline", name: "outline", thread: spec.thread });
+        if (spec.style === "outline")
+          ps.push({
+            obj: obj(paths, { type: "running", ...defaultRunning(), length: 1.6, beanRepeats: 2 }, spec.thread),
+            role: "outline",
+            name: "outline",
+            thread: spec.thread,
+          });
       }
       return { items: ps, width: gl.width, ink: gl.ink, y: gl.y };
     });
@@ -1057,7 +1122,12 @@ export async function layoutText(spec: TextSpec, font: LoadedFont): Promise<Desi
   // Ink/Stitch's colour sort: sortable fonts only, by the objects' colour sort index
   const sorting = !!emb?.sortable && !!spec.colorSort && spec.colorSort !== "off";
   // trims: after every letter / word / line (Ink/Stitch _add_trims); the font's own stay
-  if (emb) letterTrims(lines.flatMap((l) => l.items), spec.trims, sorting);
+  if (emb)
+    letterTrims(
+      lines.flatMap((l) => l.items),
+      spec.trims,
+      sorting,
+    );
   // alignment: embroidery fonts by the letters' bounding box (Ink/Stitch's
   // line width), outline fonts by the advance; x = 0 is the alignment point
   // of every line (Block: like left)
@@ -1070,8 +1140,7 @@ export async function layoutText(spec: TextSpec, font: LoadedFont): Promise<Desi
   let reach = 0;
   if (Math.abs(spec.arc) >= 0.5 && !pathPts)
     for (const l of lines)
-      for (const it of l.items)
-        for (const sp of it.obj.paths) for (const n of sp.nodes) reach = Math.max(reach, spec.arc > 0 ? n.p[1] : -n.p[1]);
+      for (const it of l.items) for (const sp of it.obj.paths) for (const n of sp.nodes) reach = Math.max(reach, spec.arc > 0 ? n.p[1] : -n.p[1]);
   const bend = pathPts ? null : arcMap(spec.arc, blockW, reach);
   const rad = (spec.rotation * Math.PI) / 180;
   const cos = Math.cos(rad);

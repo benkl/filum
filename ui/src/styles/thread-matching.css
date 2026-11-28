@@ -414,7 +414,10 @@
   color: var(--muted);
   text-align: center;
   padding: var(--sp-5);
-  transition: border-color var(--dur-fast), background var(--dur-fast), transform var(--dur-fast);
+  transition:
+    border-color var(--dur-fast),
+    background var(--dur-fast),
+    transform var(--dur-fast);
 }
 .drop-zone b {
   color: var(--text);
@@ -1511,10 +1514,24 @@
 }
 
 /* multicolour satin */
-.mc-satin { display: flex; flex-direction: column; gap: 6px; }
-.mc-stripe { display: flex; align-items: center; gap: 6px; }
-.mc-stripe > .stat { width: 14px; }
-.mc-actions { display: flex; flex-direction: column; gap: 6px; }
+.mc-satin {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mc-stripe {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mc-stripe > .stat {
+  width: 14px;
+}
+.mc-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 
 /* several numbers ("2 1") in one field */
 .num.pattern input::placeholder {

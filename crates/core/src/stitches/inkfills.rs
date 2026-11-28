@@ -23,7 +23,6 @@ use super::meander_tiles::{Tile, SNAP};
 use super::running::running_stitch;
 use super::{push, sew_along, Run};
 
-
 /// Join pieces (in order) into runs, travelling inside the shape between them.
 fn join_pieces(rings: &[Ring], pieces: Vec<Vec<Point>>, stitch_len: f64, travel_len: f64, f: u8) -> Vec<Run> {
     let mut runs: Vec<Run> = Vec::new();
@@ -357,7 +356,21 @@ pub fn meander(
     end: Option<Point>,
     f: u8,
 ) -> Vec<Run> {
-    meander_ex(rings, pattern, tile, scale, angle_deg, smoothness, stitch_len, travel_len, seed, start, end, &MeanderOpts { aspect: 1.0, ..Default::default() }, f)
+    meander_ex(
+        rings,
+        pattern,
+        tile,
+        scale,
+        angle_deg,
+        smoothness,
+        stitch_len,
+        travel_len,
+        seed,
+        start,
+        end,
+        &MeanderOpts { aspect: 1.0, ..Default::default() },
+        f,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -483,7 +496,13 @@ pub fn meander_ex(
             continue;
         }
         // honeycomb cells need longer detours than squares or triangles
-        let reach = if tile.is_some() { 12 } else if pattern == MeanderPattern::Hexagon { 10 } else { 6 };
+        let reach = if tile.is_some() {
+            12
+        } else if pattern == MeanderPattern::Hexagon {
+            10
+        } else {
+            6
+        };
         let walk = grow(&adj, base, &mut rng, reach);
         let pts: Vec<Point> = walk.iter().map(|v| nodes[*v]).collect();
         let pts = smooth_open(&pts, iterations);
@@ -741,10 +760,12 @@ pub fn circular(
     let circle = |r: f64| -> Vec<Point> {
         // segments within 0.01 mm of the circle
         let n = ((TAU / (2.0 * (1.0 - 0.01 / r.max(0.02)).clamp(-1.0, 1.0).acos())).ceil() as usize).clamp(16, 4096);
-        (0..=n).map(|k| {
-            let t = TAU * k as f64 / n as f64;
-            pt(c.x + r * t.cos(), c.y + r * t.sin())
-        }).collect()
+        (0..=n)
+            .map(|k| {
+                let t = TAU * k as f64 / n as f64;
+                pt(c.x + r * t.cos(), c.y + r * t.sin())
+            })
+            .collect()
     };
     let sew = |pts: &[Point]| -> Run { super::running::sew_line(pts, stitch_len, FILL_TOLERANCE).into_iter().map(|q| (q, f)).collect() };
     if sp > distance {
@@ -767,7 +788,8 @@ pub fn circular(
     radii.reverse();
     let circles: Vec<Vec<Point>> = radii.iter().map(|&r| circle(r)).collect();
     let spiral = make_fermat_spiral(&circles, stitch_len, circles[0][0]);
-    let pieces: Vec<Vec<Point>> = clip_to_shape(&spiral, rings).iter().map(|p| super::running::sew_line(p, stitch_len, FILL_TOLERANCE)).filter(|p| p.len() > 1).collect();
+    let pieces: Vec<Vec<Point>> =
+        clip_to_shape(&spiral, rings).iter().map(|p| super::running::sew_line(p, stitch_len, FILL_TOLERANCE)).filter(|p| p.len() > 1).collect();
     if pieces.len() == 1 {
         return vec![pieces[0].iter().map(|&q| (q, f)).collect()];
     }
@@ -811,7 +833,14 @@ pub fn circular(
 
 /// Unit row direction at a point (sign arbitrary): bilinear in doubled angles.
 fn field_dir(f: &crate::model::FlowField, p: Point) -> Option<Point> {
-    if f.cols == 0 || f.rows == 0 || (f.angles.len() as u64) < f.cols as u64 * f.rows as u64 || f.cell.is_nan() || f.cell <= 0.0 || !p.x.is_finite() || !p.y.is_finite() {
+    if f.cols == 0
+        || f.rows == 0
+        || (f.angles.len() as u64) < f.cols as u64 * f.rows as u64
+        || f.cell.is_nan()
+        || f.cell <= 0.0
+        || !p.x.is_finite()
+        || !p.y.is_finite()
+    {
         return None;
     }
     let gx = ((p.x - f.origin[0]) / f.cell - 0.5).clamp(0.0, (f.cols - 1) as f64);
@@ -967,7 +996,16 @@ pub fn flow(rings: &[Ring], field: &crate::model::FlowField, spacing: f64, stitc
 /// Streamline fill (evenly spaced streamlines, Jobard & Lefer 1997) with a
 /// variable separation (density ramps) and per-layer pieces (gradients).
 #[allow(clippy::too_many_arguments)]
-pub fn flow_ex(rings: &[Ring], field: &crate::model::FlowField, spacing: f64, stitch_len: f64, travel_len: f64, start: Option<Point>, o: &FlowOpts, f: u8) -> Vec<Run> {
+pub fn flow_ex(
+    rings: &[Ring],
+    field: &crate::model::FlowField,
+    spacing: f64,
+    stitch_len: f64,
+    travel_len: f64,
+    start: Option<Point>,
+    o: &FlowOpts,
+    f: u8,
+) -> Vec<Run> {
     if rings.is_empty() || !field.is_usable() {
         return vec![];
     }
@@ -1003,7 +1041,8 @@ pub fn flow_ex(rings: &[Ring], field: &crate::model::FlowField, spacing: f64, st
         let key = |p: Point| ((p.x / dsep).floor() as i64, (p.y / dsep).floor() as i64);
         let meets_itself = |own: &crate::geom::CellMap<Vec<(Point, f64)>>, q: Point, at: f64, r: f64| {
             let (kx, ky) = key(q);
-            (kx - 1..=kx + 1).any(|x| (ky - 1..=ky + 1).any(|y| own.get(&(x, y)).is_some_and(|v| v.iter().any(|(p, s)| (s - at).abs() > r * 4.5 && p.dist(q) < r))))
+            (kx - 1..=kx + 1)
+                .any(|x| (ky - 1..=ky + 1).any(|y| own.get(&(x, y)).is_some_and(|v| v.iter().any(|(p, s)| (s - at).abs() > r * 4.5 && p.dist(q) < r))))
         };
         own.entry(key(seed)).or_default().push((seed, 0.0));
         for sign in [1.0, -1.0] {
@@ -1090,7 +1129,13 @@ pub fn flow_ex(rings: &[Ring], field: &crate::model::FlowField, spacing: f64, st
             owner.entry(okey(line[k])).or_default().push((line[k], id, tan(k).perp() * side));
         }
     };
-    let accept = |line: Vec<Point>, seed: Point, grid: &mut SpatialHash, queue: &mut std::collections::VecDeque<Point>, lines: &mut Vec<Vec<Point>>, ranks: &mut Vec<i64>, owner: &mut Owners| {
+    let accept = |line: Vec<Point>,
+                  seed: Point,
+                  grid: &mut SpatialHash,
+                  queue: &mut std::collections::VecDeque<Point>,
+                  lines: &mut Vec<Vec<Point>>,
+                  ranks: &mut Vec<i64>,
+                  owner: &mut Owners| {
         if line.is_empty() {
             // nothing traced from here: mark the seed so the scan moves on
             grid.add(seed);
@@ -1328,7 +1373,16 @@ const ON_TOP_MAX: f64 = 2.0;
 /// before it). Every line with the travel that leads to it (None: a jump,
 /// or the first line).
 #[allow(clippy::too_many_arguments)]
-fn order_lines(rings: &[Ring], lines: Vec<Vec<(Point, bool)>>, start: Point, dsep: f64, travel_ok: Option<&dyn Fn(Point) -> bool>, open: Option<&dyn Fn(Point) -> f64>, angle: f64, stitched: &dyn Fn(&[Point]) -> Vec<Point>) -> Vec<(Vec<(Point, bool)>, Option<Vec<Point>>)> {
+fn order_lines(
+    rings: &[Ring],
+    lines: Vec<Vec<(Point, bool)>>,
+    start: Point,
+    dsep: f64,
+    travel_ok: Option<&dyn Fn(Point) -> bool>,
+    open: Option<&dyn Fn(Point) -> f64>,
+    angle: f64,
+    stitched: &dyn Fn(&[Point]) -> Vec<Point>,
+) -> Vec<(Vec<(Point, bool)>, Option<Vec<Point>>)> {
     crate::prof!("flow: order_lines");
     let mut graph = super::travel::TravelGraph::new(rings, angle);
     {
@@ -1371,7 +1425,11 @@ fn order_lines(rings: &[Ring], lines: Vec<Vec<(Point, bool)>>, start: Point, dse
         ends.sort_by(|x, y| x.0.total_cmp(&y.0));
         let end_of = |&(_, i, rev): &(f64, usize, bool)| {
             let l = &left[i];
-            if rev { l[l.len() - 1].0 } else { l[0].0 }
+            if rev {
+                l[l.len() - 1].0
+            } else {
+                l[0].0
+            }
         };
         let mut pick: Option<(usize, Vec<Point>)> = None;
         if !out.is_empty() {
@@ -1395,7 +1453,8 @@ fn order_lines(rings: &[Ring], lines: Vec<Vec<(Point, bool)>>, start: Point, dse
         // none of the nearest ends is reached: the route to any line left
         if pick.is_none() && !out.is_empty() && left.len() * 2 > ends.len() {
             crate::prof!("flow: order routes to every end");
-            let all: Vec<(f64, usize, bool)> = left.iter().enumerate().flat_map(|(i, l)| [(l[0].0.dist(pos), i, false), (l[l.len() - 1].0.dist(pos), i, true)]).collect();
+            let all: Vec<(f64, usize, bool)> =
+                left.iter().enumerate().flat_map(|(i, l)| [(l[0].0.dist(pos), i, false), (l[l.len() - 1].0.dist(pos), i, true)]).collect();
             let targets: Vec<Point> = all.iter().map(|&(_, i, rev)| if rev { left[i][left[i].len() - 1].0 } else { left[i][0].0 }).collect();
             if let Some((k, r)) = graph
                 .routes(pos, &targets)
@@ -1443,7 +1502,13 @@ fn order_lines(rings: &[Ring], lines: Vec<Vec<(Point, bool)>>, start: Point, dse
 
 /// Stitch the ordered lines: travel along the given paths (a jump where
 /// there is none), stretches of a line marked true travelled hidden.
-fn join_ordered(order: Vec<(Vec<(Point, bool)>, Option<Vec<Point>>)>, stitch_len: f64, travel_len: f64, sew: Option<&dyn Fn(&[Point]) -> Vec<Point>>, f: u8) -> Vec<Run> {
+fn join_ordered(
+    order: Vec<(Vec<(Point, bool)>, Option<Vec<Point>>)>,
+    stitch_len: f64,
+    travel_len: f64,
+    sew: Option<&dyn Fn(&[Point]) -> Vec<Point>>,
+    f: u8,
+) -> Vec<Run> {
     let mut runs: Vec<Run> = Vec::new();
     let mut run: Run = Vec::new();
     for (piece, travel) in order {
@@ -1534,7 +1599,12 @@ mod tests {
             let mut adj: Vec<Vec<usize>> = vec![Vec::new(); nodes.len()];
             let mut total = 0.0;
             for &(u, v) in &edges {
-                if point_in_rings(nodes[u], &rings) && point_in_rings(nodes[v], &rings) && dist_to_boundary(&rings, nodes[u]) >= 0.05 && dist_to_boundary(&rings, nodes[v]) >= 0.05 && segment_inside(&rings, nodes[u], nodes[v]) {
+                if point_in_rings(nodes[u], &rings)
+                    && point_in_rings(nodes[v], &rings)
+                    && dist_to_boundary(&rings, nodes[u]) >= 0.05
+                    && dist_to_boundary(&rings, nodes[v]) >= 0.05
+                    && segment_inside(&rings, nodes[u], nodes[v])
+                {
                     adj[u].push(v);
                     adj[v].push(u);
                 }
@@ -1601,7 +1671,13 @@ mod tests {
         // the doubled angles cancel in the middle: no direction there, the
         // seeds there are used up instead of found again and again
         let rings = vec![square(20.0)];
-        let field = crate::model::FlowField { origin: [0.0, 0.0], cell: 10.0, cols: 2, rows: 2, angles: vec![0.0, std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2, 0.0] };
+        let field = crate::model::FlowField {
+            origin: [0.0, 0.0],
+            cell: 10.0,
+            cols: 2,
+            rows: 2,
+            angles: vec![0.0, std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2, 0.0],
+        };
         let t = std::time::Instant::now();
         let _ = flow(&rings, &field, 0.5, 2.5, 2.5, None, 0);
         assert!(t.elapsed().as_secs_f64() < 20.0);
@@ -1619,4 +1695,3 @@ mod tests {
         assert_eq!(runs.len(), 1);
     }
 }
-

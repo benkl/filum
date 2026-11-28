@@ -35,7 +35,7 @@ import { safeSetItem } from "../lib/storage";
 
 /** Reactive spec of a lettering group. */
 export function useTextSpec(group: string | null): TextSpec | null {
-  return useStore((s) => (group ? s.doc.objects.find((o) => o.text?.group === group)?.text ?? null : null));
+  return useStore((s) => (group ? (s.doc.objects.find((o) => o.text?.group === group)?.text ?? null) : null));
 }
 
 /** Reactive "is the selection one lettering?" */
@@ -109,7 +109,16 @@ function LetterFill({ group, spec, fontFill, fontScales }: { group: string; spec
           label="Crosses"
           title={`Keep the font's cross size (more crosses on bigger letters) or grow the crosses with the letters (the designed pattern at every size). This font: ${fontScales ? "grow with the letters" : "keep their size"} (Ink/Stitch's scale cross stitch pattern).`}
         >
-          <Seg value={!!grow} options={[[false, "Font size"], [true, "Grow with letters"]] as const} onChange={(v) => updateText(group, { crossScale: v })} />
+          <Seg
+            value={!!grow}
+            options={
+              [
+                [false, "Font size"],
+                [true, "Grow with letters"],
+              ] as const
+            }
+            onChange={(v) => updateText(group, { crossScale: v })}
+          />
         </Row>
       )}
     </>
@@ -134,7 +143,12 @@ function FontButton({ spec }: { spec: TextSpec }) {
 
 function AlignSeg({ spec, group }: { spec: TextSpec; group: string }) {
   const icons = { left: <AlignLeft size={13} />, center: <AlignCenter size={13} />, right: <AlignRight size={13} />, block: <AlignJustify size={13} /> };
-  const titles = { left: "Align left", center: "Centre", right: "Align right", block: "Block: spread every line to the width of the longest (Ink/Stitch Block)" };
+  const titles = {
+    left: "Align left",
+    center: "Centre",
+    right: "Align right",
+    block: "Block: spread every line to the width of the longest (Ink/Stitch Block)",
+  };
   const block = spec.align === "block" || spec.align === "blockLetters";
   return (
     <div className="seg" role="group" aria-label="Alignment">
@@ -272,23 +286,50 @@ export function TextProperties({ group }: { group: string }) {
           <AlignSeg spec={spec} group={group} />
         </Row>
         {(spec.align === "block" || spec.align === "blockLetters") && (
-          <Row label="One-word lines" title="Block alignment widens the gaps between words; a line of one word can keep its spacing or spread its letters (Ink/Stitch Block, letter spacing)">
-            <Seg value={spec.align} options={[["block", "Keep"], ["blockLetters", "Spread letters"]] as const} onChange={(v) => updateText(group, { align: v })} />
+          <Row
+            label="One-word lines"
+            title="Block alignment widens the gaps between words; a line of one word can keep its spacing or spread its letters (Ink/Stitch Block, letter spacing)"
+          >
+            <Seg
+              value={spec.align}
+              options={
+                [
+                  ["block", "Keep"],
+                  ["blockLetters", "Spread letters"],
+                ] as const
+              }
+              onChange={(v) => updateText(group, { align: v })}
+            />
           </Row>
         )}
       </Section>
       {spec.path && (
         <Section title="On a path">
           <Row label="Place" title="Where the text sits along the path">
-            <Seg value={(spec.pathAlign ?? "center")} options={[
+            <Seg
+              value={spec.pathAlign ?? "center"}
+              options={
+                [
                   ["start", "Start"],
                   ["center", "Centre"],
                   ["end", "End"],
                   ["stretch", "Stretch"],
-                ] as const} onChange={(v) => updateText(group, { pathAlign: v })} />
+                ] as const
+              }
+              onChange={(v) => updateText(group, { pathAlign: v })}
+            />
           </Row>
           <Row label="Side" title="Letters on top of the path, or below it (the path read backwards)">
-            <Seg value={!!spec.pathFlip} options={[[false, "Above"], [true, "Below"]] as const} onChange={(v) => updateText(group, { pathFlip: v })} />
+            <Seg
+              value={!!spec.pathFlip}
+              options={
+                [
+                  [false, "Above"],
+                  [true, "Below"],
+                ] as const
+              }
+              onChange={(v) => updateText(group, { pathFlip: v })}
+            />
           </Row>
           <button className="btn sm ghost" onClick={() => updateText(group, { path: undefined })} title="Back to straight text at the anchor">
             Off the path
@@ -307,7 +348,12 @@ export function TextProperties({ group }: { group: string }) {
         {outline ? (
           <>
             <Row label="Style">
-              <select className="select" style={{ width: "100%" }} value={spec.style} onChange={(e) => updateText(group, { style: e.target.value as TextStyle })}>
+              <select
+                className="select"
+                style={{ width: "100%" }}
+                value={spec.style}
+                onChange={(e) => updateText(group, { style: e.target.value as TextStyle })}
+              >
                 {STYLES.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.label}
@@ -328,64 +374,79 @@ export function TextProperties({ group }: { group: string }) {
           </>
         ) : (
           <>
-          <LetterFill group={group} spec={spec} fontFill={fontFill} fontScales={emb?.scaleCrossStitch} />
-          {emb && emb.variants.length > 1 && (
-            <Row label="Direction" title="The direction the letters are stitched in: the font comes digitized in several (Ink/Stitch font variants)">
-              <div className="seg">
-                {emb.variants.map((v) => (
-                  <button
-                    key={v}
-                    title={`${VARIANT_LABELS[v]?.name ?? v}${v === emb.variant ? " (the font's default)" : ""}`}
-                    className={(spec.variant && emb.variants.includes(spec.variant) ? spec.variant : emb.variant) === v ? "on" : ""}
-                    onClick={() => updateText(group, { variant: v === emb.variant ? undefined : v })}
-                  >
-                    {VARIANT_LABELS[v]?.arrow ?? v}
-                  </button>
-                ))}
-              </div>
-            </Row>
-          )}
-          <Row
-            label="Back and forth"
-            title={
-              emb && !emb.reversible
-                ? "This font is digitized to be stitched in one direction only (font.json: reversible false)"
-                : "Stitch every second line the other way round, so each line starts where the last one ended — less travel (Ink/Stitch: stitch lines of text back and forth)"
-            }
-          >
-            {emb && !emb.reversible ? (
-              <span className="hint" style={{ padding: 0 }}>
-                Not for this font
-              </span>
-            ) : (
-              <Toggle on={!!spec.backAndForth} onChange={(v) => updateText(group, { backAndForth: v })} />
+            <LetterFill group={group} spec={spec} fontFill={fontFill} fontScales={emb?.scaleCrossStitch} />
+            {emb && emb.variants.length > 1 && (
+              <Row label="Direction" title="The direction the letters are stitched in: the font comes digitized in several (Ink/Stitch font variants)">
+                <div className="seg">
+                  {emb.variants.map((v) => (
+                    <button
+                      key={v}
+                      title={`${VARIANT_LABELS[v]?.name ?? v}${v === emb.variant ? " (the font's default)" : ""}`}
+                      className={(spec.variant && emb.variants.includes(spec.variant) ? spec.variant : emb.variant) === v ? "on" : ""}
+                      onClick={() => updateText(group, { variant: v === emb.variant ? undefined : v })}
+                    >
+                      {VARIANT_LABELS[v]?.arrow ?? v}
+                    </button>
+                  ))}
+                </div>
+              </Row>
             )}
-          </Row>
-          <Row label="Trims" title="Trim the thread after every letter, word or line (the font's own trims are always kept)">
-            <Seg value={(spec.trims ?? "never")} options={[
-                  ["never", "Never"],
-                  ["letter", "Letters"],
-                  ["word", "Words"],
-                  ["line", "Lines"],
-                ] as const} onChange={(v) => updateText(group, { trims: v })} />
-          </Row>
-          <p className={`hint ${outOfRange ? "warn" : ""}`}>
-            Pre-digitized Ink/Stitch embroidery font: every letter carries its own satin columns and underlay.
-            {range &&
-              (range[1] > range[0]
-                ? ` Designed for ${range[0].toFixed(0)}–${range[1].toFixed(0)} mm${outOfRange ? " — outside this range stitches get too dense or too loose." : "."}`
-                : ` Designed for ${range[0].toFixed(0)} mm.`)}
-          </p>
+            <Row
+              label="Back and forth"
+              title={
+                emb && !emb.reversible
+                  ? "This font is digitized to be stitched in one direction only (font.json: reversible false)"
+                  : "Stitch every second line the other way round, so each line starts where the last one ended — less travel (Ink/Stitch: stitch lines of text back and forth)"
+              }
+            >
+              {emb && !emb.reversible ? (
+                <span className="hint" style={{ padding: 0 }}>
+                  Not for this font
+                </span>
+              ) : (
+                <Toggle on={!!spec.backAndForth} onChange={(v) => updateText(group, { backAndForth: v })} />
+              )}
+            </Row>
+            <Row label="Trims" title="Trim the thread after every letter, word or line (the font's own trims are always kept)">
+              <Seg
+                value={spec.trims ?? "never"}
+                options={
+                  [
+                    ["never", "Never"],
+                    ["letter", "Letters"],
+                    ["word", "Words"],
+                    ["line", "Lines"],
+                  ] as const
+                }
+                onChange={(v) => updateText(group, { trims: v })}
+              />
+            </Row>
+            <p className={`hint ${outOfRange ? "warn" : ""}`}>
+              Pre-digitized Ink/Stitch embroidery font: every letter carries its own satin columns and underlay.
+              {range &&
+                (range[1] > range[0]
+                  ? ` Designed for ${range[0].toFixed(0)}–${range[1].toFixed(0)} mm${outOfRange ? " — outside this range stitches get too dense or too loose." : "."}`
+                  : ` Designed for ${range[0].toFixed(0)} mm.`)}
+            </p>
           </>
         )}
         {!outline && emb?.sortable && (
-          <Row label="Colour order" title="Sew the font's colours in turn (its colour sort order) within the whole text, each line or each word — fewer colour changes (Ink/Stitch colour sort; the font allows it)">
-            <Seg value={(spec.colorSort ?? "off")} options={[
+          <Row
+            label="Colour order"
+            title="Sew the font's colours in turn (its colour sort order) within the whole text, each line or each word — fewer colour changes (Ink/Stitch colour sort; the font allows it)"
+          >
+            <Seg
+              value={spec.colorSort ?? "off"}
+              options={
+                [
                   ["off", "As drawn"],
                   ["all", "Text"],
                   ["line", "Line"],
                   ["word", "Word"],
-                ] as const} onChange={(v) => updateText(group, { colorSort: v })} />
+                ] as const
+              }
+              onChange={(v) => updateText(group, { colorSort: v })}
+            />
           </Row>
         )}
         {palette && palette.length > 1 ? (
@@ -417,7 +478,9 @@ export function TextProperties({ group }: { group: string }) {
         <button
           className="btn sm ghost"
           title="Turn into ordinary shapes (no longer editable as text)"
-          onClick={() => useStore.getState().commit((d) => ({ ...d, objects: d.objects.map((o) => (o.text?.group === group ? { ...o, text: undefined } : o)) }))}
+          onClick={() =>
+            useStore.getState().commit((d) => ({ ...d, objects: d.objects.map((o) => (o.text?.group === group ? { ...o, text: undefined } : o)) }))
+          }
         >
           <Unlink size={12} /> Convert to shapes
         </button>
@@ -560,7 +623,12 @@ export function FontPickerDialog({ onClose }: { onClose: () => void }) {
   const list = useMemo(() => {
     // installed Ink/Stitch fonts (imported, copies, made from letters) first among the embroidery fonts
     const installed = imported.filter((f) => f.kind === "embroidery");
-    let all = tab === "embroidery" ? [...installed, ...library] : tab === "outline" ? [...BUNDLED_OUTLINE, ...imported.filter((f) => f.kind === "outline")] : system ?? [];
+    let all =
+      tab === "embroidery"
+        ? [...installed, ...library]
+        : tab === "outline"
+          ? [...BUNDLED_OUTLINE, ...imported.filter((f) => f.kind === "outline")]
+          : (system ?? []);
     if (tab === "embroidery" && tag) all = all.filter((f) => f.keywords?.includes(tag));
     const q = query.trim().toLowerCase();
     return q
@@ -653,7 +721,11 @@ export function FontPickerDialog({ onClose }: { onClose: () => void }) {
           <button className="btn" onClick={importFont}>
             Import TTF / OTF…
           </button>
-          <button className="btn" onClick={importInk} title="A folder with font.json and the font's Inkscape files (ltr.svg / →.svg, and the other directions if it has them), as in Ink/Stitch's fonts folder">
+          <button
+            className="btn"
+            onClick={importInk}
+            title="A folder with font.json and the font's Inkscape files (ltr.svg / →.svg, and the other directions if it has them), as in Ink/Stitch's fonts folder"
+          >
             Import Ink/Stitch font…
           </button>
           <button
@@ -703,7 +775,10 @@ export function FontPickerDialog({ onClose }: { onClose: () => void }) {
         {tab === "embroidery" &&
           "The Ink/Stitch community collection, bundled for offline use: every letter is hand-digitized with satin columns and underlay. Each font has its own licence (Help → Licences). Fonts marked optional download aren't included because of their licence: click one to download them in Preferences → Downloads."}
         {tab === "outline" && "Regular fonts, stitched as fill, satin edge, fill + edge or outline."}
-        {tab === "system" && (systemFontsSupported() ? "Fonts installed on this computer (the browser asks for permission once)." : "This browser can't list system fonts — import a TTF/OTF file instead.")}
+        {tab === "system" &&
+          (systemFontsSupported()
+            ? "Fonts installed on this computer (the browser asks for permission once)."
+            : "This browser can't list system fonts — import a TTF/OTF file instead.")}
       </p>
       {tab === "embroidery" && tags.length > 0 && (
         <div className="font-tags">

@@ -292,7 +292,10 @@ impl TravelGraph {
         if self.pts.is_empty() {
             return;
         }
-        let b = self.pts.iter().fold(Rect::EMPTY, |mut r, p| { r.include(*p); r });
+        let b = self.pts.iter().fold(Rect::EMPTY, |mut r, p| {
+            r.include(*p);
+            r
+        });
         let cell = self.step;
         let (w, h) = ((b.width() / cell).ceil() as usize + 2, (b.height() / cell).ceil() as usize + 2);
         let o = pt(b.min_x - cell * 0.5, b.min_y - cell * 0.5);
@@ -705,7 +708,15 @@ type GEdge = (usize, usize, Kind, usize);
 
 /// Ink/Stitch `insert_node`: a start or end point as a new node splitting
 /// the outline edge it lies on.
-fn insert_node(rings: &[Ring], perim: &[f64], p: Point, nodes: &mut Vec<Point>, pos: &mut Vec<OutlinePos>, edges: &mut Vec<GEdge>, alive: &mut Vec<bool>) -> Option<usize> {
+fn insert_node(
+    rings: &[Ring],
+    perim: &[f64],
+    p: Point,
+    nodes: &mut Vec<Point>,
+    pos: &mut Vec<OutlinePos>,
+    edges: &mut Vec<GEdge>,
+    alive: &mut Vec<bool>,
+) -> Option<usize> {
     let op = outline_pos(rings, p)?;
     let id = nodes.len();
     nodes.push(op.at);
@@ -1070,8 +1081,19 @@ mod tests {
     use super::*;
 
     fn ring_shape() -> Vec<Ring> {
-        let outer: Ring = (0..64).map(|k| { let a = k as f64 / 64.0 * std::f64::consts::TAU; pt(20.0 + 18.0 * a.cos(), 20.0 + 14.0 * a.sin()) }).collect();
-        let inner: Ring = (0..32).rev().map(|k| { let a = k as f64 / 32.0 * std::f64::consts::TAU; pt(20.0 + 6.0 * a.cos(), 20.0 + 5.0 * a.sin()) }).collect();
+        let outer: Ring = (0..64)
+            .map(|k| {
+                let a = k as f64 / 64.0 * std::f64::consts::TAU;
+                pt(20.0 + 18.0 * a.cos(), 20.0 + 14.0 * a.sin())
+            })
+            .collect();
+        let inner: Ring = (0..32)
+            .rev()
+            .map(|k| {
+                let a = k as f64 / 32.0 * std::f64::consts::TAU;
+                pt(20.0 + 6.0 * a.cos(), 20.0 + 5.0 * a.sin())
+            })
+            .collect();
         vec![outer, inner]
     }
 

@@ -30,8 +30,7 @@ export const MAX_PIECES = 400;
 /** The cells in sewing order: row by row; a serpentine goes back along every second row. */
 export function gridCells(rows: number, cols: number, order: GridOrder): { row: number; col: number }[] {
   const out: { row: number; col: number }[] = [];
-  for (let row = 0; row < rows; row++)
-    for (let k = 0; k < cols; k++) out.push({ row, col: order === "serpentine" && row % 2 ? cols - 1 - k : k });
+  for (let row = 0; row < rows; row++) for (let k = 0; k < cols; k++) out.push({ row, col: order === "serpentine" && row % 2 ? cols - 1 - k : k });
   return out;
 }
 
@@ -64,7 +63,10 @@ export function gridBox(box: Box, opt: Pick<GridOptions, "rows" | "cols" | "gap"
 }
 
 const valid = (opt: GridOptions) =>
-  [opt.rows, opt.cols].every((n) => Number.isInteger(n) && n >= 1) && opt.rows * opt.cols >= 2 && opt.rows * opt.cols <= MAX_PIECES && opt.gap.every(Number.isFinite);
+  [opt.rows, opt.cols].every((n) => Number.isInteger(n) && n >= 1) &&
+  opt.rows * opt.cols >= 2 &&
+  opt.rows * opt.cols <= MAX_PIECES &&
+  opt.gap.every(Number.isFinite);
 
 /**
  * The document with the grid made from the objects `ids`: the copies are

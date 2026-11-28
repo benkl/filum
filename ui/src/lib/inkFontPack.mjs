@@ -43,7 +43,10 @@ const len = (v) => {
  * in mm or inch documents are scaled to px like everything else.
  */
 function viewport(root) {
-  const vb = (root.get("viewBox") ?? "").trim().split(/[\s,]+/).map(Number);
+  const vb = (root.get("viewBox") ?? "")
+    .trim()
+    .split(/[\s,]+/)
+    .map(Number);
   if (vb.length !== 4 || !vb[2] || !vb[3]) return { s: 1, tx: 0, ty: 0 };
   const px = (v, fallback) => {
     const l = len(v);
@@ -54,7 +57,10 @@ function viewport(root) {
 }
 
 function pageHeightUU(root) {
-  const vb = (root.get("viewBox") ?? "").trim().split(/[\s,]+/).map(Number);
+  const vb = (root.get("viewBox") ?? "")
+    .trim()
+    .split(/[\s,]+/)
+    .map(Number);
   if (vb.length === 4 && vb[3]) return vb[3];
   const h = len(root.get("height"));
   return h && h.unit !== "%" ? h.v * (PX_PER[h.unit] ?? 1) : null; // unknown page height
@@ -115,7 +121,22 @@ function cleanAttrs(tag, body, isGlyphRoot, keepIds, connector = false) {
 /** Clip-path ids an element refers to (attribute or style). */
 const clipRefs = (body) => [...body.matchAll(/clip-path\s*[:=]\s*["']?\s*url\(\s*["']?#([^"')\s]+)/g)].map((m) => decode(m[1]));
 
-const DROP = new Set(["metadata", "title", "desc", "sodipodi:namedview", "use", "clipPath", "mask", "style", "script", "symbol", "marker", "pattern", "linearGradient", "radialGradient"]);
+const DROP = new Set([
+  "metadata",
+  "title",
+  "desc",
+  "sodipodi:namedview",
+  "use",
+  "clipPath",
+  "mask",
+  "style",
+  "script",
+  "symbol",
+  "marker",
+  "pattern",
+  "linearGradient",
+  "radialGradient",
+]);
 const TOKEN = /<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<\?[\s\S]*?\?>|<!DOCTYPE[\s\S]*?>|<(\/?)([\w:.-]+)((?:[^>"']|"[^"]*"|'[^']*')*?)(\/?)>|([^<]+)/g;
 
 /** An Ink/Stitch command symbol (`<use xlink:href="#inkstitch_trim">`). */
@@ -222,9 +243,7 @@ export function extractGlyphs(text) {
     if (!glyph && tag === "g" && label.startsWith("GlyphLayer-") && !selfClose) {
       const name = decode(label.slice("GlyphLayer-".length)).normalize("NFC");
       stack.push({ tag, transform: a.get("transform") ?? null });
-      const wrap = [page, ...stack.slice(1, -1).map((s) => s.transform)]
-        .filter(Boolean)
-        .map((t) => roundNums(t).replace(/\s+/g, " ").trim());
+      const wrap = [page, ...stack.slice(1, -1).map((s) => s.transform)].filter(Boolean).map((t) => roundNums(t).replace(/\s+/g, " ").trim());
       glyph = { name, depth: stack.length, parts: [`<g${cleanAttrs(tag, body, true, keepIds)}>`], wrap, clips: new Set(clipRefs(body)) };
       continue;
     }

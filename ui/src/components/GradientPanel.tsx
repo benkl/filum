@@ -40,7 +40,13 @@ import { ThreadPicker } from "./ThreadPicker";
 import { followPointer, Num, Row, Section, Seg, Slider } from "./ui";
 
 /** Paint a dithered preview of the gradient into a canvas. */
-function paintDither(c: HTMLCanvasElement | null, g: Pick<GradientParams, "stops" | "curve" | "steps" | "dither">, colors: string[], cols: number, rows: number) {
+function paintDither(
+  c: HTMLCanvasElement | null,
+  g: Pick<GradientParams, "stops" | "curve" | "steps" | "dither">,
+  colors: string[],
+  cols: number,
+  rows: number,
+) {
   if (!c) return;
   const dpr = window.devicePixelRatio || 1;
   const w = c.clientWidth || 200;
@@ -84,7 +90,13 @@ function paintShape(
   const oy = (H - box.h * sc) / 2 - box.y * sc;
   const cols = Math.max(6, Math.round((box.w * sc) / cell));
   const rows = Math.max(3, Math.round((box.h * sc) / cell));
-  const grid = ditherCells((ci, ri) => weightsAt(g, [box.x + ((ci + 0.5) / cols) * box.w, box.y + ((ri + 0.5) / rows) * box.h]), Math.max(1, g.stops.length), g.dither, cols, rows);
+  const grid = ditherCells(
+    (ci, ri) => weightsAt(g, [box.x + ((ci + 0.5) / cols) * box.w, box.y + ((ri + 0.5) / rows) * box.h]),
+    Math.max(1, g.stops.length),
+    g.dither,
+    cols,
+    rows,
+  );
   ctx.save();
   ctx.setTransform(dpr * sc, 0, 0, dpr * sc, dpr * ox, dpr * oy);
   ctx.clip(shape.paths, "evenodd");
@@ -124,7 +136,7 @@ function paintShape(
       }
     ctx.stroke();
   }
-  const pts = g.kind === "mesh" ? g.mesh?.nodes ?? [] : g.kind === "freeform" ? g.points ?? [] : [];
+  const pts = g.kind === "mesh" ? (g.mesh?.nodes ?? []) : g.kind === "freeform" ? (g.points ?? []) : [];
   pts.forEach((q, i) => {
     const [x, y] = tp(q.p);
     ctx.beginPath();
@@ -357,7 +369,7 @@ function Gradient2DEditor({ group }: { group: string }) {
     if (g && shape) paintShape(ref.current, g, colors, shape, 2.5, { selected: sel });
   });
   if (!g || !shape) return null;
-  const nodes = g.kind === "mesh" ? g.mesh?.nodes ?? [] : g.points ?? [];
+  const nodes = g.kind === "mesh" ? (g.mesh?.nodes ?? []) : (g.points ?? []);
   const valid = sel.filter((i) => i < nodes.length);
   const selThread = valid.length ? stops[nodes[valid[0]].c]?.thread : undefined;
   const aspect = Math.min(1.1, Math.max(0.35, shape.box.h / Math.max(shape.box.w, 1e-6)));
@@ -387,7 +399,9 @@ function Gradient2DEditor({ group }: { group: string }) {
       </div>
       <div className="grad-stop-edit">
         <span className="stat">
-          {valid.length ? `${valid.length} ${isMesh ? (valid.length === 1 ? "node" : "nodes") : valid.length === 1 ? "point" : "points"} selected` : `Select ${isMesh ? "nodes" : "points"} on the canvas to colour them`}
+          {valid.length
+            ? `${valid.length} ${isMesh ? (valid.length === 1 ? "node" : "nodes") : valid.length === 1 ? "point" : "points"} selected`
+            : `Select ${isMesh ? "nodes" : "points"} on the canvas to colour them`}
         </span>
         <ThreadPick value={selThread} disabled={!valid.length} onPick={(t) => colorNodes(group, valid, t)} />
         <div className="grad-stop-row">
@@ -395,18 +409,42 @@ function Gradient2DEditor({ group }: { group: string }) {
             <>
               <label className="ctx-field" title="Mesh rows (keeps the warp, resamples the colours)">
                 rows
-                <Num value={g.mesh?.rows ?? 2} step={1} min={2} max={16} digits={0} onChange={(v) => { const m = meshResample(g, Math.round(v), g.mesh!.cols); if (m) commit2D(group, { mesh: m }); }} />
+                <Num
+                  value={g.mesh?.rows ?? 2}
+                  step={1}
+                  min={2}
+                  max={16}
+                  digits={0}
+                  onChange={(v) => {
+                    const m = meshResample(g, Math.round(v), g.mesh!.cols);
+                    if (m) commit2D(group, { mesh: m });
+                  }}
+                />
               </label>
               <label className="ctx-field" title="Mesh columns">
                 cols
-                <Num value={g.mesh?.cols ?? 2} step={1} min={2} max={16} digits={0} onChange={(v) => { const m = meshResample(g, g.mesh!.rows, Math.round(v)); if (m) commit2D(group, { mesh: m }); }} />
+                <Num
+                  value={g.mesh?.cols ?? 2}
+                  step={1}
+                  min={2}
+                  max={16}
+                  digits={0}
+                  onChange={(v) => {
+                    const m = meshResample(g, g.mesh!.rows, Math.round(v));
+                    if (m) commit2D(group, { mesh: m });
+                  }}
+                />
               </label>
             </>
           ) : (
             <label className="ctx-field" title="How far the colour of the selected points (or all points) reaches before it blends">
               spread
               <Num
-                value={+(valid.length ? g.points![valid[0]].spread : (g.points ?? []).reduce((a, q) => a + q.spread, 0) / Math.max(1, g.points?.length ?? 1)).toFixed(1)}
+                value={
+                  +(
+                    valid.length ? g.points![valid[0]].spread : (g.points ?? []).reduce((a, q) => a + q.spread, 0) / Math.max(1, g.points?.length ?? 1)
+                  ).toFixed(1)
+                }
                 unit="mm"
                 step={1}
                 min={0.5}
@@ -423,7 +461,8 @@ function Gradient2DEditor({ group }: { group: string }) {
             disabled={!valid.length}
             title={isMesh ? "Remove the mesh lines through the selected node" : "Delete the selected points"}
             onClick={() => {
-              if (!removeNodes(group, valid)) useStore.getState().toast(isMesh ? "The mesh border stays — select an inner node" : "A gradient keeps at least one colour point");
+              if (!removeNodes(group, valid))
+                useStore.getState().toast(isMesh ? "The mesh border stays — select an inner node" : "A gradient keeps at least one colour point");
             }}
           >
             <Trash2 size={12} />
@@ -463,16 +502,47 @@ export function GradientSection({ group }: { group: string }) {
           <GradientBar group={group} selected={s} onSelect={setSel} />
           <div className="grad-stop-edit">
             <span className="stat">Stop {s + 1}</span>
-            <ThreadPick value={stop.thread} onPick={(t) => setStops(group, stops.map((x, i) => (i === s ? { ...x, thread: t } : x)))} />
+            <ThreadPick
+              value={stop.thread}
+              onPick={(t) =>
+                setStops(
+                  group,
+                  stops.map((x, i) => (i === s ? { ...x, thread: t } : x)),
+                )
+              }
+            />
             <div className="grad-stop-row">
               <label className="ctx-field" title="Position of this stop">
                 at
-                <Num value={Math.round(stop.pos * 100)} unit="%" step={5} min={0} max={100} digits={0} onChange={(v) => setStops(group, stops.map((x, i) => (i === s ? { ...x, pos: v / 100 } : x)))} />
+                <Num
+                  value={Math.round(stop.pos * 100)}
+                  unit="%"
+                  step={5}
+                  min={0}
+                  max={100}
+                  digits={0}
+                  onChange={(v) =>
+                    setStops(
+                      group,
+                      stops.map((x, i) => (i === s ? { ...x, pos: v / 100 } : x)),
+                    )
+                  }
+                />
               </label>
               <button className="btn sm ghost" title="Reverse the colours" onClick={() => setStops(group, reverseStops(stops))}>
                 <ArrowLeftRight size={12} />
               </button>
-              <button className="btn sm ghost" disabled={stops.length <= 2} title="Delete this stop" onClick={() => setStops(group, stops.filter((_, i) => i !== s))}>
+              <button
+                className="btn sm ghost"
+                disabled={stops.length <= 2}
+                title="Delete this stop"
+                onClick={() =>
+                  setStops(
+                    group,
+                    stops.filter((_, i) => i !== s),
+                  )
+                }
+              >
                 <Trash2 size={12} />
               </button>
             </div>
@@ -494,18 +564,37 @@ export function GradientSection({ group }: { group: string }) {
       {straight && (
         <div className="grad-rows">
           <span className="stat">Mix</span>
-          <Seg label="Mix" value={mix} options={[["blend", "Blend", "The colours share one set of rows: each row is sewn in one colour at a time, more of them where it is stronger, so the density stays even"], ["rows", "Rows", "Every row in one colour, the colours alternating rows through the transition (as Ink/Stitch's linear gradient fill); travel along the outline only"], ["dither", "Dither", "The rows are cut into cells, each in one colour: a crisp pixel mix, with a jump at many cell borders"]] as const} onChange={(v) => up({ mix: v })} />
+          <Seg
+            label="Mix"
+            value={mix}
+            options={
+              [
+                [
+                  "blend",
+                  "Blend",
+                  "The colours share one set of rows: each row is sewn in one colour at a time, more of them where it is stronger, so the density stays even",
+                ],
+                [
+                  "rows",
+                  "Rows",
+                  "Every row in one colour, the colours alternating rows through the transition (as Ink/Stitch's linear gradient fill); travel along the outline only",
+                ],
+                ["dither", "Dither", "The rows are cut into cells, each in one colour: a crisp pixel mix, with a jump at many cell borders"],
+              ] as const
+            }
+            onChange={(v) => up({ mix: v })}
+          />
         </div>
       )}
       {mix === "rows" ? (
         <p className="hint grad-blend-note">
-          <b>Alternate rows.</b> Every row is sewn in one colour; through the transition the colours take turns, the runs of one colour getting
-          shorter towards the next. Smoothest with the rows across the gradient{flat ? "" : " (2D gradients: by each row's average colour)"}.
+          <b>Alternate rows.</b> Every row is sewn in one colour; through the transition the colours take turns, the runs of one colour getting shorter towards
+          the next. Smoothest with the rows across the gradient{flat ? "" : " (2D gradients: by each row's average colour)"}.
         </p>
       ) : blended ? (
         <p className="hint grad-blend-note">
-          <b>Blended by rows.</b> The colours share one set of rows, each row sewn in one colour at a time, more of them where a colour is
-          stronger, so the density stays even. {straight ? "Rows or Dither for a crisper mix." : "Flow and curved rows always blend."}
+          <b>Blended by rows.</b> The colours share one set of rows, each row sewn in one colour at a time, more of them where a colour is stronger, so the
+          density stays even. {straight ? "Rows or Dither for a crisper mix." : "Flow and curved rows always blend."}
         </p>
       ) : (
         <div className="dither-cards">
@@ -556,13 +645,17 @@ export function GradientBarCompact({ group }: { group: string }) {
   const nodeSel = useStore((s) => s.gradNodes);
   const blended = fill?.method === "flow" || fill?.method === "curved" || (g?.mix ?? "blend") !== "dither";
   if (!g) return null;
-  const nodes = g.kind === "mesh" ? g.mesh?.nodes ?? [] : g.points ?? [];
+  const nodes = g.kind === "mesh" ? (g.mesh?.nodes ?? []) : (g.points ?? []);
   const valid = nodeSel.filter((i) => i < nodes.length);
   return (
     <>
       {is2D(g.kind) ? (
         <div style={{ maxWidth: 260, overflow: "hidden" }}>
-          <ThreadPick value={valid.length ? stops[nodes[valid[0]].c]?.thread : undefined} disabled={!valid.length} onPick={(t) => colorNodes(group, valid, t)} />
+          <ThreadPick
+            value={valid.length ? stops[nodes[valid[0]].c]?.thread : undefined}
+            disabled={!valid.length}
+            onPick={(t) => colorNodes(group, valid, t)}
+          />
         </div>
       ) : (
         <div style={{ width: 220 }}>
@@ -570,7 +663,12 @@ export function GradientBarCompact({ group }: { group: string }) {
         </div>
       )}
       <KindPicker value={g.kind} compact onChange={(k) => setGradientKind(group, k)} />
-      <select className="select" style={{ width: 96 }} value={g.curve} onChange={(e) => updateGradient(group, { curve: e.target.value as GradientParams["curve"] })}>
+      <select
+        className="select"
+        style={{ width: 96 }}
+        value={g.curve}
+        onChange={(e) => updateGradient(group, { curve: e.target.value as GradientParams["curve"] })}
+      >
         {CURVES.map((c) => (
           <option key={c.id} value={c.id}>
             {c.label}
@@ -613,7 +711,11 @@ export function RowStylePicker({ objects, kind }: { objects: DesignObject[]; kin
   const style = rowStyleOf(objects);
   const flow = canFlow(objects);
   const curvedHint =
-    kind === "mesh" ? "Rows follow the mesh: warp it and the stitches bend with it" : kind === "freeform" ? "Rows circle the colour points, and follow the outline further out" : "Rows follow the outline of the shape";
+    kind === "mesh"
+      ? "Rows follow the mesh: warp it and the stitches bend with it"
+      : kind === "freeform"
+        ? "Rows circle the colour points, and follow the outline further out"
+        : "Rows follow the outline of the shape";
   const ids = objects.map((o) => o.id);
   const fromColours = flow && objects.every((o) => flowSource(o) === "colours");
   const across = objects[0]?.stitch.type === "fill" && !!objects[0].stitch.flowAcross;
@@ -634,12 +736,7 @@ export function RowStylePicker({ objects, kind }: { objects: DesignObject[]; kin
         <button className={style === "curved" ? "on" : ""} title={curvedHint} onClick={() => setRowStyle(ids, "curved")}>
           Curved
         </button>
-        <button
-          className={style === "flow" ? "on" : ""}
-          disabled={!flow}
-          title={flowHint}
-          onClick={() => setRowStyle(ids, "flow")}
-        >
+        <button className={style === "flow" ? "on" : ""} disabled={!flow} title={flowHint} onClick={() => setRowStyle(ids, "flow")}>
           Flow
         </button>
       </div>
@@ -648,7 +745,11 @@ export function RowStylePicker({ objects, kind }: { objects: DesignObject[]; kin
           <button className={!across ? "on" : ""} title="Rows run along the colour bands: each row keeps one shade" onClick={() => setFlowAcross(ids, false)}>
             <FlowDirIcon across={false} /> Along
           </button>
-          <button className={across ? "on" : ""} title="Rows run across the colour bands: from one colour into the next" onClick={() => setFlowAcross(ids, true)}>
+          <button
+            className={across ? "on" : ""}
+            title="Rows run across the colour bands: from one colour into the next"
+            onClick={() => setFlowAcross(ids, true)}
+          >
             <FlowDirIcon across /> Across
           </button>
         </div>

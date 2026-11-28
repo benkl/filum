@@ -28,7 +28,6 @@ export interface AutoSatinOptions {
   end?: Vec2;
 }
 
-
 /** The part of a polyline between fractions f0 < f1 of its length. */
 function substring(pts: Vec2[], f0: number, f1: number): Vec2[] {
   const cum = cumulative(pts);
@@ -139,7 +138,13 @@ function cutRail(r: Rail, d0: number, d1: number): SubPath {
     const [, right] = splitCubic(c, a.t);
     const [mid] = splitCubic(right, a.t >= 1 ? 0 : (b.t - a.t) / (1 - a.t));
     const curved = isCurved(r.sp, a.seg);
-    return { closed: false, nodes: [{ p: mid[0], o: curved ? mid[1] : undefined }, { p: mid[3], i: curved ? mid[2] : undefined }] };
+    return {
+      closed: false,
+      nodes: [
+        { p: mid[0], o: curved ? mid[1] : undefined },
+        { p: mid[3], i: curved ? mid[2] : undefined },
+      ],
+    };
   }
   const nodes: PathNode[] = [];
   // the start: inside segment a.seg (or on its first node)
@@ -239,8 +244,10 @@ function shapeOf(o: DesignObject): SatinShape | null {
       return d0 == null || d1 == null ? null : { sp: o.paths[i], d0, d1 };
     })
     .filter((x): x is { sp: SubPath; d0: number; d1: number } => !!x);
-  const nodeRungs = !rungCuts.length && !(st.guides?.length) && r0.nodeIdx.length === r1.nodeIdx.length && r0.nodeIdx.length > 2;
-  const cuts = nodeRungs ? r0.nodeIdx.slice(1, -1).map((k, j) => ({ sp: null as SubPath | null, d0: r0.cum[k], d1: r1.cum[r1.nodeIdx[j + 1]] })) : rungCuts.map((c) => ({ ...c, sp: c.sp as SubPath | null }));
+  const nodeRungs = !rungCuts.length && !st.guides?.length && r0.nodeIdx.length === r1.nodeIdx.length && r0.nodeIdx.length > 2;
+  const cuts = nodeRungs
+    ? r0.nodeIdx.slice(1, -1).map((k, j) => ({ sp: null as SubPath | null, d0: r0.cum[k], d1: r1.cum[r1.nodeIdx[j + 1]] }))
+    : rungCuts.map((c) => ({ ...c, sp: c.sp as SubPath | null }));
   cuts.sort((x, y) => x.d0 - y.d0);
   const pairs: { d0: number; d1: number }[] = [{ d0: 0, d1: 0 }];
   const rungs: { sp: SubPath; pair: number }[] = [];
@@ -384,7 +391,8 @@ export function autoSatin(objects: DesignObject[], opts: AutoSatinOptions = {}):
       edges.push({ a: addNode(pointAt(s, seg.start), elemOf[si]), b: addNode(pointAt(s, seg.end), elemOf[si]), op: seg, el: elemOf[si] });
     }
   });
-  for (const r of runs) edges.push({ a: addNode(r.pts[0], r.el), b: addNode(r.pts[r.pts.length - 1], r.el), op: { kind: "run", pts: r.pts, from: r.el }, el: r.el });
+  for (const r of runs)
+    edges.push({ a: addNode(r.pts[0], r.el), b: addNode(r.pts[r.pts.length - 1], r.el), op: { kind: "run", pts: r.pts, from: r.el }, el: r.el });
 
   // adjacency (undirected; with preserve order, jumps only go forward)
   const adj = new Map<string, { to: string; e: number; jumpDir?: boolean }[]>();
@@ -414,10 +422,11 @@ export function autoSatin(objects: DesignObject[], opts: AutoSatinOptions = {}):
       const a = nodesOf(el);
       const b = nodesOf(el + 1);
       let best: [string, string, number] | null = null;
-      for (const x of a) for (const y of b) {
-        const d = dist(nodes.get(x)!.p, nodes.get(y)!.p);
-        if (!best || d < best[2]) best = [x, y, d];
-      }
+      for (const x of a)
+        for (const y of b) {
+          const d = dist(nodes.get(x)!.p, nodes.get(y)!.p);
+          if (!best || d < best[2]) best = [x, y, d];
+        }
       if (best && best[0] !== best[1]) addJump(best[0], best[1], true);
     }
   } else {
@@ -444,10 +453,11 @@ export function autoSatin(objects: DesignObject[], opts: AutoSatinOptions = {}):
     for (let i = 0; i < nc; i++)
       for (let j = i + 1; j < nc; j++) {
         let best: [string, string, number] | null = null;
-        for (const x of members[i]) for (const y of members[j]) {
-          const d = dist(nodes.get(x)!.p, nodes.get(y)!.p);
-          if (!best || d < best[2]) best = [x, y, d];
-        }
+        for (const x of members[i])
+          for (const y of members[j]) {
+            const d = dist(nodes.get(x)!.p, nodes.get(y)!.p);
+            if (!best || d < best[2]) best = [x, y, d];
+          }
         if (best) cand.push([i, j, best[0], best[1], best[2]]);
       }
     cand.sort((x, y) => x[4] - y[4]);
@@ -526,7 +536,9 @@ export function autoSatin(objects: DesignObject[], opts: AutoSatinOptions = {}):
     // DFS from `node` over the edges not walked yet (networkx dfs_labeled_edges)
     const events: [string, string, number, "forward" | "reverse" | "nontree"][] = [];
     const visited = new Set([node]);
-    const stack: { u: string; it: { to: string; e: number }[]; k: number; via: number }[] = [{ u: node, it: undirected(node).filter((x) => !removed.has(x.e)), k: 0, via: -1 }];
+    const stack: { u: string; it: { to: string; e: number }[]; k: number; via: number }[] = [
+      { u: node, it: undirected(node).filter((x) => !removed.has(x.e)), k: 0, via: -1 },
+    ];
     while (stack.length) {
       const top = stack[stack.length - 1];
       if (top.k < top.it.length) {
@@ -578,9 +590,21 @@ export function autoSatin(objects: DesignObject[], opts: AutoSatinOptions = {}):
   const merged: Op[] = [];
   for (const op of ops) {
     const last = merged[merged.length - 1];
-    if (last?.kind === "satin" && op.kind === "satin" && last.shape === op.shape && last.reverse === op.reverse && Math.abs(last.reverse ? last.start - op.end : last.end - op.start) < 1e-9) {
+    if (
+      last?.kind === "satin" &&
+      op.kind === "satin" &&
+      last.shape === op.shape &&
+      last.reverse === op.reverse &&
+      Math.abs(last.reverse ? last.start - op.end : last.end - op.start) < 1e-9
+    ) {
       merged[merged.length - 1] = last.reverse ? { ...last, start: op.start } : { ...last, end: op.end };
-    } else if (last?.kind === "run" && op.kind === "run" && last.from === op.from && dist(last.pts[last.pts.length - 1], op.pts[0]) < 0.5 && !(dist(last.pts[0], op.pts[op.pts.length - 1]) < 1e-6 && dist(last.pts[last.pts.length - 1], op.pts[0]) < 1e-6 && op.pts.length === last.pts.length)) {
+    } else if (
+      last?.kind === "run" &&
+      op.kind === "run" &&
+      last.from === op.from &&
+      dist(last.pts[last.pts.length - 1], op.pts[0]) < 0.5 &&
+      !(dist(last.pts[0], op.pts[op.pts.length - 1]) < 1e-6 && dist(last.pts[last.pts.length - 1], op.pts[0]) < 1e-6 && op.pts.length === last.pts.length)
+    ) {
       merged[merged.length - 1] = { ...last, pts: [...last.pts, ...op.pts.slice(1)] };
     } else merged.push(op);
   }
@@ -637,7 +661,13 @@ export function autoSatin(objects: DesignObject[], opts: AutoSatinOptions = {}):
       id: uid(),
       name: `AutoSatin ${n++}`,
       paths,
-      stitch: { ...st, reverse: op.reverse, swapRails: whole || !s.rails ? st.swapRails : false, centerWalkRepeats: walk % 2 ? Math.max(2, walk - 1) : walk, guides: whole ? st.guides : undefined },
+      stitch: {
+        ...st,
+        reverse: op.reverse,
+        swapRails: whole || !s.rails ? st.swapRails : false,
+        centerWalkRepeats: walk % 2 ? Math.max(2, walk - 1) : walk,
+        guides: whole ? st.guides : undefined,
+      },
       start: undefined,
       end: undefined,
       trimAfter: false,

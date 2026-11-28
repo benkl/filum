@@ -15,7 +15,12 @@ import { useStore } from "../../store";
 import { stopsOf } from "../../lib/gradient";
 
 /** The move of a gradient or density-ramp drag. */
-export function moveGradient(c: CanvasCtx, d: Extract<Drag, { kind: "gradvec" | "gradend" | "gradnode" | "gradspread" | "gradstop" | "rampend" | "rampvec" }>, p: Vec2, e: RPointerEvent) {
+export function moveGradient(
+  c: CanvasCtx,
+  d: Extract<Drag, { kind: "gradvec" | "gradend" | "gradnode" | "gradspread" | "gradstop" | "rampend" | "rampvec" }>,
+  p: Vec2,
+  e: RPointerEvent,
+) {
   const { draw, iRef, overlayRef } = c;
   switch (d.kind) {
     case "rampend": {
@@ -80,7 +85,11 @@ export function moveGradient(c: CanvasCtx, d: Extract<Drag, { kind: "gradvec" | 
       const dv = [g.to[0] - g.from[0], g.to[1] - g.from[1]];
       const l2 = dv[0] * dv[0] + dv[1] * dv[1] || 1;
       const t = Math.min(1, Math.max(0, ((p[0] - g.from[0]) * dv[0] + (p[1] - g.from[1]) * dv[1]) / l2));
-      setStops(d.group, d.stops.map((st, i) => (i === d.index ? { ...st, pos: t } : st)), true);
+      setStops(
+        d.group,
+        d.stops.map((st, i) => (i === d.index ? { ...st, pos: t } : st)),
+        true,
+      );
       iRef.current.tooltip = { p, text: `${Math.round(t * 100)} %` };
       draw();
       return;
@@ -89,7 +98,12 @@ export function moveGradient(c: CanvasCtx, d: Extract<Drag, { kind: "gradvec" | 
 }
 
 /** The release of a gradient or density-ramp drag. */
-export function upGradient(c: CanvasCtx, s: StoreState, d: Extract<Drag, { kind: "gradvec" | "gradend" | "gradstop" | "gradnode" | "gradspread" | "rampend" | "rampvec" }>, e: RPointerEvent) {
+export function upGradient(
+  c: CanvasCtx,
+  s: StoreState,
+  d: Extract<Drag, { kind: "gradvec" | "gradend" | "gradstop" | "gradnode" | "gradspread" | "rampend" | "rampvec" }>,
+  e: RPointerEvent,
+) {
   const { draw, iRef, overlayRef, pick, toMm } = c;
   if (d.kind === "gradvec") {
     const draft = iRef.current.gradDraft;
@@ -167,7 +181,10 @@ export function downGradient(c: CanvasCtx, tool: "gradient", s: StoreState, e: R
         }
         if (gh.kind === "stop") {
           if ((e.altKey || e.detail === 2) && gh.stops.length > 2) {
-            setStops(gh.group, gh.stops.filter((_, i) => i !== gh.index));
+            setStops(
+              gh.group,
+              gh.stops.filter((_, i) => i !== gh.index),
+            );
             return;
           }
           s.checkpoint();
@@ -176,7 +193,10 @@ export function downGradient(c: CanvasCtx, tool: "gradient", s: StoreState, e: R
         }
         // click on the line: a new stop there, with the colour of the nearest stop
         const near = gh.stops.reduce((b, st, i) => (Math.abs(st.pos - gh.t) < Math.abs(gh.stops[b].pos - gh.t) ? i : b), 0);
-        setStops(gh.group, [...gh.stops, { pos: gh.t, mid: 0.5, thread: gh.stops[near].thread }].sort((a, b) => a.pos - b.pos));
+        setStops(
+          gh.group,
+          [...gh.stops, { pos: gh.t, mid: 0.5, thread: gh.stops[near].thread }].sort((a, b) => a.pos - b.pos),
+        );
         return;
       }
       // a new gradient vector across the selected (or clicked) shape

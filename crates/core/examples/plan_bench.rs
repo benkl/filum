@@ -191,7 +191,9 @@ fn suite(dir: &PathBuf, only: Option<&str>) -> Result<Vec<Case>, String> {
     let mut images: Vec<PathBuf> = std::fs::read_dir(dir)
         .map_err(|e| e.to_string())?
         .filter_map(|e| e.ok().map(|e| e.path()))
-        .filter(|p| matches!(p.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase().as_str(), "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp"))
+        .filter(|p| {
+            matches!(p.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase().as_str(), "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp")
+        })
         .filter(|p| only.is_none_or(|o| p.file_stem().and_then(|s| s.to_str()).unwrap_or("").contains(o)))
         .collect();
     images.sort();
@@ -234,25 +236,33 @@ fn object(id: String, thread: usize, paths: Vec<SubPath>, stitch: StitchParams) 
 }
 
 fn ellipse(c: Point, rx: f64, ry: f64, n: usize) -> Vec<SubPath> {
-    let pts: Vec<Point> = (0..n).map(|k| {
-        let a = k as f64 / n as f64 * std::f64::consts::TAU;
-        pt(c.x + rx * a.cos(), c.y + ry * a.sin())
-    }).collect();
+    let pts: Vec<Point> = (0..n)
+        .map(|k| {
+            let a = k as f64 / n as f64 * std::f64::consts::TAU;
+            pt(c.x + rx * a.cos(), c.y + ry * a.sin())
+        })
+        .collect();
     vec![SubPath::polyline(&pts, true)]
 }
 
 /// A blob: an ellipse with a wavy edge (curved-fill fields bend along it).
 fn blob(c: Point, r: f64, n: usize, seed: f64) -> Vec<SubPath> {
-    let pts: Vec<Point> = (0..n).map(|k| {
-        let a = k as f64 / n as f64 * std::f64::consts::TAU;
-        let rr = r * (1.0 + 0.18 * (3.0 * a + seed).sin() + 0.08 * (5.0 * a + 2.0 * seed).cos());
-        pt(c.x + rr * a.cos(), c.y + 0.8 * rr * a.sin())
-    }).collect();
+    let pts: Vec<Point> = (0..n)
+        .map(|k| {
+            let a = k as f64 / n as f64 * std::f64::consts::TAU;
+            let rr = r * (1.0 + 0.18 * (3.0 * a + seed).sin() + 0.08 * (5.0 * a + 2.0 * seed).cos());
+            pt(c.x + rr * a.cos(), c.y + 0.8 * rr * a.sin())
+        })
+        .collect();
     vec![SubPath::polyline(&pts, true)]
 }
 
 fn doc(name: &str, objects: Vec<Object>, threads: usize) -> Case {
-    Case { name: name.into(), doc: Document { name: name.into(), threads: (0..threads).map(thread).collect(), objects, ..Document::default() }, digitize_s: None }
+    Case {
+        name: name.into(),
+        doc: Document { name: name.into(), threads: (0..threads).map(thread).collect(), objects, ..Document::default() },
+        digitize_s: None,
+    }
 }
 
 fn fill(method: FillMethod, angle: f64) -> FillParams {
@@ -277,7 +287,12 @@ fn synthetic() -> Vec<Case> {
     for j in 0..12 {
         for i in 0..12 {
             let k = j * 12 + i;
-            objs.push(object(format!("f{k}"), k % 4, ellipse(pt(i as f64 * 7.0, j as f64 * 7.0), 4.5, 4.5, 48), StitchParams::Fill(fill(FillMethod::Tatami, (k * 17 % 180) as f64))));
+            objs.push(object(
+                format!("f{k}"),
+                k % 4,
+                ellipse(pt(i as f64 * 7.0, j as f64 * 7.0), 4.5, 4.5, 48),
+                StitchParams::Fill(fill(FillMethod::Tatami, (k * 17 % 180) as f64)),
+            ));
         }
     }
     v.push(doc("synth-144-tatami", objs, 4));
@@ -286,7 +301,12 @@ fn synthetic() -> Vec<Case> {
     let mut objs = Vec::new();
     for k in 0..16 {
         let c = pt((k % 4) as f64 * 24.0, (k / 4) as f64 * 22.0);
-        objs.push(object(format!("c{k}"), k % 3, blob(c, 15.0, 120, k as f64), StitchParams::Fill(FillParams { curve: 1.0, ..fill(FillMethod::Curved, (k * 23 % 180) as f64) })));
+        objs.push(object(
+            format!("c{k}"),
+            k % 3,
+            blob(c, 15.0, 120, k as f64),
+            StitchParams::Fill(FillParams { curve: 1.0, ..fill(FillMethod::Curved, (k * 23 % 180) as f64) }),
+        ));
     }
     v.push(doc("synth-16-curved", objs, 3));
 
@@ -303,12 +323,18 @@ fn synthetic() -> Vec<Case> {
     // 4. satins and running stitch: 120 satin columns (wavy centre lines, 3 mm) over 30 fills
     let mut objs = Vec::new();
     for k in 0..30 {
-        objs.push(object(format!("b{k}"), 0, ellipse(pt((k % 6) as f64 * 20.0, (k / 6) as f64 * 20.0), 10.0, 9.0, 64), StitchParams::Fill(fill(FillMethod::Tatami, 45.0))));
+        objs.push(object(
+            format!("b{k}"),
+            0,
+            ellipse(pt((k % 6) as f64 * 20.0, (k / 6) as f64 * 20.0), 10.0, 9.0, 64),
+            StitchParams::Fill(fill(FillMethod::Tatami, 45.0)),
+        ));
     }
     for k in 0..120 {
         let (x0, y0) = ((k % 10) as f64 * 12.0, (k / 10) as f64 * 8.0);
         let pts: Vec<Point> = (0..40).map(|j| pt(x0 + j as f64 * 0.8, y0 + 2.0 * (j as f64 * 0.3 + k as f64).sin())).collect();
-        let st = if k % 4 == 3 { StitchParams::Running(RunningParams::default()) } else { StitchParams::Satin(SatinParams { width: 3.0, ..Default::default() }) };
+        let st =
+            if k % 4 == 3 { StitchParams::Running(RunningParams::default()) } else { StitchParams::Satin(SatinParams { width: 3.0, ..Default::default() }) };
         objs.push(object(format!("s{k}"), 1 + k % 3, vec![SubPath::polyline(&pts, false)], st));
     }
     v.push(doc("synth-120-satins", objs, 4));
@@ -317,7 +343,12 @@ fn synthetic() -> Vec<Case> {
     let mut objs = Vec::new();
     for k in 0..300 {
         let (x, y) = ((k * 37 % 90) as f64, (k * 53 % 90) as f64);
-        objs.push(object(format!("p{k}"), k % 5, ellipse(pt(x + 5.0, y + 5.0), 6.0 + (k % 7) as f64, 5.0 + (k % 5) as f64, 40), StitchParams::Fill(fill(FillMethod::Tatami, (k * 31 % 180) as f64))));
+        objs.push(object(
+            format!("p{k}"),
+            k % 5,
+            ellipse(pt(x + 5.0, y + 5.0), 6.0 + (k % 7) as f64, 5.0 + (k % 5) as f64, 40),
+            StitchParams::Fill(fill(FillMethod::Tatami, (k * 31 % 180) as f64)),
+        ));
     }
     v.push(doc("synth-300-pile", objs, 5));
     v

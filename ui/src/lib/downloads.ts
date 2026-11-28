@@ -49,7 +49,8 @@ async function fetchFile(url: string, size: number, onBytes: (n: number) => void
     n = b.length;
     onBytes(n);
   }
-  if (size && n !== size) throw new Error(`${decodeURIComponent(url.split("/").pop() ?? url)}: expected ${size} bytes, got ${n} — the download may be incomplete`);
+  if (size && n !== size)
+    throw new Error(`${decodeURIComponent(url.split("/").pop() ?? url)}: expected ${size} bytes, got ${n} — the download may be incomplete`);
   const out = new Uint8Array(n);
   let o = 0;
   for (const p of parts) {
@@ -101,13 +102,19 @@ export async function installPack(pack: DownloadPack, onProgress: (p: Progress) 
     if (signal.aborted) throw new DOMException("Cancelled", "AbortError");
     const mine = it.files.map(([p]) => ({ path: p, bytes: bytes.get(p)! }));
     if (pack.kind === "fonts") {
-      const { root: _root, ...packed } = await packInkFolder(mine.filter((f) => /\.(json|svg)$/i.test(f.path)).map((f) => ({ path: f.path, text: async () => dec.decode(f.bytes) })));
+      const { root: _root, ...packed } = await packInkFolder(
+        mine.filter((f) => /\.(json|svg)$/i.test(f.path)).map((f) => ({ path: f.path, text: async () => dec.decode(f.bytes) })),
+      );
       const lic = mine.find((f) => /\/(license|licence)(\.txt)?$/i.test(f.path));
       const png = mine.find((f) => /\/preview\.png$/i.test(f.path));
       changes.push({
         store: "fonts",
         key: it.id,
-        value: { pack: packed, license: lic ? dec.decode(lic.bytes).replace(/\r\n/g, "\n") : "", preview: png ? new Blob([png.bytes as BlobPart], { type: "image/png" }) : undefined },
+        value: {
+          pack: packed,
+          license: lic ? dec.decode(lic.bytes).replace(/\r\n/g, "\n") : "",
+          preview: png ? new Blob([png.bytes as BlobPart], { type: "image/png" }) : undefined,
+        },
       });
     } else {
       const xml = dec.decode(mine[0].bytes);

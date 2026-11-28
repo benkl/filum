@@ -18,7 +18,10 @@ const ms = (f) => {
   return performance.now() - t;
 };
 console.log("design                 cold ms  warm ms  stitches");
-for (const f of fs.readdirSync(dir).filter((x) => x.endsWith(".filum")).sort()) {
+for (const f of fs
+  .readdirSync(dir)
+  .filter((x) => x.endsWith(".filum"))
+  .sort()) {
   const json = fs.readFileSync(path.join(dir, f), "utf8");
   const cold = [];
   let stitches = 0;
@@ -31,5 +34,9 @@ for (const f of fs.readdirSync(dir).filter((x) => x.endsWith(".filum")).sort()) 
   e.plan(json);
   const warm = ms(() => e.plan(json));
   e.free();
-  console.log(`${f.replace(".filum", "").padEnd(22)} ${Math.min(...cold).toFixed(0).padStart(7)}  ${warm.toFixed(1).padStart(7)}  ${String(stitches).padStart(8)}`);
+  console.log(
+    `${f.replace(".filum", "").padEnd(22)} ${Math.min(...cold)
+      .toFixed(0)
+      .padStart(7)}  ${warm.toFixed(1).padStart(7)}  ${String(stitches).padStart(8)}`,
+  );
 }

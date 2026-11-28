@@ -50,7 +50,6 @@ function canvasOf(w: number, h: number) {
   return c.getContext("2d", { willReadFrequently: true })!;
 }
 
-
 // ---------------------------------------------------------------------------
 // Segmentation (MobileSAM)
 
@@ -79,7 +78,6 @@ export async function samEncode(bmp: ImageBitmap): Promise<SamImage> {
   const out = await enc.run({ input_image: new ort.Tensor("float32", input, [h, w, 3]) });
   return { w, h, embedding: out.image_embeddings };
 }
-
 
 /** Mask (0 / 255 per working-frame pixel) for the clicked points. */
 export async function samMask(img: SamImage, points: SamPoint[]): Promise<Uint8Array> {
@@ -110,7 +108,6 @@ export async function samMask(img: SamImage, points: SamPoint[]): Promise<Uint8A
 
 // ---------------------------------------------------------------------------
 // Edges (DexiNed)
-
 
 /** Learned edge map (255 = strongest), 640 × 480, base64: the engine stretches it over the image. */
 export async function detectEdges(bmp: ImageBitmap): Promise<EdgeMapData> {
@@ -144,7 +141,6 @@ export async function detectEdges(bmp: ImageBitmap): Promise<EdgeMapData> {
   for (let i = 0; i < W * H; i++) bytes[i] = Math.round((sig[i] - lo) * k);
   return { width: W, height: H, data: toBase64(bytes) };
 }
-
 
 // ---------------------------------------------------------------------------
 // Line drawing (Informative Drawings)
@@ -180,10 +176,8 @@ export async function drawLines(bmp: ImageBitmap): Promise<EdgeMapData> {
   return { width: ow, height: oh, data: toBase64(bytes) };
 }
 
-
 // ---------------------------------------------------------------------------
 // Text (Tesseract)
-
 
 /** Recognise text lines (English) in the image. */
 export async function findText(bytes: Uint8Array): Promise<TextLine[]> {

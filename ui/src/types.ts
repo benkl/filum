@@ -183,7 +183,8 @@ export interface LayeredOptions {
   baseThread?: string;
 }
 
-export type FillMethod = "tatami" | "contour" | "spiral" | "radial" | "hilbert" | "stipple" | "meander" | "guided" | "circular" | "flow" | "curved" | "cross" | "tartan";
+export type FillMethod =
+  "tatami" | "contour" | "spiral" | "radial" | "hilbert" | "stipple" | "meander" | "guided" | "circular" | "flow" | "curved" | "cross" | "tartan";
 
 /** Direction field (design mm) for flow fills: row angles in radians, row-major. */
 export interface FlowField {

@@ -87,10 +87,7 @@ pub struct Thread {
 
 impl Thread {
     pub fn from_rgb(rgb: [u8; 3]) -> Self {
-        Thread {
-            rgb,
-            ..Default::default()
-        }
+        Thread { rgb, ..Default::default() }
     }
     /// `#rrggbb`
     pub fn hex(&self) -> String {
@@ -320,10 +317,7 @@ impl Format {
         if self == Format::Json {
             return &JSON_INFO;
         }
-        FORMATS
-            .iter()
-            .find(|i| i.format == self)
-            .expect("every format is listed")
+        FORMATS.iter().find(|i| i.format == self).expect("every format is listed")
     }
     pub fn extension(self) -> &'static str {
         self.info().extension
@@ -334,10 +328,7 @@ impl Format {
 /// included. `json` is not matched (see [`Format::Json`]).
 pub fn format_from_extension(ext: &str) -> Option<Format> {
     let e = ext.trim().trim_start_matches('.');
-    FORMATS
-        .iter()
-        .find(|i| i.extension.eq_ignore_ascii_case(e) || i.aliases.iter().any(|a| a.eq_ignore_ascii_case(e)))
-        .map(|i| i.format)
+    FORMATS.iter().find(|i| i.extension.eq_ignore_ascii_case(e) || i.aliases.iter().any(|a| a.eq_ignore_ascii_case(e))).map(|i| i.format)
 }
 
 /// Guess the format of `bytes`: magic bytes first (`#PES`, `#PEC`, `#PHB`, `#PHC`, DST `LA:`,
@@ -402,7 +393,12 @@ pub fn machine_colors(p: &Pattern, f: Format, opts: &WriteOptions) -> Vec<Machin
             (0..e.threads.len())
                 .map(|i| {
                     let slot = idx.get(i).copied().unwrap_or(0);
-                    MachineColor { thread: e.thread(i), shown: Some(palette::pec_thread(slot)), slot: Some(slot), exact: f == Format::Pes && opts.pes_version == PesVersion::V6 }
+                    MachineColor {
+                        thread: e.thread(i),
+                        shown: Some(palette::pec_thread(slot)),
+                        slot: Some(slot),
+                        exact: f == Format::Pes && opts.pes_version == PesVersion::V6,
+                    }
                 })
                 .collect()
         }
@@ -427,7 +423,12 @@ pub fn machine_colors(p: &Pattern, f: Format, opts: &WriteOptions) -> Vec<Machin
             sew::color_indices(&e)
                 .into_iter()
                 .enumerate()
-                .map(|(i, slot)| MachineColor { thread: e.thread(i), shown: Some(palette::table_thread(&palette::SEW_PALETTE, slot, "Sew")), slot: Some(slot), exact: false })
+                .map(|(i, slot)| MachineColor {
+                    thread: e.thread(i),
+                    shown: Some(palette::table_thread(&palette::SEW_PALETTE, slot, "Sew")),
+                    slot: Some(slot),
+                    exact: false,
+                })
                 .collect()
         }
         // The exact colours: TBF's thread list, the thread colour files and text dumps.
@@ -574,12 +575,7 @@ const DEFAULT_COLORS: [[u8; 3]; 12] = [
 
 /// Synthesized thread for colour block `index` when none is available.
 pub fn default_thread(index: usize) -> Thread {
-    Thread {
-        rgb: DEFAULT_COLORS[index % DEFAULT_COLORS.len()],
-        name: format!("Color {}", index + 1),
-        code: String::new(),
-        brand: String::new(),
-    }
+    Thread { rgb: DEFAULT_COLORS[index % DEFAULT_COLORS.len()], name: format!("Color {}", index + 1), code: String::new(), brand: String::new() }
 }
 
 #[cfg(test)]

@@ -22,7 +22,12 @@ function grouped(sel: NodeRef[]): Map<string, Map<number, number[]>> {
     if (!g.has(n.sp)) g.set(n.sp, []);
     g.get(n.sp)!.push(n.ni);
   }
-  for (const g of m.values()) for (const [k, v] of g) g.set(k, [...new Set(v)].sort((a, b) => a - b));
+  for (const g of m.values())
+    for (const [k, v] of g)
+      g.set(
+        k,
+        [...new Set(v)].sort((a, b) => a - b),
+      );
   return m;
 }
 
@@ -73,11 +78,18 @@ function fitCubic(pts: Vec2[], t0: Vec2, t1: Vec2): [Vec2, Vec2] {
   const u = [0];
   for (let i = 1; i < pts.length; i++) u.push(u[i - 1] + vdist(pts[i], pts[i - 1]));
   const total = u[u.length - 1] || 1;
-  let c00 = 0, c01 = 0, c11 = 0, x0 = 0, x1 = 0;
+  let c00 = 0,
+    c01 = 0,
+    c11 = 0,
+    x0 = 0,
+    x1 = 0;
   for (let i = 0; i < pts.length; i++) {
     const t = u[i] / total;
     const s = 1 - t;
-    const b0 = s * s * s, b1 = 3 * t * s * s, b2 = 3 * t * t * s, b3 = t * t * t;
+    const b0 = s * s * s,
+      b1 = 3 * t * s * s,
+      b2 = 3 * t * t * s,
+      b3 = t * t * t;
     const a1 = mul(t0, b1);
     const a2 = mul(t1, b2);
     c00 += dot(a1, a1);
@@ -224,7 +236,7 @@ export function setNodeType(doc: StitchDocument, sel: NodeRef[], type: "corner" 
         if (!dir[0] && !dir[1]) continue;
         let li = prev ? vdist(prev, n.p) / 3 : 0;
         let lo = next ? vdist(next, n.p) / 3 : 0;
-        if (type === "symmetric") li = lo = (li && lo ? (li + lo) / 2 : li || lo);
+        if (type === "symmetric") li = lo = li && lo ? (li + lo) / 2 : li || lo;
         if (prev) n.i = sub(n.p, mul(dir, li));
         if (next) n.o = add(n.p, mul(dir, lo));
       }
@@ -376,7 +388,11 @@ export function toggleClosed(doc: StitchDocument, sel: NodeRef[]): StitchDocumen
     const per = g.get(o.id);
     return per && [...per.keys()].some((si) => o.paths[si] && !o.paths[si].closed);
   });
-  if (!anyOpen) return breakAtNodes(doc, [...g].flatMap(([id, per]) => [...per].map(([sp, list]) => ({ id, sp, ni: list[0] }))));
+  if (!anyOpen)
+    return breakAtNodes(
+      doc,
+      [...g].flatMap(([id, per]) => [...per].map(([sp, list]) => ({ id, sp, ni: list[0] }))),
+    );
   // a satin's two rails close together (or not at all)
   return mapObjects(doc, sel, (o, per) =>
     isRailSatin(o)
@@ -400,9 +416,7 @@ export function moveNodes(doc: StitchDocument, sel: NodeRef[], d: Vec2): StitchD
       const set = new Set(list);
       return {
         ...sp,
-        nodes: sp.nodes.map((n, k) =>
-          set.has(k) ? { p: add(n.p, d), ...(n.i ? { i: add(n.i, d) } : {}), ...(n.o ? { o: add(n.o, d) } : {}) } : n,
-        ),
+        nodes: sp.nodes.map((n, k) => (set.has(k) ? { p: add(n.p, d), ...(n.i ? { i: add(n.i, d) } : {}), ...(n.o ? { o: add(n.o, d) } : {}) } : n)),
       };
     }),
   }));
@@ -471,7 +485,9 @@ export function bendSegment(sp: SubPath, seg: number, t: number, d: Vec2): SubPa
 
 /** Every node of the given objects. */
 export function allNodes(doc: StitchDocument, ids: string[]): NodeRef[] {
-  return doc.objects.filter((o) => ids.includes(o.id) && !o.text && !o.locked).flatMap((o) => o.paths.flatMap((sp, si) => sp.nodes.map((_, ni) => ({ id: o.id, sp: si, ni }))));
+  return doc.objects
+    .filter((o) => ids.includes(o.id) && !o.text && !o.locked)
+    .flatMap((o) => o.paths.flatMap((sp, si) => sp.nodes.map((_, ni) => ({ id: o.id, sp: si, ni }))));
 }
 
 /** Nodes of the given objects inside a box. */

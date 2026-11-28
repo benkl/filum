@@ -412,9 +412,12 @@ export function rowSlots(segs: number[], rec: number[], plan: PlanData): number[
     while (b < n && plan.objects[rec[b]] === obj && (plan.flags[rec[b]] & FLAG.UNDERLAY) === under) b++;
     if (!under && b - a >= 24) {
       // the run's dominant stitch direction (mean of doubled angles) and how coherent it is
-      let cx = 0, cy = 0, w = 0;
+      let cx = 0,
+        cy = 0,
+        w = 0;
       for (let j = a; j < b; j++) {
-        const dx = segs[4 * j + 2] - segs[4 * j], dy = segs[4 * j + 3] - segs[4 * j + 1];
+        const dx = segs[4 * j + 2] - segs[4 * j],
+          dy = segs[4 * j + 3] - segs[4 * j + 1];
         const l2 = dx * dx + dy * dy;
         if (l2 < 1e-6) continue;
         cx += (dx * dx - dy * dy) / Math.sqrt(l2);
@@ -424,17 +427,21 @@ export function rowSlots(segs: number[], rec: number[], plan: PlanData): number[
       if (w > 0 && Math.hypot(cx, cy) / w > 0.85) {
         const th = Math.atan2(cy, cx) / 2;
         // across the rows, pointing away from the light (which comes from the top left)
-        let nx = -Math.sin(th), ny = Math.cos(th);
+        let nx = -Math.sin(th),
+          ny = Math.cos(th);
         if (nx * 0.6 + ny * 0.8 < 0) [nx, ny] = [-nx, -ny];
-        const ux = Math.cos(th), uy = Math.sin(th);
+        const ux = Math.cos(th),
+          uy = Math.sin(th);
         // stitches across the rows (the short links between them) go underneath, in their
         // own order; the rows themselves are layered by position
         const along = (j: number) => {
-          const dx = segs[4 * j + 2] - segs[4 * j], dy = segs[4 * j + 3] - segs[4 * j + 1];
+          const dx = segs[4 * j + 2] - segs[4 * j],
+            dy = segs[4 * j + 3] - segs[4 * j + 1];
           const l = Math.hypot(dx, dy);
           return l < 1e-3 || Math.abs(dx * ux + dy * uy) / l > 0.94;
         };
-        const links: number[] = [], rows: number[] = [];
+        const links: number[] = [],
+          rows: number[] = [];
         for (let j = a; j < b; j++) (along(j) ? rows : links).push(j);
         const key = (j: number) => ((segs[4 * j] + segs[4 * j + 2]) / 2) * nx + ((segs[4 * j + 1] + segs[4 * j + 3]) / 2) * ny;
         rows.sort((p, q) => key(p) - key(q));
@@ -496,8 +503,25 @@ export class StitchGL {
     this.gl = gl;
     this.stitchProg = this.program(STITCH_VS, STITCH_FS);
     this.fabricProg = this.program(FABRIC_VS, FABRIC_FS);
-    for (const n of ["u_view", "u_res", "u_dpr", "u_limit", "u_jumps", "u_dots", "u_entries", "u_depthDen", "u_recObj", "u_moving", "u_live", "u_objects", "u_lm0", "u_lm1"]) this.us[n] = gl.getUniformLocation(this.stitchProg, n);
-    for (const n of ["u_rect", "u_radius", "u_dpr", "u_height", "u_color", "u_scale", "u_kind", "u_pitch", "u_oval", "u_minPx"]) this.uf[n] = gl.getUniformLocation(this.fabricProg, n);
+    for (const n of [
+      "u_view",
+      "u_res",
+      "u_dpr",
+      "u_limit",
+      "u_jumps",
+      "u_dots",
+      "u_entries",
+      "u_depthDen",
+      "u_recObj",
+      "u_moving",
+      "u_live",
+      "u_objects",
+      "u_lm0",
+      "u_lm1",
+    ])
+      this.us[n] = gl.getUniformLocation(this.stitchProg, n);
+    for (const n of ["u_rect", "u_radius", "u_dpr", "u_height", "u_color", "u_scale", "u_kind", "u_pitch", "u_oval", "u_minPx"])
+      this.uf[n] = gl.getUniformLocation(this.fabricProg, n);
     this.quad = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.quad);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, -1, 1, -1, 0, 1, 1, 1]), gl.STATIC_DRAW);
@@ -553,7 +577,18 @@ export class StitchGL {
     const depthDen = flags.length + 3 * blocks + 4;
     const slotDepth = (slot: number) => 1 - (slot + 1) / (depthDen + 1);
     let entryCount = 0;
-    const addEntry = (hw: number, minHw: number, ox: number, oy: number, c: [number, number, number], a: number, part: number, depth: number, dash: number, kind: number) => {
+    const addEntry = (
+      hw: number,
+      minHw: number,
+      ox: number,
+      oy: number,
+      c: [number, number, number],
+      a: number,
+      part: number,
+      depth: number,
+      dash: number,
+      kind: number,
+    ) => {
       entries.push(hw, minHw, ox, oy, c[0] * a, c[1] * a, c[2] * a, a, part, depth, dash, kind);
       return entryCount++;
     };
@@ -562,7 +597,19 @@ export class StitchGL {
       for (let i = 0, j = 0; i < geo.length; i += 4, j++) inst.push(geo[i], geo[i + 1], geo[i + 2], geo[i + 3], e, rec[j], slot[j]);
     };
     /** A pass drawn once per pixel: interior instances first, then the fringe. */
-    const pass = (geo: number[], rec: number[], hw: number, minHw: number, ox: number, oy: number, c: [number, number, number], a: number, dash = 0, kind = 0, depth?: number) => {
+    const pass = (
+      geo: number[],
+      rec: number[],
+      hw: number,
+      minHw: number,
+      ox: number,
+      oy: number,
+      c: [number, number, number],
+      a: number,
+      dash = 0,
+      kind = 0,
+      depth?: number,
+    ) => {
       emit(geo, rec, addEntry(hw, minHw, ox, oy, c, a, 1, depth ?? nextDepth(), dash, kind));
       emit(geo, rec, addEntry(hw, minHw, ox, oy, c, a, 2, depth ?? nextDepth(), dash, kind));
     };
@@ -652,7 +699,9 @@ export class StitchGL {
         // already drawn, so whatever lies underneath has to be drawn first
         const slots = rowSlots(segs, segRec, plan);
         const order = slots.map((_, j) => j).sort((a, b) => slots[a] - slots[b]);
-        const g: number[] = [], rc: number[] = [], sl: number[] = [];
+        const g: number[] = [],
+          rc: number[] = [],
+          sl: number[] = [];
         for (const j of order) {
           g.push(segs[4 * j], segs[4 * j + 1], segs[4 * j + 2], segs[4 * j + 3]);
           rc.push(segRec[j]);

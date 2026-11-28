@@ -8,10 +8,7 @@
 use crate::{cmd, Pattern};
 
 fn row(out: &mut String, values: &[&str]) {
-    let cells: Vec<String> = values
-        .iter()
-        .map(|v| format!("\"{}\"", v.replace('"', "\"\"")))
-        .collect();
+    let cells: Vec<String> = values.iter().map(|v| format!("\"{}\"", v.replace('"', "\"\""))).collect();
     out.push_str(&cells.join(","));
     out.push('\n');
 }
@@ -19,13 +16,7 @@ fn row(out: &mut String, values: &[&str]) {
 /// Name of a flag combination, e.g. `STITCH`, `JUMP`, `STITCH|UNDERLAY`.
 pub(crate) fn flag_name(flags: u8) -> String {
     let mut parts: Vec<&str> = Vec::new();
-    let names = [
-        (cmd::JUMP, "JUMP"),
-        (cmd::TRIM, "TRIM"),
-        (cmd::COLOR_CHANGE, "COLOR_CHANGE"),
-        (cmd::STOP, "STOP"),
-        (cmd::END, "END"),
-    ];
+    let names = [(cmd::JUMP, "JUMP"), (cmd::TRIM, "TRIM"), (cmd::COLOR_CHANGE, "COLOR_CHANGE"), (cmd::STOP, "STOP"), (cmd::END, "END")];
     for (bit, name) in names {
         if flags & bit != 0 {
             parts.push(name);
@@ -34,11 +25,7 @@ pub(crate) fn flag_name(flags: u8) -> String {
     if parts.is_empty() {
         parts.push("STITCH");
     }
-    for (bit, name) in [
-        (cmd::TIE, "TIE"),
-        (cmd::UNDERLAY, "UNDERLAY"),
-        (cmd::TRAVEL, "TRAVEL"),
-    ] {
+    for (bit, name) in [(cmd::TIE, "TIE"), (cmd::UNDERLAY, "UNDERLAY"), (cmd::TRAVEL, "TRAVEL")] {
         if flags & bit != 0 {
             parts.push(name);
         }
@@ -85,39 +72,15 @@ pub(crate) fn write(p: &Pattern) -> Vec<u8> {
     out.push('\n');
 
     if !p.threads.is_empty() {
-        row(
-            &mut out,
-            &[
-                "#",
-                "[THREAD_NUMBER]",
-                "[HEX_COLOR]",
-                "[DESCRIPTION]",
-                "[BRAND]",
-                "[CATALOG_NUMBER]",
-            ],
-        );
+        row(&mut out, &["#", "[THREAD_NUMBER]", "[HEX_COLOR]", "[DESCRIPTION]", "[BRAND]", "[CATALOG_NUMBER]"]);
         for (i, t) in p.threads.iter().enumerate() {
-            row(
-                &mut out,
-                &["$", &i.to_string(), &t.hex(), &t.name, &t.brand, &t.code],
-            );
+            row(&mut out, &["$", &i.to_string(), &t.hex(), &t.name, &t.brand, &t.code]);
         }
         out.push('\n');
     }
 
     if !p.stitches.is_empty() {
-        row(
-            &mut out,
-            &[
-                "#",
-                "[STITCH_INDEX]",
-                "[STITCH_TYPE]",
-                "[X]",
-                "[Y]",
-                "[DX]",
-                "[DY]",
-            ],
-        );
+        row(&mut out, &["#", "[STITCH_INDEX]", "[STITCH_TYPE]", "[X]", "[Y]", "[DX]", "[DY]"]);
         let (mut cx, mut cy) = (0.0, 0.0);
         for (i, s) in p.stitches.iter().enumerate() {
             row(
@@ -147,10 +110,7 @@ mod tests {
     #[test]
     fn dump_contains_rows() {
         let p = Pattern {
-            stitches: vec![
-                Stitch::new(1.0, 2.0, cmd::UNDERLAY),
-                Stitch::new(1.0, 2.0, cmd::END),
-            ],
+            stitches: vec![Stitch::new(1.0, 2.0, cmd::UNDERLAY), Stitch::new(1.0, 2.0, cmd::END)],
             threads: vec![Thread::from_rgb([255, 0, 0])],
             name: "x".into(),
         };

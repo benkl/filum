@@ -68,17 +68,91 @@ async function pool(items, n, fn) {
 // Brands: names are "<brand> <line>"; these brands have spaces or dashes
 
 const BRANDS = [
-  "Brothread/Brother", "New Brothreads", "Jenny Haskins", "Poly X40", "Cotone Mako", "Misairu Tsuru", "Filato Lana", "Hilos Iris", "Robison-Anton", "Fil-Tec", "Coats", "Pearl Yacht", "Quilters Select", "Hilos Iris", "Embroidery Service", "Colourful Thread",
-  "The Institute of Heraldry", "Madeira", "Isacord", "Gunold", "Sulky", "Mettler", "Floriani", "Brother", "Brothread", "Marathon",
-  "Gutermann", "Gütermann", "Aurifil", "AURIfil", "Simthread", "Wonderfil", "Exquisite", "Embellish", "Robison Anton", "King Star", "Kingstar",
-  "Outback", "Radiant", "Royal", "Tristar", "Sigma", "Janome", "Admelody", "ARC", "BFC", "Brildor", "FuFu", "Fufu", "Isafil", "Isalon", "Amann",
-  "Angelking", "Candle", "Durak", "Embro", "Iris", "Polyseda", "RNK", "Sakura", "Setta", "Silky", "Skylab", "Tridalia", "Wonang", "Yenmet",
+  "Brothread/Brother",
+  "New Brothreads",
+  "Jenny Haskins",
+  "Poly X40",
+  "Cotone Mako",
+  "Misairu Tsuru",
+  "Filato Lana",
+  "Hilos Iris",
+  "Robison-Anton",
+  "Fil-Tec",
+  "Coats",
+  "Pearl Yacht",
+  "Quilters Select",
+  "Hilos Iris",
+  "Embroidery Service",
+  "Colourful Thread",
+  "The Institute of Heraldry",
+  "Madeira",
+  "Isacord",
+  "Gunold",
+  "Sulky",
+  "Mettler",
+  "Floriani",
+  "Brother",
+  "Brothread",
+  "Marathon",
+  "Gutermann",
+  "Gütermann",
+  "Aurifil",
+  "AURIfil",
+  "Simthread",
+  "Wonderfil",
+  "Exquisite",
+  "Embellish",
+  "Robison Anton",
+  "King Star",
+  "Kingstar",
+  "Outback",
+  "Radiant",
+  "Royal",
+  "Tristar",
+  "Sigma",
+  "Janome",
+  "Admelody",
+  "ARC",
+  "BFC",
+  "Brildor",
+  "FuFu",
+  "Fufu",
+  "Isafil",
+  "Isalon",
+  "Amann",
+  "Angelking",
+  "Candle",
+  "Durak",
+  "Embro",
+  "Iris",
+  "Polyseda",
+  "RNK",
+  "Sakura",
+  "Setta",
+  "Silky",
+  "Skylab",
+  "Tridalia",
+  "Wonang",
+  "Yenmet",
 ];
 function brandOf(name) {
   const n = name.replace(/_/g, " ");
-  const b = BRANDS.filter((x) => n.toLowerCase().startsWith(x.toLowerCase() + " ") || n.toLowerCase() === x.toLowerCase()).sort((a, c) => c.length - a.length)[0];
+  const b = BRANDS.filter((x) => n.toLowerCase().startsWith(x.toLowerCase() + " ") || n.toLowerCase() === x.toLowerCase()).sort(
+    (a, c) => c.length - a.length,
+  )[0];
   const brand = b ?? n.split(/\s+/)[0];
-  const norm = { "Brothread/Brother": "Brother", "New Brothreads": "Brother", "Threadart": "ThreadArt", "Pantone®": "Pantone", "AURIfil": "Aurifil", "Gutermann": "Gütermann", "Kingstar": "King Star", "Fufu": "FuFu", "Robison Anton": "Robison-Anton", "Brothread": "Brother" };
+  const norm = {
+    "Brothread/Brother": "Brother",
+    "New Brothreads": "Brother",
+    Threadart: "ThreadArt",
+    "Pantone®": "Pantone",
+    AURIfil: "Aurifil",
+    Gutermann: "Gütermann",
+    Kingstar: "King Star",
+    Fufu: "FuFu",
+    "Robison Anton": "Robison-Anton",
+    Brothread: "Brother",
+  };
   return norm[brand] ?? brand;
 }
 
@@ -124,7 +198,8 @@ async function palettes(ink, en) {
     license: {
       name: "No licence stated",
       url: `https://github.com/${EN}`,
-      terms: "The author offers these charts as a free download for embroiderers but has not published a licence, so Filum can't include them. Filum downloads them from the author's repository to this device, for your own use. Brand and colour names belong to their owners.",
+      terms:
+        "The author offers these charts as a free download for embroiderers but has not published a licence, so Filum can't include them. Filum downloads them from the author's repository to this device, for your own use. Brand and colour names belong to their owners.",
     },
     source: { label: `${EN} (corel-swatches)`, url: `https://github.com/${EN}/tree/${en.sha}/corel-swatches` },
     base: `https://raw.githubusercontent.com/${EN}/${en.sha}/`,
@@ -140,12 +215,18 @@ async function palettes(ink, en) {
     sources: {
       ...prev.sources,
       inkstitch: { label: "Ink/Stitch", url: `https://github.com/${INK}/tree/${ink.sha}/palettes`, license: "GPL-3.0-or-later" },
-      embroiderynerd: { label: "Embroidery Nerds", url: `https://github.com/${EN}/tree/${en.sha}/corel-swatches`, license: "none stated (\"provided for free\") — downloaded on request, not bundled" },
+      embroiderynerd: {
+        label: "Embroidery Nerds",
+        url: `https://github.com/${EN}/tree/${en.sha}/corel-swatches`,
+        license: 'none stated ("provided for free") — downloaded on request, not bundled',
+      },
     },
     charts: index,
   };
   fs.writeFileSync(path.join(dir, "index.json"), JSON.stringify(out, null, 1) + "\n");
-  console.log(`palettes: ${index.filter((c) => c.source === "inkstitch").length} Ink/Stitch + ${index.filter((c) => c.source === "embroiderynerd").length} Embroidery Nerds, ${index.reduce((a, c) => a + c.count, 0)} colours`);
+  console.log(
+    `palettes: ${index.filter((c) => c.source === "inkstitch").length} Ink/Stitch + ${index.filter((c) => c.source === "embroiderynerd").length} Embroidery Nerds, ${index.reduce((a, c) => a + c.count, 0)} colours`,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -155,9 +236,19 @@ async function palettes(ink, en) {
 
 function parseTransform(t) {
   let m = [1, 0, 0, 1, 0, 0];
-  const mul = (a, b) => [a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1], a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3], a[0] * b[4] + a[2] * b[5] + a[4], a[1] * b[4] + a[3] * b[5] + a[5]];
+  const mul = (a, b) => [
+    a[0] * b[0] + a[2] * b[1],
+    a[1] * b[0] + a[3] * b[1],
+    a[0] * b[2] + a[2] * b[3],
+    a[1] * b[2] + a[3] * b[3],
+    a[0] * b[4] + a[2] * b[5] + a[4],
+    a[1] * b[4] + a[3] * b[5] + a[5],
+  ];
   for (const [, fn, args] of (t ?? "").matchAll(/(\w+)\s*\(([^)]*)\)/g)) {
-    const v = args.split(/[\s,]+/).filter(Boolean).map(Number);
+    const v = args
+      .split(/[\s,]+/)
+      .filter(Boolean)
+      .map(Number);
     let k = [1, 0, 0, 1, 0, 0];
     if (fn === "matrix") k = v;
     else if (fn === "translate") k = [1, 0, 0, 1, v[0], v[1] ?? 0];
@@ -254,18 +345,29 @@ function parseTile(svg) {
     if (isPara) {
       let pts;
       if (name === "polygon" || name === "polyline") {
-        const v = a.points.trim().split(/[\s,]+/).map(Number);
+        const v = a.points
+          .trim()
+          .split(/[\s,]+/)
+          .map(Number);
         pts = [];
         for (let k = 0; k + 1 < v.length; k += 2) pts.push([v[k], v[k + 1]]);
       } else if (name === "path") {
         pts = pathNodes(a.d)[0];
       } else if (name === "rect") {
         const [x, y, w, h] = [+a.x || 0, +a.y || 0, +a.width, +a.height];
-        pts = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+        pts = [
+          [x, y],
+          [x + w, y],
+          [x + w, y + h],
+          [x, y + h],
+        ];
       }
       if (pts && pts.length >= 3) {
         const p = pts.map((q) => apply(m0, q));
-        para = [[p[1][0] - p[0][0], p[1][1] - p[0][1]], [p[2][0] - p[1][0], p[2][1] - p[1][1]]];
+        para = [
+          [p[1][0] - p[0][0], p[1][1] - p[0][1]],
+          [p[2][0] - p[1][0], p[2][1] - p[1][1]],
+        ];
       }
       continue;
     }
@@ -278,7 +380,11 @@ function parseTile(svg) {
     const m = new RegExp(`\\b${k}="([\\d.]+)\\s*([a-z]*)"`).exec(root);
     return m ? parseFloat(m[1]) * (UNIT[m[2]] ?? 1) : 0;
   };
-  if (!para) para = [[dim("width"), 0], [0, dim("height")]];
+  if (!para)
+    para = [
+      [dim("width"), 0],
+      [0, dim("height")],
+    ];
   // centre on the bounds of the lines (Ink/Stitch does the same)
   const xs = lines.flatMap((l) => [l[0][0], l[1][0]]);
   const ys = lines.flatMap((l) => [l[0][1], l[1][1]]);
@@ -288,7 +394,9 @@ function parseTile(svg) {
   return {
     shift0: para[0].map(r),
     shift1: para[1].map(r),
-    lines: lines.filter((l) => Math.hypot(l[1][0] - l[0][0], l[1][1] - l[0][1]) > 1e-6).map(([s, e]) => [r(s[0] - cx), r(s[1] - cy), r(e[0] - cx), r(e[1] - cy)]),
+    lines: lines
+      .filter((l) => Math.hypot(l[1][0] - l[0][0], l[1][1] - l[0][1]) > 1e-6)
+      .map(([s, e]) => [r(s[0] - cx), r(s[1] - cy), r(e[0] - cx), r(e[1] - cy)]),
   };
 }
 
@@ -336,7 +444,8 @@ async function tiles(ink) {
 async function symbols(ink) {
   const dir = path.join(root, "crates/core/assets/inkstitch");
   fs.mkdirSync(dir, { recursive: true });
-  for (const f of ["symbols/inkstitch.svg", "symbols/marker.svg"]) fs.writeFileSync(path.join(dir, path.basename(f)), (await get(raw(INK, ink.sha, f))).replace(/\r\n/g, "\n"));
+  for (const f of ["symbols/inkstitch.svg", "symbols/marker.svg"])
+    fs.writeFileSync(path.join(dir, path.basename(f)), (await get(raw(INK, ink.sha, f))).replace(/\r\n/g, "\n"));
   console.log(`symbols → ${path.relative(root, dir)}`);
 }
 

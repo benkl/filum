@@ -18,7 +18,16 @@ const satin = {
     { closed: false, nodes: [{ p: [0, 0] }, { p: [40, 0] }] },
     { closed: false, nodes: [{ p: [0, 8] }, { p: [40, 8] }] },
   ],
-  stitch: { type: "satin", width: 8, guides: [[[10, -1], [14, 9]]] },
+  stitch: {
+    type: "satin",
+    width: 8,
+    guides: [
+      [
+        [10, -1],
+        [14, 9],
+      ],
+    ],
+  },
 } as unknown as DesignObject;
 const guide = (o: DesignObject) => (o.stitch.type === "satin" ? o.stitch.guides?.[0] : undefined);
 const moved = transformObject(satin, translateMat(10, 5));

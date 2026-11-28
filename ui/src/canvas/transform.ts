@@ -104,8 +104,7 @@ export function rotateZone(b: Box, p: Vec2, scale: number): number {
   return -1;
 }
 
-const svgCursor = (svg: string, x: number, y: number, fallback: string) =>
-  `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}") ${x} ${y}, ${fallback}`;
+const svgCursor = (svg: string, x: number, y: number, fallback: string) => `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}") ${x} ${y}, ${fallback}`;
 
 export const ROTATE_CURSOR = svgCursor(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M5 12a7 7 0 1 1 3 5.7" fill="none" stroke="white" stroke-width="4" stroke-linecap="round"/><path d="M5 12a7 7 0 1 1 3 5.7" fill="none" stroke="black" stroke-width="1.8" stroke-linecap="round"/><path d="M2 15l3-4 4 3z" fill="black" stroke="white" stroke-width="1"/></svg>',

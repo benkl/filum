@@ -305,7 +305,8 @@ fn walk(edges: &[Line], tol: f64, pos: &mut Point) -> Vec<Step> {
         let mut depth: std::collections::HashMap<usize, f64> = Default::default();
         for &u in order.iter().rev() {
             let list = items.entry(u).or_default();
-            let d = list.iter().map(|it| if let Item::Child(e, _, v) = it { len_of(*e) + depth.get(v).copied().unwrap_or(0.0) } else { 0.0 }).fold(0.0, f64::max);
+            let d =
+                list.iter().map(|it| if let Item::Child(e, _, v) = it { len_of(*e) + depth.get(v).copied().unwrap_or(0.0) } else { 0.0 }).fold(0.0, f64::max);
             if let Some(i) = list
                 .iter()
                 .enumerate()
@@ -401,7 +402,15 @@ mod tests {
 
     fn line(pts: &[(f64, f64)], satin: bool) -> Object {
         let p: Vec<Point> = pts.iter().map(|&(x, y)| pt(x, y)).collect();
-        Object { name: "Black line 1".into(), ..Object::new("o", "t", vec![SubPath::polyline(&p, false)], if satin { StitchParams::Satin(SatinParams { width: 1.2, ..Default::default() }) } else { StitchParams::Running(RunningParams::default()) }) }
+        Object {
+            name: "Black line 1".into(),
+            ..Object::new(
+                "o",
+                "t",
+                vec![SubPath::polyline(&p, false)],
+                if satin { StitchParams::Satin(SatinParams { width: 1.2, ..Default::default() }) } else { StitchParams::Running(RunningParams::default()) },
+            )
+        }
     }
 
     fn ends(o: &Object, doc: &crate::model::Document) -> (Point, Point) {
@@ -439,7 +448,9 @@ mod tests {
         for (i, o) in routed.iter().enumerate().filter(|(_, o)| matches!(o.stitch, StitchParams::Running(_))) {
             let p = o.paths[0].flatten(0.05);
             let mid = p[p.len() / 2];
-            let covered = routed[i + 1..].iter().any(|c| matches!(c.stitch, StitchParams::Satin(_)) && c.paths[0].flatten(0.05).windows(2).any(|w| seg_project(mid, w[0], w[1]).1.dist(mid) < 0.1));
+            let covered = routed[i + 1..].iter().any(|c| {
+                matches!(c.stitch, StitchParams::Satin(_)) && c.paths[0].flatten(0.05).windows(2).any(|w| seg_project(mid, w[0], w[1]).1.dist(mid) < 0.1)
+            });
             assert!(covered, "{} is never covered", o.name);
         }
     }

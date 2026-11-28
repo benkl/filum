@@ -18,7 +18,12 @@ export function ReferenceBar({ id }: { id: string }) {
   const opacityLive = (v: number) => updateReference(id, { opacity: v / 100 }, true);
   const aspect = r.width / r.height;
   return (
-    <div className="ref-bar" onPointerDown={(e) => e.stopPropagation()} style={{ transform: mv.moved ? `translate(${mv.off[0]}px, ${mv.off[1]}px)` : undefined }} data-movable>
+    <div
+      className="ref-bar"
+      onPointerDown={(e) => e.stopPropagation()}
+      style={{ transform: mv.moved ? `translate(${mv.off[0]}px, ${mv.off[1]}px)` : undefined }}
+      data-movable
+    >
       <Grip grip={mv.grip} vertical />
       <span className="ref-name" title={r.name}>
         {r.name}
@@ -41,8 +46,22 @@ export function ReferenceBar({ id }: { id: string }) {
         />
         <span className="stat">{Math.round(r.opacity * 100)} %</span>
       </label>
-      <Seg label="Placement" value={r.placement} options={[["behind", "Behind", "Behind the stitches"], ["over", "Over", "Over the stitches, like tracing paper"]] as const} onChange={(v) => set({ placement: v })} />
-      <button className={`icon-btn ${r.grayscale ? "on" : ""}`} onClick={() => set({ grayscale: !r.grayscale })} title="Grey: thread colours stand out against it">
+      <Seg
+        label="Placement"
+        value={r.placement}
+        options={
+          [
+            ["behind", "Behind", "Behind the stitches"],
+            ["over", "Over", "Over the stitches, like tracing paper"],
+          ] as const
+        }
+        onChange={(v) => set({ placement: v })}
+      />
+      <button
+        className={`icon-btn ${r.grayscale ? "on" : ""}`}
+        onClick={() => set({ grayscale: !r.grayscale })}
+        title="Grey: thread colours stand out against it"
+      >
         <span className="ref-grey" />
       </button>
       <button className={`icon-btn ${r.flip ? "on" : ""}`} onClick={() => set({ flip: !r.flip })} title="Mirror">

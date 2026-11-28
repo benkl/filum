@@ -193,7 +193,11 @@ export function fontNameFromFiles(paths: string[]): string {
       n = i;
       break;
     }
-  const name = stems[0].slice(0, Math.max(0, n)).join("").replace(/[_\-\s.]+/g, " ").trim();
+  const name = stems[0]
+    .slice(0, Math.max(0, n))
+    .join("")
+    .replace(/[_\-\s.]+/g, " ")
+    .trim();
   return name || "Letters";
 }
 

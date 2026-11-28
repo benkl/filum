@@ -35,7 +35,15 @@ const crossings = (rung: SubPath, rail: SubPath) => {
   check(far.removed === 0, "a revisit beyond the window stays");
   const near = removeDuplicatePoints(line([0, 0], [5, 0], [10, 0], [5, 0]), { distance: 0.01, window: 10 });
   check(near.removed === 1, "a revisit within the window goes");
-  const curve: SubPath = { closed: false, nodes: [{ p: [0, 0], o: [2, 2] }, { p: [5, 0], i: [3, 2] }, { p: [5, 0], o: [7, -2] }, { p: [10, 0], i: [8, -2] }] };
+  const curve: SubPath = {
+    closed: false,
+    nodes: [
+      { p: [0, 0], o: [2, 2] },
+      { p: [5, 0], i: [3, 2] },
+      { p: [5, 0], o: [7, -2] },
+      { p: [10, 0], i: [8, -2] },
+    ],
+  };
   const c = removeDuplicatePoints(curve).sp;
   check(c.nodes.length === 3 && c.nodes[1].i?.[0] === 3 && c.nodes[1].o?.[0] === 7, "curve handles survive at the merged node");
   const closed: SubPath = { closed: true, nodes: [{ p: [0, 0] }, { p: [10, 0] }, { p: [10, 10] }, { p: [0, 0] }] };
@@ -48,10 +56,16 @@ const crossings = (rung: SubPath, rail: SubPath) => {
   check(!!r && r.rungs.length >= 1, `straight line: rails and ${r?.rungs.length} rung(s)`);
   if (r) {
     const ys = [...r.rails[0], ...r.rails[1]].map((p) => Math.abs(p[1]));
-    check(ys.every((y) => Math.abs(y - 2) < 1e-6), "rails at half the width");
+    check(
+      ys.every((y) => Math.abs(y - 2) < 1e-6),
+      "rails at half the width",
+    );
     const paths = satinPaths(r);
     check(paths[0].nodes.length >= 3 && paths[1].nodes.length >= 3, "rails have three or more nodes (read as rails)");
-    check(paths.slice(2).every((g) => crossings(g, paths[0]) === 1 && crossings(g, paths[1]) === 1), "every rung crosses both rails once");
+    check(
+      paths.slice(2).every((g) => crossings(g, paths[0]) === 1 && crossings(g, paths[1]) === 1),
+      "every rung crosses both rails once",
+    );
   }
   // an L: the rungs stay away from the corner
   const l = centreLineToRails(line([0, 0], [30, 0], [30, 30]), 4);
@@ -73,7 +87,17 @@ const crossings = (rung: SubPath, rail: SubPath) => {
   const pts: Vec2[] = [];
   for (let k = 0; k < 6; k++) {
     const x = k * 4;
-    pts.push(...(k % 2 === 0 ? ([[x, 0], [x, 4]] as Vec2[]) : ([[x, 4], [x, 0]] as Vec2[])));
+    pts.push(
+      ...(k % 2 === 0
+        ? ([
+            [x, 0],
+            [x, 4],
+          ] as Vec2[])
+        : ([
+            [x, 4],
+            [x, 0],
+          ] as Vec2[])),
+    );
   }
   const sq = zigzagToSatin(pts, { pattern: "square", smoothing: false, rungs: true, reduceRungs: false });
   check(!!sq && sq.length >= 3, `square: rails and rungs (${sq?.length} paths)`);
@@ -103,7 +127,10 @@ const crossings = (rung: SubPath, rail: SubPath) => {
     check(Math.abs(Math.max(...xs) - 40) < 1e-6, "not stretched: ends after the last whole repeat");
     const ys0 = ps[0].nodes.map((n) => n.p[1]);
     const ys1 = ps[1].nodes.map((n) => n.p[1]);
-    check(Math.abs(Math.max(...ys0.map(Math.abs)) - 3) < 1e-6 && Math.abs(Math.min(...ys1.map(Math.abs)) - 1) < 1e-6, "centred on the line: 2 mm narrow, 6 mm wide");
+    check(
+      Math.abs(Math.max(...ys0.map(Math.abs)) - 3) < 1e-6 && Math.abs(Math.min(...ys1.map(Math.abs)) - 1) < 1e-6,
+      "centred on the line: 2 mm narrow, 6 mm wide",
+    );
   }
   const str = patternSatin(line([0, 0], [45, 0]), { pattern: "pearl", minWidth: 2, maxWidth: 6, length: 10, stretched: true, rungs: false });
   check(!!str && str.length === 2 && Math.abs(Math.max(...str[0].nodes.map((n) => n.p[0])) - 45) < 1e-6, "stretched: fills the whole line");

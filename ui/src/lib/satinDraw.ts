@@ -45,8 +45,8 @@ export function satinOutlineOf(nodes: PathNode[], widths: number[], closed = fal
   const right: Vec2[] = [];
   const m = center.length;
   for (let i = 0; i < m; i++) {
-    const prev = i > 0 ? center[i - 1] : closed ? center[m - 2] ?? center[i] : center[i];
-    const next = i < m - 1 ? center[i + 1] : closed ? center[1] ?? center[i] : center[i];
+    const prev = i > 0 ? center[i - 1] : closed ? (center[m - 2] ?? center[i]) : center[i];
+    const next = i < m - 1 ? center[i + 1] : closed ? (center[1] ?? center[i]) : center[i];
     const t0 = i > 0 || closed ? unit(center[i][0] - prev[0], center[i][1] - prev[1]) : unit(next[0] - center[i][0], next[1] - center[i][1]);
     const t1 = i < m - 1 || closed ? unit(next[0] - center[i][0], next[1] - center[i][1]) : t0;
     let nx = -(t0[1] + t1[1]);
@@ -122,5 +122,11 @@ export function buildSatin(nodes: PathNode[], widths: number[], closed: boolean,
     left.push(mk(-1));
     right.push(mk(1));
   });
-  return { paths: [{ nodes: left, closed }, { nodes: right, closed }], width: Math.max(...widths) };
+  return {
+    paths: [
+      { nodes: left, closed },
+      { nodes: right, closed },
+    ],
+    width: Math.max(...widths),
+  };
 }

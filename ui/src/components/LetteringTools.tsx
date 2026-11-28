@@ -43,7 +43,11 @@ const SEPARATORS: [string, string][] = [
 function loadBatch(): { text: string; separator: string; formats: string[] } {
   try {
     const v = JSON.parse(localStorage.getItem(BATCH_KEY) ?? "{}");
-    return { text: v.text ?? "", separator: v.separator ?? "", formats: Array.isArray(v.formats) && v.formats.length ? v.formats : [localStorage.getItem("filum.format") ?? "pes"] };
+    return {
+      text: v.text ?? "",
+      separator: v.separator ?? "",
+      formats: Array.isArray(v.formats) && v.formats.length ? v.formats : [localStorage.getItem("filum.format") ?? "pes"],
+    };
   } catch {
     return { text: "", separator: "", formats: ["pes"] };
   }
@@ -112,7 +116,12 @@ export function BatchSection({ group, spec }: { group: string; spec: TextSpec })
       <Row label="Formats" title="Every text is exported in each of these formats">
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
           {quick.map((e) => (
-            <button key={e} className={`chip ${state.formats.includes(e) ? "on" : ""}`} onClick={() => toggle(e)} title={formats.find((f) => f.extension === e)?.name}>
+            <button
+              key={e}
+              className={`chip ${state.formats.includes(e) ? "on" : ""}`}
+              onClick={() => toggle(e)}
+              title={formats.find((f) => f.extension === e)?.name}
+            >
               {e.toUpperCase()}
             </button>
           ))}
@@ -137,7 +146,13 @@ export function BatchSection({ group, spec }: { group: string; spec: TextSpec })
           )}
         </div>
       </Row>
-      <button className="btn sm" style={{ width: "100%", marginTop: 6 }} disabled={!total || busy !== null} onClick={run} title="Files are named like Ink/Stitch's: 000-Anna.pes, 001-Ben.pes …">
+      <button
+        className="btn sm"
+        style={{ width: "100%", marginTop: 6 }}
+        disabled={!total || busy !== null}
+        onClick={run}
+        title="Files are named like Ink/Stitch's: 000-Anna.pes, 001-Ben.pes …"
+      >
         <FileArchive size={13} />
         {busy !== null ? ` Exporting ${busy}…` : total ? ` Export ${total} file${total === 1 ? "" : "s"} as ZIP` : " Add texts and a format"}
       </button>
@@ -179,8 +194,7 @@ export function FontSection({ group, spec, font }: { group: string; spec: TextSp
       <p className="hint" style={{ paddingTop: 2 }}>
         {font ? (
           <>
-            {font.name} · {font.names.size} glyphs · {font.size.toFixed(0)} mm at 100 %
-            {font.variants.length > 1 ? ` · directions ${variants}` : ""}
+            {font.name} · {font.names.size} glyphs · {font.size.toFixed(0)} mm at 100 %{font.variants.length > 1 ? ` · directions ${variants}` : ""}
             {font.reversible ? "" : " · not reversible"}
           </>
         ) : (
@@ -197,7 +211,11 @@ export function FontSection({ group, spec, font }: { group: string; spec: TextSp
         <button
           className="btn sm"
           onClick={edit}
-          title={installed ? "Name, description, spacing, kerning … (Ink/Stitch's font.json)" : "Bundled fonts are read-only: edit an installed copy (this lettering switches to it)"}
+          title={
+            installed
+              ? "Name, description, spacing, kerning … (Ink/Stitch's font.json)"
+              : "Bundled fonts are read-only: edit an installed copy (this lettering switches to it)"
+          }
         >
           <PencilRuler size={12} /> {installed ? "Edit font info…" : "Edit a copy…"}
         </button>
@@ -250,7 +268,23 @@ export function FontInfoDialog({ fontKey, onClose }: { fontKey: string; onClose:
     const f = withFontInfo(font, info);
     const t = setTimeout(() => {
       layoutText(
-        { group: "preview", content: text || "Aa", font: fontKey, size: f.size, letterSpacing: 0, lineSpacing: 1, align: "left", arc: 0, rotation: 0, anchor: [0, 0], style: "fill", borderWidth: 1, fillAngle: 45, thread: "preview", borderThread: "preview" },
+        {
+          group: "preview",
+          content: text || "Aa",
+          font: fontKey,
+          size: f.size,
+          letterSpacing: 0,
+          lineSpacing: 1,
+          align: "left",
+          arc: 0,
+          rotation: 0,
+          anchor: [0, 0],
+          style: "fill",
+          borderWidth: 1,
+          fillAngle: 45,
+          thread: "preview",
+          borderThread: "preview",
+        },
         f,
       )
         .then((o) => live && setPreview(o.map((x) => ({ ...x, thread: "preview" }))))
@@ -292,7 +326,12 @@ export function FontInfoDialog({ fontKey, onClose }: { fontKey: string; onClose:
   };
   const remove = async () => {
     const used = useStore.getState().doc.objects.some((o) => o.text?.font === fontKey);
-    if (!confirm(`Remove ${str(info.name, "this font")} from the installed fonts?${used ? " Letterings in this design that use it can no longer be edited as text." : ""}`)) return;
+    if (
+      !confirm(
+        `Remove ${str(info.name, "this font")} from the installed fonts?${used ? " Letterings in this design that use it can no longer be edited as text." : ""}`,
+      )
+    )
+      return;
     await removeInkFont(fontKey);
     useStore.getState().toast(`${fontLabel(fontKey)} removed`);
     onClose();
@@ -321,7 +360,13 @@ export function FontInfoDialog({ fontKey, onClose }: { fontKey: string; onClose:
       <label className="mono" style={{ fontSize: "var(--fs-lg)" }}>
         {left} {right}
       </label>
-      <Num value={kern[key] ?? kern[left + right] ?? 0} unit="px" step={0.5} digits={1} onChange={(v) => setIn("kerning_pairs", kern[key] === undefined && kern[left + right] !== undefined ? left + right : key, v || null)} />
+      <Num
+        value={kern[key] ?? kern[left + right] ?? 0}
+        unit="px"
+        step={0.5}
+        digits={1}
+        onChange={(v) => setIn("kerning_pairs", kern[key] === undefined && kern[left + right] !== undefined ? left + right : key, v || null)}
+      />
       {kern[key] !== undefined || kern[left + right] !== undefined ? (
         <button className="icon-btn" title="Remove the pair" onClick={() => setIn("kerning_pairs", kern[key] !== undefined ? key : left + right, null)}>
           <Trash2 size={12} />
@@ -357,12 +402,19 @@ export function FontInfoDialog({ fontKey, onClose }: { fontKey: string; onClose:
     >
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 300px", gap: 14 }}>
         <div>
-          <Seg style={{ marginBottom: 8 }} value={tab} options={[
+          <Seg
+            style={{ marginBottom: 8 }}
+            value={tab}
+            options={
+              [
                 ["info", "Info"],
                 ["settings", "Settings"],
                 ["spacing", "Spacing"],
                 ["kerning", "Kerning"],
-              ] as const} onChange={(v) => setTab(v)} />
+              ] as const
+            }
+            onChange={(v) => setTab(v)}
+          />
           {tab === "info" && (
             <>
               {field("Name", "name")}
@@ -376,7 +428,10 @@ export function FontInfoDialog({ fontKey, onClose }: { fontKey: string; onClose:
                   onChange={(e) =>
                     set(
                       "keywords",
-                      e.target.value.split(",").map((k) => k.trim()).filter((k, i, a) => k || i === a.length - 1),
+                      e.target.value
+                        .split(",")
+                        .map((k) => k.trim())
+                        .filter((k, i, a) => k || i === a.length - 1),
                     )
                   }
                 />
@@ -397,7 +452,12 @@ export function FontInfoDialog({ fontKey, onClose }: { fontKey: string; onClose:
                 <Num value={num(info.max_scale, 1)} step={0.05} min={0.05} max={10} digits={2} onChange={(v) => set("max_scale", v)} />
               </Row>
               <Row label="Default direction" title="The variant used unless a lettering picks another (the font's default_variant)">
-                <select className="select" style={{ width: "100%" }} value={str(info.default_variant, "ltr")} onChange={(e) => set("default_variant", e.target.value)}>
+                <select
+                  className="select"
+                  style={{ width: "100%" }}
+                  value={str(info.default_variant, "ltr")}
+                  onChange={(e) => set("default_variant", e.target.value)}
+                >
                   {(font?.variants ?? ["ltr"]).map((v) => (
                     <option key={v} value={v}>
                       {VARIANT_LABELS[v]?.arrow} {VARIANT_LABELS[v]?.name ?? v}
@@ -439,19 +499,40 @@ export function FontInfoDialog({ fontKey, onClose }: { fontKey: string; onClose:
               </Row>
               <Row label="Advance" title="Default horizontal advance of a glyph (px): from its origin to the next glyph's. Off: every glyph's own width">
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  <Toggle on={advDefault !== null} onChange={(v) => set("horiz_adv_x_default", v ? 50 : null)} title="A fixed default advance instead of the glyph width" />
-                  {advDefault !== null ? <Num value={advDefault} unit="px" step={0.5} digits={1} onChange={(v) => set("horiz_adv_x_default", v)} /> : <span className="hint" style={{ padding: 0 }}>Glyph width</span>}
+                  <Toggle
+                    on={advDefault !== null}
+                    onChange={(v) => set("horiz_adv_x_default", v ? 50 : null)}
+                    title="A fixed default advance instead of the glyph width"
+                  />
+                  {advDefault !== null ? (
+                    <Num value={advDefault} unit="px" step={0.5} digits={1} onChange={(v) => set("horiz_adv_x_default", v)} />
+                  ) : (
+                    <span className="hint" style={{ padding: 0 }}>
+                      Glyph width
+                    </span>
+                  )}
                 </div>
               </Row>
               <p className="hint">Per-glyph advances (empty: the default). Click a glyph's value to change it.</p>
-              <input className="input" placeholder="Filter glyphs" value={filter} onChange={(e) => setFilter(e.target.value)} style={{ width: "100%", marginBottom: 6 }} />
+              <input
+                className="input"
+                placeholder="Filter glyphs"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                style={{ width: "100%", marginBottom: 6 }}
+              />
               <div style={{ maxHeight: 220, overflow: "auto", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: "2px 10px" }}>
                 {glyphs
                   .filter((g) => !q || g.includes(q))
                   .map((g) => {
                     const v = map(info.horiz_adv_x)[g];
                     return (
-                      <div key={g} className="row" style={{ gridTemplateColumns: "34px 1fr" }} title={v === undefined ? "Default advance" : "Own advance — set to 0 for the default"}>
+                      <div
+                        key={g}
+                        className="row"
+                        style={{ gridTemplateColumns: "34px 1fr" }}
+                        title={v === undefined ? "Default advance" : "Own advance — set to 0 for the default"}
+                      >
                         <label className="mono" style={{ fontSize: "var(--fs-lg)" }}>
                           {g}
                         </label>

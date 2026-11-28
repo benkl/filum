@@ -182,9 +182,7 @@ fn polygon_to_satins(poly: &[Ring], rungs: &[Vec<Point>], skip_end: bool, used: 
         cand.push(Rung { src: k, hits: [(h[0].0, h[0].1, h[0].2), (h[1].0, h[1].1, h[1].2)], chord });
     }
     // rungs crossing each other inside the shape would make bad sections: drop them
-    let crosses = |a: &[Point], b: &[Point]| {
-        a.windows(2).any(|s| b.windows(2).any(|t| segment_intersection(s[0], s[1], t[0], t[1]).is_some()))
-    };
+    let crosses = |a: &[Point], b: &[Point]| a.windows(2).any(|s| b.windows(2).any(|t| segment_intersection(s[0], s[1], t[0], t[1]).is_some()));
     let keep: Vec<bool> = (0..cand.len()).map(|i| !(0..cand.len()).any(|j| j != i && crosses(&cand[i].chord, &cand[j].chord))).collect();
     let valid: Vec<Rung> = cand.into_iter().zip(keep).filter(|(_, k)| *k).map(|(r, _)| r).collect();
     if valid.is_empty() {
@@ -480,7 +478,8 @@ pub fn centre_lines(rings: &[Ring], o: &CentreLineOpts) -> Vec<CentreLine> {
                     continue;
                 }
                 let m = pts.len();
-                let (e, q, half) = if at_start { (pts[0], pts[(m - 1).min(3)], wid[0] * 0.5) } else { (pts[m - 1], pts[m.saturating_sub(4)], wid[m - 1] * 0.5) };
+                let (e, q, half) =
+                    if at_start { (pts[0], pts[(m - 1).min(3)], wid[0] * 0.5) } else { (pts[m - 1], pts[m.saturating_sub(4)], wid[m - 1] * 0.5) };
                 let d = e - q;
                 if d.length() > 1e-9 {
                     let tip = e + d.unit() * (half * 0.9);
@@ -554,7 +553,9 @@ pub enum BreakApart {
     Valid,
     /// Smaller than the threshold: removed.
     Removed,
-    Parts { parts: Vec<Part> },
+    Parts {
+        parts: Vec<Part>,
+    },
 }
 
 fn ring_is_simple(r: &[Point]) -> bool {
@@ -833,10 +834,12 @@ pub fn knockdown_shape(covers: &[Cover], o: &KnockdownShapeOpts) -> Vec<Ring> {
         _ => {
             let Some((c, r)) = min_bounding_circle(&all) else { return vec![] };
             let n = 128;
-            (0..n).map(|k| {
-                let a = std::f64::consts::TAU * k as f64 / n as f64;
-                pt(c.x + r * a.cos(), c.y + r * a.sin())
-            }).collect()
+            (0..n)
+                .map(|k| {
+                    let a = std::f64::consts::TAU * k as f64 / n as f64;
+                    pt(c.x + r * a.cos(), c.y + r * a.sin())
+                })
+                .collect()
         }
     };
     let frame = clip::rings(&clip::offset_joined(&clip::region(&[frame]), o.frame_offset.max(0.0), o.frame_join, o.mitre_limit));
@@ -1002,7 +1005,17 @@ mod tests {
         let mitre = knockdown_shape(&covers, &KnockdownShapeOpts { keep_holes: false, join: clip::Join::Mitre, ..o.clone() });
         assert!((rings_area(&mitre) - 264.0).abs() < 0.5, "{}", rings_area(&mitre));
         // a rectangle frame with the design cut out
-        let framed = knockdown_shape(&covers, &KnockdownShapeOpts { keep_holes: false, join: clip::Join::Mitre, frame: KnockdownFrame::Rect, frame_join: clip::Join::Mitre, frame_offset: 2.0, ..o.clone() });
+        let framed = knockdown_shape(
+            &covers,
+            &KnockdownShapeOpts {
+                keep_holes: false,
+                join: clip::Join::Mitre,
+                frame: KnockdownFrame::Rect,
+                frame_join: clip::Join::Mitre,
+                frame_offset: 2.0,
+                ..o.clone()
+            },
+        );
         assert!((rings_area(&framed) - (26.0 * 16.0 - 264.0)).abs() < 1.0, "{}", rings_area(&framed));
         let circle = knockdown_shape(&covers, &KnockdownShapeOpts { frame: KnockdownFrame::Circle, frame_only: true, frame_offset: 0.0, ..o });
         assert_eq!(circle.len(), 1);
@@ -1016,7 +1029,10 @@ mod tests {
 
     #[test]
     fn satin_centre_line_of_rails() {
-        let rails = vec![SubPath::polyline(&[pt(0.0, 0.0), pt(20.0, 0.0), pt(40.0, 0.0)], false), SubPath::polyline(&[pt(0.0, 4.0), pt(20.0, 4.0), pt(40.0, 4.0)], false)];
+        let rails = vec![
+            SubPath::polyline(&[pt(0.0, 0.0), pt(20.0, 0.0), pt(40.0, 0.0)], false),
+            SubPath::polyline(&[pt(0.0, 4.0), pt(20.0, 4.0), pt(40.0, 4.0)], false),
+        ];
         let p = SatinParams::default();
         let c = satin_centre_line(&rails, &p);
         assert!(c.len() >= 2);

@@ -26,7 +26,16 @@ export interface Prefs {
 }
 
 /** Optimise's steps when nothing is chosen: all but moving locked objects, keeping to the selection and centre out. */
-export const DEFAULT_OPTIMIZE: OptimizeSteps = { colors: true, travel: true, foamLast: true, ends: true, links: true, locked: false, selectionOnly: false, centerOut: false };
+export const DEFAULT_OPTIMIZE: OptimizeSteps = {
+  colors: true,
+  travel: true,
+  foamLast: true,
+  ends: true,
+  links: true,
+  locked: false,
+  selectionOnly: false,
+  centerOut: false,
+};
 
 /** Fabrics that are sewn centre out unless you choose otherwise: caps (bottom up too) and the ones that stretch (the engine's optimize.rs). */
 export const CENTER_OUT_FABRICS: Fabric[] = (Object.keys(FABRICS) as Fabric[]).filter((f) => FABRICS[f].centerOut);
@@ -77,7 +86,15 @@ const rgb = (hex: string) => {
   const v = parseInt(hex.replace("#", "").padEnd(6, "0").slice(0, 6), 16);
   return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
 };
-const hex = (c: number[]) => "#" + c.map((x) => Math.round(Math.max(0, Math.min(255, x))).toString(16).padStart(2, "0")).join("");
+const hex = (c: number[]) =>
+  "#" +
+  c
+    .map((x) =>
+      Math.round(Math.max(0, Math.min(255, x)))
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("");
 /** a + (b − a)·t */
 const mix = (a: string, b: string, t: number) => {
   const x = rgb(a);

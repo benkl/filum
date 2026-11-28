@@ -25,12 +25,7 @@ fn save_file(request: tauri::ipc::Request<'_>) -> Result<(), String> {
     let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
         return Err("save_file: the file's bytes are missing".into());
     };
-    let path = request
-        .headers()
-        .get("path")
-        .and_then(|v| v.to_str().ok())
-        .and_then(safe_write::decode_path)
-        .ok_or("save_file: no file name")?;
+    let path = request.headers().get("path").and_then(|v| v.to_str().ok()).and_then(safe_write::decode_path).ok_or("save_file: no file name")?;
     safe_write::write_replacing(std::path::Path::new(&path), bytes).map_err(|e| format!("{path}: {e}"))
 }
 
@@ -86,11 +81,7 @@ pub fn run() {
         #[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]
         if let tauri::RunEvent::Opened { urls } = _event {
             use tauri::{Emitter, Manager};
-            let paths: Vec<String> = urls
-                .iter()
-                .filter_map(|u| u.to_file_path().ok())
-                .map(|p| p.to_string_lossy().into_owned())
-                .collect();
+            let paths: Vec<String> = urls.iter().filter_map(|u| u.to_file_path().ok()).map(|p| p.to_string_lossy().into_owned()).collect();
             if !paths.is_empty() {
                 _app.state::<OpenQueue>().0.lock().unwrap().extend(paths);
                 let _ = _app.emit("open-files", ());

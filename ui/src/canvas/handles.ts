@@ -6,7 +6,8 @@ import { flatten, normAngle, objectBoundsCached } from "../lib/geometry";
 import type { DesignObject, PlanData, Vec2 } from "../types";
 import { FLAG } from "../types";
 
-export type HandleKind = "angle" | "spacing" | "center" | "width-l" | "width-r" | "reverse" | "start" | "end" | "text-arc" | "text-spacing" | "guide" | "ripple";
+export type HandleKind =
+  "angle" | "spacing" | "center" | "width-l" | "width-r" | "reverse" | "start" | "end" | "text-arc" | "text-spacing" | "guide" | "ripple";
 
 export interface Handle {
   kind: HandleKind;
@@ -120,11 +121,12 @@ export function computeHandles(o: DesignObject, index: number, plan: PlanData | 
     }
   }
   // stitch patterns drawn over the object
-  for (const pat of o.patterns ?? []) for (const sp of pat.paths) {
-    const curve = flatten(sp, 16);
-    if (sp.closed && curve.length) curve.push(curve[0]);
-    if (curve.length >= 2) out.push({ kind: "guide", objId: o.id, p: curve[0], curve });
-  }
+  for (const pat of o.patterns ?? [])
+    for (const sp of pat.paths) {
+      const curve = flatten(sp, 16);
+      if (sp.closed && curve.length) curve.push(curve[0]);
+      if (curve.length >= 2) out.push({ kind: "guide", objId: o.id, p: curve[0], curve });
+    }
   // ripple stitch: the centre the ripples shrink towards, and its guide
   if (st.type === "running" && st.ripple) {
     const g = st.ripple.guide ?? [];
@@ -299,7 +301,10 @@ export function handleAt(handles: Handle[], p: Vec2, scale: number): Handle | nu
 export function computeTextHandles(objs: DesignObject[], rotation: number, scale: number): Handle[] {
   const live = objs.filter((o) => o.visible && !o.locked);
   if (!live.length) return [];
-  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  let x0 = Infinity,
+    y0 = Infinity,
+    x1 = -Infinity,
+    y1 = -Infinity;
   for (const o of live) {
     const b = objectBoundsCached(o);
     if (!b) continue;

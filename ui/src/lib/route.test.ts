@@ -20,27 +20,65 @@ const onPath = (path: Vec2[], q: Vec2) =>
 
 // a plus sign: two crossing lines → one path (one arm sewn twice)
 const plus: Vec2[][] = [
-  [[-10, 0], [10, 0]],
-  [[0, -10], [0, 10]],
+  [
+    [-10, 0],
+    [10, 0],
+  ],
+  [
+    [0, -10],
+    [0, 10],
+  ],
 ];
 const r = routeRunning(plus);
 check(r.length === 1, `plus: one path (${r.length})`);
-check([[-10, 0], [10, 0], [0, -10], [0, 10]].every((q) => onPath(r[0], q as Vec2)), "plus: every arm sewn");
+check(
+  [
+    [-10, 0],
+    [10, 0],
+    [0, -10],
+    [0, 10],
+  ].every((q) => onPath(r[0], q as Vec2)),
+  "plus: every arm sewn",
+);
 // four line ends: the walk starts and ends at two, the other two are joined through the centre (the optimum)
 check(Math.abs(len(r[0]) - 60) < 0.5, `plus: 40 mm of lines + 20 mm travelled twice (${len(r[0]).toFixed(1)})`);
 
 // a square of four separate strokes: one closed walk, nothing repeated
 const sq: Vec2[][] = [
-  [[0, 0], [10, 0]],
-  [[10, 0], [10, 10]],
-  [[0, 10], [10, 10]],
-  [[0, 0], [0, 10]],
+  [
+    [0, 0],
+    [10, 0],
+  ],
+  [
+    [10, 0],
+    [10, 10],
+  ],
+  [
+    [0, 10],
+    [10, 10],
+  ],
+  [
+    [0, 0],
+    [0, 10],
+  ],
 ];
 const rs = routeRunning(sq);
 check(rs.length === 1 && Math.abs(len(rs[0]) - 40) < 0.1, `square: one walk, no repeats (${rs.length}, ${len(rs[0]).toFixed(1)})`);
 
 // two separate parts: two paths, nearest first
-const two = routeRunning([[[0, 0], [5, 0]], [[50, 0], [55, 0]]], { start: [56, 0] });
+const two = routeRunning(
+  [
+    [
+      [0, 0],
+      [5, 0],
+    ],
+    [
+      [50, 0],
+      [55, 0],
+    ],
+  ],
+  { start: [56, 0] },
+);
 check(two.length === 2 && two[0][0][0] > 49, "two parts: two paths, the nearer first");
 
 // redwork: the plus sign out and back — 80 mm, ending where it began

@@ -16,7 +16,12 @@ use filum_core::stitches::fill::fill;
 use filum_core::stitches::Run;
 
 fn circ(cx: f64, cy: f64, r: f64, n: usize, ccw: bool) -> Ring {
-    let mut v: Ring = (0..n).map(|i| { let a = TAU * i as f64 / n as f64; pt(cx + r * a.cos(), cy + r * a.sin()) }).collect();
+    let mut v: Ring = (0..n)
+        .map(|i| {
+            let a = TAU * i as f64 / n as f64;
+            pt(cx + r * a.cos(), cy + r * a.sin())
+        })
+        .collect();
     if ccw {
         v.reverse();
     }
@@ -28,11 +33,22 @@ fn rect(x: f64, y: f64, w: f64, h: f64) -> Ring {
 }
 
 fn arc(cx: f64, cy: f64, r: f64, a0: f64, a1: f64, n: usize) -> Vec<Point> {
-    (0..=n).map(|i| { let a = (a0 + (a1 - a0) * i as f64 / n as f64).to_radians(); pt(cx + r * a.cos(), cy + r * a.sin()) }).collect()
+    (0..=n)
+        .map(|i| {
+            let a = (a0 + (a1 - a0) * i as f64 / n as f64).to_radians();
+            pt(cx + r * a.cos(), cy + r * a.sin())
+        })
+        .collect()
 }
 
 fn star() -> Ring {
-    (0..10).map(|i| { let r = if i % 2 == 0 { 30.0 } else { 12.0 }; let a = -TAU / 4.0 + TAU / 2.0 * i as f64 / 5.0; pt(50.0 + r * a.cos(), 50.0 + r * a.sin()) }).collect()
+    (0..10)
+        .map(|i| {
+            let r = if i % 2 == 0 { 30.0 } else { 12.0 };
+            let a = -TAU / 4.0 + TAU / 2.0 * i as f64 / 5.0;
+            pt(50.0 + r * a.cos(), 50.0 + r * a.sin())
+        })
+        .collect()
 }
 
 /// A thick S: two arcs of a centre line, 6 mm wide.
@@ -69,7 +85,10 @@ fn cshape() -> Vec<Ring> {
 }
 
 fn neck() -> Vec<Ring> {
-    vec![[(20., 30.), (45., 30.), (49., 48.), (51., 48.), (55., 30.), (80., 30.), (80., 70.), (55., 70.), (51., 52.), (49., 52.), (45., 70.), (20., 70.)].iter().map(|&(x, y)| pt(x, y)).collect()]
+    vec![[(20., 30.), (45., 30.), (49., 48.), (51., 48.), (55., 30.), (80., 30.), (80., 70.), (55., 70.), (51., 52.), (49., 52.), (45., 70.), (20., 70.)]
+        .iter()
+        .map(|&(x, y)| pt(x, y))
+        .collect()]
 }
 
 fn ring_shape() -> Vec<Ring> {
@@ -116,7 +135,12 @@ impl Grid {
         let mut m: std::collections::HashMap<(i64, i64), Vec<usize>> = Default::default();
         for (i, s) in segs.iter().enumerate().filter(|(_, s)| keep(s)) {
             let n = (s.0.dist(s.1) / 0.5).ceil().max(1.0) as usize;
-            let mut cells: Vec<(i64, i64)> = (0..=n).map(|k| { let q = s.0.lerp(s.1, k as f64 / n as f64); (q.x.floor() as i64, q.y.floor() as i64) }).collect();
+            let mut cells: Vec<(i64, i64)> = (0..=n)
+                .map(|k| {
+                    let q = s.0.lerp(s.1, k as f64 / n as f64);
+                    (q.x.floor() as i64, q.y.floor() as i64)
+                })
+                .collect();
             cells.sort_unstable();
             cells.dedup();
             for c in cells {
@@ -148,7 +172,11 @@ fn visible_travel_mm(runs: &[Run]) -> f64 {
             let (mut before, mut after) = (false, false);
             for j in grid.near(p) {
                 if seg_dist(p, segs[j].0, segs[j].1) < 0.3 {
-                    if j < i { before = true } else { after = true }
+                    if j < i {
+                        before = true
+                    } else {
+                        after = true
+                    }
                 }
             }
             if before && !after {
@@ -185,21 +213,21 @@ fn coverage(rings: &[Ring], runs: &[Run], reach: f64) -> f64 {
 
 fn short_share(runs: &[Run]) -> f64 {
     let segs = segments(runs);
-    let short = segs.iter().filter(|s| { let l = s.0.dist(s.1); l > 0.05 && l < 0.5 }).count();
+    let short = segs
+        .iter()
+        .filter(|s| {
+            let l = s.0.dist(s.1);
+            l > 0.05 && l < 0.5
+        })
+        .count();
     short as f64 / segs.len().max(1) as f64
 }
 
 #[test]
 fn tatami_sews_a_connected_shape_in_one_run() {
     // pockets between holes and arms stay reachable along the outline
-    let shapes: Vec<(&str, Vec<Ring>)> = vec![
-        ("16 holes", holes16()),
-        ("star", vec![star()]),
-        ("C", cshape()),
-        ("neck", neck()),
-        ("S", vec![s_shape()]),
-        ("ring", ring_shape()),
-    ];
+    let shapes: Vec<(&str, Vec<Ring>)> =
+        vec![("16 holes", holes16()), ("star", vec![star()]), ("C", cshape()), ("neck", neck()), ("S", vec![s_shape()]), ("ring", ring_shape())];
     for (name, rings) in &shapes {
         for underlay in [false, true] {
             for angle in [0.0, 45.0, 90.0] {
@@ -216,7 +244,9 @@ fn tatami_sews_a_connected_shape_in_one_run() {
 fn tatami_travel_hides_under_later_rows() {
     // Ink/Stitch: ~10 mm of travel shows on the S, ~0 on the square
     let ink = FillParams { tatami_route: TatamiRoute::InkStitch, ..params(FillMethod::Tatami, false) };
-    for (name, rings, max_vis, max_travel) in [("S", vec![s_shape()], 20.0, 200.0), ("square", vec![rect(30.0, 30.0, 40.0, 40.0)], 1.0, 150.0), ("star", vec![star()], 10.0, 150.0)] {
+    for (name, rings, max_vis, max_travel) in
+        [("S", vec![s_shape()], 20.0, 200.0), ("square", vec![rect(30.0, 30.0, 40.0, 40.0)], 1.0, 150.0), ("star", vec![star()], 10.0, 150.0)]
+    {
         let runs = sew(&rings, &ink);
         let vis = visible_travel_mm(&runs);
         let travel = travel_mm(&runs);
@@ -225,7 +255,9 @@ fn tatami_travel_hides_under_later_rows() {
     }
     // one way: a branch left behind (the star's second leg) is reached back
     // up along the outline, never across sewn rows
-    for (name, rings, max_vis, max_travel) in [("S", vec![s_shape()], 25.0, 200.0), ("square", vec![rect(30.0, 30.0, 40.0, 40.0)], 1.0, 150.0), ("star", vec![star()], 25.0, 150.0)] {
+    for (name, rings, max_vis, max_travel) in
+        [("S", vec![s_shape()], 25.0, 200.0), ("square", vec![rect(30.0, 30.0, 40.0, 40.0)], 1.0, 150.0), ("star", vec![star()], 25.0, 150.0)]
+    {
         let runs = sew(&rings, &params(FillMethod::Tatami, false));
         let vis = visible_travel_mm(&runs);
         let travel = travel_mm(&runs);
@@ -260,7 +292,9 @@ fn tatami_without_an_end_finishes_where_it_started() {
 #[test]
 fn circular_fill_does_not_sew_the_outline_over_and_over() {
     // Ink/Stitch: star 4.45 m of thread, 40 mm square 6.6 m (Filum sewed 12 m and 9.7 m)
-    for (name, rings, max_thread, max_travel) in [("star", vec![star()], 4900.0, 400.0), ("square", vec![rect(30.0, 30.0, 40.0, 40.0)], 7000.0, 300.0), ("ring", ring_shape(), 4400.0, 400.0)] {
+    for (name, rings, max_thread, max_travel) in
+        [("star", vec![star()], 4900.0, 400.0), ("square", vec![rect(30.0, 30.0, 40.0, 40.0)], 7000.0, 300.0), ("ring", ring_shape(), 4400.0, 400.0)]
+    {
         let p = FillParams { max_stitch_length: 2.5, ..params(FillMethod::Circular, false) };
         let runs = sew(&rings, &p);
         assert_eq!(runs.len(), 1, "{name}: one run");

@@ -24,7 +24,13 @@ export const runStitch = (kind: "running" | "triple", length: number): StitchPar
 });
 
 /** The move of a drawing, cutting or selecting drag. */
-export function moveDraw(c: CanvasCtx, s: StoreState, d: Extract<Drag, { kind: "build" | "marquee" | "shape" | "freehand" | "ruler" | "split" | "cut" }>, p: Vec2, e: RPointerEvent) {
+export function moveDraw(
+  c: CanvasCtx,
+  s: StoreState,
+  d: Extract<Drag, { kind: "build" | "marquee" | "shape" | "freehand" | "ruler" | "split" | "cut" }>,
+  p: Vec2,
+  e: RPointerEvent,
+) {
   const { builderRef, draw, faceAt, fhRef, iRef, overlayRef, splitLiveRef } = c;
   switch (d.kind) {
     case "build": {
@@ -80,7 +86,9 @@ export function moveDraw(c: CanvasCtx, s: StoreState, d: Extract<Drag, { kind: "
       if (!d.moved && dist(d.a, p) * s.view.scale < 4) return;
       d.moved = true;
       // the stretches that will cut: inside a fill from edge to edge
-      const chords = s.doc.objects.filter((o) => o.visible && !o.locked && o.stitch.type === "fill" && crossesObject(o, d.a, p)).flatMap((o) => cutChords(o, d.a, p));
+      const chords = s.doc.objects
+        .filter((o) => o.visible && !o.locked && o.stitch.type === "fill" && crossesObject(o, d.a, p))
+        .flatMap((o) => cutChords(o, d.a, p));
       iRef.current.cutLine = { a: d.a, b: p, chords };
       iRef.current.cutPoint = null;
       iRef.current.tooltip = { p, text: chords.length ? "Release to cut where the line is solid" : "Drag all the way across a fill to cut it" };
@@ -91,7 +99,12 @@ export function moveDraw(c: CanvasCtx, s: StoreState, d: Extract<Drag, { kind: "
 }
 
 /** The release of a drawing, cutting or selecting drag. */
-export function upDraw(c: CanvasCtx, s: StoreState, d: Extract<Drag, { kind: "build" | "marquee" | "shape" | "freehand" | "ruler" | "split" | "cut" }>, e: RPointerEvent) {
+export function upDraw(
+  c: CanvasCtx,
+  s: StoreState,
+  d: Extract<Drag, { kind: "build" | "marquee" | "shape" | "freehand" | "ruler" | "split" | "cut" }>,
+  e: RPointerEvent,
+) {
   const { applyBuild, draw, fhRef, iRef, newObject, overlayRef, pick, replaceObjects, splitLiveRef, toMm } = c;
   if (d.kind === "build") {
     void applyBuild(d.faces, d.del || e.altKey);
@@ -121,8 +134,22 @@ export function upDraw(c: CanvasCtx, s: StoreState, d: Extract<Drag, { kind: "bu
       if (sh && sh.box.w > 0.5 && sh.box.h > 0.5) {
         const b = sh.box;
         const so = s.toolOptions.shape;
-        const path = sh.kind === "rect" ? (so.kind !== "rect" || so.radius > 0 ? shapeToolPath(so.kind, b, so) : rectPath(b.x, b.y, b.w, b.h)) : ellipsePath(b.x + b.w / 2, b.y + b.h / 2, b.w / 2, b.h / 2);
-        const name = sh.kind === "ellipse" ? "Ellipse" : so.kind === "polygon" ? `${so.sides}-gon` : so.kind === "star" ? `${so.sides}-point star` : so.radius > 0 ? "Rounded rectangle" : "Rectangle";
+        const path =
+          sh.kind === "rect"
+            ? so.kind !== "rect" || so.radius > 0
+              ? shapeToolPath(so.kind, b, so)
+              : rectPath(b.x, b.y, b.w, b.h)
+            : ellipsePath(b.x + b.w / 2, b.y + b.h / 2, b.w / 2, b.h / 2);
+        const name =
+          sh.kind === "ellipse"
+            ? "Ellipse"
+            : so.kind === "polygon"
+              ? `${so.sides}-gon`
+              : so.kind === "star"
+                ? `${so.sides}-point star`
+                : so.radius > 0
+                  ? "Rounded rectangle"
+                  : "Rectangle";
         const o = newObject([path], defaultStitch("fill"), name);
         s.addObjects([o]);
         s.select([o.id]);
@@ -205,7 +232,13 @@ export function upDraw(c: CanvasCtx, s: StoreState, d: Extract<Drag, { kind: "bu
 }
 
 /** A press with the ruler, shape, freehand, knife, Split or builder tool: which drag it starts. */
-export function downDraw(c: CanvasCtx, tool: "ruler" | "rect" | "ellipse" | "freehand" | "cut" | "split" | "builder", s: StoreState, e: RPointerEvent, p: Vec2) {
+export function downDraw(
+  c: CanvasCtx,
+  tool: "ruler" | "rect" | "ellipse" | "freehand" | "cut" | "split" | "builder",
+  s: StoreState,
+  e: RPointerEvent,
+  p: Vec2,
+) {
   const { dragRef, draw, faceAt, fhRef, iRef, pick, refreshRegions } = c;
   switch (tool) {
     case "ruler":
@@ -229,7 +262,8 @@ export function downDraw(c: CanvasCtx, tool: "ruler" | "rect" | "ellipse" | "fre
       const cur = dft.id ? s.doc.objects.find((o) => o.id === dft.id) : undefined;
       // the shape: the one clicked (while no line is drawn yet), else the one being split, else the selected fill
       const lone = s.selection.length === 1 ? s.doc.objects.find((o) => o.id === s.selection[0]) : undefined;
-      const next = splittable(h) && (!cur || (!dft.cuts.length && !dft.directions.length)) ? h : cur && splittable(cur) ? cur : splittable(lone) ? lone : undefined;
+      const next =
+        splittable(h) && (!cur || (!dft.cuts.length && !dft.directions.length)) ? h : cur && splittable(cur) ? cur : splittable(lone) ? lone : undefined;
       if (next && next.id !== dft.id) {
         // not selected: its stitches and handles would cover the preview of the parts
         s.set({ splitDraft: { ...dft, id: next.id, cuts: [], directions: [], order: [] } });

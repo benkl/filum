@@ -15,7 +15,6 @@ import { lerp } from "./vec";
 
 type Hit = { sp: number; seg: number; t: number; p: Vec2; d: number };
 
-
 function segPoint(sp: SubPath, s: number, t: number): Vec2 {
   const n = sp.nodes.length;
   const a = sp.nodes[s];
@@ -115,7 +114,10 @@ export function cutSatinObject(o: DesignObject, q: Vec2): DesignObject[] | null 
   // the rails as the engine picks them
   const ri = satinRailIndices(o.paths);
   if (!ri) return null;
-  const [r0, r1] = [{ sp: o.paths[ri[0]], i: ri[0] }, { sp: o.paths[ri[1]], i: ri[1] }];
+  const [r0, r1] = [
+    { sp: o.paths[ri[0]], i: ri[0] },
+    { sp: o.paths[ri[1]], i: ri[1] },
+  ];
   const one = (i: number) => ({ ...o, paths: [o.paths[i]] });
   const h0 = nearestOnPaths(one(r0.i), q);
   const h1 = nearestOnPaths(one(r1.i), q);
@@ -146,7 +148,15 @@ export function cutSatinObject(o: DesignObject, q: Vec2): DesignObject[] | null 
     const keep = (p: Vec2) => (k === 0 ? inFirst(p) : !inFirst(p));
     const railsK = [pa2[k], pb2[k]];
     const st = { ...o.stitch, guides: guides.filter((g) => keep([(g[0][0] + g[1][0]) / 2, (g[0][1] + g[1][1]) / 2])) };
-    return { ...o, id: uid(), name: `${o.name} ${k ? "b" : "a"}`, start: undefined, end: undefined, paths: [...railsK, ...rungs.filter((r) => keep(mid(r)))], stitch: st };
+    return {
+      ...o,
+      id: uid(),
+      name: `${o.name} ${k ? "b" : "a"}`,
+      start: undefined,
+      end: undefined,
+      paths: [...railsK, ...rungs.filter((r) => keep(mid(r)))],
+      stitch: st,
+    };
   };
   return [half(0), half(1)];
 }

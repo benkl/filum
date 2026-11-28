@@ -112,7 +112,12 @@ export function nextGroupName(doc: Pick<StitchDocument, "objects" | "groupNames"
 const tri = (k: number, n: number) => (k === n ? "all" : k ? "some" : "none");
 
 /** The rows of the Layers tab, top (stitched last) first. */
-export function buildLayerRows(objects: DesignObject[], folded: ReadonlySet<string>, names: Record<string, string> = {}, parents?: Record<string, string>): LayerListRow[] {
+export function buildLayerRows(
+  objects: DesignObject[],
+  folded: ReadonlySet<string>,
+  names: Record<string, string> = {},
+  parents?: Record<string, string>,
+): LayerListRow[] {
   const doc: GroupDoc = { objects, groupParents: parents };
   const info = groupInfo(objects, names, parents);
   const index = new Map(objects.map((o, i) => [o.id, i]));
@@ -173,7 +178,12 @@ export function buildLayerRows(objects: DesignObject[], folded: ReadonlySet<stri
  * `where`: above (after it in stitch order), below, or — `auto` — on the far
  * side from where they come from (taking the target's place, as dragging does).
  */
-export function moveBlock(objects: DesignObject[], ids: Iterable<string>, target: Iterable<string>, where: "above" | "below" | "auto" = "auto"): DesignObject[] {
+export function moveBlock(
+  objects: DesignObject[],
+  ids: Iterable<string>,
+  target: Iterable<string>,
+  where: "above" | "below" | "auto" = "auto",
+): DesignObject[] {
   const set = new Set(ids);
   const index = new Map(objects.map((o, i) => [o.id, i]));
   const tset = new Set([...target].filter((id) => !set.has(id) && index.has(id)));
@@ -278,7 +288,12 @@ export function dropOnRow(doc: StitchDocument, drag: LayerListRow, target: Layer
   const from = drag.member;
   // dropped on its own group's header: it stays in, at the top of the group
   if (from && target.kind === "group" && target.group === from) {
-    const moved = moveBlock(objects, drag.ids, objectsIn(doc, from).map((o) => o.id), "above");
+    const moved = moveBlock(
+      objects,
+      drag.ids,
+      objectsIn(doc, from).map((o) => o.id),
+      "above",
+    );
     return moved === objects ? doc : { ...doc, objects: moved };
   }
   const into = target.kind === "object" ? plain(target.member) : plain(target.parent);

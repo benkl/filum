@@ -75,9 +75,7 @@ mod tests {
         let k = srgb_to_lab([0, 0, 0]);
         assert!(k[0].abs() < 1e-9);
         let r = srgb_to_lab([255, 0, 0]);
-        assert!(
-            (r[0] - 53.24).abs() < 0.05 && (r[1] - 80.09).abs() < 0.1 && (r[2] - 67.20).abs() < 0.1
-        );
+        assert!((r[0] - 53.24).abs() < 0.05 && (r[1] - 80.09).abs() < 0.1 && (r[2] - 67.20).abs() < 0.1);
     }
 
     #[test]

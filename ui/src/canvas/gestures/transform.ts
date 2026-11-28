@@ -25,7 +25,13 @@ import { loadFont } from "../../lib/fonts";
 import { mapObjects } from "../../lib/docEdit";
 
 /** The move of a selection transform (move, scale, rotate, skew, pivot) drag. */
-export function moveTransform(c: CanvasCtx, s: StoreState, d: Extract<Drag, { kind: "move" | "scale" | "rotate" | "skew" | "pivot" }>, p: Vec2, e: RPointerEvent) {
+export function moveTransform(
+  c: CanvasCtx,
+  s: StoreState,
+  d: Extract<Drag, { kind: "move" | "scale" | "rotate" | "skew" | "pivot" }>,
+  p: Vec2,
+  e: RPointerEvent,
+) {
   const { cloneObjects, draw, iRef, pivotRef, xform } = c;
   switch (d.kind) {
     case "move": {
@@ -83,12 +89,10 @@ export function moveTransform(c: CanvasCtx, s: StoreState, d: Extract<Drag, { ki
       iRef.current.guides = null;
       if (d.targets && !e.ctrlKey && !e.metaKey) {
         // snap the dragged edge(s)
-        const snap = snapBox(
-          { x: p[0], y: p[1], w: 0, h: 0 },
-          d.targets,
-          6 / s.view.scale,
-          { x: d.handle === 1 || d.handle === 5 ? [] : [p[0]], y: d.handle === 3 || d.handle === 7 ? [] : [p[1]] },
-        );
+        const snap = snapBox({ x: p[0], y: p[1], w: 0, h: 0 }, d.targets, 6 / s.view.scale, {
+          x: d.handle === 1 || d.handle === 5 ? [] : [p[0]],
+          y: d.handle === 3 || d.handle === 7 ? [] : [p[1]],
+        });
         q = [p[0] + snap.dx, p[1] + snap.dy];
         iRef.current.guides = snap.guides;
       }
@@ -132,7 +136,7 @@ export function moveTransform(c: CanvasCtx, s: StoreState, d: Extract<Drag, { ki
       const m = rotateAbout(deg, d.center[0], d.center[1]);
       const next = new Map(d.orig.map((o) => [o.id, transformObject(o, m, deg)]));
       s.liveTransform({ ids: d.orig.map((o) => o.id), m }, (doc) => ({ ...doc, objects: doc.objects.map((o) => next.get(o.id) ?? o) }));
-      const shown = ((deg % 360) + 540) % 360 - 180;
+      const shown = (((deg % 360) + 540) % 360) - 180;
       iRef.current.tooltip = { p, text: `${shown.toFixed(1)}°` };
       return;
     }
@@ -176,10 +180,10 @@ export function moveTransform(c: CanvasCtx, s: StoreState, d: Extract<Drag, { ki
 /** The release of a selection transform (move, scale, rotate, skew, pivot) drag. */
 export function upTransform(c: CanvasCtx, d: Extract<Drag, { kind: "move" | "scale" | "rotate" | "skew" | "pivot" }>) {
   const { draw, iRef, pivotRef, selKey } = c;
-    iRef.current.guides = null;
-    iRef.current.tooltip = null;
-    if (d.kind !== "pivot" && d.kind !== "move") pivotRef.current = pivotRef.current?.key === selKey() ? pivotRef.current : null;
-    draw();
+  iRef.current.guides = null;
+  iRef.current.tooltip = null;
+  if (d.kind !== "pivot" && d.kind !== "move") pivotRef.current = pivotRef.current?.key === selKey() ? pivotRef.current : null;
+  draw();
 }
 
 /** A press with the selection tool: which drag it starts. */
@@ -230,7 +234,10 @@ export function downSelect(c: CanvasCtx, tool: "select", s: StoreState, e: RPoin
           return;
         }
       }
-      const sel = transformable(s.doc.objects.filter((o) => s.selection.includes(o.id)), s.doc.objects).objects;
+      const sel = transformable(
+        s.doc.objects.filter((o) => s.selection.includes(o.id)),
+        s.doc.objects,
+      ).objects;
       const box = unionBoxes(sel.map(objectBounds));
       if (box && sel.length && sel.every((o) => !o.locked)) {
         const pv = pivotOf(box);
@@ -294,7 +301,10 @@ export function downSelect(c: CanvasCtx, tool: "select", s: StoreState, e: RPoin
           // locked objects stay put; an Alt-drag copy takes them along
           // a lettering with locked letters stays in place with them
           orig: (() => {
-            const t = transformable(s.doc.objects.filter((o) => ids.includes(o.id)), s.doc.objects);
+            const t = transformable(
+              s.doc.objects.filter((o) => ids.includes(o.id)),
+              s.doc.objects,
+            );
             if (t.held) s.toast("A lettering with locked letters stays in place: unlock it in Layers to move it");
             return t.objects;
           })(),

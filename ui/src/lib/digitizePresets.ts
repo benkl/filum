@@ -10,7 +10,21 @@ import type { DigitizeOptions } from "../types";
 
 /** Options remembered between sessions (image-specific colour edits are not). */
 export type DigitizeSettings = Required<
-  Omit<DigitizeOptions, "palette" | "paletteBrand" | "fixedColors" | "skipColors" | "lineColors" | "fillColors" | "edgeColors" | "colorOrder" | "widthMm" | "masks" | "edgeMap" | "regionEdits">
+  Omit<
+    DigitizeOptions,
+    | "palette"
+    | "paletteBrand"
+    | "fixedColors"
+    | "skipColors"
+    | "lineColors"
+    | "fillColors"
+    | "edgeColors"
+    | "colorOrder"
+    | "widthMm"
+    | "masks"
+    | "edgeMap"
+    | "regionEdits"
+  >
 >;
 
 export const DIGITIZE_DEFAULTS: DigitizeSettings = {
@@ -112,7 +126,23 @@ export const DIGITIZE_PRESETS: DigitizePreset[] = [
     id: "illustration",
     label: "Illustration",
     hint: "More colours and finer detail; lines keep the width they are drawn with",
-    opts: { colors: 10, denoise: 1, smoothing: 1, minRegionMm2: 0.8, removeBackground: true, backgroundScope: "outside", simplifyMm: 0.1, maxPixels: 900, satinMaxWidthMm: 5, lineNetworks: true, outlineLineMm: 0, fillMethod: "tatami", rowSpacing: 0.4, underlay: true, pixelArt: "off" },
+    opts: {
+      colors: 10,
+      denoise: 1,
+      smoothing: 1,
+      minRegionMm2: 0.8,
+      removeBackground: true,
+      backgroundScope: "outside",
+      simplifyMm: 0.1,
+      maxPixels: 900,
+      satinMaxWidthMm: 5,
+      lineNetworks: true,
+      outlineLineMm: 0,
+      fillMethod: "tatami",
+      rowSpacing: 0.4,
+      underlay: true,
+      pixelArt: "off",
+    },
   },
   {
     id: "drawing",
@@ -163,7 +193,19 @@ export const DIGITIZE_PRESETS: DigitizePreset[] = [
     id: "pixel",
     label: "Pixel art",
     hint: "Sprites and icons: smooth, depixelized shapes",
-    opts: { colors: 16, removeBackground: true, backgroundScope: "outside", smoothing: 0, denoise: 0, mergeDeltaE: 0, minRegionMm2: 0, pixelArt: "on", allowSatin: false, allowRunning: false, fillMethod: "tatami" },
+    opts: {
+      colors: 16,
+      removeBackground: true,
+      backgroundScope: "outside",
+      smoothing: 0,
+      denoise: 0,
+      mergeDeltaE: 0,
+      minRegionMm2: 0,
+      pixelArt: "on",
+      allowSatin: false,
+      allowRunning: false,
+      fillMethod: "tatami",
+    },
   },
 ];
 

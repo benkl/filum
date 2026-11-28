@@ -59,7 +59,12 @@ export function TransformPanel({ objects }: { objects: DesignObject[] }) {
         <div className="refgrid" role="group" aria-label="Reference point" title="Reference point for position, size and rotation">
           {[0, 0.5, 1].map((y) =>
             [0, 0.5, 1].map((x) => (
-              <button key={`${x}${y}`} className={ref[0] === x && ref[1] === y ? "on" : ""} onClick={() => pickRef([x, y])} aria-label={`Reference ${x},${y}`} />
+              <button
+                key={`${x}${y}`}
+                className={ref[0] === x && ref[1] === y ? "on" : ""}
+                onClick={() => pickRef([x, y])}
+                aria-label={`Reference ${x},${y}`}
+              />
             )),
           )}
         </div>

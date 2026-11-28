@@ -132,10 +132,26 @@ export function swatchDocument(fabric: Fabric, machine: MachineSettings, threadW
   const objects: DesignObject[] = [];
   for (const p of PIECES) {
     const b = LAYOUT[p.id];
-    objects.push(obj(`${p.letter} label`, LETTERS[p.id].map((s) => line(s, LABEL_AT[p.id])), { type: "running", length: 1.2, tolerance: 0.1, repeats: 1, beanRepeats: 0 }));
-    if (p.kind === "fill") objects.push(obj(`${p.letter} · ${p.name}`, [ellipsePath(b.x + b.w / 2, b.y + b.h / 2, b.w / 2, b.h / 2)], fill(p.stitches === "horizontal" ? 0 : 90)));
+    objects.push(
+      obj(
+        `${p.letter} label`,
+        LETTERS[p.id].map((s) => line(s, LABEL_AT[p.id])),
+        { type: "running", length: 1.2, tolerance: 0.1, repeats: 1, beanRepeats: 0 },
+      ),
+    );
+    if (p.kind === "fill")
+      objects.push(obj(`${p.letter} · ${p.name}`, [ellipsePath(b.x + b.w / 2, b.y + b.h / 2, b.w / 2, b.h / 2)], fill(p.stitches === "horizontal" ? 0 : 90)));
     else {
-      const centre: Vec2[] = b.w > b.h ? [[b.x, b.y + b.h / 2], [b.x + b.w, b.y + b.h / 2]] : [[b.x + b.w / 2, b.y], [b.x + b.w / 2, b.y + b.h]];
+      const centre: Vec2[] =
+        b.w > b.h
+          ? [
+              [b.x, b.y + b.h / 2],
+              [b.x + b.w, b.y + b.h / 2],
+            ]
+          : [
+              [b.x + b.w / 2, b.y],
+              [b.x + b.w / 2, b.y + b.h],
+            ];
       objects.push(obj(`${p.letter} · ${p.name}`, [line(centre)], satin()));
     }
   }
@@ -205,13 +221,16 @@ export function calibrate(m: Measurements): CalibrationResult {
   }
 
   const odd = PIECES.flatMap((p) =>
-    (["along", "across"] as const).filter((d) => {
-      const v = m[fieldKey(p.id, d)];
-      const drawn = p[d];
-      return v != null && (v <= 0 || Math.abs(v - drawn) > Math.max(1.5, drawn * 0.15));
-    }).map((d) => `${p.letter} ${d}`),
+    (["along", "across"] as const)
+      .filter((d) => {
+        const v = m[fieldKey(p.id, d)];
+        const drawn = p[d];
+        return v != null && (v <= 0 || Math.abs(v - drawn) > Math.max(1.5, drawn * 0.15));
+      })
+      .map((d) => `${p.letter} ${d}`),
   );
-  if (odd.length) notes.unshift(`Check ${odd.join(", ")}: that's far from what was drawn. Measure the stitched area only, without thread tails or the lettering.`);
+  if (odd.length)
+    notes.unshift(`Check ${odd.join(", ")}: that's far from what was drawn. Measure the stitched area only, without thread tails or the lettering.`);
   return { satin, fill, notes, odd };
 }
 

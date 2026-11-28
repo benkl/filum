@@ -173,24 +173,14 @@ pub const PEC_TABLE_LEN: usize = PEC_PALETTE.len() + 1;
 pub const JEF_TABLE_LEN: usize = JEF_PALETTE.len() + 1;
 
 fn entry_thread(e: &PaletteEntry, brand: &str) -> Thread {
-    Thread {
-        rgb: e.0,
-        name: e.1.to_string(),
-        code: e.2.to_string(),
-        brand: brand.to_string(),
-    }
+    Thread { rgb: e.0, name: e.1.to_string(), code: e.2.to_string(), brand: brand.to_string() }
 }
 
 /// Thread for a PEC file palette index (taken modulo the table size like pystitch).
 pub fn pec_thread(index: usize) -> Thread {
     let i = index % PEC_TABLE_LEN;
     if i == 0 {
-        Thread {
-            rgb: [0, 0, 0],
-            name: "Unknown".into(),
-            code: "0".into(),
-            brand: "Brother".into(),
-        }
+        Thread { rgb: [0, 0, 0], name: "Unknown".into(), code: "0".into(), brand: "Brother".into() }
     } else {
         entry_thread(&PEC_PALETTE[i - 1], "Brother")
     }
@@ -209,15 +199,11 @@ pub fn jef_thread(index: usize) -> Option<Thread> {
 
 /// Table with slot 0 empty, as used by pystitch's index lookups.
 pub(crate) fn pec_slots() -> Vec<Option<[u8; 3]>> {
-    std::iter::once(None)
-        .chain(PEC_PALETTE.iter().enumerate().map(|(i, e)| (i + 1 < PEC_RESERVED_FROM).then_some(e.0)))
-        .collect()
+    std::iter::once(None).chain(PEC_PALETTE.iter().enumerate().map(|(i, e)| (i + 1 < PEC_RESERVED_FROM).then_some(e.0))).collect()
 }
 
 pub(crate) fn jef_slots() -> Vec<Option<[u8; 3]>> {
-    std::iter::once(None)
-        .chain(JEF_PALETTE.iter().map(|e| Some(e.0)))
-        .collect()
+    std::iter::once(None).chain(JEF_PALETTE.iter().map(|e| Some(e.0))).collect()
 }
 
 /// Nearest PEC palette index (1..=64) for a colour (CIE Lab ΔE76).
@@ -250,11 +236,7 @@ pub(crate) fn build_unique_palette_keyed<K: PartialEq + Clone>(slots: &[Option<[
             None => break,
         }
     }
-    colors
-        .iter()
-        .zip(keys)
-        .map(|(c, k)| claimed.iter().find(|(kk, _)| kk == k).map(|x| x.1).unwrap_or_else(|| nearest_index(*c, slots).unwrap_or(0)))
-        .collect()
+    colors.iter().zip(keys).map(|(c, k)| claimed.iter().find(|(kk, _)| kk == k).map(|x| x.1).unwrap_or_else(|| nearest_index(*c, slots).unwrap_or(0))).collect()
 }
 
 /// pystitch's JEF "non-repeat" palette: consecutive *different* threads

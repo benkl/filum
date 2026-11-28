@@ -9,11 +9,16 @@ import type * as U from "../types";
 /** The fields of an object type (of every member of a union). */
 type Fields<T> = T extends unknown ? keyof T & string : never;
 /** true when both have the same fields, the editor's own `EditorOnly` aside; else the fields on one side. */
-type SameFields<Ui, Engine, EditorOnly extends string = never> = [Exclude<Fields<Ui>, Fields<Engine> | EditorOnly>, Exclude<Fields<Engine>, Fields<Ui>>] extends [never, never]
+type SameFields<Ui, Engine, EditorOnly extends string = never> = [
+  Exclude<Fields<Ui>, Fields<Engine> | EditorOnly>,
+  Exclude<Fields<Engine>, Fields<Ui>>,
+] extends [never, never]
   ? true
   : { onlyInEditor: Exclude<Fields<Ui>, Fields<Engine> | EditorOnly>; onlyInEngine: Exclude<Fields<Engine>, Fields<Ui>> };
 /** true when both unions have the same members; else the members on one side. */
-type SameUnion<Ui, Engine> = [Exclude<Ui, Engine>, Exclude<Engine, Ui>] extends [never, never] ? true : { onlyInEditor: Exclude<Ui, Engine>; onlyInEngine: Exclude<Engine, Ui> };
+type SameUnion<Ui, Engine> = [Exclude<Ui, Engine>, Exclude<Engine, Ui>] extends [never, never]
+  ? true
+  : { onlyInEditor: Exclude<Ui, Engine>; onlyInEngine: Exclude<Engine, Ui> };
 
 /** Compiles only when its check is `true` (the error shows the fields on one side). */
 const ok = <T extends true>(): T => true as T;

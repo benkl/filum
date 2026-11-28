@@ -13,11 +13,7 @@ use crate::io::ByteWriter;
 use crate::raw::RawPattern;
 use crate::{Error, Pattern, Thread, WriteOptions};
 
-pub(crate) const SETTINGS: EncodeSettings = EncodeSettings {
-    max_stitch: 121,
-    max_jump: 121,
-    full_jump: true,
-};
+pub(crate) const SETTINGS: EncodeSettings = EncodeSettings { max_stitch: 121, max_jump: 121, full_jump: true };
 const HEADER_SIZE: usize = 512;
 /// Number of jumps a trim is written as (pystitch `trim_at`).
 const TRIM_AT: usize = 3;
@@ -44,20 +40,8 @@ pub(crate) fn encode_record(dx: i32, dy: i32, kind: Kind) -> [u8; 3] {
     }
     b2 |= 0b11;
     // (threshold, weight, byte index, bit for positive, bit for negative)
-    let x_digits: [(i32, usize, u8, u8); 5] = [
-        (81, 2, 2, 3),
-        (27, 1, 2, 3),
-        (9, 0, 2, 3),
-        (3, 1, 0, 1),
-        (1, 0, 0, 1),
-    ];
-    let y_digits: [(i32, usize, u8, u8); 5] = [
-        (81, 2, 5, 4),
-        (27, 1, 5, 4),
-        (9, 0, 5, 4),
-        (3, 1, 7, 6),
-        (1, 0, 7, 6),
-    ];
+    let x_digits: [(i32, usize, u8, u8); 5] = [(81, 2, 2, 3), (27, 1, 2, 3), (9, 0, 2, 3), (3, 1, 0, 1), (1, 0, 0, 1)];
+    let y_digits: [(i32, usize, u8, u8); 5] = [(81, 2, 5, 4), (27, 1, 5, 4), (9, 0, 5, 4), (3, 1, 7, 6), (1, 0, 7, 6)];
     let bytes = [&mut b0, &mut b1, &mut b2];
     for &(w, bi, pos, neg) in &x_digits {
         let half = w / 2;
@@ -91,11 +75,7 @@ fn bit(b: u8, pos: u32) -> i32 {
 
 /// Decodes the x delta (0.1 mm).
 pub(crate) fn decode_dx(b0: u8, b1: u8, b2: u8) -> i32 {
-    81 * (bit(b2, 2) - bit(b2, 3))
-        + 27 * (bit(b1, 2) - bit(b1, 3))
-        + 9 * (bit(b0, 2) - bit(b0, 3))
-        + 3 * (bit(b1, 0) - bit(b1, 1))
-        + (bit(b0, 0) - bit(b0, 1))
+    81 * (bit(b2, 2) - bit(b2, 3)) + 27 * (bit(b1, 2) - bit(b1, 3)) + 9 * (bit(b0, 2) - bit(b0, 3)) + 3 * (bit(b1, 0) - bit(b1, 1)) + (bit(b0, 0) - bit(b0, 1))
 }
 
 /// Decodes the y delta (0.1 mm), already flipped to y down.
@@ -110,11 +90,7 @@ pub(crate) fn decode_dy(b0: u8, b1: u8, b2: u8) -> i32 {
 
 /// Header-safe label: ASCII printable only, at most 16 characters.
 fn label(name: &str) -> String {
-    let n: String = name
-        .chars()
-        .filter(|c| c.is_ascii() && !c.is_ascii_control())
-        .take(16)
-        .collect();
+    let n: String = name.chars().filter(|c| c.is_ascii() && !c.is_ascii_control()).take(16).collect();
     if n.trim().is_empty() {
         "Untitled".into()
     } else {
@@ -172,9 +148,7 @@ pub(crate) fn write(p: &Pattern, opts: &WriteOptions) -> Result<Vec<u8>, Error> 
         match r.cmd {
             Cmd::Stitch => out.extend_from_slice(&encode_record(dx, dy, Kind::Stitch)),
             Cmd::Jump => out.extend_from_slice(&encode_record(dx, dy, Kind::Jump)),
-            Cmd::ColorChange | Cmd::Stop => {
-                out.extend_from_slice(&encode_record(0, 0, Kind::ColorChange))
-            }
+            Cmd::ColorChange | Cmd::Stop => out.extend_from_slice(&encode_record(0, 0, Kind::ColorChange)),
             Cmd::End => out.extend_from_slice(&encode_record(0, 0, Kind::End)),
             Cmd::Trim => {
                 let mut delta = -4;
@@ -347,9 +321,7 @@ mod tests {
         assert_eq!(lines[10], "MY:+    0");
         assert_eq!(lines[11], "PD:******");
         assert_eq!(lines[12].as_bytes()[0], 0x1A);
-        assert!(h[h.iter().position(|&b| b == 0x1A).unwrap() + 1..]
-            .iter()
-            .all(|&b| b == b' '));
+        assert!(h[h.iter().position(|&b| b == 0x1A).unwrap() + 1..].iter().all(|&b| b == b' '));
         assert_eq!(&bytes[bytes.len() - 3..], &[0, 0, 0xF3]);
     }
 

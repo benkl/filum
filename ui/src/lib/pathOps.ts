@@ -13,7 +13,8 @@ type End = { ref: NodeRef; p: [number, number] };
 /** Objects whose paths these commands must not rewrite: a gradient's or tartan's colour layers (they share one shape) and linked clones (their paths follow the original). */
 function untouchable(objs: DesignObject[]): string | null {
   if (objs.some((o) => o.clone)) return "Linked clones follow their original: unlink them first";
-  if (objs.some((o) => o.stitch.type === "fill" && (o.stitch.gradient || o.stitch.tartan))) return "Gradients and tartans keep one shape for all their colours: remove the gradient or tartan first";
+  if (objs.some((o) => o.stitch.type === "fill" && (o.stitch.gradient || o.stitch.tartan)))
+    return "Gradients and tartans keep one shape for all their colours: remove the gradient or tartan first";
   return null;
 }
 

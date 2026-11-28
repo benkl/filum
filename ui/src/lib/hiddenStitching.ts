@@ -10,7 +10,22 @@ import { FLAG, type DesignObject, type DesignOptions, type Fabric, type PlanData
 import { defaultDesignOptions } from "./geometry";
 
 /** The options with every hidden-stitching setting filled in. */
-export const hiddenOptions = (o: Partial<DesignOptions> | undefined): Required<Pick<DesignOptions, "removeOverlaps" | "overlapMargin" | "coverMinWidth" | "coverMaxSpacing" | "texturedCovers" | "appliqueCovers" | "minFragment" | "keepUnderlay" | "trimRunning">> => {
+export const hiddenOptions = (
+  o: Partial<DesignOptions> | undefined,
+): Required<
+  Pick<
+    DesignOptions,
+    | "removeOverlaps"
+    | "overlapMargin"
+    | "coverMinWidth"
+    | "coverMaxSpacing"
+    | "texturedCovers"
+    | "appliqueCovers"
+    | "minFragment"
+    | "keepUnderlay"
+    | "trimRunning"
+  >
+> => {
   const d = defaultDesignOptions();
   return {
     removeOverlaps: o?.removeOverlaps ?? d.removeOverlaps,
@@ -56,8 +71,14 @@ export function coverVerdict(o: DesignObject, opts: Partial<DesignOptions> | und
   if (mode === "always") return { hides: "yes", why: "Set to always hide, even when thin or open." };
   const wide = `if any part is at least ${h.coverMinWidth} mm wide`;
   const open = (sp: number) => h.coverMaxSpacing > 0 && sp > h.coverMaxSpacing + 1e-9;
-  if (st.type === "applique") return h.appliqueCovers ? { hides: "wide", why: `The appliqué fabric hides what's under it, ${wide}.` } : { hides: "no", why: "Appliqué fabric is set not to hide." };
-  if (st.type === "satin") return open(st.spacing) ? { hides: "no", why: `Open: rows ${st.spacing} mm apart (the limit is ${h.coverMaxSpacing} mm).` } : { hides: "wide", why: `Dense satin: hides ${wide}.` };
+  if (st.type === "applique")
+    return h.appliqueCovers
+      ? { hides: "wide", why: `The appliqué fabric hides what's under it, ${wide}.` }
+      : { hides: "no", why: "Appliqué fabric is set not to hide." };
+  if (st.type === "satin")
+    return open(st.spacing)
+      ? { hides: "no", why: `Open: rows ${st.spacing} mm apart (the limit is ${h.coverMaxSpacing} mm).` }
+      : { hides: "wide", why: `Dense satin: hides ${wide}.` };
   if (st.gradient || st.tartan) return { hides: "wide", why: "One colour of a gradient: the colours together hide what's under them, not each other." };
   if (st.ramp || (st.endRowSpacing ?? 0) > 0) return { hides: "no", why: "Its rows open up towards one end, so it shows what's under it." };
   if (TEXTURES.has(st.method) && !h.texturedCovers) return { hides: "no", why: "A texture (stipple, meander, Hilbert, cross stitch) shows what's under it." };
@@ -113,19 +134,17 @@ export function hiddenReport(doc: StitchDocument): Promise<HiddenReport> {
     engine.planLatest("hidden-without", { ...doc, options: { ...opts, removeOverlaps: false } }),
     own ? Promise.resolve(own) : engine.planLatest("hidden-with", on),
     engine.stitchedShapesLatest("hidden-shapes", on),
-  ]).then(
-    ([without, withIt, shapes]) => {
-      const a = perObject(without);
-      const b = perObject(withIt);
-      const objects: HiddenObject[] = [];
-      for (const [index, before] of a) {
-        const after = b.get(index) ?? 0;
-        if (after < before) objects.push({ index, before, after, gone: shapes.some((s) => s.index === index && !s.paths.length) });
-      }
-      objects.sort((x, y) => y.before - y.after - (x.before - x.after));
-      return { before: without.stats.stitches, after: withIt.stats.stitches, objects, shapes };
-    },
-  );
+  ]).then(([without, withIt, shapes]) => {
+    const a = perObject(without);
+    const b = perObject(withIt);
+    const objects: HiddenObject[] = [];
+    for (const [index, before] of a) {
+      const after = b.get(index) ?? 0;
+      if (after < before) objects.push({ index, before, after, gone: shapes.some((s) => s.index === index && !s.paths.length) });
+    }
+    objects.sort((x, y) => y.before - y.after - (x.before - x.after));
+    return { before: without.stats.stitches, after: withIt.stats.stitches, objects, shapes };
+  });
   reports.set(doc, p);
   // a superseded request (a newer document came) is not remembered
   p.catch(() => reports.delete(doc));

@@ -312,7 +312,11 @@ pub fn guide_field(rings: &[Ring], guide: &[Point], buffer: bool) -> Option<Flow
                 // round the end: across the line from the end point
                 let e = if tt <= 1e-9 { guide[0] } else { guide[last] };
                 let v = q - e;
-                if v.length() < 1e-9 { dir.y.atan2(dir.x) } else { v.y.atan2(v.x) + std::f64::consts::FRAC_PI_2 }
+                if v.length() < 1e-9 {
+                    dir.y.atan2(dir.x)
+                } else {
+                    v.y.atan2(v.x) + std::f64::consts::FRAC_PI_2
+                }
             } else {
                 dir.y.atan2(dir.x)
             };
@@ -335,10 +339,12 @@ mod tests {
     #[test]
     fn a_ring_field_runs_around() {
         // a circle: near the rim the rows run along it (tangential)
-        let ring: Ring = (0..72).map(|k| {
-            let a = k as f64 / 72.0 * std::f64::consts::TAU;
-            pt(20.0 + 15.0 * a.cos(), 20.0 + 15.0 * a.sin())
-        }).collect();
+        let ring: Ring = (0..72)
+            .map(|k| {
+                let a = k as f64 / 72.0 * std::f64::consts::TAU;
+                pt(20.0 + 15.0 * a.cos(), 20.0 + 15.0 * a.sin())
+            })
+            .collect();
         let f = shape_field(&[ring], 0.0, 1.0);
         // right of the centre (east rim): rows vertical
         let a = dir_at(&f, 33.0, 20.0);
@@ -376,7 +382,10 @@ mod tests {
         use std::f64::consts::FRAC_PI_2;
         let sq: Ring = vec![pt(0.0, 0.0), pt(40.0, 0.0), pt(40.0, 40.0), pt(0.0, 40.0)];
         let vertical = |a: f64| (a.rem_euclid(std::f64::consts::PI) - FRAC_PI_2).abs() < 0.12;
-        let horizontal = |a: f64| { let m = a.rem_euclid(std::f64::consts::PI); m < 0.12 || m > std::f64::consts::PI - 0.12 };
+        let horizontal = |a: f64| {
+            let m = a.rem_euclid(std::f64::consts::PI);
+            m < 0.12 || m > std::f64::consts::PI - 0.12
+        };
         // linear left → right: the bands (and rows) are vertical, also past the end
         let f = colour_field(std::slice::from_ref(&sq), &grad(GradientKind::Linear), 0.0, false).unwrap();
         for x in [5.0, 25.0, 38.0] {
@@ -401,7 +410,10 @@ mod tests {
         // an L-shaped guide: along x, then down
         let guide = [pt(5.0, 5.0), pt(30.0, 5.0), pt(30.0, 35.0)];
         let f = guide_field(std::slice::from_ref(&sq), &guide, false).unwrap();
-        let horiz = |a: f64| { let m = a.rem_euclid(std::f64::consts::PI); m < 0.15 || m > std::f64::consts::PI - 0.15 };
+        let horiz = |a: f64| {
+            let m = a.rem_euclid(std::f64::consts::PI);
+            m < 0.15 || m > std::f64::consts::PI - 0.15
+        };
         let vert = |a: f64| (a.rem_euclid(std::f64::consts::PI) - std::f64::consts::FRAC_PI_2).abs() < 0.15;
         assert!(horiz(dir_at(&f, 15.0, 12.0)), "near the first leg: along x");
         assert!(vert(dir_at(&f, 22.0, 25.0)), "near the second leg: along y");

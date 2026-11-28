@@ -28,7 +28,14 @@ export function LockPicker({ value, onChange }: { value: LockStyle; onChange: (v
   return (
     <div className="lock-picker" role="radiogroup">
       {LOCKS.map((l) => (
-        <button key={l.id} className={`lock-chip ${value === l.id ? "on" : ""}`} title={`${l.label}: ${l.hint}`} aria-checked={value === l.id} role="radio" onClick={() => onChange(l.id)}>
+        <button
+          key={l.id}
+          className={`lock-chip ${value === l.id ? "on" : ""}`}
+          title={`${l.label}: ${l.hint}`}
+          aria-checked={value === l.id}
+          role="radio"
+          onClick={() => onChange(l.id)}
+        >
           <Preview d={l.d} />
         </button>
       ))}

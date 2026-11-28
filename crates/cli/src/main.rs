@@ -61,7 +61,15 @@ fn info(doc: &Document, engine: &mut Engine) -> Result<(), String> {
     let q = filum_core::quality::stitch_quality(doc, &plan);
     out!("Quality     {} short stitches, {} needle drops on an earlier hole ({} of them travel)", q.short, q.rehits, q.travel_rehits);
     match q.hot_spots.first() {
-        Some(h) => out!("            {}{} spots over {:.0} holes/mm², the worst {:.0} at ({:.1}, {:.1})", q.hot_spots.len(), if q.hot_spots.len() >= 20 { "+" } else { "" }, q.hole_limit, h.per_mm2, h.at[0], h.at[1]),
+        Some(h) => out!(
+            "            {}{} spots over {:.0} holes/mm², the worst {:.0} at ({:.1}, {:.1})",
+            q.hot_spots.len(),
+            if q.hot_spots.len() >= 20 { "+" } else { "" },
+            q.hole_limit,
+            h.per_mm2,
+            h.at[0],
+            h.at[1]
+        ),
         None => out!("            no spot over {:.0} holes/mm²", q.hole_limit),
     }
     for (i, t) in plan.threads.iter().enumerate() {
@@ -95,7 +103,12 @@ fn run(args: Vec<String>) -> Result<(), String> {
             optimize::apply(&mut doc, &r);
             out!(
                 "colour changes {} → {}, trims {} → {}, jumps {:.0} → {:.0} mm",
-                r.color_changes_before, r.color_changes_after, r.trims_before, r.trims_after, r.travel_before_mm, r.travel_after_mm
+                r.color_changes_before,
+                r.color_changes_after,
+                r.trims_before,
+                r.trims_after,
+                r.travel_before_mm,
+                r.travel_after_mm
             );
             save(&doc, &mut engine, &args[2])?;
         }
@@ -118,13 +131,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         }
         Some("formats") => {
             for f in io::formats() {
-                out!(
-                    "{:<12} {:<28} {}{}",
-                    f.extension,
-                    f.name,
-                    if f.can_read { "read " } else { "     " },
-                    if f.can_write { "write" } else { "" }
-                );
+                out!("{:<12} {:<28} {}{}", f.extension, f.name, if f.can_read { "read " } else { "     " }, if f.can_write { "write" } else { "" });
             }
         }
         _ => {

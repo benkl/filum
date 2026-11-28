@@ -13,7 +13,17 @@ const satin = (id: string, pts: Vec2[], width = 3): DesignObject => ({
   visible: true,
   locked: false,
   paths: [{ closed: false, nodes: pts.map((p) => ({ p })) }],
-  stitch: { type: "satin", method: "satin", width, spacing: 0.4, pullComp: 0, flip: false, stops: false, swapRails: false, reverse: false } as unknown as DesignObject["stitch"],
+  stitch: {
+    type: "satin",
+    method: "satin",
+    width,
+    spacing: 0.4,
+    pullComp: 0,
+    flip: false,
+    stops: false,
+    swapRails: false,
+    reverse: false,
+  } as unknown as DesignObject["stitch"],
   trimAfter: false,
   stopAfter: false,
 });
@@ -52,17 +62,26 @@ for (let i = 1; i < t.length; i++) {
   if (d(prevEnd, start) > 0.01) gaps++;
 }
 ok(gaps === 0, `one continuous path through the T (${t.length} objects)`);
-ok(t.some((o) => o.stitch.type === "running"), "a running underpath where the route goes down a branch and back");
-ok(t.every((o) => o.id !== "bar" && o.id !== "stem"), "new objects replace the originals");
+ok(
+  t.some((o) => o.stitch.type === "running"),
+  "a running underpath where the route goes down a branch and back",
+);
+ok(
+  t.every((o) => o.id !== "bar" && o.id !== "stem"),
+  "new objects replace the originals",
+);
 
 // two satins apart: one jump, a trim with the option
-const far = [satin("a", [
-  [0, 0],
-  [20, 0],
-]), satin("b", [
-  [40, 10],
-  [60, 10],
-])];
+const far = [
+  satin("a", [
+    [0, 0],
+    [20, 0],
+  ]),
+  satin("b", [
+    [40, 10],
+    [60, 10],
+  ]),
+];
 const plain = autoSatin(far)!;
 ok(satins(plain).length === 2 && !plain.some((o) => o.trimAfter), "two satins, no trim by default");
 const trimmed = autoSatin(far, { trim: true })!;
@@ -82,17 +101,25 @@ const arc = (cx: number, cy: number, r: number, n: number): Vec2[] =>
     const a = -Math.PI / 2 + (Math.PI * i) / n;
     return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
   });
-const twoRail = (id: string, r0: Vec2[], r1: Vec2[]): DesignObject => ({ ...satin(id, r0), thread: id, paths: [r0, r1].map((pts) => ({ closed: false, nodes: pts.map((p) => ({ p })) })) });
+const twoRail = (id: string, r0: Vec2[], r1: Vec2[]): DesignObject => ({
+  ...satin(id, r0),
+  thread: id,
+  paths: [r0, r1].map((pts) => ({ closed: false, nodes: pts.map((p) => ({ p })) })),
+});
 const outer: Vec2[] = [[20, 30], ...arc(60, 45, 15, 8), [20, 60]];
 const inner: Vec2[] = [[20, 34], ...arc(60, 45, 11, 8), [20, 56]];
 const u = twoRail("u", outer, inner);
-const stemR = twoRail("stem", [
-  [30, 10],
-  [30, 31],
-], [
-  [33, 10],
-  [33, 31],
-]);
+const stemR = twoRail(
+  "stem",
+  [
+    [30, 10],
+    [30, 31],
+  ],
+  [
+    [33, 10],
+    [33, 31],
+  ],
+);
 const routed = autoSatin([u, stemR])!;
 const original = [...outer, ...inner];
 const uPieces = satins(routed).filter((o) => o.thread === "u");
@@ -100,7 +127,10 @@ ok(uPieces.length >= 2, `the U is cut (${uPieces.length} pieces)`);
 for (const o of uPieces) {
   const [a, b] = [o.paths[0].nodes, o.paths[1].nodes];
   ok(a.length === b.length && o.paths.length === 2, `${o.name}: as many nodes on both rails, no rung needed (${a.length} / ${b.length})`);
-  ok(a.slice(1, -1).every((n) => original.some((q) => d(q, n.p) < 1e-9)) && b.slice(1, -1).every((n) => original.some((q) => d(q, n.p) < 1e-9)), `${o.name}: the rails keep the original nodes`);
+  ok(
+    a.slice(1, -1).every((n) => original.some((q) => d(q, n.p) < 1e-9)) && b.slice(1, -1).every((n) => original.some((q) => d(q, n.p) < 1e-9)),
+    `${o.name}: the rails keep the original nodes`,
+  );
   // cuts on the straight parts run straight across (they slanted 17° when cut at equal shares of each rail)
   for (const [p, q] of [
     [a[0].p, b[0].p],
@@ -116,22 +146,33 @@ ok(Math.abs(sumOuter - railLen(outer)) < 0.05, `the outer rail sewn once (${sumO
 
 // rails with nodes that do not correspond: the pieces get a rung, so the
 // engine does not pair nodes up by count
-const loose = twoRail("loose", [
-  [0, 0],
-  [10, 0],
-  [20, 0],
-  [30, 0],
-  [40, 0],
-], [
-  [0, 4],
-  [40, 4],
-]);
-const cross = twoRail("cross", [
-  [20, -10],
-  [20, 0.5],
-], [
-  [22, -10],
-  [22, 0.5],
-]);
+const loose = twoRail(
+  "loose",
+  [
+    [0, 0],
+    [10, 0],
+    [20, 0],
+    [30, 0],
+    [40, 0],
+  ],
+  [
+    [0, 4],
+    [40, 4],
+  ],
+);
+const cross = twoRail(
+  "cross",
+  [
+    [20, -10],
+    [20, 0.5],
+  ],
+  [
+    [22, -10],
+    [22, 0.5],
+  ],
+);
 const loosePieces = satins(autoSatin([loose, cross])!).filter((o) => o.thread === "loose");
-ok(loosePieces.length >= 2 && loosePieces.every((o) => o.paths.length === 3), `pieces of a satin without node rungs get one rung (${loosePieces.map((o) => o.paths.length).join(",")})`);
+ok(
+  loosePieces.length >= 2 && loosePieces.every((o) => o.paths.length === 3),
+  `pieces of a satin without node rungs get one rung (${loosePieces.map((o) => o.paths.length).join(",")})`,
+);

@@ -74,7 +74,14 @@ export function PrintDialog({ onClose }: { onClose: () => void }) {
   // pictures: the whole design and every colour block on its own
   const pictures = useMemo(() => {
     if (!plan || !plan.flags.length) return null;
-    const opts = { kind: s.realistic ? ("realistic" as const) : ("simple" as const), lineWidth: 0.3, background: "transparent" as const, fabricColor, threadWeight: doc.options?.threadWeight, maxSide: 1800 };
+    const opts = {
+      kind: s.realistic ? ("realistic" as const) : ("simple" as const),
+      lineWidth: 0.3,
+      background: "transparent" as const,
+      fabricColor,
+      threadWeight: doc.options?.threadWeight,
+      maxSide: 1800,
+    };
     const url = (p: typeof plan, dpi: number) => renderPicture(p, { ...opts, dpi }).toDataURL("image/png");
     const big = Math.max(plan.stats.width, plan.stats.height, 1);
     return {
@@ -180,10 +187,28 @@ export function PrintDialog({ onClose }: { onClose: () => void }) {
               </label>
             ))}
             <Row label="Paper">
-              <Seg value={s.paper} options={[["a4", "A4"], ["letter", "Letter"]] as const} onChange={(v) => set({ paper: v })} />
+              <Seg
+                value={s.paper}
+                options={
+                  [
+                    ["a4", "A4"],
+                    ["letter", "Letter"],
+                  ] as const
+                }
+                onChange={(v) => set({ paper: v })}
+              />
             </Row>
             <Row label="Pictures" title="Realistic: as sewn · Stitches: every stitch as a line">
-              <Seg value={!!s.realistic} options={[[true, "Realistic"], [false, "Stitches"]] as const} onChange={(v) => set({ realistic: v })} />
+              <Seg
+                value={!!s.realistic}
+                options={
+                  [
+                    [true, "Realistic"],
+                    [false, "Stitches"],
+                  ] as const
+                }
+                onChange={(v) => set({ realistic: v })}
+              />
             </Row>
             {s.views.operatorDetailed && (
               <Row label="Thumbnails" title="Size of the colour pictures in the operator detailed view (Ink/Stitch 15–110 mm)">
@@ -229,7 +254,15 @@ export function PrintDialog({ onClose }: { onClose: () => void }) {
               <Num value={s.timeTrim} unit="s" step={1} min={0} max={120} digits={0} onChange={(v) => (set({ timeTrim: v }), machine({ trimSeconds: v }))} />
             </Row>
             <Row label="Colour change" title="Seconds for every colour change — saved with the design">
-              <Num value={s.timeColorChange} unit="s" step={1} min={0} max={600} digits={0} onChange={(v) => (set({ timeColorChange: v }), machine({ colorChangeSeconds: v }))} />
+              <Num
+                value={s.timeColorChange}
+                unit="s"
+                step={1}
+                min={0}
+                max={600}
+                digits={0}
+                onChange={(v) => (set({ timeColorChange: v }), machine({ colorChangeSeconds: v }))}
+              />
             </Row>
             <Row label="Add to total" title="Preparing the machine, thread breaks, bobbin changes…">
               <Num value={s.timeAdditional} unit="s" step={30} min={0} max={36000} digits={0} onChange={(v) => set({ timeAdditional: v })} />
@@ -259,7 +292,12 @@ export function PrintDialog({ onClose }: { onClose: () => void }) {
             {s.views.info && (
               <>
                 <span className="stat">Information sheet</span>
-                <textarea className="input" value={s.infoText} onChange={(e) => set({ infoText: e.target.value })} placeholder="Care instructions, terms, contact…" />
+                <textarea
+                  className="input"
+                  value={s.infoText}
+                  onChange={(e) => set({ infoText: e.target.value })}
+                  placeholder="Care instructions, terms, contact…"
+                />
               </>
             )}
           </Section>

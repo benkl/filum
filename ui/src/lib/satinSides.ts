@@ -87,7 +87,12 @@ export const isCentreLineSatin = (o: DesignObject) => isSatin(o) && !o.stitch.mu
 export function toTwoSides(o: DesignObject): DesignObject {
   if (!isCentreLineSatin(o) || !isSatin(o)) return o;
   const sp = o.paths[0];
-  const { paths } = buildSatin(sp.nodes, sp.nodes.map(() => o.stitch.width), sp.closed, true);
+  const { paths } = buildSatin(
+    sp.nodes,
+    sp.nodes.map(() => o.stitch.width),
+    sp.closed,
+    true,
+  );
   return { ...o, paths };
 }
 
@@ -118,7 +123,8 @@ export function toCentreLine(o: DesignObject): DesignObject {
   } else {
     const pa = flattenSubPath(a, 0.2);
     let pb = flattenSubPath(b, 0.2);
-    if (vdist(pa[0], pb[0]) + vdist(pa[pa.length - 1], pb[pb.length - 1]) > vdist(pa[0], pb[pb.length - 1]) + vdist(pa[pa.length - 1], pb[0])) pb = [...pb].reverse();
+    if (vdist(pa[0], pb[0]) + vdist(pa[pa.length - 1], pb[pb.length - 1]) > vdist(pa[0], pb[pb.length - 1]) + vdist(pa[pa.length - 1], pb[0]))
+      pb = [...pb].reverse();
     const pts: Vec2[] = [];
     widths = [];
     for (let k = 0; k <= 80; k++) {
@@ -178,7 +184,12 @@ function sidesOf(o: DesignObject): [Rail, Rail] | null {
   if (o.paths.length === 1) {
     const sp = o.paths[0];
     if (sp.nodes.length < 2) return null;
-    const { left, right } = satinOutlineOf(sp.nodes, sp.nodes.map(() => o.stitch.width), sp.closed, 14);
+    const { left, right } = satinOutlineOf(
+      sp.nodes,
+      sp.nodes.map(() => o.stitch.width),
+      sp.closed,
+      14,
+    );
     const n = sp.nodes.length;
     const nodeIdx = [0];
     let i = 0;

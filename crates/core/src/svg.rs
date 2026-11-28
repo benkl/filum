@@ -173,14 +173,7 @@ impl Affine {
     fn mul(self, o: Affine) -> Affine {
         let [a, b, c, d, e, f] = self.0;
         let [a2, b2, c2, d2, e2, f2] = o.0;
-        Affine([
-            a * a2 + c * b2,
-            b * a2 + d * b2,
-            a * c2 + c * d2,
-            b * c2 + d * d2,
-            a * e2 + c * f2 + e,
-            b * e2 + d * f2 + f,
-        ])
+        Affine([a * a2 + c * b2, b * a2 + d * b2, a * c2 + c * d2, b * c2 + d * d2, a * e2 + c * f2 + e, b * e2 + d * f2 + f])
     }
     fn apply(self, p: Point) -> Point {
         let [a, b, c, d, e, f] = self.0;
@@ -428,7 +421,8 @@ impl Sheet {
                 if !ok || parts.is_empty() || parts.last().unwrap().1 {
                     continue;
                 }
-                let spec = parts.iter().fold((0, 0, 0), |(a, b, c), (p, _)| (a + p.id.is_some() as u32, b + p.classes.len() as u32, c + p.tag.is_some() as u32));
+                let spec =
+                    parts.iter().fold((0, 0, 0), |(a, b, c), (p, _)| (a + p.id.is_some() as u32, b + p.classes.len() as u32, c + p.tag.is_some() as u32));
                 let order = self.rules.len();
                 self.rules.push(CssRule { parts, spec, order, decls: decls.clone() });
             }
@@ -440,10 +434,15 @@ impl Sheet {
     /// presentation attributes, `<style>` rules by specificity and order,
     /// the `style` attribute, then `!important` rules.
     fn declarations(&self, node: roxmltree::Node) -> Vec<(String, String)> {
-        let mut out: Vec<(String, String)> = node.attributes().filter(|a| a.namespace().is_none() && !matches!(a.name(), "style" | "d" | "points" | "transform" | "id" | "class")).map(|a| (a.name().to_string(), a.value().to_string())).collect();
+        let mut out: Vec<(String, String)> = node
+            .attributes()
+            .filter(|a| a.namespace().is_none() && !matches!(a.name(), "style" | "d" | "points" | "transform" | "id" | "class"))
+            .map(|a| (a.name().to_string(), a.value().to_string()))
+            .collect();
         let mut matched: Vec<&CssRule> = self.rules.iter().filter(|r| r.matches(node)).collect();
         matched.sort_by_key(|r| (r.spec, r.order));
-        let rule_decls = |important: bool| matched.iter().flat_map(move |r| r.decls.iter().filter(move |d| d.2 == important).map(|(k, v, _)| (k.clone(), v.clone())));
+        let rule_decls =
+            |important: bool| matched.iter().flat_map(move |r| r.decls.iter().filter(move |d| d.2 == important).map(|(k, v, _)| (k.clone(), v.clone())));
         out.extend(rule_decls(false));
         if let Some(style) = node.attribute("style") {
             out.extend(css_decls(style).into_iter().map(|(k, v, _)| (k, v)));
@@ -678,12 +677,7 @@ fn shape_subpaths(node: roxmltree::Node, tf: Affine) -> Vec<SubPath> {
             vec![SubPath::polyline(&pts.map(|p| tf.apply(p)), false)]
         }
         "polyline" | "polygon" => {
-            let nums: Vec<f64> = node
-                .attribute("points")
-                .unwrap_or("")
-                .split(|c: char| c == ',' || c.is_whitespace())
-                .filter_map(|s| s.parse().ok())
-                .collect();
+            let nums: Vec<f64> = node.attribute("points").unwrap_or("").split(|c: char| c == ',' || c.is_whitespace()).filter_map(|s| s.parse().ok()).collect();
             let pts: Vec<Point> = nums.as_chunks::<2>().0.iter().map(|c| tf.apply(pt(c[0], c[1]))).collect();
             if pts.len() < 2 {
                 return vec![];
@@ -808,7 +802,12 @@ impl<'a> Ink<'a> {
                     _ => {}
                 }
                 // plain strokes used to be zig-zags, dashed ones running stitches
-                let dashed = node.attribute("style").map(css_decls).unwrap_or_default().iter().any(|(k, v, _)| k == "stroke-dasharray" && !matches!(v.trim(), "" | "none"));
+                let dashed = node
+                    .attribute("style")
+                    .map(css_decls)
+                    .unwrap_or_default()
+                    .iter()
+                    .any(|(k, v, _)| k == "stroke-dasharray" && !matches!(v.trim(), "" | "none"));
                 if method.is_none() && self.get("satin_column").is_none() && !dashed {
                     self.set("stroke_method", "zigzag_stitch");
                 }
@@ -857,7 +856,9 @@ impl<'a> Ink<'a> {
     }
     /// All numbers of a value with several ("2 1").
     fn list(&self, k: &str) -> Vec<f64> {
-        self.get(k).map(|v| v.split(|c: char| c.is_whitespace() || c == ',').filter_map(|x| x.parse().ok()).filter(|v: &f64| v.is_finite()).collect()).unwrap_or_default()
+        self.get(k)
+            .map(|v| v.split(|c: char| c.is_whitespace() || c == ',').filter_map(|x| x.parse().ok()).filter(|v: &f64| v.is_finite()).collect())
+            .unwrap_or_default()
     }
     /// Ink/Stitch random stitch length (% jitter, 0 = off).
     fn random_length(&self) -> f64 {
@@ -908,16 +909,30 @@ fn name_of<T: PartialEq>(names: Names<T>, t: T) -> &'static str {
 }
 
 /// `guided_fill_strategy`: 0 copy, 1 parallel offset, 2 buffer.
-const GUIDED_STRATEGY: Names<GuidedStrategy> = &[(GuidedStrategy::Copy, &["0"]), (GuidedStrategy::Parallel, &["1", "parallel_offset"]), (GuidedStrategy::Buffer, &["2", "buffer"])];
-const SATIN_METHOD: Names<SatinMethod> = &[(SatinMethod::Satin, &["satin_column"]), (SatinMethod::EStitch, &["e_stitch"]), (SatinMethod::SStitch, &["s_stitch"]), (SatinMethod::Zigzag, &["zigzag"])];
+const GUIDED_STRATEGY: Names<GuidedStrategy> =
+    &[(GuidedStrategy::Copy, &["0"]), (GuidedStrategy::Parallel, &["1", "parallel_offset"]), (GuidedStrategy::Buffer, &["2", "buffer"])];
+const SATIN_METHOD: Names<SatinMethod> = &[
+    (SatinMethod::Satin, &["satin_column"]),
+    (SatinMethod::EStitch, &["e_stitch"]),
+    (SatinMethod::SStitch, &["s_stitch"]),
+    (SatinMethod::Zigzag, &["zigzag"]),
+];
 /// `reverse_rails` (automatic is left out of the export).
-const RAIL_REVERSE: Names<RailReverse> = &[(RailReverse::Automatic, &["automatic"]), (RailReverse::None, &["none"]), (RailReverse::First, &["first"]), (RailReverse::Second, &["second"]), (RailReverse::Both, &["both"])];
+const RAIL_REVERSE: Names<RailReverse> = &[
+    (RailReverse::Automatic, &["automatic"]),
+    (RailReverse::None, &["none"]),
+    (RailReverse::First, &["first"]),
+    (RailReverse::Second, &["second"]),
+    (RailReverse::Both, &["both"]),
+];
 /// Ripple `scale_axis`: 0 both, 1 x, 2 y, 3 none.
-const SCALE_AXIS: Names<RippleScaleAxis> = &[(RippleScaleAxis::Both, &["0"]), (RippleScaleAxis::X, &["1"]), (RippleScaleAxis::Y, &["2"]), (RippleScaleAxis::None, &["3"])];
-const GUIDE_POSITION: Names<RippleGuidePosition> = &[(RippleGuidePosition::LineCount, &["default"]), (RippleGuidePosition::Rungs, &["render_at_rungs"]), (RippleGuidePosition::Adaptive, &["adaptive"])];
+const SCALE_AXIS: Names<RippleScaleAxis> =
+    &[(RippleScaleAxis::Both, &["0"]), (RippleScaleAxis::X, &["1"]), (RippleScaleAxis::Y, &["2"]), (RippleScaleAxis::None, &["3"])];
+const GUIDE_POSITION: Names<RippleGuidePosition> =
+    &[(RippleGuidePosition::LineCount, &["default"]), (RippleGuidePosition::Rungs, &["render_at_rungs"]), (RippleGuidePosition::Adaptive, &["adaptive"])];
 /// `ties` (read in lower case): 0 both, 1 before, 2 after, 3 neither.
-const TIES: Names<Ties> = &[(Ties::Both, &["0"]), (Ties::Start, &["1", "start", "before"]), (Ties::End, &["2", "end", "after"]), (Ties::None, &["3", "none", "neither", "false"])];
-
+const TIES: Names<Ties> =
+    &[(Ties::Both, &["0"]), (Ties::Start, &["1", "start", "before"]), (Ties::End, &["2", "end", "after"]), (Ties::None, &["3", "none", "neither", "false"])];
 
 fn ink_fill(ink: &Ink) -> FillParams {
     let method = match ink.get("fill_method").unwrap_or("tatami_fill") {
@@ -949,10 +964,8 @@ fn ink_fill(ink: &Ink) -> FillParams {
         ink.f("angle", 0.0)
     };
     let row = ink.f("row_spacing_mm", 0.25);
-    let underlay_angles: Vec<f64> = ink
-        .get("fill_underlay_angle")
-        .map(|v| v.split_whitespace().filter_map(|a| a.trim_end_matches(",").parse::<f64>().ok()).collect())
-        .unwrap_or_default();
+    let underlay_angles: Vec<f64> =
+        ink.get("fill_underlay_angle").map(|v| v.split_whitespace().filter_map(|a| a.trim_end_matches(",").parse::<f64>().ok()).collect()).unwrap_or_default();
     FillParams {
         method,
         angle,
@@ -972,7 +985,8 @@ fn ink_fill(ink: &Ink) -> FillParams {
         },
         // more than two, or two that do not cross at 90°: the list itself
         underlay_cross: underlay_angles.len() == 2 && ((underlay_angles[1] - underlay_angles[0]).abs() - 90.0).abs() < 1e-6,
-        underlay_angles: if underlay_angles.len() > 2 || (underlay_angles.len() == 2 && ((underlay_angles[1] - underlay_angles[0]).abs() - 90.0).abs() >= 1e-6) {
+        underlay_angles: if underlay_angles.len() > 2 || (underlay_angles.len() == 2 && ((underlay_angles[1] - underlay_angles[0]).abs() - 90.0).abs() >= 1e-6)
+        {
             underlay_angles.iter().map(|a| a - angle).collect()
         } else {
             Vec::new()
@@ -1035,7 +1049,10 @@ fn ink_fill(ink: &Ink) -> FillParams {
         guided_strategy: read_name(GUIDED_STRATEGY, ink.get("guided_fill_strategy").map(str::trim)),
         cross_offset: {
             // "x y", or one value for both
-            let v: Vec<f64> = ink.get("cross_offset_mm").map(|v| v.split_whitespace().filter_map(|x| x.parse().ok()).filter(|v: &f64| v.is_finite()).collect()).unwrap_or_default();
+            let v: Vec<f64> = ink
+                .get("cross_offset_mm")
+                .map(|v| v.split_whitespace().filter_map(|x| x.parse().ok()).filter(|v: &f64| v.is_finite()).collect())
+                .unwrap_or_default();
             match v.as_slice() {
                 [x, y, ..] => [x.max(0.0), y.max(0.0)],
                 [x] => [x.max(0.0), x.max(0.0)],
@@ -1291,7 +1308,9 @@ impl<'a> Ctx<'a> {
         if ns.is_some() && ns != Some(SVG_NS) {
             return;
         }
-        if matches!(tag, "defs" | "clipPath" | "mask" | "metadata" | "title" | "desc" | "style" | "marker" | "pattern" | "linearGradient" | "radialGradient") || (tag == "symbol" && self.in_clone == 0) {
+        if matches!(tag, "defs" | "clipPath" | "mask" | "metadata" | "title" | "desc" | "style" | "marker" | "pattern" | "linearGradient" | "radialGradient")
+            || (tag == "symbol" && self.in_clone == 0)
+        {
             return;
         }
         if is_connector(node) {
@@ -1325,7 +1344,9 @@ impl<'a> Ctx<'a> {
 
     /// The region of an element's `clip-path` (mm), if it has one.
     fn clip_of(&self, node: roxmltree::Node<'a, 'a>, tf: Affine) -> Option<Vec<Ring>> {
-        let style_val = node.attribute("style").and_then(|s| s.split(';').find_map(|d| d.split_once(':').filter(|(k, _)| k.trim() == "clip-path").map(|(_, v)| v.trim().to_string())));
+        let style_val = node
+            .attribute("style")
+            .and_then(|s| s.split(';').find_map(|d| d.split_once(':').filter(|(k, _)| k.trim() == "clip-path").map(|(_, v)| v.trim().to_string())));
         let val = node.attribute("clip-path").map(|s| s.to_string()).or(style_val)?;
         let id = val.trim().strip_prefix("url(#")?.split(')').next()?.trim_matches(['"', '\'']);
         let cp = *self.by_id.get(id)?;
@@ -1360,7 +1381,11 @@ impl<'a> Ctx<'a> {
                 continue;
             }
             // the original's transform: where it was walked, or where it sits in the document
-            let tf_o = target.attribute("id").and_then(|id| self.made.get(id)).map(|m| m.1).unwrap_or_else(|| target.parent().map(composed_tf).unwrap_or(Affine::IDENTITY));
+            let tf_o = target
+                .attribute("id")
+                .and_then(|id| self.made.get(id))
+                .map(|m| m.1)
+                .unwrap_or_else(|| target.parent().map(composed_tf).unwrap_or(Affine::IDENTITY));
             let m = self.root_tf.mul(tf_c).mul(self.root_tf.mul(tf_o).inverse());
             let [a, b, c, d, _, _] = m.0;
             let rot = b.atan2(a).to_degrees();
@@ -1407,7 +1432,10 @@ impl<'a> Ctx<'a> {
         match tag {
             "svg" | "g" | "a" | "switch" | "symbol" => {
                 // Ink/Stitch "ignore layer" command: anywhere in a layer (`layer_commands`)
-                if tag == "g" && node.attribute((INKSCAPE_NS, "groupmode")) == Some("layer") && node.descendants().any(|c| command_of(c) == Some("ignore_layer")) {
+                if tag == "g"
+                    && node.attribute((INKSCAPE_NS, "groupmode")) == Some("layer")
+                    && node.descendants().any(|c| command_of(c) == Some("ignore_layer"))
+                {
                     return;
                 }
                 // a guide line applies to the fills grouped with it
@@ -1563,7 +1591,12 @@ impl<'a> Ctx<'a> {
         if stops.len() < 2 {
             return stops.first().map(|s| ([0.0, 0.0], [1.0, 0.0], vec![*s]));
         }
-        let coord = |k: &str, d: f64| attr(k).map(|v| v.trim()).map(|v| v.strip_suffix('%').map(|p| p.parse::<f64>().unwrap_or(0.0) / 100.0).unwrap_or_else(|| v.parse().unwrap_or(d))).unwrap_or(d);
+        let coord = |k: &str, d: f64| {
+            attr(k)
+                .map(|v| v.trim())
+                .map(|v| v.strip_suffix('%').map(|p| p.parse::<f64>().unwrap_or(0.0) / 100.0).unwrap_or_else(|| v.parse().unwrap_or(d)))
+                .unwrap_or(d)
+        };
         let (x1, y1, x2, y2) = (coord("x1", 0.0), coord("y1", 0.0), coord("x2", 1.0), coord("y2", 0.0));
         let gt = attr("gradientTransform").map(parse_transform).unwrap_or(Affine::IDENTITY);
         let user = if attr("gradientUnits") == Some("userSpaceOnUse") {
@@ -1646,7 +1679,9 @@ impl<'a> Ctx<'a> {
                 let first = self.doc.objects.len();
                 self.add(label, color, paths, stitch, &ink);
                 // its part in hidden-stitch removal
-                if let Some(h) = node.attributes().find(|a| a.namespace() == Some(FILUM_NS) && a.name() == "hidden").and_then(|a| serde_json::from_str(a.value()).ok()) {
+                if let Some(h) =
+                    node.attributes().find(|a| a.namespace() == Some(FILUM_NS) && a.name() == "hidden").and_then(|a| serde_json::from_str(a.value()).ok())
+                {
                     for o in &mut self.doc.objects[first..] {
                         o.hidden = Some(h);
                     }
@@ -1662,7 +1697,8 @@ impl<'a> Ctx<'a> {
         let fill = fill.filter(|_| st.fill_opacity.as_deref().map(str::trim) != Some("0"));
         if let Some(c) = fill {
             // a closed path of two curved nodes (a lens, a leaf) is a shape too
-            let closed: Vec<SubPath> = paths.iter().filter(|s| s.nodes.len() >= 3 || (s.closed && s.nodes.len() >= 2 && s.flatten(0.1).len() >= 3)).cloned().collect();
+            let closed: Vec<SubPath> =
+                paths.iter().filter(|s| s.nodes.len() >= 3 || (s.closed && s.nodes.len() >= 2 && s.flatten(0.1).len() >= 3)).cloned().collect();
             // Ink/Stitch's fill stitching toggle (`inkstitch:fill`). The old
             // `auto_fill="False"` meant legacy fill, which sews too.
             if !closed.is_empty() && !ink.b("fill", true) {
@@ -1719,7 +1755,9 @@ impl<'a> Ctx<'a> {
             self.add(name, c, paths, StitchParams::Satin(sp), &ink);
         } else if let Some(c) = st.stroke.flatten() {
             let stitch = match ink.get("stroke_method").unwrap_or("running_stitch") {
-                "manual_stitch" => StitchParams::Manual(ManualParams { max_length: ink.f("max_stitch_length_mm", 0.0).max(0.0), bean_pattern: manual_beans(&ink) }),
+                "manual_stitch" => {
+                    StitchParams::Manual(ManualParams { max_length: ink.f("max_stitch_length_mm", 0.0).max(0.0), bean_pattern: manual_beans(&ink) })
+                }
                 "zigzag_stitch" => StitchParams::Running(RunningParams {
                     zigzag: Some(ZigzagParams {
                         width: stroke_mm.max(0.1),
@@ -1784,7 +1822,8 @@ fn legacy_version(xml: &roxmltree::Document) -> Option<u32> {
         return None;
     }
     let inkstitch = xml.descendants().filter(|n| n.is_element()).any(|n| {
-        n.tag_name().namespace() == Some(INKSTITCH_NS) || n.attributes().any(|a| a.namespace() == Some(INKSTITCH_NS) || (a.namespace().is_none() && a.name().starts_with("embroider_")))
+        n.tag_name().namespace() == Some(INKSTITCH_NS)
+            || n.attributes().any(|a| a.namespace() == Some(INKSTITCH_NS) || (a.namespace().is_none() && a.name().starts_with("embroider_")))
     });
     inkstitch.then_some(version)
 }
@@ -1797,9 +1836,7 @@ pub fn import_svg(text: &str) -> Result<SvgImport, String> {
     if root.tag_name().name() != "svg" {
         return Err("not an SVG document".into());
     }
-    let vb: Option<Vec<f64>> = root.attribute("viewBox").map(|v| {
-        v.split(|c: char| c == ',' || c.is_whitespace()).filter_map(|s| s.parse().ok()).collect()
-    });
+    let vb: Option<Vec<f64>> = root.attribute("viewBox").map(|v| v.split(|c: char| c == ',' || c.is_whitespace()).filter_map(|s| s.parse().ok()).collect());
     let w_mm = root.attribute("width").and_then(parse_length_mm);
     let h_mm = root.attribute("height").and_then(parse_length_mm);
     let px = 25.4 / 96.0;
@@ -1869,7 +1906,11 @@ pub fn import_svg(text: &str) -> Result<SvgImport, String> {
 fn fmt(v: f64) -> String {
     let s = format!("{:.4}", v);
     let s = s.trim_end_matches('0').trim_end_matches('.');
-    if s == "-0" { "0".into() } else { s.to_string() }
+    if s == "-0" {
+        "0".into()
+    } else {
+        s.to_string()
+    }
 }
 
 pub fn subpaths_to_d(paths: &[SubPath]) -> String {
@@ -1890,15 +1931,7 @@ pub fn subpaths_to_d(paths: &[SubPath]) -> String {
             } else {
                 let c1 = a.o.unwrap_or(a.p);
                 let c2 = b.i.unwrap_or(b.p);
-                d.push_str(&format!(
-                    "C {} {} {} {} {} {} ",
-                    fmt(c1[0]),
-                    fmt(c1[1]),
-                    fmt(c2[0]),
-                    fmt(c2[1]),
-                    fmt(b.p[0]),
-                    fmt(b.p[1])
-                ));
+                d.push_str(&format!("C {} {} {} {} {} {} ", fmt(c1[0]), fmt(c1[1]), fmt(c2[0]), fmt(c2[1]), fmt(b.p[0]), fmt(b.p[1])));
             }
         }
         if sp.closed {
@@ -1913,7 +1946,11 @@ fn esc(s: &str) -> String {
 }
 
 fn b(v: bool) -> &'static str {
-    if v { "True" } else { "False" }
+    if v {
+        "True"
+    } else {
+        "False"
+    }
 }
 
 /// An element of a bundled Ink/Stitch SVG, by id, as source text.
@@ -2071,7 +2108,9 @@ xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"{}mm\" height=\"{}mm\" view
         // guided fills: the guide line, grouped with the fill (Ink/Stitch guide-line marker)
         // ripples: their guide line or satin guide, and the anchor line
         let (guide, guide_satin, anchor): (Option<Vec<SubPath>>, bool, Option<[[f64; 2]; 2]>) = match &o.stitch {
-            StitchParams::Fill(p) if p.method == FillMethod::Guided => (Some(vec![p.guide.clone().unwrap_or_else(|| crate::stitches::inkfills::default_guide(o.bounds()))]), false, None),
+            StitchParams::Fill(p) if p.method == FillMethod::Guided => {
+                (Some(vec![p.guide.clone().unwrap_or_else(|| crate::stitches::inkfills::default_guide(o.bounds()))]), false, None)
+            }
             StitchParams::Running(RunningParams { ripple: Some(r), .. }) if !r.guide.is_empty() => (Some(r.guide.clone()), r.guide.len() >= 2, r.anchor),
             _ => (None, false, None),
         };
@@ -2338,10 +2377,7 @@ fn fill_attrs(doc: &Document, o: &Object, p: &FillParams, color: &str, attrs: &m
         attrs.push(("gap_fill_rows".into(), p.gap_fill_rows.to_string()));
     }
     if p.method == FillMethod::Guided {
-        attrs.push((
-            "guided_fill_strategy".into(),
-            name_of(GUIDED_STRATEGY, p.guided_strategy).into(),
-        ));
+        attrs.push(("guided_fill_strategy".into(), name_of(GUIDED_STRATEGY, p.guided_strategy).into()));
     }
     style
 }
@@ -2364,10 +2400,7 @@ fn satin_attrs(p: &SatinParams, color: &str, attrs: &mut Vec<(String, String)>, 
         paths.push(SubPath::polyline(&[a - u, b + u], false));
     }
     attrs.push(("satin_column".into(), "True".into()));
-    attrs.push((
-        "satin_method".into(),
-        name_of(SATIN_METHOD, p.method).into(),
-    ));
+    attrs.push(("satin_method".into(), name_of(SATIN_METHOD, p.method).into()));
     attrs.push(("zigzag_spacing_mm".into(), fmt(p.spacing)));
     // per-rail values: "first second" where the second rail has its own
     let r = p.second_rail.unwrap_or_default();
@@ -2611,7 +2644,11 @@ mod tests {
 
     #[test]
     fn split_methods_map_both_ways() {
-        let svg = |m: &str| format!(r#"<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkstitch="http://inkstitch.org/namespace" width="100mm" height="100mm" viewBox="0 0 100 100"><metadata><inkstitch:inkstitch_svg_version>4</inkstitch:inkstitch_svg_version></metadata><path d="M20 40 L80 40 M20 60 L80 60" style="fill:none;stroke:#000;stroke-width:0.5" inkstitch:satin_column="True" inkstitch:split_method="{m}" inkstitch:split_staggers="3"/></svg>"#);
+        let svg = |m: &str| {
+            format!(
+                r#"<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkstitch="http://inkstitch.org/namespace" width="100mm" height="100mm" viewBox="0 0 100 100"><metadata><inkstitch:inkstitch_svg_version>4</inkstitch:inkstitch_svg_version></metadata><path d="M20 40 L80 40 M20 60 L80 60" style="fill:none;stroke:#000;stroke-width:0.5" inkstitch:satin_column="True" inkstitch:split_method="{m}" inkstitch:split_staggers="3"/></svg>"#
+            )
+        };
         let staggers = |m: &str| match &import_svg(&svg(m)).unwrap().document.objects[0].stitch {
             StitchParams::Satin(p) => p.split_staggers,
             other => panic!("{other:?}"),
@@ -2638,7 +2675,9 @@ mod tests {
         }
         assert!(matches!(&d.objects[1].stitch, StitchParams::Running(r) if r.bean_repeats == 2), "Ink/Stitch triple");
         // Ink/Stitch zig-zag line: its width, the pull compensation per side
-        assert!(matches!(&d.objects[2].stitch, StitchParams::Running(r) if r.zigzag.as_ref().is_some_and(|z| (z.pull_comp - 0.2).abs() < 1e-9 && (z.width - 3.0).abs() < 1e-6)));
+        assert!(
+            matches!(&d.objects[2].stitch, StitchParams::Running(r) if r.zigzag.as_ref().is_some_and(|z| (z.pull_comp - 0.2).abs() < 1e-9 && (z.width - 3.0).abs() < 1e-6))
+        );
         match &d.objects[3].stitch {
             StitchParams::Fill(f) => {
                 assert_eq!(f.method, FillMethod::Cross);
@@ -2802,7 +2841,11 @@ mod tests {
             assert_eq!(a.stitch, b.stitch, "{}", a.name);
         }
         // Ink/Stitch-only reading (without our params) keeps the commands too
-        let plain: String = svg.lines().map(|l| l.split(" filum:params=").next().unwrap().to_string() + if l.contains(" filum:params=") { " />" } else { "" }).collect::<Vec<_>>().join("\n");
+        let plain: String = svg
+            .lines()
+            .map(|l| l.split(" filum:params=").next().unwrap().to_string() + if l.contains(" filum:params=") { " />" } else { "" })
+            .collect::<Vec<_>>()
+            .join("\n");
         let ink = import_svg(&plain).unwrap().document;
         assert_eq!(ink.objects[0].start, Some([5.0, 7.0]));
         assert_eq!(ink.objects[0].end, Some([30.0, 30.0]));
@@ -2947,7 +2990,8 @@ mod tests {
         assert!(o[4].bounds().max_x <= 50.0 + 1e-6 && (o[4].bounds().max_x - 50.0).abs() < 0.1, "fill clipped: {:?}", o[4].bounds());
         assert!(o[5].bounds().max_x <= 50.0 + 1e-6, "line clipped");
         // a plain gradient: two blended layers; Ink/Stitch linear gradient fill: rows
-        let grads: Vec<&FillParams> = o.iter().filter_map(|x| if let StitchParams::Fill(f) = &x.stitch { f.gradient.as_ref().map(|_| f) } else { None }).collect();
+        let grads: Vec<&FillParams> =
+            o.iter().filter_map(|x| if let StitchParams::Fill(f) = &x.stitch { f.gradient.as_ref().map(|_| f) } else { None }).collect();
         assert_eq!(grads.len(), 4);
         assert_eq!(grads[0].gradient.as_ref().unwrap().mix, GradientMix::Blend);
         assert_eq!(grads[2].gradient.as_ref().unwrap().mix, GradientMix::Rows);
@@ -3063,14 +3107,24 @@ mod tests {
         let mut d = imp(&format!(r##"<path {SQ} style="fill:#f00" inkstitch:fill_method="contour_fill" inkstitch:contour_strategy="2"/>"##));
         let svg = export_svg(&d);
         assert!(svg.contains(r#"inkstitch:contour_strategy="2""#) && !svg.contains("single_spiral"), "a double spiral stays double");
-        assert_eq!(fill_of(&imp(&format!(r##"<path {SQ} style="fill:#f00" inkstitch:fill_method="contour_fill" inkstitch:contour_strategy="1"/>"##)).objects[0]).method, FillMethod::Spiral);
+        assert_eq!(
+            fill_of(&imp(&format!(r##"<path {SQ} style="fill:#f00" inkstitch:fill_method="contour_fill" inkstitch:contour_strategy="1"/>"##)).objects[0])
+                .method,
+            FillMethod::Spiral
+        );
         // the old names still read
-        let old = imp(&format!(r##"<path {SQ} style="fill:#f00" inkstitch:fill_method="contour_fill" inkstitch:contour_strategy="double_spiral" inkstitch:ties="False"/>"##));
+        let old = imp(&format!(
+            r##"<path {SQ} style="fill:#f00" inkstitch:fill_method="contour_fill" inkstitch:contour_strategy="double_spiral" inkstitch:ties="False"/>"##
+        ));
         assert!(fill_of(&old.objects[0]).contour_double && old.objects[0].ties == Ties::None);
-        let old = imp(&format!(r##"<path {SQ} style="fill:#f00" inkstitch:fill_method="guided_fill" inkstitch:guided_fill_strategy="parallel_offset" inkstitch:ties="end"/>"##));
+        let old = imp(&format!(
+            r##"<path {SQ} style="fill:#f00" inkstitch:fill_method="guided_fill" inkstitch:guided_fill_strategy="parallel_offset" inkstitch:ties="end"/>"##
+        ));
         assert_eq!((fill_of(&old.objects[0]).guided_strategy, old.objects[0].ties), (GuidedStrategy::Parallel, Ties::End));
         // guided strategy and ties written as Ink/Stitch's numbers
-        for (strategy, ties, gs, ts) in [(GuidedStrategy::Copy, Ties::Start, "0", "1"), (GuidedStrategy::Parallel, Ties::End, "1", "2"), (GuidedStrategy::Buffer, Ties::None, "2", "3")] {
+        for (strategy, ties, gs, ts) in
+            [(GuidedStrategy::Copy, Ties::Start, "0", "1"), (GuidedStrategy::Parallel, Ties::End, "1", "2"), (GuidedStrategy::Buffer, Ties::None, "2", "3")]
+        {
             d.objects[0].stitch = StitchParams::Fill(FillParams { method: FillMethod::Guided, guided_strategy: strategy, ..FillParams::default() });
             d.objects[0].ties = ties;
             let svg = export_svg(&d);
@@ -3083,7 +3137,9 @@ mod tests {
     #[test]
     fn fill_stitching_toggle() {
         // Ink/Stitch's `fill` toggle off: artwork only, or just the outline
-        let d = imp(&format!(r##"<path {SQ} style="fill:#f00" inkstitch:fill="False"/><path {SQ} style="fill:#f00;stroke:#00f;stroke-width:0.3" inkstitch:fill="False"/>"##));
+        let d = imp(&format!(
+            r##"<path {SQ} style="fill:#f00" inkstitch:fill="False"/><path {SQ} style="fill:#f00;stroke:#00f;stroke-width:0.3" inkstitch:fill="False"/>"##
+        ));
         assert_eq!(d.objects.len(), 2);
         assert!(matches!(d.objects[0].stitch, StitchParams::None));
         assert!(matches!(d.objects[1].stitch, StitchParams::Running(_)) && color(&d, &d.objects[1]) == "#0000ff");
@@ -3118,7 +3174,9 @@ mod tests {
 
     #[test]
     fn rounded_rectangles() {
-        let d = imp(r##"<rect x="10" y="10" width="40" height="20" rx="5" style="fill:#f00"/><rect x="10" y="40" width="40" height="20" ry="50" style="fill:#f00"/><rect x="60" y="10" width="20" height="20" rx="0" ry="5" style="fill:#f00"/>"##);
+        let d = imp(
+            r##"<rect x="10" y="10" width="40" height="20" rx="5" style="fill:#f00"/><rect x="10" y="40" width="40" height="20" ry="50" style="fill:#f00"/><rect x="60" y="10" width="20" height="20" rx="0" ry="5" style="fill:#f00"/>"##,
+        );
         let ring = |o: &Object| o.paths[0].flatten(0.01);
         let near = |o: &Object, x: f64, y: f64| ring(o).iter().map(|p| p.dist(pt(x, y))).fold(f64::INFINITY, f64::min);
         // rx alone: ry the same; the corner cut by the arc (5·(√2 − 1) from it)
@@ -3173,7 +3231,9 @@ mod tests {
             ]
         );
         // the satin threshold from the document's metadata
-        let d = imp(r##"<metadata><inkstitch:min_satin_stroke_width_mm>2</inkstitch:min_satin_stroke_width_mm></metadata><path d="M 10 10 L 50 10" style="fill:none;stroke:#000;stroke-width:1.5" inkstitch:satin_column="True"/>"##);
+        let d = imp(
+            r##"<metadata><inkstitch:min_satin_stroke_width_mm>2</inkstitch:min_satin_stroke_width_mm></metadata><path d="M 10 10 L 50 10" style="fill:none;stroke:#000;stroke-width:1.5" inkstitch:satin_column="True"/>"##,
+        );
         assert!(matches!(d.objects[0].stitch, StitchParams::Running(_)));
     }
 
@@ -3345,7 +3405,10 @@ mod tests {
         assert_eq!(running_of(&o[7]).zigzag.as_ref().unwrap().pull_comp, 0.0);
 
         // current files and files Filum made are left as they are
-        for d in [versioned(Some(4), LEGACY_BODY).document, import_svg(&format!("{}{LEGACY_BODY}</svg>", HEAD.replace("<svg ", &format!("<svg xmlns:filum=\"{FILUM_NS}\" ")))).unwrap().document] {
+        for d in [
+            versioned(Some(4), LEGACY_BODY).document,
+            import_svg(&format!("{}{LEGACY_BODY}</svg>", HEAD.replace("<svg ", &format!("<svg xmlns:filum=\"{FILUM_NS}\" ")))).unwrap().document,
+        ] {
             let o = &d.objects;
             assert_eq!(fill_of(&o[0]).max_stitch_length, 4.0);
             assert_eq!(fill_of(&o[1]).max_stitch_length, 0.0);
@@ -3424,7 +3487,10 @@ mod tests {
         let back = import_svg(&without_filum_params(&svg)).unwrap().document;
         for (a, b) in d.objects.iter().zip(&back.objects) {
             let (x, y) = (satin_of(a), satin_of(b));
-            assert_eq!((x.pull_comp, x.contour_inset, x.zigzag_underlay_inset, x.second_rail), (y.pull_comp, y.contour_inset, y.zigzag_underlay_inset, y.second_rail));
+            assert_eq!(
+                (x.pull_comp, x.contour_inset, x.zigzag_underlay_inset, x.second_rail),
+                (y.pull_comp, y.contour_inset, y.zigzag_underlay_inset, y.second_rail)
+            );
             assert!((x.zigzag_inset_pct - y.zigzag_inset_pct).abs() < 1e-9 && (x.random_wider - y.random_wider).abs() < 1e-9);
         }
     }
@@ -3437,13 +3503,26 @@ mod tests {
             <path {SQ} style="fill:#00f"/>"##
         ));
         let l = d.objects[0].lock.unwrap();
-        assert_eq!(l, LockOverride { start: Some(LockStyle::Arrow), end: Some(LockStyle::BackForth), start_scale: Some(150.0), end_length: Some(1.2), ..Default::default() });
+        assert_eq!(
+            l,
+            LockOverride {
+                start: Some(LockStyle::Arrow),
+                end: Some(LockStyle::BackForth),
+                start_scale: Some(150.0),
+                end_length: Some(1.2),
+                ..Default::default()
+            }
+        );
         assert_eq!(d.objects[0].color_sort_index, Some(3));
         // an unknown lock: Ink/Stitch's half stitch
         assert_eq!(d.objects[1].lock, Some(LockOverride { end: Some(LockStyle::HalfStitch), ..Default::default() }));
         assert_eq!((d.objects[2].lock, d.objects[2].color_sort_index), (None, None));
         let svg = export_svg(&d);
-        assert!(svg.contains(r#"inkstitch:lock_start="arrow""#) && svg.contains(r#"inkstitch:lock_end="back_forth""#) && svg.contains(r#"inkstitch:lock_end_scale_mm="1.2""#));
+        assert!(
+            svg.contains(r#"inkstitch:lock_start="arrow""#)
+                && svg.contains(r#"inkstitch:lock_end="back_forth""#)
+                && svg.contains(r#"inkstitch:lock_end_scale_mm="1.2""#)
+        );
         assert!(svg.contains(r#"inkstitch:color_sort_index="3""#));
         let back = import_svg(&without_filum_params(&svg)).unwrap().document;
         for (a, b) in d.objects.iter().zip(&back.objects) {
@@ -3462,14 +3541,20 @@ mod tests {
         let plain = imp(&format!(r##"<path {SQ} style="fill:#f00"/>"##));
         assert_eq!(plain.machine, MachineSettings::default());
         let svg = export_svg(&d);
-        assert!(svg.contains("<inkstitch:min_stitch_len_mm>0.5</inkstitch:min_stitch_len_mm>") && svg.contains("<inkstitch:collapse_len_mm>2.5</inkstitch:collapse_len_mm>"), "{svg}");
+        assert!(
+            svg.contains("<inkstitch:min_stitch_len_mm>0.5</inkstitch:min_stitch_len_mm>")
+                && svg.contains("<inkstitch:collapse_len_mm>2.5</inkstitch:collapse_len_mm>"),
+            "{svg}"
+        );
         let back = import_svg(&svg).unwrap().document;
         assert_eq!((back.machine.min_stitch, back.machine.trim_distance), (0.5, 2.5));
     }
 
     #[test]
     fn roundtrip_of_the_new_settings() {
-        let mut d = imp(r##"<path d="M 10 10 L 90 10 M 10 14 L 90 14" style="fill:none;stroke:#000" inkstitch:satin_column="True" inkstitch:pull_compensation_mm="0.1 0.3" inkstitch:lock_start="star" inkstitch:color_sort_index="1"/>"##);
+        let mut d = imp(
+            r##"<path d="M 10 10 L 90 10 M 10 14 L 90 14" style="fill:none;stroke:#000" inkstitch:satin_column="True" inkstitch:pull_compensation_mm="0.1 0.3" inkstitch:lock_start="star" inkstitch:color_sort_index="1"/>"##,
+        );
         d.machine.min_stitch = 0.2;
         d.machine.trim_distance = 4.0;
         let svg = export_svg(&d);
