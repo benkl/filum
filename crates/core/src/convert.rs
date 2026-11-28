@@ -172,7 +172,7 @@ fn polygon_to_satins(poly: &[Ring], rungs: &[Vec<Point>], skip_end: bool, used: 
         if h.len() != 2 {
             continue;
         }
-        h.sort_by(|a, b| a.3.partial_cmp(&b.3).unwrap());
+        h.sort_by(|a, b| a.3.total_cmp(&b.3));
         let lc = cumulative_lengths(line);
         let chord = substring(line, &lc, h[0].3, h[1].3);
         let mid = crate::geom::point_at(line, &lc, (h[0].3 + h[1].3) * 0.5);
@@ -208,7 +208,7 @@ fn polygon_to_satins(poly: &[Ring], rungs: &[Vec<Point>], skip_end: bool, used: 
         if cuts.is_empty() {
             continue;
         }
-        cuts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        cuts.sort_by(|a, b| a.0.total_cmp(&b.0));
         let m = cuts.len();
         for i in 0..m {
             let (from, start) = cuts[i];
@@ -587,7 +587,7 @@ fn rings_cross(a: &[Point], b: &[Point]) -> bool {
 /// others are holes inside it, nothing crosses itself or anything else.
 fn shape_is_valid(rings: &[Ring]) -> bool {
     let mut idx: Vec<usize> = (0..rings.len()).collect();
-    idx.sort_by(|a, b| signed_area(&rings[*b]).abs().partial_cmp(&signed_area(&rings[*a]).abs()).unwrap());
+    idx.sort_by(|a, b| signed_area(&rings[*b]).abs().total_cmp(&signed_area(&rings[*a]).abs()));
     let Some((&outer, holes)) = idx.split_first() else { return false };
     if !rings.iter().all(|r| ring_is_simple(r)) {
         return false;
@@ -645,7 +645,7 @@ pub fn break_apart(rings: &[Ring], method: BreakMethod, min_area: f64) -> BreakA
         BreakMethod::Complex => components(clip::rings(&clip::region(&pieces))),
         BreakMethod::Simple => {
             pieces.retain(|r| signed_area(r).abs() > min_area);
-            pieces.sort_by(|a, b| signed_area(b).abs().partial_cmp(&signed_area(a).abs()).unwrap());
+            pieces.sort_by(|a, b| signed_area(b).abs().total_cmp(&signed_area(a).abs()));
             let regions: Vec<clip::Region> = pieces.iter().map(|r| clip::region(std::slice::from_ref(r))).collect();
             let mut hole = vec![false; pieces.len()];
             let mut groups = Vec::new();
@@ -679,7 +679,7 @@ pub fn break_apart(rings: &[Ring], method: BreakMethod, min_area: f64) -> BreakA
         *g = std::iter::once(outer).chain(rest).collect();
     }
     groups.retain(|g| signed_area(&g[0]).abs() > min_area.max(0.35));
-    groups.sort_by(|a, b| signed_area(&b[0]).abs().partial_cmp(&signed_area(&a[0]).abs()).unwrap());
+    groups.sort_by(|a, b| signed_area(&b[0]).abs().total_cmp(&signed_area(&a[0]).abs()));
     let parts = groups
         .into_iter()
         .map(|g| {
@@ -741,7 +741,7 @@ pub fn min_bounding_circle(points: &[Point]) -> Option<(Point, f64)> {
         let d = 2.0 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
         if d.abs() < 1e-12 {
             // collinear: the widest pair
-            let (x, y) = [(a, b), (a, c), (b, c)].into_iter().max_by(|u, v| u.0.dist(u.1).partial_cmp(&v.0.dist(v.1)).unwrap()).unwrap();
+            let (x, y) = [(a, b), (a, c), (b, c)].into_iter().max_by(|u, v| u.0.dist(u.1).total_cmp(&v.0.dist(v.1))).unwrap();
             return circle2(x, y);
         }
         let (a2, b2, c2) = (a.length_sq(), b.length_sq(), c.length_sq());
@@ -774,7 +774,7 @@ pub fn min_bounding_circle(points: &[Point]) -> Option<(Point, f64)> {
 
 fn convex_hull(points: &[Point]) -> Vec<Point> {
     let mut p: Vec<Point> = points.to_vec();
-    p.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap().then(a.y.partial_cmp(&b.y).unwrap()));
+    p.sort_by(|a, b| a.x.total_cmp(&b.x).then(a.y.total_cmp(&b.y)));
     p.dedup_by(|a, b| a.dist(*b) < 1e-9);
     if p.len() < 3 {
         return p;

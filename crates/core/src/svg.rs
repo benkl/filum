@@ -684,7 +684,7 @@ fn shape_subpaths(node: roxmltree::Node, tf: Affine) -> Vec<SubPath> {
                 .split(|c: char| c == ',' || c.is_whitespace())
                 .filter_map(|s| s.parse().ok())
                 .collect();
-            let pts: Vec<Point> = nums.chunks_exact(2).map(|c| tf.apply(pt(c[0], c[1]))).collect();
+            let pts: Vec<Point> = nums.as_chunks::<2>().0.iter().map(|c| tf.apply(pt(c[0], c[1]))).collect();
             if pts.len() < 2 {
                 return vec![];
             }
@@ -719,7 +719,7 @@ impl<'a> Ink<'a> {
     }
     fn f(&self, k: &str, d: f64) -> f64 {
         // nan / inf / 1e400 parse as floats but can't go through JSON
-        self.get(k).and_then(|v| v.trim().split_whitespace().next()?.parse().ok()).filter(|v: &f64| v.is_finite()).unwrap_or(d)
+        self.get(k).and_then(|v| v.split_whitespace().next()?.parse().ok()).filter(|v: &f64| v.is_finite()).unwrap_or(d)
     }
     /// A number the way Ink/Stitch's `get_float_param` reads it: the whole
     /// value, or nothing.

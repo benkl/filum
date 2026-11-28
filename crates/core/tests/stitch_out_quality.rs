@@ -40,7 +40,7 @@ fn count(p: &StitchPlan, f: u8) -> usize {
     p.stitches.iter().filter(|s| s.is(f)).count()
 }
 
-/// 1. The minimum stitch (0.3 mm on the machine) must not drop the 0.25 mm
+/// Check 1: The minimum stitch (0.3 mm on the machine) must not drop the 0.25 mm
 /// step from one tatami row to the next: every other row would start with a
 /// slanted stitch (a saw-tooth edge, fabric showing between the rows).
 #[test]
@@ -78,7 +78,7 @@ fn min_stitch_keeps_the_step_to_the_next_row() {
     assert_eq!(short, 0, "0.2 mm stitches along a line are merged");
 }
 
-/// 2a. Manual stitch places every needle drop itself: no lock stitches on
+/// Check 2a: Manual stitch places every needle drop itself: no lock stitches on
 /// top, unless it forces them (Ink/Stitch `force_lock_stitches`).
 #[test]
 fn manual_stitch_gets_no_locks_unless_forced() {
@@ -91,7 +91,7 @@ fn manual_stitch_gets_no_locks_unless_forced() {
     assert!(count(&p, flags::TIE) >= 6, "forced: locked at both ends");
 }
 
-/// 2b. A machine file's stitches already hold its locks: importing it adds
+/// Check 2b: A machine file's stitches already hold its locks: importing it adds
 /// none, and round trips don't grow the design.
 #[test]
 fn imported_files_keep_their_own_locks() {
@@ -140,7 +140,7 @@ fn an_objects_own_locks_are_used() {
     assert!((mine - 4.0).abs() < 0.05, "back and forth over 2 mm twice: {mine}");
 }
 
-/// 3. The optimiser keeps a detail in the same thread on top of the fill
+/// Check 3: The optimiser keeps a detail in the same thread on top of the fill
 /// under it (a border sewn first would vanish under the fill).
 #[test]
 fn optimiser_keeps_same_colour_details_on_top() {
@@ -159,7 +159,7 @@ fn optimiser_keeps_same_colour_details_on_top() {
     assert_eq!(r.order, vec!["X", "B", "A"], "nearest first among same-thread fills");
 }
 
-/// 4. "Remove running stitches under covers" keeps a routed underpath (the
+/// Check 4: "Remove running stitches under covers" keeps a routed underpath (the
 /// line the next satin sews back over): taking it out brings the trims back.
 #[test]
 fn routed_underpaths_stay() {
@@ -191,7 +191,7 @@ fn routed_underpaths_stay() {
     assert_eq!(count(&Engine::new().plan(&d), flags::TRIM), plain, "the routed network still sews without trims");
 }
 
-/// 5. "Keep underlay": the full underlay and the top of what's left of the
+/// Check 5: "Keep underlay": the full underlay and the top of what's left of the
 /// fill are joined by a travel inside the shape, not a tie-off, trim and jump.
 #[test]
 fn keep_underlay_travels_to_the_top_stitching() {
@@ -214,7 +214,7 @@ fn keep_underlay_travels_to_the_top_stitching() {
     }
 }
 
-/// 6. Basting is pulled out after sewing: it is tied off and cut before the
+/// Check 6: Basting is pulled out after sewing: it is tied off and cut before the
 /// knockdown starts.
 #[test]
 fn basting_is_cut_before_the_knockdown() {
@@ -235,7 +235,7 @@ fn basting_is_cut_before_the_knockdown() {
     }
 }
 
-/// 7. Hidden-stitch removal keeps the lower fill under a narrow gap between
+/// Check 7: Hidden-stitch removal keeps the lower fill under a narrow gap between
 /// two covers (it shows there), but not a sliver along its own outline.
 #[test]
 fn a_narrow_gap_between_two_covers_keeps_the_fill_under_it() {

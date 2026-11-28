@@ -446,17 +446,17 @@ pub fn meander_ex(
         let near = |c: usize, p: Point| comps[c].iter().map(|v| nodes[*v].dist(p)).fold(f64::INFINITY, f64::min);
         let k = match pos {
             Some(p) => {
-                let last_comp = end_r.and_then(|e| order.iter().copied().min_by(|x, y| near(*x, e).partial_cmp(&near(*y, e)).unwrap()));
+                let last_comp = end_r.and_then(|e| order.iter().copied().min_by(|x, y| near(*x, e).total_cmp(&near(*y, e))));
                 (0..order.len())
                     .filter(|i| order.len() == 1 || Some(order[*i]) != last_comp)
-                    .min_by(|x, y| near(order[*x], p).partial_cmp(&near(order[*y], p)).unwrap())
+                    .min_by(|x, y| near(order[*x], p).total_cmp(&near(order[*y], p)))
                     .unwrap_or(0)
             }
             None => (0..order.len()).max_by_key(|i| comps[order[*i]].len()).unwrap(),
         };
         let c = order.remove(k);
         let members = &comps[c];
-        let pick = |q: Point| *members.iter().min_by(|x, y| nodes[**x].dist(q).partial_cmp(&nodes[**y].dist(q)).unwrap()).unwrap();
+        let pick = |q: Point| *members.iter().min_by(|x, y| nodes[**x].dist(q).total_cmp(&nodes[**y].dist(q))).unwrap();
         let first = pos.map(pick).unwrap_or(members[0]);
         let last = match (order.is_empty(), end_r) {
             (true, Some(e)) => pick(e),
@@ -545,7 +545,7 @@ impl Guide {
         let mut ys = Vec::new();
         for p in pts.iter().map(|p| p.rotate(rot)) {
             // keep it a function of x (drop back-tracking parts)
-            if xs.last().map_or(true, |&x| p.x > x + 1e-6) {
+            if xs.last().is_none_or(|&x| p.x > x + 1e-6) {
                 xs.push(p.x);
                 ys.push(p.y);
             }
@@ -675,7 +675,7 @@ fn clip_to_shape(path: &[Point], rings: &[Ring]) -> Vec<Vec<Point>> {
         }
         ts.push(0.0);
         ts.push(1.0);
-        ts.sort_by(|x, y| x.partial_cmp(y).unwrap());
+        ts.sort_by(|x, y| x.total_cmp(y));
         ts.dedup_by(|x, y| (*x - *y).abs() < 1e-12);
         for tw in ts.windows(2) {
             let (p0, p1) = (a.lerp(c, tw[0]), a.lerp(c, tw[1]));
@@ -1366,9 +1366,9 @@ fn order_lines(rings: &[Ring], lines: Vec<Vec<(Point, bool)>>, start: Point, dse
             ends.push((l[l.len() - 1].0.dist(pos), i, true));
         }
         let k = CANDIDATES.min(ends.len());
-        ends.select_nth_unstable_by(k - 1, |x, y| x.0.partial_cmp(&y.0).unwrap());
+        ends.select_nth_unstable_by(k - 1, |x, y| x.0.total_cmp(&y.0));
         ends.truncate(k);
-        ends.sort_by(|x, y| x.0.partial_cmp(&y.0).unwrap());
+        ends.sort_by(|x, y| x.0.total_cmp(&y.0));
         let end_of = |&(_, i, rev): &(f64, usize, bool)| {
             let l = &left[i];
             if rev { l[l.len() - 1].0 } else { l[0].0 }
@@ -1389,7 +1389,7 @@ fn order_lines(rings: &[Ring], lines: Vec<Vec<(Point, bool)>>, start: Point, dse
                     .into_iter()
                     .enumerate()
                     .filter_map(|(ci, r)| r.filter(|r| allowed(r)).map(|r| (ci, r)))
-                    .min_by(|x, y| polyline_length(&x.1).partial_cmp(&polyline_length(&y.1)).unwrap());
+                    .min_by(|x, y| polyline_length(&x.1).total_cmp(&polyline_length(&y.1)));
             }
         }
         // none of the nearest ends is reached: the route to any line left
@@ -1402,7 +1402,7 @@ fn order_lines(rings: &[Ring], lines: Vec<Vec<(Point, bool)>>, start: Point, dse
                 .into_iter()
                 .enumerate()
                 .filter_map(|(k, r)| r.filter(|r| allowed(r)).map(|r| (k, r)))
-                .min_by(|x, y| polyline_length(&x.1).partial_cmp(&polyline_length(&y.1)).unwrap())
+                .min_by(|x, y| polyline_length(&x.1).total_cmp(&polyline_length(&y.1)))
             {
                 ends = vec![all[k]];
                 pick = Some((0, r));

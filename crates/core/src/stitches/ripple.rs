@@ -572,7 +572,7 @@ fn orient_grid(mut grid: Vec<Vec<Point>>, last: Point) -> Vec<Vec<Point>> {
     let (Some(f), Some(l)) = (grid.first().cloned(), grid.last().cloned()) else { return grid };
     let d = |q: Option<&Point>| q.map_or(f64::INFINITY, |q| q.dist(last));
     let ds = [d(f.first()), d(f.last()), d(l.first()), d(l.last())];
-    let nearest = (0..4).min_by(|a, b| ds[*a].partial_cmp(&ds[*b]).unwrap()).unwrap();
+    let nearest = (0..4).min_by(|a, b| ds[*a].total_cmp(&ds[*b])).unwrap();
     if nearest == 1 || nearest == 3 {
         for line in &mut grid {
             line.reverse();
@@ -754,10 +754,10 @@ mod tests {
     fn skip_min_distance_exponent_and_grid() {
         let line = SubPath::polyline(&[pt(0.0, 0.0), pt(20.0, 0.0)], false);
         let base = RippleParams { lines: 6, spacing: 2.0, ..Default::default() };
-        let rows = |p: &RippleParams| ripple_stitches(&[line.clone()], p, &run())[0].iter().map(|q| (q.y * 100.0).round() as i64).collect::<std::collections::BTreeSet<_>>().len();
+        let rows = |p: &RippleParams| ripple_stitches(std::slice::from_ref(&line), p, &run())[0].iter().map(|q| (q.y * 100.0).round() as i64).collect::<std::collections::BTreeSet<_>>().len();
         assert_eq!(rows(&base), 6);
         assert_eq!(rows(&RippleParams { skip_start: 1, skip_end: 2, ..base.clone() }), 3, "skipped lines");
-        let fan = |p: &RippleParams| ripple_stitches(&[line.clone()], p, &run());
+        let fan = |p: &RippleParams| ripple_stitches(std::slice::from_ref(&line), p, &run());
         let g = fan(&RippleParams { grid_size: 2.0, ..base.clone() });
         assert_eq!(g.len(), 2, "ripples and the grid");
         let steps_exp = steps(5, 0.0, 1.0, 2.0, false);
@@ -771,7 +771,7 @@ mod tests {
         let line = SubPath::polyline(&[pt(-30.0, 0.0), pt(0.0, 0.0)], false);
         for exponent in [-1.0, 0.0, f64::NAN] {
             let p = RippleParams { exponent, fan: true, ..Default::default() };
-            let g = ripple_stitches(&[line.clone()], &p, &run());
+            let g = ripple_stitches(std::slice::from_ref(&line), &p, &run());
             assert!(!g.is_empty() && g.iter().flatten().all(|q| q.x.is_finite() && q.y.is_finite()), "exponent {exponent}");
         }
         // a closed shape and a guided line with a line distance of 1e-6 mm: done quickly
@@ -780,7 +780,7 @@ mod tests {
         let _ = ripple_stitches(&[closed], &RippleParams { min_line_dist: 1e-6, ..Default::default() }, &run());
         let open = SubPath::polyline(&[pt(20.0, 0.0), pt(0.0, 0.0)], false);
         let guide = SubPath::polyline(&[pt(20.0, 0.0), pt(0.0, 0.0)], false);
-        let _ = ripple_stitches(&[open.clone()], &RippleParams { min_line_dist: 1e-6, guide: vec![guide], ..Default::default() }, &run());
+        let _ = ripple_stitches(std::slice::from_ref(&open), &RippleParams { min_line_dist: 1e-6, guide: vec![guide], ..Default::default() }, &run());
         let _ = ripple_stitches(&[open], &RippleParams { grid_size: 1e-6, ..Default::default() }, &run());
         assert!(t.elapsed().as_secs_f64() < 20.0);
     }

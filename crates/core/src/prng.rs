@@ -23,7 +23,7 @@ impl Stream {
     pub fn new(seed: u32, stream: u64) -> Self {
         Stream { seed, stream, i: 0 }
     }
-    pub fn next(&mut self) -> f64 {
+    pub fn next_f64(&mut self) -> f64 {
         self.i += 1;
         uniform(self.seed, self.stream, self.i)
     }

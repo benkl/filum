@@ -65,7 +65,7 @@ pub fn travel_path(rings: &[Ring], a: Point, b: Point) -> Option<Vec<Point>> {
         let mut best: Option<(f64, Point)> = None;
         for p in ring.iter() {
             let d = a.dist(*p);
-            if best.map_or(true, |(bd, _)| d < bd) && segment_inside(rings, a, a.lerp(*p, 0.98)) {
+            if best.is_none_or(|(bd, _)| d < bd) && segment_inside(rings, a, a.lerp(*p, 0.98)) {
                 best = Some((d, *p));
             }
         }
@@ -306,7 +306,7 @@ fn row_colours(g: &GradientParams, grating: &Grating, a: f64) -> std::collection
     for (rn, acc) in mix {
         let sum: f64 = acc.iter().sum::<f64>().max(1e-12);
         let v: Vec<f64> = (0..n).map(|j| acc[j] / sum + err[j]).collect();
-        let best = (0..n).max_by(|x, y| v[*x].partial_cmp(&v[*y]).unwrap()).unwrap_or(0);
+        let best = (0..n).max_by(|x, y| v[*x].total_cmp(&v[*y])).unwrap_or(0);
         for j in 0..n {
             err[j] = v[j] - if j == best { 1.0 } else { 0.0 };
         }
@@ -357,10 +357,10 @@ fn stitch_row(out: &mut Run, y: f64, x0: f64, x1: f64, row_num: i64, max_len: f6
         let min_gap = 0.25_f64.min(max_len * 0.3);
         let stream = (row_num as u64).wrapping_mul(0x9E37_79B9) ^ ((x0 * 64.0).round() as i64 as u64);
         let mut rng = crate::prng::Stream::new(seed, stream);
-        let mut d = min_gap + (max_len - min_gap) * rng.next();
+        let mut d = min_gap + (max_len - min_gap) * rng.next_f64();
         while d < dist - 0.05 {
             push(out, pt(beg + dir * d, y), f);
-            d += max_len * (1.0 + jitter * (rng.next() - 0.5) * 2.0).max(0.1);
+            d += max_len * (1.0 + jitter * (rng.next_f64() - 0.5) * 2.0).max(0.1);
         }
         if !o.skip_last {
             push(out, pt(end, y), f);
@@ -498,7 +498,7 @@ pub fn tatami_ramp(
                 .iter()
                 .filter_map(|s| s.rows.first())
                 .filter(|r| (r.0 - ymid).abs() <= spacing * 1.5)
-                .max_by(|a, b| (a.2 - a.1).partial_cmp(&(b.2 - b.1)).unwrap())
+                .max_by(|a, b| (a.2 - a.1).total_cmp(&(b.2 - b.1)))
                 .map(|r| pt(r.1, r.0));
             grating.sections = secs;
         }
@@ -640,7 +640,7 @@ pub fn tatami_ramp(
         remaining.iter().copied().min_by(|x, y| {
             let dx = (0..4).map(|k| section_exit(&grating.sections[*x], k).dist(e)).fold(f64::INFINITY, f64::min);
             let dy = (0..4).map(|k| section_exit(&grating.sections[*y], k).dist(e)).fold(f64::INFINITY, f64::min);
-            dx.partial_cmp(&dy).unwrap()
+            dx.total_cmp(&dy)
         })
     });
     while !remaining.is_empty() {
@@ -741,13 +741,12 @@ pub fn tatami_ramp(
             }
             let (x0, x1) = (pieces[0].0, pieces[pieces.len() - 1].1);
             let start = pt(if ltr { x0 } else { x1 }, y);
-            if mask.is_some() {
+            if let Some(m) = &mask {
                 // gradient layers skip rows: travel along the previous row line and
                 // step across, or start a new run when that would cross the outside
                 if let Some(&(prev, _)) = run.last() {
                     if prev.dist(start) > spacing * 3.0 {
                         let corner = pt(start.x, prev.y);
-                        let m = mask.as_ref().unwrap();
                         let hidden = m.hidden_along_row(prev.y, prev.x, corner.x) && m.hidden_across_rows(corner.x, prev.y, start.y);
                         if hidden && (start.y - prev.y).abs() < 2.0 && segment_inside(&rr, prev, corner) && segment_inside(&rr, corner, start) {
                             sew_along(&mut run, &[prev, corner], travel_len, f | flags::TRAVEL);
@@ -973,7 +972,7 @@ pub(crate) fn polygons_of(rings: &[Ring]) -> Vec<(Ring, Vec<Ring>)> {
     let n = rings.len();
     let probe = |r: &Ring| -> Point {
         // the middle of the longest edge: off the other rings' vertices
-        let k = (0..r.len()).max_by(|&a, &b| r[a].dist(r[(a + 1) % r.len()]).partial_cmp(&r[b].dist(r[(b + 1) % r.len()])).unwrap()).unwrap_or(0);
+        let k = (0..r.len()).max_by(|&a, &b| r[a].dist(r[(a + 1) % r.len()]).total_cmp(&r[b].dist(r[(b + 1) % r.len()]))).unwrap_or(0);
         r[k].lerp(r[(k + 1) % r.len()], 0.5)
     };
     let area: Vec<f64> = rings.iter().map(|r| signed_area(r).abs()).collect();
@@ -986,14 +985,14 @@ pub(crate) fn polygons_of(rings: &[Ring]) -> Vec<(Ring, Vec<Ring>)> {
     let mut out: Vec<(Ring, Vec<Ring>)> = Vec::new();
     let mut slot: Vec<Option<usize>> = vec![None; n];
     for i in 0..n {
-        if inside[i].len() % 2 == 0 {
+        if inside[i].len().is_multiple_of(2) {
             slot[i] = Some(out.len());
             out.push((rings[i].clone(), Vec::new()));
         }
     }
     for i in 0..n {
         if inside[i].len() % 2 == 1 {
-            let parent = inside[i].iter().copied().filter(|&j| inside[j].len() + 1 == inside[i].len()).min_by(|&a, &b| area[a].partial_cmp(&area[b]).unwrap());
+            let parent = inside[i].iter().copied().filter(|&j| inside[j].len() + 1 == inside[i].len()).min_by(|&a, &b| area[a].total_cmp(&area[b]));
             if let Some(k) = parent.and_then(|j| slot[j]) {
                 out[k].1.push(rings[i].clone());
             }
@@ -1220,7 +1219,7 @@ fn inner_to_outer_path(t: &[Iso], offset: f64, start: Point) -> Vec<Point> {
                 Some((project(&ring, &cum, p).0, q, c))
             })
             .collect();
-        conns.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        conns.sort_by(|a, b| a.0.total_cmp(&b.0));
         if conns.is_empty() {
             // the centre of a spiral: the innermost ring reversed looks nicer
             let mut r = ring;
@@ -1270,7 +1269,7 @@ fn spiral_rings(t: &[Iso]) -> Vec<Vec<Point>> {
         let (mut c, mut l) = (Point::ZERO, 0.0);
         for w in r.windows(2) {
             let d = w[0].dist(w[1]);
-            c = c + (w[0] + w[1]) * (0.5 * d);
+            c += (w[0] + w[1]) * (0.5 * d);
             l += d;
         }
         if l > 0.0 { c / l } else { r[0] }
@@ -1284,7 +1283,7 @@ fn spiral_rings(t: &[Iso]) -> Vec<Vec<Point>> {
             1 => node = t[node].children[0],
             _ => {
                 let c = centroid(&t[node].ring);
-                node = *t[node].children.iter().min_by(|&&a, &&b| centroid(&t[a].ring).dist(c).partial_cmp(&centroid(&t[b].ring).dist(c)).unwrap()).unwrap();
+                node = *t[node].children.iter().min_by(|&&a, &&b| centroid(&t[a].ring).dist(c).total_cmp(&centroid(&t[b].ring).dist(c))).unwrap();
             }
         }
         if out.len() > 100_000 {
@@ -1306,7 +1305,7 @@ fn resample_count(line: &[Point], count: usize) -> Vec<Point> {
 fn interpolate_rings(r1: &[Point], r2: &[Point], stitch_len: f64, start: Point) -> Vec<Point> {
     let count = ((20.0 * polyline_length(r1) / stitch_len.max(0.1)) as usize).max(3);
     let roll = |v: Vec<Point>| {
-        let k = (0..v.len()).min_by(|&a, &b| v[a].dist(start).partial_cmp(&v[b].dist(start)).unwrap()).unwrap_or(0);
+        let k = (0..v.len()).min_by(|&a, &b| v[a].dist(start).total_cmp(&v[b].dist(start))).unwrap_or(0);
         v[k..].iter().chain(v[..k].iter()).copied().collect::<Vec<Point>>()
     };
     let a = roll(resample_count(r1, count));
@@ -1357,7 +1356,7 @@ pub fn contour_ex(rings: &[Ring], spacing: f64, length: f64, spiral: bool, doubl
     // Ink/Stitch: (0, 0) without a start
     let mut pos = start.unwrap_or(Point::ZERO);
     while !polys.is_empty() {
-        let k = (0..polys.len()).min_by(|&a, &b| dist_to_boundary(std::slice::from_ref(&polys[a].0), pos).partial_cmp(&dist_to_boundary(std::slice::from_ref(&polys[b].0), pos)).unwrap()).unwrap();
+        let k = (0..polys.len()).min_by(|&a, &b| dist_to_boundary(std::slice::from_ref(&polys[a].0), pos).total_cmp(&dist_to_boundary(std::slice::from_ref(&polys[b].0), pos))).unwrap();
         let (outer, holes) = polys.swap_remove(k);
         let tree = offset_tree(&outer, &holes, offset, clockwise);
         let path = if spiral {
@@ -1391,7 +1390,7 @@ fn ray_intervals(rings: &[Ring], c: Point, u: Point, rmax: f64) -> Vec<(f64, f64
             }
         }
     }
-    ts.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    ts.sort_by(|a, b| a.total_cmp(b));
     ts.dedup_by(|a, b| (*a - *b).abs() < 1e-7);
     let mut inside = point_in_rings(c, rings);
     let mut out = Vec::new();
@@ -1606,7 +1605,7 @@ pub fn tsp_tour(pts: &[Point], rings: &[Ring], start: Point) -> Vec<usize> {
     }
     let mut used = vec![false; n];
     let mut order = Vec::with_capacity(n);
-    let mut cur = (0..n).min_by(|a, b| pts[*a].dist(start).partial_cmp(&pts[*b].dist(start)).unwrap()).unwrap();
+    let mut cur = (0..n).min_by(|a, b| pts[*a].dist(start).total_cmp(&pts[*b].dist(start))).unwrap();
     // bucket grid for NN queries
     let b = Rect::of_points(pts.iter());
     let cs = ((b.width() * b.height()) / n as f64).sqrt().max(0.1) * 1.5;
@@ -1641,7 +1640,7 @@ pub fn tsp_tour(pts: &[Point], rings: &[Ring], start: Point) -> Vec<usize> {
                         if d > cs && !segment_inside(rings, p, pts[j]) {
                             d *= 8.0;
                         }
-                        if best.map_or(true, |(_, bd)| d < bd) {
+                        if best.is_none_or(|(_, bd)| d < bd) {
                             best = Some((j, d));
                         }
                     }
@@ -1897,7 +1896,7 @@ fn edge_run(rings: &[Ring], stitch_len: f64, start: Option<Point>, f: u8) -> Vec
     let mut pos = start;
     let mut out = Vec::new();
     for ring in rings.iter().filter(|r| r.len() >= 3) {
-        let k = pos.map_or(0, |p| (0..ring.len()).min_by(|&a, &b| ring[a].dist(p).partial_cmp(&ring[b].dist(p)).unwrap()).unwrap_or(0));
+        let k = pos.map_or(0, |p| (0..ring.len()).min_by(|&a, &b| ring[a].dist(p).total_cmp(&ring[b].dist(p))).unwrap_or(0));
         let mut pts: Vec<Point> = ring[k..].iter().chain(ring[..k].iter()).copied().collect();
         pts.push(pts[0]);
         let run: Run = running_stitch(&pts, stitch_len.max(1.0), 0.1).into_iter().map(|q| (q, f)).collect();
@@ -2005,7 +2004,7 @@ fn fill_part(rings: &[Ring], whole: &[Ring], original: &[Ring], p: &FillParams, 
     let spacing = (p.row_spacing * density).max(0.1);
     // a gradient's underlay is sewn once, by its first layer
     let plan = super::underlay::fill_underlay(whole, p, fabric);
-    let underlay_on = !plan.is_empty() && p.gradient.as_ref().map_or(true, |g| g.layer == 0) && p.tartan.as_ref().map_or(true, |t| t.layer == 0);
+    let underlay_on = !plan.is_empty() && p.gradient.as_ref().is_none_or(|g| g.layer == 0) && p.tartan.as_ref().is_none_or(|t| t.layer == 0);
     if underlay_on && matches!(p.method, FillMethod::Tatami | FillMethod::Radial | FillMethod::Contour | FillMethod::Spiral | FillMethod::Meander | FillMethod::Guided | FillMethod::Circular | FillMethod::Flow | FillMethod::Curved | FillMethod::Tartan) {
         let inset = if p.underlay_inset > 0.0 { offset_rings(rings, -p.underlay_inset) } else { rings.to_vec() };
         if !inset.is_empty() {
@@ -2040,7 +2039,7 @@ fn fill_part(rings: &[Ring], whole: &[Ring], original: &[Ring], p: &FillParams, 
                     flags::UNDERLAY,
                 ));
             }
-            runs.extend(chain(&rings, ul, p.travel_length, flags::UNDERLAY));
+            runs.extend(chain(rings, ul, p.travel_length, flags::UNDERLAY));
         }
     }
     let top_start = runs.last().and_then(|r| r.last()).map(|x| x.0).or(start);
@@ -2070,10 +2069,10 @@ fn fill_part(rings: &[Ring], whole: &[Ring], original: &[Ring], p: &FillParams, 
         FillMethod::Tatami if p.carve != crate::model::CarvePattern::None && p.gradient.is_none() => {
             // the pattern in the row frame, centred on the shape
             let a = p.angle.to_radians();
-            let b = rings_bounds(&rotate_rings(&rings, a));
+            let b = rings_bounds(&rotate_rings(rings, a));
             let carve = Carve { pattern: p.carve, size: p.carve_size, centre: pt((b.min_x + b.max_x) / 2.0, (b.min_y + b.max_y) / 2.0) };
             tatami_ramp(
-                &rings,
+                rings,
                 p.angle,
                 spacing,
                 if p.end_row_spacing > 0.0 { p.end_row_spacing * density } else { 0.0 },
@@ -2095,10 +2094,10 @@ fn fill_part(rings: &[Ring], whole: &[Ring], original: &[Ring], p: &FillParams, 
         FillMethod::Tatami
             if p.gradient.as_ref().is_some_and(|g| g.mix == crate::model::GradientMix::Blend) || (p.gradient.is_none() && p.ramp.as_ref().is_some_and(|r| r.additive && r.group.is_some())) =>
         {
-            straight_blend(&rings, p, spacing, density, top_start, &opts)
+            straight_blend(rings, p, spacing, density, top_start, &opts)
         }
         FillMethod::Cross => super::decor::cross_full_ex(
-            &rings,
+            rings,
             p.angle,
             p.cross_size,
             p.cross_coverage,
@@ -2113,7 +2112,7 @@ fn fill_part(rings: &[Ring], whole: &[Ring], original: &[Ring], p: &FillParams, 
             0,
         ),
         FillMethod::Tatami => tatami_ramp(
-            &rings,
+            rings,
             p.angle,
             spacing,
             if p.end_row_spacing > 0.0 { p.end_row_spacing * density } else { 0.0 },
@@ -2129,13 +2128,13 @@ fn fill_part(rings: &[Ring], whole: &[Ring], original: &[Ring], p: &FillParams, 
             &opts,
             0,
         ),
-        FillMethod::Contour => contour_ex(&rings, spacing, p.max_stitch_length, false, false, p.clockwise, top_start, 0),
-        FillMethod::Spiral => contour_ex(&rings, spacing, p.max_stitch_length, true, p.contour_double, p.clockwise, top_start, 0),
-        FillMethod::Radial => radial(&rings, p.center, spacing, p.max_stitch_length, pin, 0),
-        FillMethod::Hilbert => hilbert(&rings, spacing, p.max_stitch_length, pin, 0),
-        FillMethod::Stipple => stipple(&rings, spacing, p.max_stitch_length, pin, 0),
+        FillMethod::Contour => contour_ex(rings, spacing, p.max_stitch_length, false, false, p.clockwise, top_start, 0),
+        FillMethod::Spiral => contour_ex(rings, spacing, p.max_stitch_length, true, p.contour_double, p.clockwise, top_start, 0),
+        FillMethod::Radial => radial(rings, p.center, spacing, p.max_stitch_length, pin, 0),
+        FillMethod::Hilbert => hilbert(rings, spacing, p.max_stitch_length, pin, 0),
+        FillMethod::Stipple => stipple(rings, spacing, p.max_stitch_length, pin, 0),
         FillMethod::Meander => super::inkfills::meander_ex(
-            &rings,
+            rings,
             p.meander_pattern,
             p.meander_tile.as_deref().and_then(super::meander_tiles::tile),
             p.meander_scale,
@@ -2156,34 +2155,34 @@ fn fill_part(rings: &[Ring], whole: &[Ring], original: &[Ring], p: &FillParams, 
         // parallel offset / buffer: streamlines along the guide's direction
         FillMethod::Guided if p.guided_strategy != crate::model::GuidedStrategy::Copy && p.guide.is_some() => {
             let gpts = p.guide.as_ref().unwrap().flatten(0.1);
-            match super::fields::guide_field(&rings, &gpts, p.guided_strategy == crate::model::GuidedStrategy::Buffer) {
-                Some(field) => streamlines(&rings, &field, p, spacing, density, top_start),
-                None => tatami(&rings, p.angle, spacing, 0.0, false, p.max_stitch_length, p.staggers, p.pull_comp, p.travel_length, top_start, end, None, &opts, 0),
+            match super::fields::guide_field(rings, &gpts, p.guided_strategy == crate::model::GuidedStrategy::Buffer) {
+                Some(field) => streamlines(rings, &field, p, spacing, density, top_start),
+                None => tatami(rings, p.angle, spacing, 0.0, false, p.max_stitch_length, p.staggers, p.pull_comp, p.travel_length, top_start, end, None, &opts, 0),
             }
         }
         FillMethod::Guided => p
             .guide
             .as_ref()
             .and_then(|g| {
-                super::inkfills::guided(&rings, g, spacing, p.max_stitch_length, p.staggers, p.pull_comp + extra_pull * 0.5, p.travel_length, top_start, end, &opts, 0)
+                super::inkfills::guided(rings, g, spacing, p.max_stitch_length, p.staggers, p.pull_comp + extra_pull * 0.5, p.travel_length, top_start, end, &opts, 0)
             })
             .unwrap_or_else(|| {
-                tatami(&rings, p.angle, spacing, 0.0, false, p.max_stitch_length, p.staggers, p.pull_comp + extra_pull * 0.5, p.travel_length, top_start, end, None, &opts, 0)
+                tatami(rings, p.angle, spacing, 0.0, false, p.max_stitch_length, p.staggers, p.pull_comp + extra_pull * 0.5, p.travel_length, top_start, end, None, &opts, 0)
             }),
         // the picture's flow; without one the rows follow the shape
         FillMethod::Flow => match p.flow.as_ref().filter(|f| f.is_usable()) {
-            Some(field) => streamlines(&rings, field, p, spacing, density, top_start),
+            Some(field) => streamlines(rings, field, p, spacing, density, top_start),
             // a gradient: the rows follow its colour bands (or cross them)
             None => {
-                let field = p.gradient.as_ref().and_then(|g| super::fields::colour_field(&rings, g, -p.angle.to_radians(), p.flow_across)).unwrap_or_else(|| curved_field(&rings, p, 1.0));
-                streamlines(&rings, &field, p, spacing, density, top_start)
+                let field = p.gradient.as_ref().and_then(|g| super::fields::colour_field(rings, g, -p.angle.to_radians(), p.flow_across)).unwrap_or_else(|| curved_field(rings, p, 1.0));
+                streamlines(rings, &field, p, spacing, density, top_start)
             }
         },
-        FillMethod::Curved => streamlines(&rings, &curved_field(&rings, p, p.curve), p, spacing, density, top_start),
+        FillMethod::Curved => streamlines(rings, &curved_field(rings, p, p.curve), p, spacing, density, top_start),
         // after an underlay (which ends at the outline) the spiral runs outside-in,
         // so no travel line crosses the open spiral rows
         FillMethod::Circular => super::inkfills::circular(
-            &rings,
+            rings,
             p.center,
             spacing,
             if p.end_row_spacing > 0.0 { p.end_row_spacing * density } else { 0.0 },
@@ -2195,7 +2194,7 @@ fn fill_part(rings: &[Ring], whole: &[Ring], original: &[Ring], p: &FillParams, 
             end,
             0,
         ),
-        FillMethod::Tartan => super::tartan::tartan(&rings, p, &p.tartan.clone().unwrap_or_default(), spacing, top_start, 0),
+        FillMethod::Tartan => super::tartan::tartan(rings, p, &p.tartan.clone().unwrap_or_default(), spacing, top_start, 0),
     });
     // a maze, stipple or sunburst is one line that does not look at the
     // start: sewn backwards when that begins nearer the start (or the end point)
@@ -2216,7 +2215,7 @@ fn fill_part(rings: &[Ring], whole: &[Ring], original: &[Ring], p: &FillParams, 
     // join underlay end with top start by travelling inside the shape
     if let (Some(last_run), Some(first_top)) = (runs.last_mut(), top.first()) {
         if let (Some(&(a, _)), Some(&(b, _))) = (last_run.last(), first_top.first()) {
-            if let Some(path) = travel_path(&rings, a, b) {
+            if let Some(path) = travel_path(rings, a, b) {
                 sew_along(last_run, &path, p.travel_length, flags::TRAVEL);
                 let mut it = top.into_iter();
                 let first = it.next().unwrap();
@@ -2224,12 +2223,12 @@ fn fill_part(rings: &[Ring], whole: &[Ring], original: &[Ring], p: &FillParams, 
                     push(last_run, q, f);
                 }
                 runs.extend(it);
-                return finish_at(runs, &rings, end, p.travel_length);
+                return finish_at(runs, rings, end, p.travel_length);
             }
         }
     }
     runs.extend(top);
-    finish_at(runs, &rings, end, p.travel_length)
+    finish_at(runs, rings, end, p.travel_length)
 }
 
 /// Ink/Stitch "fill end" command: finish exactly at the end point, travelling inside the shape.
@@ -2516,7 +2515,7 @@ mod tests {
         let rows = |s0: f64, s1: f64| -> Vec<f64> {
             let g = build_grating(&sq, s0, s1, true, 0.0);
             let mut ys: Vec<f64> = g.sections.iter().flat_map(|s| s.rows.iter().map(|r| r.0)).collect();
-            ys.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            ys.sort_by(|a, b| a.total_cmp(b));
             ys
         };
         let a = rows(0.25, 2.5);

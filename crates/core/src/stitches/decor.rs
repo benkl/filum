@@ -160,7 +160,7 @@ pub fn carve_row(pattern: CarvePattern, size: f64, centre: Point, y: f64, x0: f6
         }
     }
     cuts.retain(|x| *x > a + 0.3 && *x < b - 0.3);
-    cuts.sort_by(|u, v| u.partial_cmp(v).unwrap());
+    cuts.sort_by(|u, v| u.total_cmp(v));
     cuts.dedup_by(|u, v| (*u - *v).abs() < 0.3);
     // between the pattern lines: the staggered tatami grid, kept clear of the
     // lines (a point right beside a groove would blur it); gaps still longer
@@ -541,7 +541,7 @@ pub fn cross_full_ex(rings: &[Ring], angle_deg: f64, size: f64, coverage: f64, k
     let mut left = pieces;
     while !left.is_empty() {
         let k = match pos {
-            Some(p) => (0..left.len()).min_by(|&x, &y| left[x][0].dist(p).partial_cmp(&left[y][0].dist(p)).unwrap()).unwrap(),
+            Some(p) => (0..left.len()).min_by(|&x, &y| left[x][0].dist(p).total_cmp(&left[y][0].dist(p))).unwrap(),
             None => 0,
         };
         let piece = left.remove(k);

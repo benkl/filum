@@ -184,7 +184,7 @@ impl StitchPlan {
     /// ZIP export "panelization"): every colour block sews all its copies, a
     /// trim between them, and keeps its trailing commands once at the end.
     pub fn make_offsets(&self, offsets: &[Point]) -> StitchPlan {
-        if offsets.len() <= 1 && offsets.first().map_or(true, |o| o.x == 0.0 && o.y == 0.0) {
+        if offsets.len() <= 1 && offsets.first().is_none_or(|o| o.x == 0.0 && o.y == 0.0) {
             return self.clone();
         }
         let mut out = Vec::with_capacity(self.stitches.len() * offsets.len() + 16);

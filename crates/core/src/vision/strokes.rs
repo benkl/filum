@@ -361,7 +361,7 @@ pub fn strokes(skel: &[bool], w: usize, h: usize, radius: &dyn Fn(usize) -> f64,
                 }
             }
         }
-        pairs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        pairs.sort_by(|a, b| a.0.total_cmp(&b.0));
         let mut used = vec![false; ends.len()];
         for (_, i, j) in pairs {
             if used[i] || used[j] || ends[i].0 == ends[j].0 {

@@ -149,7 +149,7 @@ fn test_card(w: usize, h: usize) -> Img {
     img.paint([120, 50, 150], |x, y| ((x - 0.3 * fw) / (0.08 * fw)).powi(2) + ((y - 0.4 * fh) / (0.05 * fh)).powi(2) <= 1.0);
     // mild deterministic noise
     let mut s: u32 = 12345;
-    for p in img.px.chunks_exact_mut(4) {
+    for p in img.px.as_chunks_mut::<4>().0 {
         for c in p.iter_mut().take(3) {
             s ^= s << 13;
             s ^= s >> 17;
@@ -221,7 +221,7 @@ fn palette_snapping_and_transparency() {
     use filum_core::threads::PaletteEntry;
     // transparent background, two shapes
     let mut img = Img::new(200, 200, [0, 0, 0]);
-    for p in img.px.chunks_exact_mut(4) {
+    for p in img.px.as_chunks_mut::<4>().0 {
         p[3] = 0;
     }
     let mut opaque = |x0: usize, x1: usize, c: [u8; 3]| {
@@ -410,9 +410,11 @@ fn satin_outline_around_silhouette() {
         assert_eq!(rgb(o, &r), [10, 10, 10]);
     }
     // the closed centre-line satin stitches without a seam gap
-    let mut doc = filum_core::Document::default();
-    doc.threads = r.threads.clone();
-    doc.objects = outlines.iter().map(|o| (*o).clone()).collect();
+    let doc = filum_core::Document {
+        threads: r.threads.clone(),
+        objects: outlines.iter().map(|o| (*o).clone()).collect(),
+        ..Default::default()
+    };
     let plan = filum_core::Engine::new().plan(&doc);
     assert!(plan.stats(800.0, 6.0, 12.0).stitches > 400);
 }
@@ -693,7 +695,8 @@ fn line_art_touching_the_border() {
     let mut img = Img::new(80, 60, [250, 250, 245]);
     img.paint([20, 30, 90], |x, y| x < 30.0 || y < 8.0);
     img.paint([200, 40, 40], |x, y| ((x - 60.0).powi(2) + (y - 60.0).powi(2)).sqrt() < 25.0);
-    for la in [LineArt::Coherent] {
+    {
+        let la = LineArt::Coherent;
         let r = img.run(&DigitizeOptions { width_mm: 80.0, line_art: la, edge_outlines: OutlineKind::Running, ..Default::default() });
         assert!(!r.objects.is_empty());
     }
@@ -925,7 +928,7 @@ fn line_networks_become_strokes_with_fills_under_them() {
     }
     // strokes are sewn after every fill
     let last_fill = r.objects.iter().rposition(|o| matches!(o.stitch, StitchParams::Fill(_))).unwrap();
-    let first_stroke = r.objects.iter().position(|o| dark(o)).unwrap();
+    let first_stroke = r.objects.iter().position(dark).unwrap();
     assert!(first_stroke > last_fill);
 }
 
@@ -1014,7 +1017,7 @@ fn sub_pixel_centres_keep_thin_lines_straight() {
     }
     let dev = |opts: &DigitizeOptions| {
         let r = img.run(opts);
-        let o = r.objects.iter().max_by(|a, b| polyline_len(a).partial_cmp(&polyline_len(b)).unwrap()).expect("a line");
+        let o = r.objects.iter().max_by(|a, b| polyline_len(a).total_cmp(&polyline_len(b))).expect("a line");
         let s = 100.0 / 400.0;
         let pts: Vec<Point> = o.paths[0].flatten(0.02);
         let inner: Vec<&Point> = pts.iter().filter(|p| (60.0 * s..340.0 * s).contains(&p.x)).collect();
@@ -1119,7 +1122,7 @@ fn colour_order_sets_the_sew_order() {
     let base = DigitizeOptions { colors: 3, width_mm: 50.0, ..Default::default() };
     // by default the largest colour comes first
     let r = img.run(&base);
-    assert_eq!(rgb(&r.objects[0], &r)[0] > 240, true, "the disc first by default");
+    assert!(rgb(&r.objects[0], &r)[0] > 240, "the disc first by default");
     // red first, then yellow
     let r = img.run(&DigitizeOptions { color_order: vec![[200, 40, 40], [250, 210, 90]], ..base.clone() });
     let reds: Vec<usize> = r.objects.iter().enumerate().filter(|(_, o)| rgb(o, &r)[1] < 100).map(|(i, _)| i).collect();

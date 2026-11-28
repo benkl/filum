@@ -395,7 +395,7 @@ pub fn components(rings: Vec<Ring>) -> Vec<Vec<Ring>> {
             .iter()
             .enumerate()
             .filter(|(_, part)| point_in_ring(p, &part[0]))
-            .min_by(|a, b| signed_area(&a.1[0]).abs().partial_cmp(&signed_area(&b.1[0]).abs()).unwrap())
+            .min_by(|a, b| signed_area(&a.1[0]).abs().total_cmp(&signed_area(&b.1[0]).abs()))
             .map(|(i, _)| i);
         if let Some(i) = host {
             parts[i].push(h);

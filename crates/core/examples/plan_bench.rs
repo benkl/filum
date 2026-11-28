@@ -134,7 +134,7 @@ fn main() -> Result<(), String> {
     if !totals.is_empty() {
         println!("\nPhases over all cold plans with removal on (inclusive seconds, calls):");
         let mut v: Vec<_> = totals.into_iter().collect();
-        v.sort_by(|a, b| b.1 .0.partial_cmp(&a.1 .0).unwrap());
+        v.sort_by(|a, b| b.1 .0.total_cmp(&a.1 .0));
         for (k, (s, n)) in v {
             println!("  {k:<38} {s:>9.3} s {n:>9}");
         }
@@ -163,7 +163,7 @@ fn time<T>(f: impl FnOnce() -> T) -> (f64, T) {
 
 fn print_phases(label: &str, t: &[(&'static str, f64, u64)]) {
     let mut v = t.to_vec();
-    v.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+    v.sort_by(|a, b| b.1.total_cmp(&a.1));
     let s: Vec<String> = v.iter().filter(|x| x.1 >= 0.005).map(|(k, s, n)| format!("{k} {s:.3}s/{n}")).collect();
     println!("{label}: {}", s.join(" · "));
 }

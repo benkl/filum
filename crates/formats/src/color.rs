@@ -43,7 +43,7 @@ pub fn red_mean_distance(a: [u8; 3], b: [u8; 3]) -> i64 {
     let (r2, g2, b2) = (b[0] as i64, b[1] as i64, b[2] as i64);
     // int(round((r1 + r2) / 2)): Python rounds halves to even
     let sum = r1 + r2;
-    let red_mean = if sum % 2 == 0 { sum / 2 } else if (sum / 2) % 2 == 0 { sum / 2 } else { sum / 2 + 1 };
+    let red_mean = if sum % 2 == 0 || (sum / 2) % 2 == 0 { sum / 2 } else { sum / 2 + 1 };
     let (r, g, bb) = (r1 - r2, g1 - g2, b1 - b2);
     (((512 + red_mean) * r * r) >> 8) + 4 * g * g + (((767 - red_mean) * bb * bb) >> 8)
 }

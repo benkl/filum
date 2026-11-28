@@ -89,7 +89,7 @@ fn orient_polyline(mut pts: Vec<Point>, closed: bool, start: Option<Point>, end:
             let mut ring = if pinned {
                 ring_from(ring, t)
             } else {
-                let k = (0..ring.len()).min_by(|a, b| ring[*a].dist(t).partial_cmp(&ring[*b].dist(t)).unwrap()).unwrap_or(0);
+                let k = (0..ring.len()).min_by(|a, b| ring[*a].dist(t).total_cmp(&ring[*b].dist(t))).unwrap_or(0);
                 ring.rotate_left(k);
                 ring
             };
@@ -342,7 +342,7 @@ mod tests {
     use crate::model::*;
 
     fn obj(paths: Vec<SubPath>, stitch: StitchParams, start: Option<[f64; 2]>, end: Option<[f64; 2]>) -> Object {
-        Object { start: start, end: end, ..Object::new("o", "t", paths, stitch) }
+        Object { start, end, ..Object::new("o", "t", paths, stitch) }
     }
 
     fn first_last(runs: &[Run]) -> (Point, Point) {
@@ -436,7 +436,7 @@ mod pattern_tests {
     use crate::model::*;
 
     fn obj(paths: Vec<SubPath>, stitch: StitchParams, patterns: Vec<StitchPattern>) -> Object {
-        Object { patterns: patterns, ..Object::new("o", "t", paths, stitch) }
+        Object { patterns, ..Object::new("o", "t", paths, stitch) }
     }
     fn pts(o: &Object) -> Vec<Point> {
         generate(o, &Fabric::Cotton.profile()).into_iter().flatten().map(|x| x.0).collect()

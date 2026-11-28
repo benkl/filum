@@ -378,15 +378,15 @@ mod tests {
         let vertical = |a: f64| (a.rem_euclid(std::f64::consts::PI) - FRAC_PI_2).abs() < 0.12;
         let horizontal = |a: f64| { let m = a.rem_euclid(std::f64::consts::PI); m < 0.12 || m > std::f64::consts::PI - 0.12 };
         // linear left → right: the bands (and rows) are vertical, also past the end
-        let f = colour_field(&[sq.clone()], &grad(GradientKind::Linear), 0.0, false).unwrap();
+        let f = colour_field(std::slice::from_ref(&sq), &grad(GradientKind::Linear), 0.0, false).unwrap();
         for x in [5.0, 25.0, 38.0] {
             assert!(vertical(dir_at(&f, x, 20.0)), "linear at {x}: {}", dir_at(&f, x, 20.0));
         }
         // across: horizontal rows through the colours
-        let f = colour_field(&[sq.clone()], &grad(GradientKind::Linear), 0.0, true).unwrap();
+        let f = colour_field(std::slice::from_ref(&sq), &grad(GradientKind::Linear), 0.0, true).unwrap();
         assert!(horizontal(dir_at(&f, 25.0, 20.0)));
         // radial: circles around the centre
-        let f = colour_field(&[sq.clone()], &grad(GradientKind::Radial), 0.0, false).unwrap();
+        let f = colour_field(std::slice::from_ref(&sq), &grad(GradientKind::Radial), 0.0, false).unwrap();
         assert!(vertical(dir_at(&f, 28.0, 20.0)), "east {}", dir_at(&f, 28.0, 20.0));
         assert!(horizontal(dir_at(&f, 20.0, 12.0)), "north {}", dir_at(&f, 20.0, 12.0));
         // one colour: nothing to follow
@@ -400,7 +400,7 @@ mod tests {
         let sq: Ring = vec![pt(0.0, 0.0), pt(40.0, 0.0), pt(40.0, 40.0), pt(0.0, 40.0)];
         // an L-shaped guide: along x, then down
         let guide = [pt(5.0, 5.0), pt(30.0, 5.0), pt(30.0, 35.0)];
-        let f = guide_field(&[sq.clone()], &guide, false).unwrap();
+        let f = guide_field(std::slice::from_ref(&sq), &guide, false).unwrap();
         let horiz = |a: f64| { let m = a.rem_euclid(std::f64::consts::PI); m < 0.15 || m > std::f64::consts::PI - 0.15 };
         let vert = |a: f64| (a.rem_euclid(std::f64::consts::PI) - std::f64::consts::FRAC_PI_2).abs() < 0.15;
         assert!(horiz(dir_at(&f, 15.0, 12.0)), "near the first leg: along x");

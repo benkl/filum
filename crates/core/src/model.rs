@@ -1491,6 +1491,8 @@ impl Default for AppliqueParams {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(tag = "type", rename_all = "camelCase")]
+// one per object, cloned rarely: boxing the large variants would only add indirection
+#[allow(clippy::large_enum_variant)]
 pub enum StitchParams {
     /// Shape is shown but not stitched (e.g. appliqué artwork reference).
     None,
@@ -2350,6 +2352,11 @@ impl Document {
     }
 }
 
+/// Serde: a flag that is on by default is written only when it is off.
+fn is_true(b: &bool) -> bool {
+    *b
+}
+
 #[cfg(test)]
 mod contour_direction_tests {
     use super::*;
@@ -2397,9 +2404,4 @@ mod contour_direction_tests {
         let StitchParams::Fill(p) = &d.objects[0].stitch else { panic!() };
         assert!(!p.clockwise);
     }
-}
-
-/// Serde: a flag that is on by default is written only when it is off.
-fn is_true(b: &bool) -> bool {
-    *b
 }

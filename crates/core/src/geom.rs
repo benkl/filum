@@ -214,7 +214,7 @@ pub fn point_at(pts: &[Point], cum: &[f64], d: f64) -> Point {
         return *pts.last().unwrap();
     }
     // binary search the segment
-    let idx = match cum.binary_search_by(|v| v.partial_cmp(&d).unwrap()) {
+    let idx = match cum.binary_search_by(|v| v.total_cmp(&d)) {
         Ok(i) => return pts[i],
         Err(i) => i,
     };
@@ -458,7 +458,7 @@ pub fn scanline_spans(rings: &[Ring], y: f64, min_span: f64) -> Vec<(f64, f64)> 
         }
     }
     xs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    xs.chunks_exact(2).map(|c| (c[0], c[1])).filter(|(a, b)| b - a > min_span).collect()
+    xs.as_chunks::<2>().0.iter().map(|c| (c[0], c[1])).filter(|(a, b)| b - a > min_span).collect()
 }
 
 /// Do two segments properly intersect (excluding shared endpoints)?
@@ -646,7 +646,7 @@ pub fn nearest_ring(rings: &[Ring], p: Point) -> Option<(usize, f64)> {
         }
         let cum = cumulative_lengths(&closed);
         let (_, d) = project(&closed, &cum, p);
-        if best.map_or(true, |b| d < b.1) {
+        if best.is_none_or(|b| d < b.1) {
             best = Some((i, d));
         }
     }
@@ -1019,11 +1019,7 @@ pub fn trace_contours(grid: &[bool], w: usize, h: usize) -> Vec<Ring> {
     let mut starts: Vec<(isize, isize)> = next.keys().copied().collect();
     starts.sort();
     for s in starts {
-        loop {
-            let first_next = match next.get_mut(&s).and_then(|v| v.pop()) {
-                Some(n) => n,
-                None => break,
-            };
+        while let Some(first_next) = next.get_mut(&s).and_then(|v| v.pop()) {
             let mut ring = vec![s];
             let mut cur = first_next;
             let mut guard = 0usize;
@@ -1069,7 +1065,7 @@ mod tests {
             let g = BoundaryDist::new(&rings);
             let mut rng = crate::prng::Stream::new(7, 1);
             for _ in 0..4000 {
-                let p = pt(rng.next() * 140.0 - 30.0, rng.next() * 100.0 - 30.0);
+                let p = pt(rng.next_f64() * 140.0 - 30.0, rng.next_f64() * 100.0 - 30.0);
                 assert_eq!(g.dist(p).to_bits(), dist_to_boundary(&rings, p).to_bits(), "{p:?}");
             }
         }

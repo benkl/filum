@@ -122,10 +122,10 @@ pub fn find(lab: &Img, rgb: &Img, alpha: &[bool], step: f32, min_frac: f64, min_
         let rms = (err / cnt).sqrt() * (100.0 / 255.0);
         // ramp direction: the direction of steepest colour change (G^T G)
         let (mut gxx, mut gyy, mut gxy) = (0f64, 0f64, 0f64);
-        for k in 0..3 {
-            gxx += coef[k][1] * coef[k][1];
-            gyy += coef[k][2] * coef[k][2];
-            gxy += coef[k][1] * coef[k][2];
+        for c in &coef {
+            gxx += c[1] * c[1];
+            gyy += c[2] * c[2];
+            gxy += c[1] * c[2];
         }
         let theta = 0.5 * (2.0 * gxy).atan2(gxx - gyy);
         let (ux, uy) = (theta.cos(), theta.sin());

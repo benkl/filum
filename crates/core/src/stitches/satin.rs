@@ -188,7 +188,7 @@ pub fn satin_geometry(paths: &[SubPath], p: &SatinParams) -> Option<SatinGeometr
 /// Rails split at the cuts (arc positions on both rails), in rail order.
 fn sections_from_cuts(r0: &[Point], c0: &[f64], r1: &[Point], c1: &[f64], mut cuts: Vec<(f64, f64)>, reverse: bool) -> Vec<(Vec<Point>, Vec<Point>)> {
     let (l0, l1) = (*c0.last().unwrap_or(&0.0), *c1.last().unwrap_or(&0.0));
-    cuts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    cuts.sort_by(|a, b| a.0.total_cmp(&b.0));
     let mut sections = Vec::new();
     let (mut s0, mut s1) = (0.0, 0.0);
     for (d0, d1) in cuts.into_iter().chain(std::iter::once((l0, l1))) {
@@ -564,12 +564,12 @@ impl Splitter {
             // lengths varied by the jitter; none right next to the ends
             let len = a_short.dist(b_short);
             let mut rng = crate::prng::Stream::new(self.seed, 0x5011_7000 + row as u64);
-            let mut t = self.max_len * rng.next();
+            let mut t = self.max_len * rng.next_f64();
             let mut out = Vec::new();
             while t < len {
                 out.push(a_short.lerp(b_short, t / len));
                 // never a zero step (jitter 1 can draw one)
-                t += (self.max_len * (1.0 + self.jitter * (rng.next() - 0.5) * 2.0)).max(self.max_len * 0.05);
+                t += (self.max_len * (1.0 + self.jitter * (rng.next_f64() - 0.5) * 2.0)).max(self.max_len * 0.05);
             }
             let min_stitch = 0.25;
             if out.len() > 1 && out[0].dist(a) <= min_stitch {
@@ -924,7 +924,7 @@ mod tests {
             assert!(a.y.min(b.y) > 16.0 && a.y.max(b.y) < 20.6, "stitch {a:?} → {b:?} reaches the rung's ends");
         }
         // a "#": two rails and two rungs, all crossing two others → the longest are the rails
-        let hash = vec![line((0.0, 0.0), (20.0, 0.0)), line((0.0, 4.0), (20.0, 4.0)), line((5.0, -1.0), (5.0, 5.0)), line((15.0, -1.0), (15.0, 5.0))];
+        let hash = [line((0.0, 0.0), (20.0, 0.0)), line((0.0, 4.0), (20.0, 4.0)), line((5.0, -1.0), (5.0, 5.0)), line((15.0, -1.0), (15.0, 5.0))];
         let flat: Vec<Vec<Point>> = hash.iter().map(|s| s.flatten(0.2)).collect();
         assert_eq!(rail_indices(&flat), (0, 1));
     }
@@ -937,7 +937,7 @@ mod tests {
         let angle_at = |p: &SatinParams, x: f64| -> f64 {
             let geo = satin_geometry(&line, p).unwrap();
             let pairs = plot_points_on_rails(&geo, 0.4, 0.0, 0.0);
-            let (a, b) = pairs.iter().min_by(|u, v| ((u.0.x + u.1.x) / 2.0 - x).abs().partial_cmp(&((v.0.x + v.1.x) / 2.0 - x).abs()).unwrap()).copied().unwrap();
+            let (a, b) = pairs.iter().min_by(|u, v| ((u.0.x + u.1.x) / 2.0 - x).abs().total_cmp(&((v.0.x + v.1.x) / 2.0 - x).abs())).copied().unwrap();
             (b - a).y.atan2((b - a).x).to_degrees().abs()
         };
         assert!((angle_at(&plain, 15.0) - 90.0).abs() < 2.0);

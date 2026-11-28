@@ -29,7 +29,7 @@ pub struct Palette {
 pub const FILUM_ENTRY: &str = "# Filum:";
 
 /// Parse a GIMP palette file as used by Ink/Stitch (`palettes/InkStitch *.gpl`).
-/// Lines look like `  0   0   0	Black 1000` (rgb, then "name code"); a
+/// Lines look like `  0   0   0\tBlack 1000` (rgb, a tab, then "name code"); a
 /// [`FILUM_ENTRY`] comment before a line gives its name, code and brand exactly.
 pub fn parse_gpl(text: &str) -> Palette {
     let mut name = String::new();

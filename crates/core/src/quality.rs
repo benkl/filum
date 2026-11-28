@@ -274,12 +274,14 @@ mod tests {
     }
 
     fn doc(stitches: Vec<StitchParams>) -> Document {
-        let mut d = Document::default();
-        d.objects = stitches
+        let d = Document {
+            objects: stitches
             .into_iter()
             .enumerate()
             .map(|(i, stitch)| Object { id: format!("o{i}"), name: format!("o{i}"), thread: "t".into(), paths: vec![SubPath::polyline(&[pt(0.0, 0.0), pt(1.0, 0.0)], false)], stitch, ..serde_json::from_str(r#"{"id":"x","thread":"t","paths":[]}"#).unwrap() })
-            .collect();
+            .collect(),
+            ..Default::default()
+        };
         d
     }
 

@@ -1089,7 +1089,7 @@ fn assemble_basted(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[Run], 
         let after_prefix = std::mem::replace(&mut first_object, false) && own_prefix;
         // a layered 3D starts in its base thread
         let first_thread = crate::stitches::layered3d::start_thread(obj, doc);
-        if after_prefix || cur_thread.map_or(true, |c| !doc.same_spool(c, first_thread)) {
+        if after_prefix || cur_thread.is_none_or(|c| !doc.same_spool(c, first_thread)) {
             if cur_thread.is_some() || after_prefix {
                 // the tie-off and colour change end the prefix when it has its own colour
                 b.cut(if after_prefix { u32::MAX } else { o }, false, true);
@@ -1110,7 +1110,7 @@ fn assemble_basted(doc: &Document, items: &[(usize, Vec<Run>)], prefix: &[Run], 
             at += 1;
             if crate::stitches::layered3d::is_thread_switch(run) {
                 // a layered 3D's top layer in the object's own thread
-                if cur_thread.map_or(true, |c| !doc.same_spool(c, &obj.thread)) {
+                if cur_thread.is_none_or(|c| !doc.same_spool(c, &obj.thread)) {
                     b.cut(o, false, true);
                     b.pending = Some((ConnectionKind::ColorChange, false));
                     threads.push(doc.thread(&obj.thread).cloned().unwrap_or_else(|| fallback_thread(threads.len())));

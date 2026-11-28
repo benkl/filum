@@ -252,7 +252,7 @@ pub fn optimize(doc: &Document, engine: &mut Engine, opts: &OptimizeOptions) -> 
     // objects on the same spool count as one colour; a layered 3D begins on its inner thread
     let spool_in: Vec<String> = doc.objects.iter().map(|o| doc.spool_of(start_thread(o, doc))).collect();
     let spool_out: Vec<String> = doc.objects.iter().map(|o| doc.spool_of(&o.thread)).collect();
-    let movable: Vec<bool> = doc.objects.iter().map(|o| (opts.locked || !o.locked) && opts.selection.as_ref().map_or(true, |s| s.contains(&o.id))).collect();
+    let movable: Vec<bool> = doc.objects.iter().map(|o| (opts.locked || !o.locked) && opts.selection.as_ref().is_none_or(|s| s.contains(&o.id))).collect();
 
     // stretches: an object that stays put is a stretch of its own; without
     // grouping colours every colour block is one too
@@ -514,9 +514,11 @@ mod tests {
 
     #[test]
     fn merges_colors_without_breaking_stacking() {
-        let mut doc = Document::default();
-        // red A, blue B (on top of A), red C (separate), blue D (separate)
-        doc.objects = vec![sq("A", "red", 0.0, 0.0), sq("B", "blue", 2.0, 2.0), sq("C", "red", 30.0, 0.0), sq("D", "blue", 60.0, 0.0)];
+        let doc = Document {
+            // red A, blue B (on top of A), red C (separate), blue D (separate)
+            objects: vec![sq("A", "red", 0.0, 0.0), sq("B", "blue", 2.0, 2.0), sq("C", "red", 30.0, 0.0), sq("D", "blue", 60.0, 0.0)],
+            ..Default::default()
+        };
         let mut e = Engine::new();
         let r = optimize_order(&doc, &mut e);
         assert_eq!(r.color_changes_before, 3);
@@ -554,9 +556,11 @@ mod tests {
     }
 
     fn four() -> Document {
-        let mut doc = Document::default();
-        doc.objects = vec![sq("A", "red", 0.0, 0.0), sq("B", "blue", 30.0, 0.0), sq("C", "red", 60.0, 0.0), sq("D", "blue", 90.0, 0.0)];
-        doc
+        
+        Document {
+            objects: vec![sq("A", "red", 0.0, 0.0), sq("B", "blue", 30.0, 0.0), sq("C", "red", 60.0, 0.0), sq("D", "blue", 90.0, 0.0)],
+            ..Default::default()
+        }
     }
 
     #[test]
@@ -581,8 +585,10 @@ mod tests {
 
     #[test]
     fn without_grouping_colours_the_blocks_stay() {
-        let mut doc = Document::default();
-        doc.objects = vec![sq("A", "red", 0.0, 0.0), sq("B", "red", 60.0, 0.0), sq("C", "red", 10.0, 0.0), sq("D", "blue", 100.0, 0.0), sq("E", "red", 20.0, 0.0)];
+        let doc = Document {
+            objects: vec![sq("A", "red", 0.0, 0.0), sq("B", "red", 60.0, 0.0), sq("C", "red", 10.0, 0.0), sq("D", "blue", 100.0, 0.0), sq("E", "red", 20.0, 0.0)],
+            ..Default::default()
+        };
         let r = optimize(&doc, &mut Engine::new(), &OptimizeOptions { colors: false, ..Default::default() });
         // the shorter way within the first red block; blue and the last red stay where they are
         assert_eq!(ids(&r), "A C B D E");
@@ -594,9 +600,11 @@ mod tests {
     #[test]
     fn foam_goes_last_as_far_as_the_stacking_allows() {
         let foam = SatinParams { foam: Some(FoamOptions::default()), ..Default::default() };
-        let mut doc = Document::default();
-        // the foam column, then a red square elsewhere, then a blue one on top of the foam
-        doc.objects = vec![column("F", "red", 0.0, 50.0, foam), sq("A", "red", 40.0, 0.0), sq("B", "blue", 5.0, 48.0)];
+        let mut doc = Document {
+            // the foam column, then a red square elsewhere, then a blue one on top of the foam
+            objects: vec![column("F", "red", 0.0, 50.0, foam), sq("A", "red", 40.0, 0.0), sq("B", "blue", 5.0, 48.0)],
+            ..Default::default()
+        };
         let r = optimize_order(&doc, &mut Engine::new());
         assert_eq!(ids(&r), "A F B", "after A, before the square sewn on top of it");
         doc.objects.pop();
@@ -608,9 +616,11 @@ mod tests {
     #[test]
     fn a_layered_column_follows_its_inner_thread() {
         let layered = SatinParams { layered: Some(LayeredOptions { layers: 2, base_thread: Some("blue".into()), ..Default::default() }), width: 8.0, ..Default::default() };
-        let mut doc = Document::default();
-        doc.threads = vec![thread("red", "#ff0000"), thread("blue", "#0000ff")];
-        doc.objects = vec![sq("A", "red", 0.0, 0.0), column("L", "red", 30.0, 0.0, SatinParams { width: 8.0, ..layered }), sq("B", "blue", 60.0, 0.0), sq("C", "red", 90.0, 0.0)];
+        let doc = Document {
+            threads: vec![thread("red", "#ff0000"), thread("blue", "#0000ff")],
+            objects: vec![sq("A", "red", 0.0, 0.0), column("L", "red", 30.0, 0.0, SatinParams { width: 8.0, ..layered }), sq("B", "blue", 60.0, 0.0), sq("C", "red", 90.0, 0.0)],
+            ..Default::default()
+        };
         let r = optimize_order(&doc, &mut Engine::new());
         // red A, C; blue B, then the column (blue inside, red on top)
         assert_eq!(ids(&r), "A C B L");
@@ -647,9 +657,11 @@ mod tests {
 
     #[test]
     fn centre_out_sews_the_middle_first() {
-        let mut doc = Document::default();
-        // a row of red squares; the middle one (C) is drawn last
-        doc.objects = vec![sq("A", "red", 0.0, 0.0), sq("B", "red", 20.0, 0.0), sq("D", "red", 60.0, 0.0), sq("E", "red", 80.0, 0.0), sq("C", "red", 40.0, 0.0)];
+        let mut doc = Document {
+            // a row of red squares; the middle one (C) is drawn last
+            objects: vec![sq("A", "red", 0.0, 0.0), sq("B", "red", 20.0, 0.0), sq("D", "red", 60.0, 0.0), sq("E", "red", 80.0, 0.0), sq("C", "red", 40.0, 0.0)],
+            ..Default::default()
+        };
         assert_eq!(ids(&optimize_order(&doc, &mut Engine::new())), "A B C D E");
         let r = optimize(&doc, &mut Engine::new(), &OptimizeOptions { center_out: true, ..Default::default() });
         assert_eq!(&r.order[0], "C", "{:?}", r.order);

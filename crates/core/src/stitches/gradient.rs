@@ -105,7 +105,7 @@ fn shape_mix(g: &GradientParams, w: &mut [f64]) {
         sum += *x;
     }
     if sum < 1e-9 {
-        let best = (0..w.len()).max_by(|a, b| w[*a].partial_cmp(&w[*b]).unwrap()).unwrap_or(0);
+        let best = (0..w.len()).max_by(|a, b| w[*a].total_cmp(&w[*b])).unwrap_or(0);
         w.iter_mut().for_each(|x| *x = 0.0);
         w[best] = 1.0;
     } else {
@@ -171,7 +171,7 @@ pub fn inv_bilinear(p: Point, a: Point, b: Point, c: Point, d: Point) -> Option<
         .into_iter()
         .map(|v| (u_of(v), v))
         .filter(|(u, v)| u.is_finite() && v.is_finite())
-        .min_by(|x, y| out(x.0, x.1).partial_cmp(&out(y.0, y.1)).unwrap())
+        .min_by(|x, y| out(x.0, x.1).total_cmp(&out(y.0, y.1)))
 }
 
 fn catmull_rom(t: f64) -> [f64; 4] {
@@ -436,7 +436,7 @@ impl LayerMask {
                         continue;
                     }
                     let v: Vec<f64> = (0..n).map(|k| w[k] + cur[ci * n + k]).collect();
-                    let best = (0..n).max_by(|a, b| v[*a].partial_cmp(&v[*b]).unwrap()).unwrap();
+                    let best = (0..n).max_by(|a, b| v[*a].total_cmp(&v[*b])).unwrap();
                     assign[ri * cols + ci] = best as u8;
                     let fwd = if rev { ci.checked_sub(1) } else { (ci + 1 < cols).then_some(ci + 1) };
                     let back = if rev { (ci + 1 < cols).then_some(ci + 1) } else { ci.checked_sub(1) };
@@ -490,7 +490,7 @@ impl LayerMask {
         let c1 = ((b - 1e-9) / self.cell).floor() as i64;
         (c0..=c1).all(|c| {
             let cc = c.clamp(self.c0, self.c0 + self.cols as i64 - 1);
-            self.at(r, cc).map_or(false, |l| l >= self.layer)
+            self.at(r, cc).is_some_and(|l| l >= self.layer)
         })
     }
 
@@ -500,7 +500,7 @@ impl LayerMask {
         let (a, b) = (y0.min(y1), y0.max(y1));
         let r0 = (a / self.spacing).floor() as i64 + 1;
         let r1 = (b / self.spacing).floor() as i64 - 1;
-        (r0..=r1).all(|r| self.at(r, c).map_or(false, |l| l > self.layer))
+        (r0..=r1).all(|r| self.at(r, c).is_some_and(|l| l > self.layer))
     }
 
     /// Does this layer sew at `q` (rotated frame)? Looked up in square cells

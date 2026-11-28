@@ -546,7 +546,7 @@ fn prepare(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOptions) -> Opti
     if w0 == 0 || h0 == 0 || rgba.len() < w0 * h0 * 4 {
         return None;
     }
-    let full: Vec<[u8; 4]> = rgba.chunks_exact(4).take(w0 * h0).map(|c| [c[0], c[1], c[2], c[3]]).collect();
+    let full: Vec<[u8; 4]> = rgba.as_chunks::<4>().0.iter().take(w0 * h0).map(|c| [c[0], c[1], c[2], c[3]]).collect();
     let pixel = match opts.pixel_art {
         PixelArt::On => w0 * h0 <= 512 * 512,
         PixelArt::Off => false,
@@ -1046,7 +1046,7 @@ fn snap_rgb(rgb: [u8; 3], opts: &DigitizeOptions) -> ([u8; 3], String, String, S
     let e = opts
         .palette
         .iter()
-        .min_by(|a, b| vision::delta_e2000(l, rgb_to_lab(a.rgb)).partial_cmp(&vision::delta_e2000(l, rgb_to_lab(b.rgb))).unwrap())
+        .min_by(|a, b| vision::delta_e2000(l, rgb_to_lab(a.rgb)).total_cmp(&vision::delta_e2000(l, rgb_to_lab(b.rgb))))
         .unwrap();
     (e.rgb, e.name.clone(), e.code.clone(), opts.palette_brand.clone())
 }
@@ -1058,7 +1058,7 @@ fn ensure_thread(threads: &mut Vec<Thread>, rgb: [u8; 3], name: String, code: St
         return t.id.clone();
     }
     let id = format!("t{}", threads.len() + 1);
-    threads.push(Thread { brand: brand, code: code, ..Thread::new(id.clone(), name, hex) });
+    threads.push(Thread { brand, code, ..Thread::new(id.clone(), name, hex) });
     id
 }
 
@@ -1330,7 +1330,7 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
     for &ri in &ordered {
         let r = slots[ri].take().expect("region used once");
         let push = |objects: &mut Vec<Object>, name: String, thread: String, stitch: StitchParams, paths: Vec<SubPath>| {
-            objects.push(Object { name: name, ..Object::new(format!("dz{}", objects.len() + 1), thread, paths, stitch) });
+            objects.push(Object { name, ..Object::new(format!("dz{}", objects.len() + 1), thread, paths, stitch) });
         };
         if let StitchParams::Fill(fp) = &r.stitch {
             if let Some(gp) = &fp.gradient {
@@ -1379,7 +1379,7 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
             }
         }
         // the darkest colour last: outlines on top of coloured lines
-        order.sort_by(|a, b| rgb_to_lab(*b)[0].partial_cmp(&rgb_to_lab(*a)[0]).unwrap());
+        order.sort_by(|a, b| rgb_to_lab(*b)[0].total_cmp(&rgb_to_lab(*a)[0]));
         let mut cursor = objects.last().and_then(|o| o.paths.last()).and_then(|sp| sp.nodes.last()).map(|n| pt(n.p[0], n.p[1])).unwrap_or(Point::ZERO);
         for c in order {
             let first = keyed.iter().find(|(k, _)| *k == c).unwrap().1;
@@ -1406,7 +1406,7 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
                         let b = *st.pts.last().unwrap() * s;
                         [(i, false, a.dist(cursor)), (i, true && !st.closed, b.dist(cursor))]
                     })
-                    .min_by(|a, b| a.2.partial_cmp(&b.2).unwrap())
+                    .min_by(|a, b| a.2.total_cmp(&b.2))
                     .map(|(i, r, _)| (i, r))
                     .unwrap();
                 let ls = left.remove(bi);
@@ -1419,7 +1419,7 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
                 let fixed = (ls.ink && opts.outline_line_mm > 0.0).then_some(opts.outline_line_mm);
                 let Some((paths, stitch)) = stroke_object(st, rev, s, &ctx, fixed) else { continue };
                 let mut ws = st.widths.clone();
-                ws.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                ws.sort_by(|a, b| a.total_cmp(b));
                 line_marks.push((st.pts.iter().map(|p| *p * s).collect(), ((ws[ws.len() / 2] - 0.5).max(0.5) * s) / 2.0));
                 if let Some(e) = paths[0].nodes.last() {
                     cursor = pt(e.p[0], e.p[1]);
@@ -1443,7 +1443,7 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
             OutlineKind::Satin => StitchParams::Satin(SatinParams { width, ..satin_params(width) }),
             _ => StitchParams::Running(RunningParams { length: 2.0, bean_repeats: 2, ..Default::default() }),
         };
-        objects.push(Object { name: name, ..Object::new(format!("dz{}", objects.len() + 1), thread, paths, stitch) });
+        objects.push(Object { name, ..Object::new(format!("dz{}", objects.len() + 1), thread, paths, stitch) });
     };
 
     // Lines come from four places: strokes in the picture (satin / running
@@ -1737,7 +1737,7 @@ pub fn digitize_rgba(rgba: &[u8], width: u32, height: u32, opts: &DigitizeOption
             }
             if !lines.is_empty() {
                 // the darkest stitched colour draws the lines (or the outline colour)
-                let dark = (0..q.colors.len()).filter(|&l| !background[l]).min_by(|a, b| rgb_to_lab(q.colors[*a])[0].partial_cmp(&rgb_to_lab(q.colors[*b])[0]).unwrap());
+                let dark = (0..q.colors.len()).filter(|&l| !background[l]).min_by(|a, b| rgb_to_lab(q.colors[*a])[0].total_cmp(&rgb_to_lab(q.colors[*b])[0]));
                 let tid = match dark.filter(|&l| rgb_to_lab(q.colors[l])[0] < 35.0) {
                     Some(l) => label_thread(l, &mut threads).0,
                     None => outline_thread(&mut threads),
@@ -1906,7 +1906,7 @@ fn apply_color_order(threads: Vec<Thread>, objects: Vec<Object>, order: &[[u8; 3
         let lab = rgb_to_lab(*c);
         let best = (0..threads.len())
             .filter(|&i| rank[i] == usize::MAX)
-            .min_by(|&a, &b| vision::delta_e2000(labs[a], lab).partial_cmp(&vision::delta_e2000(labs[b], lab)).unwrap());
+            .min_by(|&a, &b| vision::delta_e2000(labs[a], lab).total_cmp(&vision::delta_e2000(labs[b], lab)));
         if let Some(i) = best {
             if vision::delta_e2000(labs[i], lab) < 12.0 {
                 rank[i] = r;
@@ -1943,7 +1943,7 @@ fn nearest_label(colors: &[[u8; 3]], rgb: [u8; 3]) -> Option<usize> {
             let c = rgb_to_lab(*c);
             (i, (c[0] - l[0]).powi(2) + (c[1] - l[1]).powi(2) + (c[2] - l[2]).powi(2))
         })
-        .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+        .min_by(|a, b| a.1.total_cmp(&b.1))
         .map(|(i, _)| i)
 }
 
@@ -2085,7 +2085,7 @@ fn photo_zigzag(prep: &Prepared, opts: &DigitizeOptions) -> DigitizeResult {
     let mut threads: Vec<Thread> = Vec::new();
     let mut objects: Vec<Object> = Vec::new();
     if !paths.is_empty() {
-        let darkest = (0..ncolors).filter(|&l| !prep.background[l]).min_by(|x, y| rgb_to_lab(prep.colors[*x])[0].partial_cmp(&rgb_to_lab(prep.colors[*y])[0]).unwrap());
+        let darkest = (0..ncolors).filter(|&l| !prep.background[l]).min_by(|x, y| rgb_to_lab(prep.colors[*x])[0].total_cmp(&rgb_to_lab(prep.colors[*y])[0]));
         let rgb = darkest.map(|l| prep.colors[l]).filter(|c| rgb_to_lab(*c)[0] < 45.0).unwrap_or([20, 20, 20]);
         let (rgb, name, code, brand) = snap_rgb(rgb, opts);
         let tid = ensure_thread(&mut threads, rgb, name, code, brand);
@@ -2347,7 +2347,7 @@ fn find_lines(
         if radii.len() < 3 {
             continue;
         }
-        radii.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        radii.sort_by(|a, b| a.total_cmp(b));
         let p95 = radii[(radii.len() * 95 / 100).min(radii.len() - 1)];
         let len = radii.len() as f64;
         let mean_w = c.len as f64 / len;
@@ -2416,7 +2416,7 @@ fn find_lines(
             .into_iter()
             .filter(|st| {
                 let mut ws = st.widths.clone();
-                ws.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                ws.sort_by(|a, b| a.total_cmp(b));
                 let wd = ws[ws.len() / 2] - 0.5;
                 // a line is long for its width: a short, wide one is a blob (two dots the ink
                 // test joined). (Its skeleton stops about half a width short of a free end.)
@@ -2765,13 +2765,13 @@ fn find_lines(
             sa += lab.data[i * 3 + 1] as f64;
             sb += lab.data[i * 3 + 2] as f64;
         }
-        ls.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        ls.sort_by(|a, b| a.total_cmp(b));
         let n = st.pts.len().max(1) as f64;
         let col = [ls[ls.len() / 2] as f64, sa / n, sb / n];
         let label = (0..ncolors)
             .filter(|&l| !background[l])
             .map(|l| (l, vision::delta_e2000(col, rgb_to_lab(colors_rgb(l)))))
-            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+            .min_by(|a, b| a.1.total_cmp(&b.1))
             .filter(|(_, d)| *d <= 12.0)
             .map(|(l, _)| l);
         out.push(LineStroke { stroke: st, label, rgb: lab_to_rgb(col), ink });
@@ -3047,7 +3047,7 @@ fn stroke_object(st: &strokes::Stroke, reverse: bool, s: f64, ctx: &Ctx, fixed: 
         return None;
     }
     let mut sorted = wid.clone();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted.sort_by(|a, b| a.total_cmp(b));
     let width = sorted[sorted.len() / 2];
     // the skeleton stops short of free ends by about the half width: give it back
     let free = if reverse { [st.free[1], st.free[0]] } else { st.free };
@@ -3205,7 +3205,7 @@ impl LineCover {
     fn stamp(&mut self, pts: &[Point], r: f64) {
         let k = (r / self.g).ceil() as isize;
         let reach = r + self.g * 0.5;
-        let mut mark = |p: Point| {
+        let mark = |p: Point| {
             let (cx, cy) = ((p.x / self.g) as isize, (p.y / self.g) as isize);
             for dy in -k..=k {
                 for dx in -k..=k {
@@ -3225,7 +3225,7 @@ impl LineCover {
                 }
             }
         };
-        for_samples(pts, self.g * 0.5, |p| mark(p));
+        for_samples(pts, self.g * 0.5, mark);
     }
 
     /// Mark a filled area (outer rings and holes) and everything within `r` of it.
@@ -3425,7 +3425,7 @@ fn box_taps(src: usize, dst: usize) -> Vec<Vec<(usize, f32)>> {
 fn downscale(rgba: &[u8], w: usize, h: usize, max_px: usize) -> (Vec<[u8; 4]>, usize, usize) {
     let long = w.max(h);
     if long <= max_px {
-        let px = rgba[..w * h * 4].chunks_exact(4).map(|c| [c[0], c[1], c[2], c[3]]).collect();
+        let px = rgba[..w * h * 4].as_chunks::<4>().0.iter().map(|c| [c[0], c[1], c[2], c[3]]).collect();
         return (px, w, h);
     }
     let f = max_px as f64 / long as f64;
@@ -4294,7 +4294,7 @@ fn process_region(ctx: &Ctx, c: &Comp, pix: &[u32], w: usize) -> Option<Region> 
             // fallback: outline of the region, single pass
             let ring = trace_contours(&mask, cw, ch)
                 .into_iter()
-                .max_by(|a, b| signed_area(a).abs().partial_cmp(&signed_area(b).abs()).unwrap())?;
+                .max_by(|a, b| signed_area(a).abs().total_cmp(&signed_area(b).abs()))?;
             let mm: Vec<Point> = ring.iter().map(|p| to_mm(*p)).collect();
             let r = simplify_ring(&chaikin_ring(&mm, f64::INFINITY), ctx.tol);
             // a crumb (a few anti-aliased pixels) rather than a hairline
@@ -4522,7 +4522,7 @@ fn satin_centre_line(
     // width: median inscribed diameter along the central part of the path
     let (lo, hi) = if n >= 10 { (n / 5, n - n / 5) } else { (0, n) };
     let mut radii: Vec<f64> = path[lo..hi].iter().map(|&i| dt[i].sqrt() - 0.25).collect();
-    radii.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    radii.sort_by(|a, b| a.total_cmp(b));
     let r_med = radii[radii.len() / 2].max(0.5);
     // centre line: trim the wiggly corner spurs, smooth, re-extend to the ends
     let trim = (r_med.round() as usize).min(n / 4);

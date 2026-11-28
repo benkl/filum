@@ -137,7 +137,7 @@ pub fn plan_to_document(plan: &StitchPlan, name: &str) -> Document {
             continue;
         }
         if s.is(flags::JUMP) || s.is(flags::TRIM) || s.is(flags::STOP) {
-            if runs.last().map_or(false, |r| !r.is_empty()) {
+            if runs.last().is_some_and(|r| !r.is_empty()) {
                 runs.push(vec![]);
             }
             continue;
@@ -325,9 +325,11 @@ mod origin_tests {
     #[test]
     fn exports_repeats_and_thread_lists() {
         use crate::model::{Object, StitchParams, SubPath};
-        let mut doc = Document::default();
-        doc.threads = vec![Thread { brand: "Madeira".into(), code: "1147".into(), ..Thread::new("a", "Red", "#ff0000") }];
-        doc.objects = vec![Object { stop_after: true, ..Object::new("o", "a", vec![SubPath::polyline(&[crate::geom::pt(0.0, 0.0), crate::geom::pt(3.0, 0.0), crate::geom::pt(6.0, 0.0)], false)], StitchParams::Manual(Default::default())) }];
+        let mut doc = Document {
+            threads: vec![Thread { brand: "Madeira".into(), code: "1147".into(), ..Thread::new("a", "Red", "#ff0000") }],
+            objects: vec![Object { stop_after: true, ..Object::new("o", "a", vec![SubPath::polyline(&[crate::geom::pt(0.0, 0.0), crate::geom::pt(3.0, 0.0), crate::geom::pt(6.0, 0.0)], false)], StitchParams::Manual(Default::default())) }],
+            ..Default::default()
+        };
         let mut e = Engine::new();
         let one = export_plan(&doc, &mut e, &ExportOptions::default());
         let four = export_plan(&doc, &mut e, &ExportOptions { x_repeats: 2, y_repeats: 2, x_spacing: 20.0, y_spacing: 10.0, ..Default::default() });

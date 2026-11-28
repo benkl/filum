@@ -304,7 +304,7 @@ fn contour_rings_are_evenly_spaced() {
                 v.push(a.x + (b.x - a.x) * t);
             }
         }
-        v.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        v.sort_by(|a, b| a.total_cmp(b));
         v
     };
     let gaps: Vec<f64> = along.windows(2).map(|w| w[1] - w[0]).filter(|g| *g > 0.05).collect();

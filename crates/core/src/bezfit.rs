@@ -441,7 +441,7 @@ fn fit_to_cubic(source: &SimplifyBezPath, range: Range<f64>, accuracy: f64) -> O
             }
             let scale = scale_f(d0).max(scale_f(d1)).powi(2);
             let err2 = err2 * scale;
-            if err2 < acc2 && best.map_or(true, |(_, b)| err2 < b) {
+            if err2 < acc2 && best.is_none_or(|(_, b)| err2 < b) {
                 best = Some((c, err2));
             }
         }

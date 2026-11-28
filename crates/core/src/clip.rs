@@ -173,7 +173,7 @@ pub fn xor(a: &Region, b: &Region) -> Region {
 
 /// Area of a region (holes subtract).
 pub fn area(r: &Region) -> f64 {
-    r.iter().map(|p| c2::area(p)).sum::<f64>().abs()
+    r.iter().map(c2::area).sum::<f64>().abs()
 }
 
 /// Region → rings (even-odd: holes are separate rings).
@@ -194,7 +194,7 @@ fn clean_ring(ring: &[Point]) -> Vec<Point> {
     const EPS: f64 = 1e-6;
     let mut r: Vec<Point> = Vec::with_capacity(ring.len());
     for &q in ring {
-        if q.x.is_finite() && q.y.is_finite() && r.last().map_or(true, |l: &Point| l.dist(q) > EPS) {
+        if q.x.is_finite() && q.y.is_finite() && r.last().is_none_or(|l: &Point| l.dist(q) > EPS) {
             r.push(q);
         }
     }

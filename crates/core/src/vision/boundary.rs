@@ -261,7 +261,7 @@ fn corners(pts: &[Point], closed: bool, corner_deg: f64, scale: f64) -> Vec<usiz
         } else {
             [j as i64 - 2, j as i64 - 1, j as i64, j as i64 + 1].into_iter().filter(|&i| i > 0 && (i as usize) < n - 1).map(|i| i as usize).collect()
         };
-        if let Some(&i) = cands.iter().max_by(|a, b| raw_turn(**a).partial_cmp(&raw_turn(**b)).unwrap()) {
+        if let Some(&i) = cands.iter().max_by(|a, b| raw_turn(**a).total_cmp(&raw_turn(**b))) {
             if !out.contains(&i) {
                 out.push(i);
             }
@@ -325,7 +325,7 @@ fn destair(pts: &[Point], closed: bool, scale: f64) -> Vec<Point> {
 fn fit_checked(pts: &[Point], closed: bool, accuracy: f64) -> Vec<Seg> {
     let mut p: Vec<Point> = Vec::with_capacity(pts.len());
     for &q in pts {
-        if p.last().map_or(true, |l: &Point| l.dist(q) > 1e-6) {
+        if p.last().is_none_or(|l: &Point| l.dist(q) > 1e-6) {
             p.push(q);
         }
     }

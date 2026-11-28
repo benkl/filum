@@ -443,7 +443,7 @@ fn hotspots(f: &DensityField, plan: &StitchPlan) -> Vec<Hotspot> {
             }
         }
         let mut v: Vec<(u32, usize)> = count.into_iter().collect();
-        v.sort_by(|a, b| b.1.cmp(&a.1));
+        v.sort_by_key(|x| std::cmp::Reverse(x.1));
         h.objects = v.into_iter().take(6).map(|x| x.0).collect();
     }
     out

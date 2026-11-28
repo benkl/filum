@@ -212,7 +212,7 @@ impl TravelGraph {
             }
             let mut chain: Vec<(usize, f64, u32)> = (0..n).map(|k| (k, 0.0, u32::MAX)).collect();
             chain.extend(on_ring[ri].iter().copied());
-            chain.sort_by(|x, y| (x.0, x.1, x.2 != u32::MAX).partial_cmp(&(y.0, y.1, y.2 != u32::MAX)).unwrap());
+            chain.sort_by(|x, y| x.0.cmp(&y.0).then(x.1.total_cmp(&y.1)).then((x.2 != u32::MAX).cmp(&(y.2 != u32::MAX))));
             let ids: Vec<u32> = chain.iter().map(|&(k, _, id)| if id == u32::MAX { self.add_node(ring[k]) } else { id }).collect();
             for w in 0..ids.len() {
                 let (a, c) = (ids[w], ids[(w + 1) % ids.len()]);
@@ -400,7 +400,7 @@ impl TravelGraph {
                     }
                 }
             }
-            near.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+            near.sort_by(|a, b| a.0.total_cmp(&b.0));
             let mut joined = 0;
             for (d, o) in near {
                 if joined == 3 || d > reach {
@@ -729,7 +729,7 @@ fn insert_node(rings: &[Ring], perim: &[f64], p: Point, nodes: &mut Vec<Point>, 
         None => {
             let near = (0..edges.len()).filter(|&e| alive[e] && edges[e].2 == Kind::Outline).min_by(|&e, &f| {
                 let d = |e: usize| dist_to_seg(op.at, nodes[edges[e].0], nodes[edges[e].1]);
-                d(e).partial_cmp(&d(f)).unwrap()
+                d(e).total_cmp(&d(f))
             });
             let e = near.or_else(|| (0..edges.len()).find(|&e| alive[e]))?;
             (edges[e].0, edges[e].1, Kind::Euler)
@@ -771,7 +771,7 @@ pub fn find_stitch_path(rings: &[Ring], ends: &[(Point, Point)], start: Option<P
     let perim: Vec<f64> = rings.iter().map(|r| (0..r.len()).map(|k| r[k].dist(r[(k + 1) % r.len()])).sum()).collect();
     // the outline between neighbouring nodes, every other edge doubled
     let mut order: Vec<usize> = (0..nodes.len()).collect();
-    order.sort_by(|&x, &y| (pos[x].ring, pos[x].s).partial_cmp(&(pos[y].ring, pos[y].s)).unwrap());
+    order.sort_by(|&x, &y| pos[x].ring.cmp(&pos[y].ring).then(pos[x].s.total_cmp(&pos[y].s)));
     let mut i0 = 0;
     while i0 < order.len() {
         let ring = pos[order[i0]].ring;
@@ -814,7 +814,7 @@ pub fn find_stitch_path(rings: &[Ring], ends: &[(Point, Point)], start: Option<P
     let deg = degree(&edges, &alive);
     let mut odd: Vec<usize> = (0..n).filter(|&v| deg[v] % 2 == 1).collect();
     while let Some(v) = odd.pop() {
-        let Some(k) = (0..odd.len()).min_by(|&x, &y| nodes[odd[x]].dist(nodes[v]).partial_cmp(&nodes[odd[y]].dist(nodes[v])).unwrap()) else { break };
+        let Some(k) = (0..odd.len()).min_by(|&x, &y| nodes[odd[x]].dist(nodes[v]).total_cmp(&nodes[odd[y]].dist(nodes[v]))) else { break };
         let w = odd.swap_remove(k);
         edges.push((v, w, Kind::Euler, 0));
         alive.push(true);
@@ -842,7 +842,7 @@ pub fn find_stitch_path(rings: &[Ring], ends: &[(Point, Point)], start: Option<P
     }
     let neighbours: std::collections::HashSet<(usize, usize)> =
         edges.iter().enumerate().filter(|(e, x)| alive[*e] && matches!(x.2, Kind::Outline | Kind::Extra)).map(|(_, x)| (x.0.min(x.1), x.0.max(x.1))).collect();
-    let nearest = |p: Point| (0..n).min_by(|&x, &y| nodes[x].dist(p).partial_cmp(&nodes[y].dist(p)).unwrap()).unwrap();
+    let nearest = |p: Point| (0..n).min_by(|&x, &y| nodes[x].dist(p).total_cmp(&nodes[y].dist(p))).unwrap();
     let starting = nearest(start.unwrap_or(nodes[0]));
     let ending = end.map_or(starting, nearest);
     // Hierholzer (networkx `eulerian_circuit`), taking a row when there is one
@@ -895,7 +895,7 @@ pub fn find_stitch_path(rings: &[Ring], ends: &[(Point, Point)], start: Option<P
             break;
         }
         let here = raw.last().map_or(nodes[ending], |r| r.b);
-        let v = left.iter().flat_map(|&e| [edges[e].0, edges[e].1]).min_by(|&x, &y| nodes[x].dist(here).partial_cmp(&nodes[y].dist(here)).unwrap()).unwrap();
+        let v = left.iter().flat_map(|&e| [edges[e].0, edges[e].1]).min_by(|&x, &y| nodes[x].dist(here).total_cmp(&nodes[y].dist(here))).unwrap();
         let mut more = Vec::new();
         circuit(v, &mut deg, &mut used, &mut more);
         if more.is_empty() {

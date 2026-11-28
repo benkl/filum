@@ -304,7 +304,7 @@ fn stitch_curve_pattern(points: &[Point], lengths: &[f64], tol: f64, mut pos: us
         }
     }
     if let Some(l) = points.last() {
-        if out.last().map_or(true, |o| o.dist(*l) > 1e-6) {
+        if out.last().is_none_or(|o| o.dist(*l) > 1e-6) {
             out.push(*l);
         }
     }
@@ -332,7 +332,7 @@ fn stitch_curve_random(points: &[Point], lengths: &[f64], tol: f64, jitter: f64,
         let l = lengths[pos];
         pos = (pos + 1) % lengths.len();
         let (lo, hi) = ((l * (1.0 - jitter)).max(0.0), l * (1.0 + jitter));
-        let r = rng.next();
+        let r = rng.next_f64();
         let len = (lerp(last_shortened, 1.0, r) * lerp(lo, hi, r)).max(0.05);
         let (s, ni) = take_stitch(last, points, ii, len, tol);
         i = ni;
@@ -345,7 +345,7 @@ fn stitch_curve_random(points: &[Point], lengths: &[f64], tol: f64, jitter: f64,
         }
     }
     if let Some(l) = points.last() {
-        if out.last().map_or(true, |o| o.dist(*l) > 1e-6) {
+        if out.last().is_none_or(|o| o.dist(*l) > 1e-6) {
             out.push(*l);
         }
     }

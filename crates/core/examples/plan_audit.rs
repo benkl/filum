@@ -357,13 +357,13 @@ fn main() -> Result<(), String> {
         }
         if verbose {
             let mut v = r.connections_exposed.clone();
-            v.sort_by(|a, b| b.partial_cmp(a).unwrap());
+            v.sort_by(|a, b| b.total_cmp(a));
             println!("    exposed connections (mm): {:?}", v.iter().map(|x| (x * 10.0).round() / 10.0).collect::<Vec<_>>());
             if !r.inside_by_object.is_empty() {
                 let by: Vec<String> = r.inside_by_object.iter().map(|(o, n)| format!("{}: {n}", doc.objects.get(*o as usize).map_or("?", |x| x.name.as_str()))).collect();
                 println!("    trims inside an object: {}", by.join(", "));
                 let mut g = r.inside_gaps.clone();
-                g.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                g.sort_by(|a, b| a.total_cmp(b));
                 println!("    their gaps (mm): {:?}", g.iter().map(|x| (x * 10.0).round() / 10.0).collect::<Vec<_>>());
             }
         }

@@ -58,7 +58,7 @@ fn cut(line: &Line, mut at: Vec<f64>, keep: f64) -> Vec<Line> {
     let arc = arcs(&line.pts);
     let total = *arc.last().unwrap();
     at.retain(|&s| s > keep && s < total - keep || line.closed);
-    at.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    at.sort_by(|a, b| a.total_cmp(b));
     at.dedup_by(|a, b| (*a - *b).abs() < keep);
     if at.is_empty() {
         return vec![line.clone()];
@@ -270,7 +270,8 @@ fn walk(edges: &[Line], tol: f64, pos: &mut Point) -> Vec<Step> {
     // part by part: a free end nearest the needle starts it (else the nearest node)
     while let Some(start) = (0..nodes.len()).filter(|&n| adj[n].iter().any(|&e| !used[e])).min_by(|&a, &b| {
         let key = |n: usize| (degree(n) != 1, nodes[n].dist(*pos));
-        key(a).partial_cmp(&key(b)).unwrap()
+        let ((ea, da), (eb, db)) = (key(a), key(b));
+        ea.cmp(&eb).then(da.total_cmp(&db))
     }) {
         // the depth-first tree: at every node its loops, its edges back to a
         // node already reached (sewn out and back) and its children
@@ -279,7 +280,7 @@ fn walk(edges: &[Line], tol: f64, pos: &mut Point) -> Vec<Step> {
         seen[start] = true;
         let mut stack = vec![start];
         while let Some(&u) = stack.last() {
-            let next = adj[u].iter().copied().filter(|&e| !used[e]).min_by(|&a, &b| len_of(a).partial_cmp(&len_of(b)).unwrap());
+            let next = adj[u].iter().copied().filter(|&e| !used[e]).min_by(|&a, &b| len_of(a).total_cmp(&len_of(b)));
             let Some(e) = next else {
                 stack.pop();
                 continue;
@@ -309,7 +310,7 @@ fn walk(edges: &[Line], tol: f64, pos: &mut Point) -> Vec<Step> {
                 .iter()
                 .enumerate()
                 .filter_map(|(i, it)| if let Item::Child(e, _, v) = it { Some((i, len_of(*e) + depth.get(v).copied().unwrap_or(0.0))) } else { None })
-                .max_by(|x, y| x.1.partial_cmp(&y.1).unwrap())
+                .max_by(|x, y| x.1.total_cmp(&y.1))
                 .map(|x| x.0)
             {
                 let it = list.remove(i);

@@ -18,12 +18,13 @@ fn obj(id: &str, thread: &str, paths: Vec<SubPath>, stitch: StitchParams) -> Obj
 }
 
 fn sample() -> Document {
-    let mut d = Document::default();
-    d.threads = vec![
+    
+    Document {
+        threads: vec![
         Thread::new("a", "Red", "#c8102e"),
         Thread::new("b", "Navy", "#1f2a56"),
-    ];
-    d.objects = vec![
+    ],
+        objects: vec![
         obj("fill", "a", vec![circle(50.0, 50.0, 20.0), circle(50.0, 50.0, 8.0)], StitchParams::Fill(FillParams::default())),
         obj("ring", "b", vec![circle(50.0, 50.0, 20.0), circle(50.0, 50.0, 23.0)], StitchParams::Satin(SatinParams::default())),
         obj(
@@ -32,8 +33,9 @@ fn sample() -> Document {
             vec![SubPath::polyline(&[pt(10.0, 90.0), pt(90.0, 90.0)], false)],
             StitchParams::Running(RunningParams { bean_repeats: 2, ..Default::default() }),
         ),
-    ];
-    d
+    ],
+        ..Default::default()
+    }
 }
 
 #[test]

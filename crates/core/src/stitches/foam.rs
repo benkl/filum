@@ -176,7 +176,7 @@ mod tests {
         let all: Vec<(Point, u8)> = runs[1..].iter().flatten().copied().collect();
         // stitch distance: 0.40 / 1.45 = 0.28 mm, along one rail of the cover
         let mut xs: Vec<f64> = all.iter().filter(|x| x.1 & flags::UNDERLAY == 0 && x.0.y > 2.4).map(|x| x.0.x).collect();
-        xs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        xs.sort_by(|a, b| a.total_cmp(b));
         let gaps: Vec<f64> = xs.windows(2).map(|w| w[1] - w[0]).filter(|g| *g > 1e-6).collect();
         let mean = gaps.iter().sum::<f64>() / gaps.len() as f64;
         assert!((mean - 0.4 / 1.45).abs() < 0.01 && (mean - 0.28).abs() < 0.01, "spacing {mean}");
