@@ -13,7 +13,8 @@
     "desktop:build": "npm run wasm && tauri build",
     "android:dev": "tauri android dev",
     "ios:dev": "tauri ios dev",
-    "lint": "npm --prefix ui run lint && cargo clippy --workspace --exclude filum-desktop --all-targets -- -D warnings",
+    "format": "cargo fmt --all && node ui/node_modules/prettier/bin/prettier.cjs --write --log-level warn .",
+    "lint": "cargo fmt --all --check && node ui/node_modules/prettier/bin/prettier.cjs --check --log-level warn . && npm --prefix ui run lint && cargo clippy --workspace --exclude filum-desktop --all-targets -- -D warnings",
     "test": "cargo test --workspace --exclude filum-desktop && npm run lint && npm --prefix ui run typecheck && npm --prefix ui run test:match && node scripts/check-wording.mjs && node ui/scripts/check-design.mjs"
   },
   "devDependencies": {

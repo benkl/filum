@@ -1,0 +1,6 @@
+# Layout-only commits: `git blame` skips them with
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# (GitHub's blame view reads this file by itself).
+
+# Format: rustfmt and Prettier over the code
+dd3c67d08a831d1d04a99dec8635bc048b9cfbce

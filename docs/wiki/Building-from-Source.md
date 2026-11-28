@@ -44,7 +44,7 @@ npm test
 
 This runs:
 - the Rust tests (`cargo test --workspace --exclude filum-desktop`);
-- the linters (`npm run lint`): ESLint on the UI, with React's rules of hooks, and clippy on the engine, both with no warnings allowed;
+- the format and lint checks (`npm run lint`): rustfmt and Prettier (`npm run format` lays the code out), ESLint on the UI with React's rules of hooks, and clippy on the engine, with no warnings allowed;
 - the TypeScript type check;
 - the UI logic checks (`ui/src/lib/*.test.ts`, including the check that nothing with a non-redistributable licence is bundled);
 - the wording check (`scripts/check-wording.mjs`) and the design check (`ui/scripts/check-design.mjs`).

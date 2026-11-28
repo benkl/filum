@@ -1,6 +1,6 @@
 # The same checks as `npm test`, on every pull request and every push to main:
 # the engine's Rust tests, the engine built to WebAssembly (the editor type-checks
-# against it), the linters (ESLint, clippy), TypeScript, the editor's logic tests,
+# against it), the formatters and linters (rustfmt, Prettier, clippy, ESLint), TypeScript, the editor's logic tests,
 # and the wording and design checks.
 name: Test
 
@@ -31,9 +31,9 @@ jobs:
             package-lock.json
             ui/package-lock.json
 
-      - name: Rust (stable, with clippy and the WebAssembly target)
+      - name: Rust (stable, with clippy, rustfmt and the WebAssembly target)
         run: |
-          rustup toolchain install stable --profile minimal --component clippy --target wasm32-unknown-unknown
+          rustup toolchain install stable --profile minimal --component clippy,rustfmt --target wasm32-unknown-unknown
           rustup default stable
 
       - uses: Swatinem/rust-cache@v2
