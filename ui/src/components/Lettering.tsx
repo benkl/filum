@@ -203,6 +203,7 @@ export function TextProperties({ group }: { group: string }) {
   const [draft, setDraft] = useState(spec?.content ?? "");
   const typing = useRef(false);
   const emb = useEmbroideryFont(spec?.font);
+  const fontFill = useStore((s) => s.doc.objects.find((o) => o.text?.group === group)?.text?.fontFill);
   useEffect(() => {
     if (!typing.current) setDraft(spec?.content ?? "");
   }, [spec?.content]);
@@ -228,7 +229,6 @@ export function TextProperties({ group }: { group: string }) {
   );
   const threadPick = (key: "thread" | "borderThread") => swatches(spec[key], (id) => updateText(group, { [key]: id }));
   const palette = spec.palette;
-  const fontFill = useStore((s) => s.doc.objects.find((o) => o.text?.group === group)?.text?.fontFill);
   const range = emb ? [emb.size * emb.minScale, emb.size * emb.maxScale] : null;
   const outOfRange = !!range && range[1] > range[0] && (spec.size < range[0] * 0.98 || spec.size > range[1] * 1.02);
   const count = members(doc.objects, group).length;

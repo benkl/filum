@@ -145,8 +145,14 @@ function endStretch(o: Outline, d: number, reach: number, inner: Vec2, banned: (
   if (!best) return [d, d];
   // the side as positions around the point
   let [r0, r1] = best.r;
-  while (r0 - x > o.L / 2) (r0 -= o.L), (r1 -= o.L);
-  while (x - r0 > o.L / 2) (r0 += o.L), (r1 += o.L);
+  while (r0 - x > o.L / 2) {
+    r0 -= o.L;
+    r1 -= o.L;
+  }
+  while (x - r0 > o.L / 2) {
+    r0 += o.L;
+    r1 += o.L;
+  }
   return [r0 + d - x, r1 + d - x];
 }
 
@@ -294,15 +300,24 @@ function pairRails(a: Vec2[], b: Vec2[], directions: Line[], middle: Vec2[] | nu
       let way = 0;
       if (i && j && !(pinned && jumps(i, j))) {
         const c = cost[(i - 1) * m + j - 1] + here * (da + db);
-        if (c < best) (best = c), (way = 0);
+        if (c < best) {
+          best = c;
+          way = 0;
+        }
       }
       if (i) {
         const c = cost[(i - 1) * m + j] + here * da;
-        if (c < best) (best = c), (way = 1);
+        if (c < best) {
+          best = c;
+          way = 1;
+        }
       }
       if (j) {
         const c = cost[i * m + j - 1] + here * db;
-        if (c < best) (best = c), (way = 2);
+        if (c < best) {
+          best = c;
+          way = 2;
+        }
       }
       cost[i * m + j] = best;
       from[i * m + j] = way;
@@ -312,7 +327,10 @@ function pairRails(a: Vec2[], b: Vec2[], directions: Line[], middle: Vec2[] | nu
     pairs.push([sa[i], sb[j]]);
     if (!i && !j) break;
     const w = from[i * m + j];
-    if (w === 0) i--, j--;
+    if (w === 0) {
+      i--;
+      j--;
+    }
     else if (w === 1) i--;
     else j--;
   }
@@ -332,7 +350,11 @@ function middleLine(a: Vec2[], b: Vec2[], pairs: [number, number][]): Vec2[] {
   const w = Math.max(1, Math.round(N / L));
   return even.map((_, k) => {
     let [sx, sy, c] = [0, 0, 0];
-    for (let i = Math.max(0, k - w); i <= Math.min(N, k + w); i++) (sx += even[i][0]), (sy += even[i][1]), c++;
+    for (let i = Math.max(0, k - w); i <= Math.min(N, k + w); i++) {
+      sx += even[i][0];
+      sy += even[i][1];
+      c++;
+    }
     return [sx / c, sy / c] as Vec2;
   });
 }
@@ -354,7 +376,10 @@ function unfold(rail: Vec2[], mids: Vec2[], inside: (q: Vec2) => boolean, deepes
       if (l2 < 1e-18) continue;
       const t = Math.max(0, Math.min(1, dot(sub(q, mids[i - 1]), e) / l2));
       const d = dist(q, add(mids[i - 1], mul(e, t)));
-      if (d < best) (best = d), (dir = mul(e, 1 / Math.sqrt(l2)));
+      if (d < best) {
+        best = d;
+        dir = mul(e, 1 / Math.sqrt(l2));
+      }
     }
     return dir;
   };

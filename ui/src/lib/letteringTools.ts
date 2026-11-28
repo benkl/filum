@@ -174,7 +174,7 @@ export function fontJsonText(info: Record<string, unknown>): string {
 // ---------------------------------------------------------------------------
 // Letters to font (Ink/Stitch's letters_to_font.py)
 
-const baseName = (path: string) => path.split(/[\/]/).pop() ?? path;
+const baseName = (path: string) => path.split(/[\\/]/).pop() ?? path;
 
 /** The glyph a letter file holds: the last character of its name before the
  *  first dot ("Example_Font_A.pes" → "A"), as Ink/Stitch reads it. */

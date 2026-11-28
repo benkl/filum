@@ -63,8 +63,8 @@ export function ThreadListDialog({ onClose }: { onClose: () => void }) {
     };
   }, [list, chart, chartNeeded]);
 
-  const blocks = plan?.threads ?? [];
-  const entries = matched ?? [];
+  const blocks = useMemo(() => plan?.threads ?? [], [plan]);
+  const entries = useMemo(() => matched ?? [], [matched]);
   const rows = Math.max(blocks.length, entries.length);
   const applied = useMemo(() => blocks.filter((_, i) => entries[i]?.color).length, [blocks, entries]);
   const unchanged = blocks.filter((b, i) => entries[i]?.color && entries[i].color!.toLowerCase() === b.color.toLowerCase()).length;

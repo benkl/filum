@@ -3,7 +3,7 @@
 // are thickened until neighbouring rows merge, shrunk back, cleaned of small
 // bits and smoothed into paths that can be stitched again as fills.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { engine } from "../engine/client";
 import { defaultStitch, pathsToPath2D, uid } from "../lib/geometry";
 import { useStore } from "../store";
@@ -31,7 +31,7 @@ const KEY = "filum.rebuild";
 export function RebuildShapesDialog({ onClose }: { onClose: () => void }) {
   const doc = useStore((s) => s.doc);
   const selection = useStore((s) => s.selection);
-  const objects = doc.objects.filter((o) => selection.includes(o.id) && o.stitch.type !== "none");
+  const objects = useMemo(() => doc.objects.filter((o) => selection.includes(o.id) && o.stitch.type !== "none"), [doc.objects, selection]);
   const [p, setP] = useState<OutlineParams>(() => loadMerged(KEY, PRESETS[0].p));
   const [keep, setKeep] = useState(false);
   const [as, setAs] = useState<"fill" | "running">("fill");
@@ -111,7 +111,7 @@ export function RebuildShapesDialog({ onClose }: { onClose: () => void }) {
       ctx.lineWidth = 1.5 / s;
       ctx.stroke(path);
     }
-  }, [result, plan, doc, objects.length]);
+  }, [result, plan, doc, objects]);
 
   const shapes = (result ?? []).reduce((n, r) => n + r.paths.length, 0);
   const empty = (result ?? []).filter((r) => !r.paths.length).length;

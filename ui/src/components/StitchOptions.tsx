@@ -970,13 +970,12 @@ function RandomLength({ value, onChange, onShuffle }: { value: number; onChange:
   );
 }
 
-/** A per-object value that falls back to a design-wide one (shown greyed until set). */
 /** Ripple stitch settings (Ink/Stitch ripple stitch): lines, guide, copies, grid. */
 function RippleSection({ o }: { o: DesignObject }) {
+  const targets = useEditTargets(o);
   const st = o.stitch;
   if (!isRipple(o) || st.type !== "running" || !st.ripple) return null;
   const r = st.ripple;
-  const targets = useEditTargets(o);
   // every target keeps its own ripple settings and takes just the change
   const up = (patch: Partial<typeof r>) => {
     const ids = new Set(targets);

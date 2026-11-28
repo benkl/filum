@@ -637,6 +637,7 @@ function bidiRuns(text: string): { text: string; level: number }[] {
 }
 
 // opentype.js reverses every Arabic "sentence" itself after shaping (its char classes)
+// eslint-disable-next-line no-misleading-character-class -- single code points (letters and marks), never combined
 const OT_ARABIC = /[\u0600-\u065f\u066a-\u06d2\u06fa-\u06ff\u0610-\u061b\u061e\u0670\u06d6-\u06dc\u06df-\u06e4\u06e7\u06e8\u06ea-\u06ed]/;
 
 type RenderOpts = opentype.RenderOptions & { tracking?: number; script?: string; language?: string };

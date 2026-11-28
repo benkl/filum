@@ -101,7 +101,7 @@ copy(path.join(ui, "node_modules/tesseract.js/dist/worker.min.js"), path.join(pu
 const core = path.join(ui, "node_modules/tesseract.js-core");
 for (const f of fs.readdirSync(core).filter((f) => /^tesseract-core.*\.(js|wasm)$/.test(f))) copy(path.join(core, f), path.join(pub, "ocr/core", f));
 // tesseract.js loads the language as eng.traineddata.gz; keep a check it is valid gzip
-zlib.gunzipSync(fs.readFileSync(path.join(pub, "ocr/eng.traineddata.gz"))).length;
+zlib.gunzipSync(fs.readFileSync(path.join(pub, "ocr/eng.traineddata.gz")));
 
 const total = (dir) =>
   fs.readdirSync(dir, { withFileTypes: true }).reduce((a, e) => a + (e.isDirectory() ? total(path.join(dir, e.name)) : fs.statSync(path.join(dir, e.name)).size), 0);

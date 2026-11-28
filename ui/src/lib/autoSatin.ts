@@ -430,7 +430,11 @@ export function autoSatin(objects: DesignObject[], opts: AutoSatinOptions = {}):
       comp.set(k, nc);
       while (stack.length) {
         const u = stack.pop()!;
-        for (const { to } of adj.get(u) ?? []) if (!comp.has(to)) (comp.set(to, nc), stack.push(to));
+        for (const { to } of adj.get(u) ?? [])
+          if (!comp.has(to)) {
+            comp.set(to, nc);
+            stack.push(to);
+          }
       }
       nc++;
     }

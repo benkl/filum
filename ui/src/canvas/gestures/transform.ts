@@ -31,7 +31,10 @@ export function moveTransform(c: CanvasCtx, s: StoreState, d: Extract<Drag, { ki
     case "move": {
       let dx = p[0] - d.start[0];
       let dy = p[1] - d.start[1];
-      if (e.shiftKey) Math.abs(dx) > Math.abs(dy) ? (dy = 0) : (dx = 0);
+      if (e.shiftKey) {
+        if (Math.abs(dx) > Math.abs(dy)) dy = 0;
+        else dx = 0;
+      }
       if (!d.moved && Math.hypot(dx, dy) * s.view.scale < 3) return;
       if (!d.moved) {
         s.checkpoint();

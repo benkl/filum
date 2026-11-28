@@ -37,7 +37,9 @@ function ghostscript() {
     try {
       execFileSync(c, ["-v"], { stdio: "ignore" });
       return c;
-    } catch {}
+    } catch {
+      // not this one: try the next
+    }
   }
   const base = "C:/Program Files/gs";
   if (fs.existsSync(base)) for (const v of fs.readdirSync(base).sort().reverse()) {
@@ -80,7 +82,10 @@ function spans(file) {
         const text = [...m[6].matchAll(/c="((?:[^"]|&quot;)*)"/g)].map((c) => c[1].replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16))).replace(/&quot;/g, '"').replace(/&amp;/g, "&")).join("");
         const s = { page: pi + 1, x0: +m[1], y: +m[2], size: +m[5], text };
         const k = `${s.page}|${s.x0}|${s.y}|${s.text}`;
-        if (!seen.has(k)) seen.add(k), out.push(s);
+        if (!seen.has(k)) {
+          seen.add(k);
+          out.push(s);
+        }
       }
     });
   return out;

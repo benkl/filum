@@ -3,7 +3,7 @@
 // realistic / simple) with a live preview, and the file list of a ZIP.
 
 import { FileArchive, Image as ImageIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { engine } from "../engine/client";
 import { isPicture, targetFileName, type PictureSettings } from "../lib/exportFiles";
 import { defaultDesignOptions } from "../lib/geometry";
@@ -162,7 +162,7 @@ export function PicturePreview({ kind, pics, opts }: { kind: string; pics: Pictu
   }, [doc, opts]);
   const realistic = kind === "png_realistic";
   const dpi = realistic ? pics.dpiRealistic : pics.dpiSimple;
-  const size = plan ? pictureSize(plan, { dpi }) : null;
+  const size = useMemo(() => (plan ? pictureSize(plan, { dpi }) : null), [plan, dpi]);
   useEffect(() => {
     const box = ref.current;
     if (!box || !plan || !size) return;
@@ -178,7 +178,7 @@ export function PicturePreview({ kind, pics, opts }: { kind: string; pics: Pictu
     });
     c.className = "xp-pic-canvas";
     box.replaceChildren(c);
-  }, [plan, kind, dpi, pics.lineWidth, pics.background, fabricColor, doc.options?.threadWeight, realistic, size?.w, size?.h]);
+  }, [plan, kind, dpi, pics.lineWidth, pics.background, fabricColor, doc.options?.threadWeight, realistic, size]);
   return (
     <div className="xp-pic">
       <div className={`xp-pic-box ${pics.background === "transparent" ? "checker" : ""}`} ref={ref} />

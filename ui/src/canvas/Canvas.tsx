@@ -289,6 +289,7 @@ export function Canvas() {
       // zoom refinement continues over the next frames
       if (more) draw();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- made once: it reads refs and the store's current state
   }, []);
   const draw = useCallback(() => {
     cancelAnimationFrame(rafRef.current);
@@ -352,6 +353,7 @@ export function Canvas() {
       glc?.removeEventListener("webglcontextlost", lost);
       glc?.removeEventListener("webglcontextrestored", restored);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- made once: it reads refs and the store's current state
   }, [draw]);
 
   // a drag that ends outside the canvas (or loses the window) still ends: the plan follows again
@@ -413,6 +415,7 @@ export function Canvas() {
           : { x: 0, y: 0, w: s.doc.hoop.width, h: s.doc.hoop.height };
       s.setView(fitView(w, h, box));
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- made once: it reads refs and the store's current state
   }, [draw]);
 
   const toMm = (e: { clientX: number; clientY: number }): Vec2 => {

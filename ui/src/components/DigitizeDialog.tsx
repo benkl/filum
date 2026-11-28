@@ -478,7 +478,7 @@ function useDigitize(onClose: () => void) {
       setError("Segmentation model: " + (e as Error).message);
     }
   };
-  const useMask = (mode: SegMask["mode"]) => {
+  const applyMask = (mode: SegMask["mode"]) => {
     if (!sam || !curMask) return;
     setMasks([...masks, { mode, px: curMask, w: sam.w, h: sam.h }]);
     setSamPts([]);
@@ -590,7 +590,7 @@ function useDigitize(onClose: () => void) {
   // stitch plan of the (recoloured) result — object geometry is cached by the engine
   const planRun = useRef(0);
   useEffect(() => {
-    if (!recoloured?.objects.length) {
+    if (!previewDoc?.objects.length) {
       // a plan still being made for the previous result is dropped
       planRun.current++;
       setPlan(null);
@@ -601,7 +601,7 @@ function useDigitize(onClose: () => void) {
     const run = runId.current;
     setBusy("Building stitches…");
     engine
-      .planDetached(previewDoc!)
+      .planDetached(previewDoc)
       .then((pl) => id === planRun.current && setPlan(pl))
       .catch((e: Error) => id === planRun.current && setError(e.message))
       .finally(() => id === planRun.current && run === runId.current && setBusy(null));
@@ -885,7 +885,7 @@ function useDigitize(onClose: () => void) {
   const pw = Math.max(200, box.w);
   const ph = Math.max(160, box.h);
 
-  return { doc, fabricColor, img, setImg, settings, setSettings, output, setOutputState, cross, setCrossState, setCross, widthMm, setWidthMm, fixedColors, setFixedColors, skipColors, setSkipColors, lineColors, setLineColors, fillColors, setFillColors, edgeColors, setEdgeColors, colorOrder, setColorOrder, regionEdits, setRegionEdits, overrides, setOverrides, chart, setChart, chartEntries, setChartEntries, preview, setPreview, traced, setTraced, plan, setPlan, tab, setTab, stitchLook, setStitchLook, busy, setBusy, error, setError, pickRole, setPickRole, eyedropper, placement, setPlacement, preset, bmp, setBmp, sam, setSam, samMode, setSamMode, samPts, setSamPts, curMask, setCurMask, masks, setMasks, edgeMap, setEdgeMap, edgeKind, setEdgeKind, textLines, setTextLines, textPick, setTextPick, boxRef, box, imgRef, runId, picRef, mounted, set, paneState, setPaneState, panes, pane, setPane, setOutput, direction, wantMap, textMask, segMasks, startSam, samClick, useMask, runOcr, opts, crossed, result, recoloured, previewDoc, planRun, loadBytes, pick, pasteFromClipboard, onDrop, colors, aspect, heightMm, isColour, roleOf, setRole, toggleColour, hasEdge, toggleEdge, moveThread, nearestSkipTarget, editColour, removeColour, lockPalette, toggleRegion, removedShare, resetColours, extra, chooseExtra, outlineColourRow, paneChanges, resetPane, onOriginalClick, fitHoop, counts, stats, tooBig, add, pw, ph };
+  return { doc, fabricColor, img, setImg, settings, setSettings, output, setOutputState, cross, setCrossState, setCross, widthMm, setWidthMm, fixedColors, setFixedColors, skipColors, setSkipColors, lineColors, setLineColors, fillColors, setFillColors, edgeColors, setEdgeColors, colorOrder, setColorOrder, regionEdits, setRegionEdits, overrides, setOverrides, chart, setChart, chartEntries, setChartEntries, preview, setPreview, traced, setTraced, plan, setPlan, tab, setTab, stitchLook, setStitchLook, busy, setBusy, error, setError, pickRole, setPickRole, eyedropper, placement, setPlacement, preset, bmp, setBmp, sam, setSam, samMode, setSamMode, samPts, setSamPts, curMask, setCurMask, masks, setMasks, edgeMap, setEdgeMap, edgeKind, setEdgeKind, textLines, setTextLines, textPick, setTextPick, boxRef, box, imgRef, runId, picRef, mounted, set, paneState, setPaneState, panes, pane, setPane, setOutput, direction, wantMap, textMask, segMasks, startSam, samClick, applyMask, runOcr, opts, crossed, result, recoloured, previewDoc, planRun, loadBytes, pick, pasteFromClipboard, onDrop, colors, aspect, heightMm, isColour, roleOf, setRole, toggleColour, hasEdge, toggleEdge, moveThread, nearestSkipTarget, editColour, removeColour, lockPalette, toggleRegion, removedShare, resetColours, extra, chooseExtra, outlineColourRow, paneChanges, resetPane, onOriginalClick, fitHoop, counts, stats, tooBig, add, pw, ph };
 }
 
 type Digitize = ReturnType<typeof useDigitize>;
@@ -1723,7 +1723,7 @@ function StitchesPane({ v }: { v: Digitize }) {
 
 /** The ai pane. */
 function AiPane({ v }: { v: Digitize }) {
-  const { img, busy, bmp, samMode, setSamMode, samPts, setSamPts, curMask, setCurMask, masks, setMasks, textLines, textPick, setTextPick, startSam, useMask, runOcr } = v;
+  const { img, busy, bmp, samMode, setSamMode, samPts, setSamPts, curMask, setCurMask, masks, setMasks, textLines, textPick, setTextPick, startSam, applyMask, runOcr } = v;
   return (
         <>
           <p className="dz-hint">
@@ -1738,7 +1738,7 @@ function AiPane({ v }: { v: Digitize }) {
                 <p className="dz-hint">Click to add · Alt- or right-click to exclude a part.</p>
                 <div className="dz-mask-actions">
                   {MASK_MODES.map(([mode, label, hint]) => (
-                    <button key={mode} className={`btn sm ${mode}`} disabled={!curMask} onClick={() => useMask(mode)} title={hint}>
+                    <button key={mode} className={`btn sm ${mode}`} disabled={!curMask} onClick={() => applyMask(mode)} title={hint}>
                       {label}
                     </button>
                   ))}

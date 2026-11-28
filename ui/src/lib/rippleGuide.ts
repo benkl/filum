@@ -28,7 +28,7 @@ export function guidePair(objects: DesignObject[]): { ripple: RippleObject; guid
 }
 
 /** The document with `guideId`'s lines as the guide of ripple `rippleId` (the guide object removed). */
-export function useAsRippleGuide(doc: StitchDocument, rippleId: string, guideId: string): StitchDocument {
+export function withRippleGuide(doc: StitchDocument, rippleId: string, guideId: string): StitchDocument {
   const g = doc.objects.find((o) => o.id === guideId);
   const paths = g && guidePaths(g);
   if (!paths) return doc;

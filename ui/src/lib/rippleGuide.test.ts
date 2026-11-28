@@ -1,5 +1,5 @@
 import type { DesignObject, StitchDocument } from "../types";
-import { defaultRippleGuide, guidePair, guidePaths, useAsRippleGuide } from "./rippleGuide";
+import { defaultRippleGuide, guidePair, guidePaths, withRippleGuide } from "./rippleGuide";
 
 function ok(c: unknown, msg: string) {
   if (!c) throw new Error(msg);
@@ -28,7 +28,7 @@ ok(guidePaths(satin)?.length === 2, "a satin guides with its rails");
 ok(guidePaths(guide)?.length === 1, "a line with itself");
 
 const doc = { objects: [ripple, guide] } as unknown as StitchDocument;
-const next = useAsRippleGuide(doc, "r", "g");
+const next = withRippleGuide(doc, "r", "g");
 ok(next.objects.length === 1, "the guide object is taken into the ripple");
 const r = next.objects[0].stitch;
 ok(r.type === "running" && r.ripple?.guide?.length === 1 && r.ripple.guide[0].nodes[0].p[1] === 10, "with its line");

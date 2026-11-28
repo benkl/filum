@@ -320,7 +320,9 @@ async function tiles(ink) {
     let meta = {};
     try {
       meta = JSON.parse(await get(raw(INK, ink.sha, `tiles/${id}/tile.json`)));
-    } catch {}
+    } catch {
+      // a tile without its metadata keeps the defaults
+    }
     const t = parseTile(svg);
     const dead = deadEnds(t);
     if (dead) console.warn(`  tile ${id}: ${dead} dead ends near the centre (pruned, as in Ink/Stitch)`);

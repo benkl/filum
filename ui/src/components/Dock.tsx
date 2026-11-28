@@ -22,7 +22,7 @@ import { HOOPS, hoopIndex, hoopOf } from "../lib/hoops";
 import { fitHoopToDesign } from "../lib/actions";
 import { Num, PatternInput, Row, Section, Toggle } from "./ui";
 import { formatPattern, parsePattern } from "../lib/patterns";
-import { guidePair, useAsRippleGuide } from "../lib/rippleGuide";
+import { guidePair, withRippleGuide } from "../lib/rippleGuide";
 import { clonesOf, unlinkClone } from "../lib/clones";
 import { applyPatterns, patternPair } from "../lib/stitchPatterns";
 import { ElementInfoSection } from "./ElementInfo";
@@ -161,7 +161,7 @@ function MultiProperties({ objects }: { objects: DesignObject[] }) {
             <button
               className="btn primary sm"
               onClick={() => {
-                useStore.getState().commit((d) => useAsRippleGuide(d, pair.ripple.id, pair.guide.id));
+                useStore.getState().commit((d) => withRippleGuide(d, pair.ripple.id, pair.guide.id));
                 useStore.getState().set({ selection: [pair.ripple.id] });
               }}
             >

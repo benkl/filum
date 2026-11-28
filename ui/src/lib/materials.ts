@@ -190,7 +190,7 @@ export const threadWidth = (w: ThreadWeight | undefined) => 0.4 * Math.sqrt(thre
  */
 export function threadSheen(t: { brand?: string; name?: string } | undefined): number {
   const s = `${t?.brand ?? ""} ${t?.name ?? ""}`.toLowerCase();
-  if (/metal|gold|silver|glitter|supertwist|lamé|lame|holo/.test(s)) return 1.4;
+  if (/metal|gold|silver|glitter|supertwist|lamé|lame\b|holo/.test(s)) return 1.4;
   if (/dmc|cotton|cotona|cotone|mako|aurifil|gütermann|gutermann|anchor|wool|burmilana|frosted|matt/.test(s)) return 0.25;
   if (/rayon|classic|sulky|marathon|robison|viscose/.test(s)) return 1;
   return 0.8; // polyester: Isacord, Polyneon, Brother, Floriani, Simthread …

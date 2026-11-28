@@ -566,7 +566,7 @@ export function ThreadManager({ onClose }: { onClose: () => void }) {
   const fitTarget: FitTarget = parseFitTarget(target).kind === "chart" ? { kind: "chart", chart } : parseFitTarget(target);
   const [report, setReport] = useState<FitReport | null>(null);
   const [match, setMatch] = useMatchOptions();
-  const sources = doc.threadSources ?? {};
+  const sources = useMemo(() => doc.threadSources ?? {}, [doc.threadSources]);
   const fittedIds = doc.threads.filter((t) => sources[t.id]).map((t) => t.id);
   const quality = useMemo(() => {
     const ds = doc.threads.filter((t) => sources[t.id]).map((t) => deltaE(lab(sources[t.id].color), lab(t.color)));

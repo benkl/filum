@@ -9,7 +9,7 @@ import { startCapture, stopCapture } from "../canvas/viewport";
 import { SPEEDS, blockAt, buildTimeline, playRate, speedLabel, tickStep, type Timeline, type TimelineBlock } from "../lib/stitchout";
 import { colorSequence } from "../lib/threads";
 import { useStore } from "../store";
-import { FLAG, NO_OBJECT, type PlanData } from "../types";
+import { FLAG, NO_OBJECT, type DesignObject, type PlanData } from "../types";
 import { fmtTime, followPointer } from "./ui";
 import { threadTitle } from "./ThreadPicker";
 import { safeSetItem } from "../lib/storage";
@@ -431,7 +431,7 @@ export function StitchOutPanel() {
       body.scrollTo({ top: Math.max(0, top - RULER - ROW), behavior: playing && now - lastScroll.current > 600 ? "smooth" : "auto" });
       lastScroll.current = now;
     }
-  }, [cur, open]);
+  }, [cur, open, playing]);
   useEffect(() => {
     const body = bodyRef.current;
     if (!body || !open || zoom === 1 || !total) return;
@@ -439,7 +439,7 @@ export function StitchOutPanel() {
     const left = body.scrollLeft + LABEL_W + 24;
     const right = body.scrollLeft + body.clientWidth - 24;
     if (x < left || x > right) body.scrollLeft = Math.max(0, x - LABEL_W - (body.clientWidth - LABEL_W) * (playing ? 0.15 : 0.5));
-  }, [at, zoom, open]);
+  }, [at, zoom, open, total, inner, playing]);
 
   const rows: RowInfo[] = useMemo(() => {
     if (!tl || !plan) return [];
@@ -448,7 +448,7 @@ export function StitchOutPanel() {
       const name = t ? t.name || [t.brand, t.code].filter(Boolean).join(" ") || t.color.toUpperCase() : `Colour ${b.index + 1}`;
       const seconds = tl.secondsAt[b.end] - tl.secondsAt[b.start];
       // the object of the block's first stitch: is it a colour of a gradient?
-      let obj: (typeof doc.objects)[number] | undefined;
+      let obj: DesignObject | undefined;
       for (let i = b.start; i < b.end && !obj; i++) if (plan.objects[i] < doc.objects.length) obj = doc.objects[plan.objects[i]];
       const g = obj?.stitch.type === "fill" ? obj.stitch.gradient : undefined;
       const title = [
