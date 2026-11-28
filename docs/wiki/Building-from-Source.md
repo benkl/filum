@@ -42,7 +42,14 @@ npm run desktop:build                    # release build and installers
 npm test
 ```
 
-This runs the Rust tests (`cargo test --workspace --exclude filum-desktop`), the TypeScript type check, the UI logic checks (`ui/src/lib/*.test.ts`, including the check that nothing with a non-redistributable licence is bundled) and the wording check (`scripts/check-wording.mjs`).
+This runs:
+- the Rust tests (`cargo test --workspace --exclude filum-desktop`);
+- the linters (`npm run lint`): ESLint on the UI, with React's rules of hooks, and clippy on the engine, both with no warnings allowed;
+- the TypeScript type check;
+- the UI logic checks (`ui/src/lib/*.test.ts`, including the check that nothing with a non-redistributable licence is bundled);
+- the wording check (`scripts/check-wording.mjs`) and the design check (`ui/scripts/check-design.mjs`).
+
+The repository stores text files with LF line endings (`.gitattributes`), and `.editorconfig` tells editors the same.
 
 ## Contributing
 

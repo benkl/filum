@@ -1,0 +1,21 @@
+# Text files are stored and checked out with LF on every system, so a Windows
+# checkout matches CI and the formatters; git's own detection finds the rest.
+* text=auto eol=lf
+
+# binary: never converted or diffed as text
+*.gz binary
+*.png binary
+*.jpg binary
+*.webp binary
+*.ico binary
+*.icns binary
+*.ttf binary
+*.otf binary
+*.woff2 binary
+*.wasm binary
+*.blend binary
+*.dst binary
+*.pes binary
+*.jef binary
+*.exp binary
+*.vp3 binary
